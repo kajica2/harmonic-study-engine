@@ -1,0 +1,6 @@
+{
+  "name": "Kandinsky Synesthesia Lab II",
+  "description": "Visualizing piano harmonic movement and voicings through Kandinsky-style geometry and color.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
