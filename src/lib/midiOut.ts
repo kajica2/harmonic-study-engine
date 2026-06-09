@@ -22,12 +22,15 @@ export class MidiOut {
     if (!this.midiAccess) return;
     const outputs = Array.from(this.midiAccess.outputs.values()) as any[];
     this.outputs = outputs;
-    this.listeners.forEach(l => l(outputs));
-    
+    this.listeners.forEach((l) => l(outputs));
+
     // Auto-select first if none selected, or validation
     if (!this.selectedOutput && outputs.length > 0) {
       this.selectedOutput = outputs[0];
-    } else if (this.selectedOutput && !outputs.some(o => o.id === this.selectedOutput.id)) {
+    } else if (
+      this.selectedOutput &&
+      !outputs.some((o) => o.id === this.selectedOutput.id)
+    ) {
       this.selectedOutput = null; // previously selected device was disconnected
     }
   }
@@ -36,7 +39,7 @@ export class MidiOut {
     this.listeners.push(listener);
     listener(this.outputs);
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.listeners = this.listeners.filter((l) => l !== listener);
     };
   }
 
@@ -70,15 +73,15 @@ export class MidiOut {
   }
 
   playChord(midis: number[]) {
-    midis.forEach(m => this.playNote(m));
+    midis.forEach((m) => this.playNote(m));
   }
 
   stopChord(midis: number[]) {
-    midis.forEach(m => this.stopNote(m));
+    midis.forEach((m) => this.stopNote(m));
   }
 
   stopAll() {
-    this.activeNotes.forEach(m => this.stopNote(m));
+    this.activeNotes.forEach((m) => this.stopNote(m));
   }
 }
 
