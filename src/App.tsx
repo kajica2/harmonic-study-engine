@@ -32,6 +32,7 @@ import { generateEtude, EtudeAlgorithm } from "./lib/etude";
 import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { RecordingModal } from "./components/RecordingModal";
+import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
 
 const NOTE_WHEEL = [
   "C",
@@ -665,6 +666,7 @@ export default function App() {
 
   const [isRecording, setIsRecording] = useState(false);
   const [showRecordingModal, setShowRecordingModal] = useState(false);
+  const [showLiveScore, setShowLiveScore] = useState(true);
 
   const handleGenerateEtude = async () => {
     const lengthMap = [8, 16, 32];
@@ -1302,6 +1304,14 @@ export default function App() {
                       {isRecording ? "REC" : "Record"}
                     </button>
                     <div className="h-4 w-px bg-neutral-700 mx-1"></div>
+                    <button
+                      onClick={() => setShowLiveScore(!showLiveScore)}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs rounded transition-colors ${showLiveScore ? "text-purple-400 font-medium bg-purple-500/10" : "text-neutral-500 hover:text-white"}`}
+                      title="Toggle Live Score View"
+                    >
+                      <BookOpen size={14} /> Score
+                    </button>
+                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
                     <select
                       value={timeSignature}
                       onChange={(e) => setTimeSignature(e.target.value as any)}
@@ -1438,6 +1448,17 @@ export default function App() {
                 Synesthesia Matrix Active
               </div>
             </div>
+
+            {showLiveScore && (
+              <div className="w-full mt-2">
+                <LiveScoreDisplay
+                  path={path}
+                  activeStepIndex={activeStepIndex}
+                  transposeShift={transposeShift}
+                  tempo={tempo}
+                />
+              </div>
+            )}
 
             {/* Piano area */}
             <div className="w-full flex justify-between items-end px-2 mb-2 mt-4">

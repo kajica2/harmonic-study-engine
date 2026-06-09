@@ -11,7 +11,7 @@ export const TRANSPOSITIONS = {
 export type InstrumentPitch = keyof typeof TRANSPOSITIONS;
 export type ClefPrefs = "treble" | "bass" | "both";
 
-function midiToABCName(midiPitch: number): string {
+export function midiToABCName(midiPitch: number): string {
   // ABC notes: C, D, E, F, G, A, B
   const noteNames = [
     "C",
