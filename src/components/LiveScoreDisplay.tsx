@@ -102,52 +102,37 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       });
     });
 
-    const v0Signatures: string[] = [];
-    const v1Signatures: string[] = [];
-
-    const getSignature = (el: Element) => {
-      let className = el.getAttribute("class") || "";
-
-      const mMatch = className.match(/abcjs-m\d+/);
-      const nMatch = className.match(/abcjs-n\d+/);
-      if (mMatch && nMatch) {
-         return `.${mMatch[0]}.${nMatch[0]}`;
-      }
-      return null;
-    };
-
-    svgRef.current.querySelectorAll(".abcjs-v0").forEach((el) => {
-      const sig = getSignature(el);
-      if (sig && !v0Signatures.includes(sig)) {
-        v0Signatures.push(sig);
-      }
-    });
-
-    svgRef.current.querySelectorAll(".abcjs-v1").forEach((el) => {
-      const sig = getSignature(el);
-      if (sig && !v1Signatures.includes(sig)) {
-        v1Signatures.push(sig);
-      }
-    });
+    // Find all notes and rests in the DOM
+    const allNotesAndRests = Array.from(
+      svgRef.current.querySelectorAll(".abcjs-note, .abcjs-rest")
+    );
 
     const activeElements: Element[] = [];
+    
+    // Treble element is at activeStepIndex, Bass is at activeStepIndex + path.steps.length
+    if (activeStepIndex < path.steps.length) {
+      const trebleEl = allNotesAndRests[activeStepIndex];
+      const bassEl = allNotesAndRests[activeStepIndex + path.steps.length];
+      
+      if (trebleEl) activeElements.push(trebleEl);
+      if (bassEl) activeElements.push(bassEl);
+      
+      // Extract exact abcjs-nXXX classes assigned to these notes to find all related symbols (chords, ledger lines, etc)
+      const getNoteClasses = (el: Element | undefined) => {
+        if (!el) return [];
+        return Array.from(el.classList).filter((c) => c.match(/^abcjs-n\d+$/));
+      };
 
-    if (activeStepIndex < v0Signatures.length) {
-      const sig0 = v0Signatures[activeStepIndex];
-      if (sig0) {
-        svgRef.current
-          .querySelectorAll(`.abcjs-v0${sig0}`)
-          .forEach((el) => activeElements.push(el));
-      }
-    }
+      const classesToHighlight = new Set([
+        ...getNoteClasses(trebleEl),
+        ...getNoteClasses(bassEl),
+      ]);
 
-    if (activeStepIndex < v1Signatures.length) {
-      const sig1 = v1Signatures[activeStepIndex];
-      if (sig1) {
-        svgRef.current
-          .querySelectorAll(`.abcjs-v1${sig1}`)
-          .forEach((el) => activeElements.push(el));
-      }
+      classesToHighlight.forEach((cls) => {
+        svgRef.current?.querySelectorAll(`.${cls}`).forEach((el) => {
+          if (!activeElements.includes(el)) activeElements.push(el);
+        });
+      });
     }
 
     let leftmostPos = -1;
