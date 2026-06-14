@@ -323,7 +323,12 @@ export default function App() {
     let current = [...optimizedStepsNotes[activeStepIndex]].sort(
       (a, b) => a - b,
     );
-    if (voicingType === "open") {
+    if (instrument === "trumpet" || instrument === "sax") {
+      // If arpeggiator is Off, play only the single highest melody note (monophonic)
+      if (arpType === "none" && current.length > 0) {
+        current = [current[current.length - 1]];
+      }
+    } else if (voicingType === "open") {
       const openNotes = [current[0]]; // keep bass note
       for (let i = 1; i < current.length; i++) {
         // Spread voicing: push every other note up an octave
@@ -332,7 +337,7 @@ export default function App() {
       current = openNotes;
     }
     return current.map((n) => n + transposeShift);
-  }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType]);
+  }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType]);
 
   useEffect(() => {
     // Initialize audio engine on first interaction
