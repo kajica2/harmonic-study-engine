@@ -2,15 +2,30 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(), 
+      tailwindcss(),
+      nodePolyfills({
+        exclude: ['fs', 'net'],
+      }),
+    ],
     define: {
       global: 'globalThis',
+      'global.process': 'undefined',
     },
     resolve: {
       alias: {
+        'node-fetch': path.resolve(__dirname, 'src/lib/fetch-shim.ts'),
+        'node:stream/web': path.resolve(__dirname, 'src/lib/empty-shim.ts'),
+        'stream/web': path.resolve(__dirname, 'src/lib/empty-shim.ts'),
+        'node:fs': path.resolve(__dirname, 'src/lib/node-shims.ts'),
+        'fs': path.resolve(__dirname, 'src/lib/node-shims.ts'),
+        'node:net': path.resolve(__dirname, 'src/lib/node-shims.ts'),
+        'net': path.resolve(__dirname, 'src/lib/node-shims.ts'),
         '@': path.resolve(__dirname, '.'),
       },
     },
