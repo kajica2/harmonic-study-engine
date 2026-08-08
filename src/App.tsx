@@ -29,6 +29,7 @@ import { generateHarmonicPath } from "./lib/generator";
 import { applyVoiceLeading } from "./lib/theory";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, EtudeAlgorithm } from "./lib/etude";
+import { generateGeminiEtude } from "./lib/geminiHelper";
 import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { RecordingModal } from "./components/RecordingModal";
@@ -676,20 +677,32 @@ export default function App() {
   const handleGenerateEtude = async () => {
     const lengthMap = [8, 16, 32];
     const len = lengthMap[genLength - 1];
+    const rootMidi = 60 + transposeShift;
 
-    if (etudeAlgorithm === "magenta_rnn") {
+    const isGemini = etudeAlgorithm.startsWith("gemini_");
+    if (etudeAlgorithm === "magenta_rnn" || isGemini) {
       try {
         setIsGeneratingML(true);
-        // import dynamically or directly from magentaHelper if we import it at top
-        const { generateMagentaSequence } = await import("./lib/magentaHelper");
-        const rootMidi = 60 + transposeShift;
-        const newPath = await generateMagentaSequence(rootMidi, len, 1.2);
+        let newPath: HarmonicPath;
+        if (isGemini) {
+          const geminiAlgo = etudeAlgorithm.replace("gemini_", "");
+          const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
+          if (!apiKey) {
+            alert("VITE_OPENROUTER_API_KEY is not set. Add it to your .env file.");
+            return;
+          }
+          newPath = await generateGeminiEtude(rootMidi, len, apiKey, geminiAlgo);
+        } else {
+          const { generateMagentaSequence } = await import("./lib/magentaHelper");
+          newPath = await generateMagentaSequence(rootMidi, len, 1.2);
+        }
         setPaths([newPath, ...paths]);
         setActivePathIndex(0);
         setActiveStepIndex(0);
         setTransposeShift(0);
       } catch (err) {
-        console.error("Magenta generation failed:", err);
+        console.error("Etude generation failed:", err);
+        alert(`Generation failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         setIsGeneratingML(false);
       }
@@ -1084,6 +1097,10 @@ export default function App() {
                             Coltrane Fractal
                           </option>
                           <option value="magenta_rnn">Magenta AI (RNN)</option>
+                          <option value="gemini_jazz">Gemini Jazz (ii-V-I)</option>
+                          <option value="gemini_classical">Gemini Classical</option>
+                          <option value="gemini_modern">Gemini Modern</option>
+                          <option value="gemini_romantic">Gemini Romantic</option>
                         </select>
                         <button
                           onClick={handleGenerateEtude}
