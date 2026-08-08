@@ -4,7 +4,11 @@ export type EtudeAlgorithm =
   | "fibonacci"
   | "sacred_geometry"
   | "coltrane_fractal"
-  | "magenta_rnn";
+  | "magenta_rnn"
+  | "gemini_jazz"
+  | "gemini_classical"
+  | "gemini_modern"
+  | "gemini_romantic";
 
 function getNoteName(midi: number): string {
   const notes = [
