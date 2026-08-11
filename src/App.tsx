@@ -22,18 +22,24 @@ import {
 import { audioEngine, InstrumentType } from "./lib/audio";
 import { rhythmEngine } from "./lib/rhythm";
 import { midiOut } from "./lib/midiOut";
-import { PATHS, HarmonicPath } from "./lib/paths";
+import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
 import { PianoKeyboard } from "./components/PianoKeyboard";
 import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
 import { generateHarmonicPath } from "./lib/generator";
 import { applyVoiceLeading } from "./lib/theory";
 import { ImportExportModal } from "./components/ImportExportModal";
-import { generateEtude, EtudeAlgorithm } from "./lib/etude";
+import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
+import { toMusicXml, toScore21 } from "./lib/scoreExport";
 import { generateGeminiEtude } from "./lib/geminiHelper";
+import { synthesizeAndPlay, checkDDSPStatus } from "./lib/ddspSynth";
 import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
+import { exportToMidiFile } from "./lib/midiExport";
 import { RecordingModal } from "./components/RecordingModal";
 import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
+import { PlaySessionRail } from "./components/PlaySessionRail";
+import { LeadSheet } from "./components/LeadSheet";
+import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 
 const NOTE_WHEEL = [
   "C",
@@ -70,13 +76,32 @@ function transposeChordName(name: string, shift: number): string {
   });
 }
 
+function downloadText(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export default function App() {
   const [paths, setPaths] = useState<HarmonicPath[]>(() => {
     try {
       const saved = localStorage.getItem("synesthesia_paths");
-      return saved ? JSON.parse(saved) : PATHS;
+      const parsed = saved ? JSON.parse(saved) : ALL_PATHS;
+      // Bump: when v2 (study materials + new PATHS shape) ships and the
+      // user has stale localStorage from before, merge in any missing
+      // built-in paths so study materials appear without a manual reset.
+      if (saved) {
+        const ids = new Set(parsed.map((p: HarmonicPath) => p.id));
+        const missing = ALL_PATHS.filter((p) => !ids.has(p.id));
+        if (missing.length) return [...parsed, ...missing];
+      }
+      return parsed;
     } catch {
-      return PATHS;
+      return ALL_PATHS;
     }
   });
 
@@ -150,6 +175,8 @@ export default function App() {
   });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
+  const [isDDSPLoading, setIsDDSPLoading] = useState(false);
+  const [ddspServerOnline, setDDSPServerOnline] = useState(false);
 
   const [tempo, setTempo] = useState(() => {
     try {
@@ -672,6 +699,9 @@ export default function App() {
 
   const [isRecording, setIsRecording] = useState(false);
   const [showRecordingModal, setShowRecordingModal] = useState(false);
+  const [showLeadSheet, setShowLeadSheet] = useState(false);
+  const [showChordInspector, setShowChordInspector] = useState(false);
+  const inspectorHistory = useMemo(() => makeInspectorHistory(), []);
   const [showLiveScore, setShowLiveScore] = useState(true);
 
   const handleGenerateEtude = async () => {
@@ -694,6 +724,10 @@ export default function App() {
           newPath = await generateGeminiEtude(rootMidi, len, apiKey, geminiAlgo);
         } else {
           const { generateMagentaSequence } = await import("./lib/magentaHelper");
+          // generateMagentaSequence now resolves with a melodic
+          // fallback rather than throwing when the model fails
+          // (e.g. tfjs util-fetch broken in Vite). The path's
+          // description makes the fallback obvious.
           newPath = await generateMagentaSequence(rootMidi, len, 1.2);
         }
         setPaths([newPath, ...paths]);
@@ -789,6 +823,57 @@ export default function App() {
       </header>
 
       <main className="flex-1 flex flex-col w-full max-w-7xl mx-auto p-4 gap-6">
+        {/* Play Session Rail — guided workflow */}
+        <PlaySessionRail
+          paths={paths}
+          activePath={path}
+          activePathIndex={activePathIndex}
+          setActivePathIndex={setActivePathIndex}
+          isPlayingAuto={isPlayingAuto}
+          setIsPlayingAuto={setIsPlayingAuto}
+          isLooping={isLooping}
+          setIsLooping={setIsLooping}
+          tempo={tempo}
+          setTempo={setTempo}
+          meter={timeSignature}
+          beat={beatType}
+          setMeter={setTimeSignature}
+          setBeat={setBeatType}
+          transposeShift={transposeShift}
+          setTransposeShift={setTransposeShift}
+          selectedPersonaId={selectedPersonaId}
+          setSelectedPersonaId={setSelectedPersonaId}
+          personas={PERSONAS}
+          activeStepIndex={activeStepIndex}
+          setActiveStepIndex={setActiveStepIndex}
+          onCommit={() => {
+            recorder.start();
+            setIsPlayingAuto(true);
+          }}
+          onExportMidi={() => {
+            const dataUri = exportToMidiFile(path);
+            const a = document.createElement("a");
+            a.href = dataUri;
+            a.download = `${path.id}.mid`;
+            a.click();
+          }}
+          onOpenLeadSheet={() => setShowLeadSheet(true)}
+          onOpenInspector={() => setShowChordInspector(true)}
+          optimizedStepsNotes={optimizedStepsNotes}
+          onPlayChord={(notes) => audioEngine.playChord(notes)}
+          onStopChord={(notes) => audioEngine.stopChord(notes)}
+          onCommitVoicing={(stepIndex, notes) => {
+            const key = `${path.id}::${stepIndex}`;
+            const prevNotes = path.steps[stepIndex]?.notes ?? [];
+            inspectorHistory.push(key, prevNotes);
+            const newSteps = path.steps.map((s, i) =>
+              i === stepIndex ? { ...s, notes } : s,
+            );
+            const newPath = { ...path, steps: newSteps };
+            setPaths(paths.map((pp, i) => (i === activePathIndex ? newPath : pp)));
+          }}
+        />
+
         {/* Synesthesia Composer Personas Ribbon */}
         <div className="bg-black/30 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between px-1">
@@ -1097,6 +1182,7 @@ export default function App() {
                             Coltrane Fractal
                           </option>
                           <option value="magenta_rnn">Magenta AI (RNN)</option>
+                          <option value="trumpet_etude">Trumpet Etude</option>
                           <option value="gemini_jazz">Gemini Jazz (ii-V-I)</option>
                           <option value="gemini_classical">Gemini Classical</option>
                           <option value="gemini_modern">Gemini Modern</option>
@@ -1109,6 +1195,39 @@ export default function App() {
                         >
                           {isGeneratingML ? "GENERATING..." : "GENERATE ETUDE"}
                         </button>
+
+                        {/* Score export — MusicXML & Score21 of the most recent path */}
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            onClick={() => {
+                              const xml = toMusicXml(path, {
+                                title: path.title,
+                                composer: "harmonic-study-engine",
+                                tempo: tempo,
+                                transpose: transposeShift,
+                              });
+                              downloadText(
+                                `${path.id}.musicxml`,
+                                xml,
+                                "application/vnd.recordare.musicxml+xml",
+                              );
+                            }}
+                            title="Download MusicXML — open in MuseScore, Finale, Sibelius, Dorico"
+                            className="py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-200 text-[11px] rounded border border-emerald-800/50 transition-colors font-mono"
+                          >
+                            ↓ MusicXML
+                          </button>
+                          <button
+                            onClick={() => {
+                              const s21 = toScore21(path, { transpose: transposeShift });
+                              downloadText(`${path.id}.s21.md`, s21, "text/markdown");
+                            }}
+                            title="Download Score21 markdown — scorable chord-and-pitch representation"
+                            className="py-1.5 bg-amber-900/30 hover:bg-amber-900/50 text-amber-200 text-[11px] rounded border border-amber-800/50 transition-colors font-mono"
+                          >
+                            ↓ Score21
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1290,6 +1409,70 @@ export default function App() {
                       <option value="guitar">Guitar</option>
                       <option value="sax">Saxophone</option>
                     </select>
+                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
+                    <button
+                      onClick={async () => {
+                        setIsDDSPLoading(true);
+                        try {
+                          const notes = path.steps.map((s) =>
+                            s.notes.map((n) => n + transposeShift),
+                          );
+                          const chordDur = 60 / tempo;
+
+                          // Record notes in real time so the user
+                          // can export the DDSP-rendered progression as MIDI.
+                          // auto-enabled per click: starts a fresh session
+                          // and emits a chord at every step.
+                          recorder.start();
+
+                          // Emit first chord immediately so it's captured
+                          // before the network round-trip latency.
+                          for (const p of notes[0]) recorder.recordNoteOn(p);
+
+                          // Hook into playback timing: each chord starts
+                          // after `chordDur` seconds the previous one played.
+                          // synthesizeAndPlay returns when playback ends,
+                          // which we'll map to NoteOff then close the session.
+                          const stepStarts = [0];
+                          for (let i = 1; i < notes.length; i++) {
+                            stepStarts.push(stepStarts[i - 1] + chordDur);
+                          }
+                          stepStarts.forEach((atSec, i) => {
+                            if (i === 0) return; // first chord already on
+                            setTimeout(
+                              () => {
+                                // NoteOff previous chord
+                                for (const p of notes[i - 1])
+                                  recorder.recordNoteOff(p);
+                                // NoteOn this chord
+                                for (const p of notes[i]) recorder.recordNoteOn(p);
+                              },
+                              atSec * 1000,
+                            );
+                          });
+
+                          await synthesizeAndPlay(notes, chordDur);
+
+                          // NoteOff final chord, close session.
+                          for (const p of notes[notes.length - 1])
+                            recorder.recordNoteOff(p);
+                          recorder.stop();
+                          setShowRecordingModal(true);
+                        } catch (e) {
+                          console.error("DDSP synth failed:", e);
+                          recorder.stop();
+                          alert("DDSP server not running. Restart the app with:\n\n  npm run dev");
+                        } finally {
+                          setIsDDSPLoading(false);
+                        }
+                      }}
+                      disabled={isDDSPLoading}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs rounded transition-colors ${isDDSPLoading ? "text-yellow-400 animate-pulse" : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/30"}`}
+                      title="Render the full progression with DDSP — recording is captured for MIDI/PDF export"
+                    >
+                      <Hexagon size={14} />
+                      {isDDSPLoading ? "Synth…" : "DDSP"}
+                    </button>
                     <div className="h-4 w-px bg-neutral-700 mx-1"></div>
                     <button
                       onClick={() => setIsPlayingAuto(!isPlayingAuto)}
@@ -1572,6 +1755,67 @@ export default function App() {
           notes={recorder.notes}
           tempo={tempo}
           onClose={() => setShowRecordingModal(false)}
+        />
+      )}
+
+      {showLeadSheet && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur z-50 flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Lead Sheet</h2>
+              <button
+                onClick={() => setShowLeadSheet(false)}
+                className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-mono"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <LeadSheet path={path} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showChordInspector && (
+        <ChordInspector
+          open={showChordInspector}
+          onClose={() => setShowChordInspector(false)}
+          path={path}
+          stepIndex={activeStepIndex}
+          originalNotes={path.steps[Math.max(0, activeStepIndex - 1)]?.notes ?? []}
+          currentNotes={optimizedStepsNotes[activeStepIndex] ?? path.steps[activeStepIndex]?.notes ?? []}
+          prevNotes={optimizedStepsNotes[Math.max(0, activeStepIndex - 1)] ?? []}
+          onApply={(stepIndex, newNotes) => {
+            const key = `${path.id}::${stepIndex}`;
+            const prevNotes = path.steps[stepIndex]?.notes ?? [];
+            inspectorHistory.push(key, prevNotes);
+            const next = path.steps.map((s, i) =>
+              i === stepIndex ? { ...s, notes: newNotes } : s,
+            );
+            const np = { ...path, steps: next };
+            setPaths(paths.map((pp, i) => (i === activePathIndex ? np : pp)));
+            audioEngine.playChord(newNotes);
+          }}
+          onAudition={(kind, notes) => {
+            audioEngine.stopAll();
+            if (kind === "arp") {
+              // staggered noteOn ~100ms apart via setTimeout
+              notes.slice().sort((a, b) => a - b).forEach((n, i) => {
+                setTimeout(() => audioEngine.playNote(n), i * 100);
+              });
+            } else if (kind === "context") {
+              // play this chord then the next one
+              audioEngine.playChord(notes);
+              const nextStep = path.steps[activeStepIndex + 1];
+              if (nextStep) {
+                setTimeout(() => audioEngine.playChord(nextStep.notes), 1100);
+              }
+            } else {
+              audioEngine.playChord(notes);
+            }
+          }}
+          onStop={() => audioEngine.stopAll()}
         />
       )}
     </div>
