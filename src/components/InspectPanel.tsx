@@ -88,8 +88,8 @@ export const InspectPanel: React.FC<Props> = ({
   if (!step) return null;
 
   return (
-    <div className="bg-black/40 border border-white/10 rounded-xl p-3 mt-3">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="bg-[color:var(--color-bg-1)] border border-[color:var(--color-border)] rounded-[var(--radius-lg)] p-3 mt-3">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
         <GitCompareArrows size={14} className="text-purple-400" />
         <span className="text-xs uppercase tracking-widest text-neutral-400 font-bold">
           Inspect · bar {Math.floor(activeStepIndex / 4) + 1} · step {activeStepIndex + 1}
@@ -115,7 +115,7 @@ export const InspectPanel: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* A/B candidates */}
+      {/* A/B candidates — each card auditions its own voicing on click */}
       <div className="flex flex-col gap-1.5 mb-2">
         {candidates.map((c) => {
           const isActive = c.kind === activeKind;
@@ -135,6 +135,7 @@ export const InspectPanel: React.FC<Props> = ({
                   ? "border-emerald-500/40 bg-emerald-700/10"
                   : "border-white/10 bg-white/5 hover:border-purple-500/40"
               }`}
+              title={`Preview the ${c.label.toLowerCase()} voicing in isolation`}
             >
               <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -159,8 +160,15 @@ export const InspectPanel: React.FC<Props> = ({
                   ))}
                 </div>
               </div>
+              {/* Per-voicing play icon — visually says "tap to hear only this voicing" */}
+              <span
+                aria-label={`Play ${c.label} voicing`}
+                className="self-center px-2 py-1 rounded bg-purple-700/40 text-purple-200 hover:bg-purple-700/60"
+              >
+                <Play size={12} />
+              </span>
               {isActive && (
-                <span className="text-[10px] font-mono text-purple-400">active</span>
+                <span className="text-[10px] font-mono text-purple-400 self-center">active</span>
               )}
             </button>
           );
@@ -180,12 +188,14 @@ export const InspectPanel: React.FC<Props> = ({
         <button
           onClick={audition}
           className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono bg-purple-600 hover:bg-purple-500 text-white"
+          title="Replay the currently selected voicing in isolation"
         >
-          <Play size={12} /> Audition
+          <Play size={12} /> Preview voicing
         </button>
         <button
           onClick={() => onStopChord(activeNotes)}
           className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono bg-neutral-800 hover:bg-neutral-700 text-neutral-300"
+          title="Stop preview playback"
         >
           <Square size={12} /> Stop
         </button>
@@ -193,6 +203,7 @@ export const InspectPanel: React.FC<Props> = ({
           onClick={() => onCommitVoicing(activeStepIndex, activeNotes)}
           disabled={activeKind === "original"}
           className="ml-auto flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40 disabled:hover:bg-emerald-700"
+          title="Write this voicing back into the path (use Undo in the inspector to revert)"
         >
           Commit voicing
         </button>

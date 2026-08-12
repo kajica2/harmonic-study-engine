@@ -10,6 +10,8 @@ import {
 } from "../lib/scoreGenerator";
 import jsPDF from "jspdf";
 import { svg2pdf } from "svg2pdf.js";
+import { StageFrame, ToolGroup, ToolChip } from "./StageFrame";
+import { ModalShell, useModalLabel } from "./ModalShell";
 
 interface RecordingModalProps {
   notes: RecordedNote[];
@@ -22,6 +24,7 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   tempo,
   onClose,
 }) => {
+  const titleId = useModalLabel("recording");
   const [instrument, setInstrument] = useState<InstrumentPitch>("Concert");
   const [clefs, setClefs] = useState<ClefPrefs>("both");
   const svgRef = useRef<HTMLDivElement>(null);
@@ -69,104 +72,93 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-neutral-900 border border-white/10 p-6 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Music className="text-red-500" />
-            Recorded Score
-          </h2>
+    <ModalShell
+      onDismiss={onClose}
+      labelledBy={titleId}
+      className="w-full max-w-4xl flex flex-col max-h-[92vh]"
+    >
+      <div className="flex justify-between items-center mb-3 px-1">
+        <h2 id={titleId} className="t-display-2 flex items-center gap-2">
+          <Music className="text-[color:var(--color-err)]" size={18} />
+          Recorded take
+        </h2>
+        <div className="flex items-center gap-2">
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            aria-label="Close recording"
+            className="p-2 rounded-full surface-1 border border-[color:var(--color-border)] hover:bg-[color:var(--color-bg-2)] transition-colors"
           >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-4 mb-6 p-4 bg-black/30 rounded-xl border border-white/5">
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-mono text-neutral-400">
-              Instrument Transposition
-            </label>
-            <div className="flex gap-2">
-              {(["Concert", "Bb", "F"] as InstrumentPitch[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setInstrument(p)}
-                  className={`px-3 py-1.5 rounded text-sm font-mono transition-colors ${
-                    instrument === p
-                      ? "bg-purple-600"
-                      : "bg-black/50 hover:bg-neutral-800"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-mono text-neutral-400">Clefs</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setClefs("treble")}
-                className={`px-3 py-1.5 rounded text-sm font-mono transition-colors ${
-                  clefs === "treble"
-                    ? "bg-purple-600"
-                    : "bg-black/50 hover:bg-neutral-800"
-                }`}
-              >
-                Treble
-              </button>
-              <button
-                onClick={() => setClefs("bass")}
-                className={`px-3 py-1.5 rounded text-sm font-mono transition-colors ${
-                  clefs === "bass"
-                    ? "bg-purple-600"
-                    : "bg-black/50 hover:bg-neutral-800"
-                }`}
-              >
-                Bass
-              </button>
-              <button
-                onClick={() => setClefs("both")}
-                className={`px-3 py-1.5 rounded text-sm font-mono transition-colors ${
-                  clefs === "both"
-                    ? "bg-purple-600"
-                    : "bg-black/50 hover:bg-neutral-800"
-                }`}
-              >
-                Both (Grand)
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto bg-white rounded-xl p-4 mb-6">
-          <div ref={svgRef} className="w-full text-black"></div>
-          {notes.length === 0 && (
-            <div className="text-neutral-500 text-center py-10">
-              No notes recorded. Try playing some music before stopping!
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-3 border-t border-white/5 pt-4">
-          <button
-            onClick={handleDownloadMidi}
-            className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-sm font-bold transition-colors"
-          >
-            <FileText size={16} /> Save as MIDI
-          </button>
-          <button
-            onClick={handleDownloadPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-bold transition-colors"
-          >
-            <Printer size={16} /> Save as PDF
+            <X size={18} />
           </button>
         </div>
       </div>
-    </div>
+
+        <StageFrame
+          accent
+          eyebrow="Performance capture"
+          title="Score preview"
+          meta={`${notes.length} notes · ${tempo} BPM`}
+          actions={
+            <div className="flex gap-2">
+              <button
+                onClick={handleDownloadMidi}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] text-[color:var(--color-text-1)] hover:border-[color:var(--color-brand-strong)] hover:text-[color:var(--color-brand-strong)] text-xs t-mono transition-colors"
+              >
+                <FileText size={12} /> MIDI
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] rounded-[var(--radius-sm)] text-xs t-mono font-bold hover:bg-[color:var(--color-brand-strong)] transition-colors"
+              >
+                <Printer size={12} /> PDF
+              </button>
+            </div>
+          }
+        >
+          <div className="flex flex-wrap gap-3 mb-4">
+            <ToolGroup label="Transposed for">
+              {(["Concert", "Bb", "F"] as InstrumentPitch[]).map((p) => (
+                <ToolChip
+                  key={p}
+                  active={instrument === p}
+                  onClick={() => setInstrument(p)}
+                >
+                  {p}
+                </ToolChip>
+              ))}
+            </ToolGroup>
+
+            <ToolGroup label="Clefs">
+              <ToolChip
+                active={clefs === "treble"}
+                onClick={() => setClefs("treble")}
+              >
+                Treble
+              </ToolChip>
+              <ToolChip
+                active={clefs === "bass"}
+                onClick={() => setClefs("bass")}
+              >
+                Bass
+              </ToolChip>
+              <ToolChip
+                active={clefs === "both"}
+                onClick={() => setClefs("both")}
+              >
+                Grand
+              </ToolChip>
+            </ToolGroup>
+          </div>
+
+          <div className="bg-white rounded-[var(--radius-md)] p-3 mb-0 overflow-auto max-h-[55vh]">
+            <div ref={svgRef} className="w-full text-black" />
+            {notes.length === 0 && (
+              <div className="text-neutral-500 text-center py-10">
+                No notes recorded. Try playing some music before stopping!
+              </div>
+            )}
+          </div>
+        </StageFrame>
+    </ModalShell>
   );
 };

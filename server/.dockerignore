@@ -1,0 +1,29 @@
+# Files NOT shipped into the Docker image.
+# Mirror .gitignore but Docker-flavored.
+
+# Python cache + venv — built inside the image, not copied from host
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# macOS noise
+.DS_Store
+*.swp
+
+# Frontend — don't ship Node sources into the Python image
+src/
+node_modules/
+dist/
+index.html
+package.json
+package-lock.json
+vite.config.ts
+tsconfig.json
+*.md
+
+# Vercel — never relevant for the backend image
+.vercel/
+dev.sh
+.git/
+.gitignore

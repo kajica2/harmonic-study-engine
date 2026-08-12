@@ -2,6 +2,7 @@
 FastAPI server that exposes DDSP synthesis via a REST API.
 """
 
+import os
 import struct
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,15 +13,27 @@ import uvicorn
 from .synthesizer import synthesize_progression
 from .fx import apply_reverb
 
+_DEFAULT_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+]
+
+
+def _resolve_origins() -> list[str]:
+    """Read origins from DDSP_CORS_ORIGINS env var (comma-separated) or default."""
+    raw = os.environ.get("DDSP_CORS_ORIGINS", "").strip()
+    if not raw:
+        return _DEFAULT_ORIGINS
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    return parts or _DEFAULT_ORIGINS
+
+
 app = FastAPI(title="DDSP Synthesis Server")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-    ],
+    allow_origins=_resolve_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
 import { HarmonicPath } from "../lib/paths";
 import { Persona } from "../lib/personas";
+import { NOTE_NAMES } from "../lib/theory";
+import { RenderMode } from "../lib/loopWav";
 import { InspectPanel } from "./InspectPanel";
+import { InlineErrorPill } from "./InlineStatus";
 import {
   Music,
   Play,
@@ -44,6 +47,13 @@ interface RailProps {
   // commit/export
   onCommit: () => void;
   onExportMidi: () => void;
+  onExportWav: () => void;
+  isExportingWav: boolean;
+  wavExportError: string | null;
+  wavExportStatus: string | null;
+  onDismissWavExportError: () => void;
+  wavMode: RenderMode;
+  setWavMode: (m: RenderMode) => void;
   onOpenLeadSheet: () => void;
   // progress (optional external override; default derived from current state)
   loopBarFrom?: number;
@@ -99,21 +109,21 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
   const persona = p.personas.find((x) => x.id === p.selectedPersonaId) ?? p.personas[0];
 
   return (
-    <div className="bg-black/40 border border-white/10 rounded-2xl p-4 mb-3 shadow-xl">
-      {/* Stage progress */}
-      <div className="flex items-center gap-3 mb-3">
+    <div className="surface-2 border border-[color:var(--color-border)] rounded-[var(--radius-xl)] p-3 sm:p-4 mb-3 overflow-hidden">
+      {/* Stage progress (section headers — not literal step numbers) */}
+      <div className="flex items-center gap-2 sm:gap-3 mb-3">
         {STAGE_ORDER.map((s, i) => {
           const status = currentStage(i);
           return (
             <div key={s} className="flex-1 flex items-center gap-2">
               <button
                 onClick={() => setStage(s)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap transition ${
+                className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap transition ${
                   status === "active"
-                    ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]"
+                    ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] shadow-[0_0_15px_rgba(212,168,87,0.35)]"
                     : status === "done"
-                    ? "bg-emerald-700/40 text-emerald-200 hover:bg-emerald-700/60"
-                    : "bg-neutral-800 text-neutral-500 hover:text-white"
+                    ? "bg-[color:var(--color-ok)]/20 text-[color:var(--color-ok)] hover:bg-[color:var(--color-ok)]/30"
+                    : "surface-1 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
                 }`}
               >
                 {status === "done" ? (
@@ -123,7 +133,7 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
                 ) : (
                   <Circle size={12} />
                 )}
-                {i + 1}. {STAGE_LABELS[s].title}
+                {STAGE_LABELS[s].title}
               </button>
               {i < STAGE_ORDER.length - 1 && (
                 <div className={`flex-1 h-px ${status === "done" ? "bg-emerald-700/60" : "bg-neutral-700"}`} />
@@ -184,32 +194,14 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           path={p.activePath}
           onCommit={p.onCommit}
           onExportMidi={p.onExportMidi}
+          onExportWav={p.onExportWav}
+          isExportingWav={p.isExportingWav}
           onOpenLeadSheet={p.onOpenLeadSheet}
+          tempo={p.tempo}
+          wavMode={p.wavMode}
+          setWavMode={p.setWavMode}
         />
       )}
-
-      <div className="flex items-center justify-between mt-3">
-        <button
-          onClick={back}
-          disabled={STAGE_ORDER.indexOf(stage) === 0}
-          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono text-neutral-400 hover:text-white disabled:opacity-30 disabled:hover:text-neutral-400"
-        >
-          <ChevronLeft size={12} /> Back
-        </button>
-        <button
-          onClick={() => setAdvOpen(!advOpen)}
-          className="px-3 py-1.5 rounded text-xs font-mono text-neutral-500 hover:text-white"
-        >
-          {advOpen ? "Hide" : "Show"} advanced controls
-        </button>
-        <button
-          onClick={advance}
-          disabled={STAGE_ORDER.indexOf(stage) === STAGE_ORDER.length - 1}
-          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-mono text-neutral-300 hover:text-white disabled:opacity-30 disabled:hover:text-neutral-300"
-        >
-          Next <ChevronRight size={12} />
-        </button>
-      </div>
     </div>
   );
 };
@@ -232,17 +224,17 @@ const ChooseStage: React.FC<{
   const visible = showAll ? paths : curated;
   return (
     <div>
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
+      <div className="flex flex-col sm:flex-row sm:gap-2 sm:overflow-x-auto sm:pb-2 mb-3 gap-2">
         {visible.map((path) => {
           const isActive = path.id === activePathId;
           return (
             <button
               key={path.id}
               onClick={() => onSelectById(path.id)}
-              className={`min-w-[14rem] text-left rounded-xl p-3 border transition ${
+              className={`w-full sm:min-w-[14rem] sm:w-auto text-left rounded-xl p-3 border transition ${
                 isActive
-                  ? "border-purple-500 bg-purple-700/20"
-                  : "border-white/10 bg-black/30 hover:border-purple-500/50"
+                  ? "border-[color:var(--color-brand-strong)] bg-[color:var(--color-brand-muted)]"
+                  : "border-[color:var(--color-border)] surface-2 hover:border-[color:var(--color-brand-muted)]"
               }`}
             >
               <div className="flex items-center gap-2 mb-1">
@@ -347,15 +339,24 @@ const PerformStage: React.FC<{
 }) => {
   const totalBars = Math.ceil(path.steps.length / 4);
   const currentBar = Math.floor(activeStepIndex / 4) + 1;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const transposeLabel = () => {
+    if (transposeShift === 0) return "Global transpose (path-level)";
+    return `Global transpose ${transposeShift > 0 ? "+" : ""}${transposeShift} st`;
+  };
+
   return (
     <div>
+      {/* Transport (the only always-visible row) */}
       <div className="flex flex-wrap items-center gap-3 mb-3">
         <button
           onClick={() => setIsPlayingAuto(!isPlayingAuto)}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold"
+          title="Audition the whole path in tempo"
         >
           {isPlayingAuto ? <Pause size={16} /> : <Play size={16} className="translate-x-[1px]" />}
-          {isPlayingAuto ? "Pause" : "Audition"}
+          {isPlayingAuto ? "Pause" : "Play path"}
         </button>
         <button
           onClick={() => {
@@ -363,6 +364,7 @@ const PerformStage: React.FC<{
             setActiveStepIndex(0);
           }}
           className="flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-mono"
+          title="Stop playback and rewind to step 1"
         >
           <Square size={14} /> Stop
         </button>
@@ -371,93 +373,150 @@ const PerformStage: React.FC<{
           className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-mono ${
             isLooping ? "bg-emerald-700/40 text-emerald-200" : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
           }`}
+          title="Loop the current selection"
         >
           <RefreshCw size={14} /> Loop
         </button>
-
-        <div className="flex items-center gap-2 text-xs font-mono text-neutral-300">
-          <span>Tempo</span>
-          <input
-            type="range"
-            min={50}
-            max={240}
-            value={tempo}
-            onChange={(e) => setTempo(Number(e.target.value))}
-            className="w-28 accent-purple-500"
-          />
-          <span className="w-12 text-right">{tempo} BPM</span>
-        </div>
-
-        <select
-          value={meter}
-          onChange={(e) => setMeter(e.target.value)}
-          className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
+        <button
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+          className="px-2.5 py-2 rounded-xl text-xs font-mono text-neutral-500 hover:text-white"
         >
-          <option value="4/4">4/4</option>
-          <option value="3/4">3/4</option>
-          <option value="6/8">6/8</option>
-        </select>
-        <select
-          value={beat}
-          onChange={(e) => setBeat(e.target.value)}
-          className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
-        >
-          <option value="none">No beat</option>
-          <option value="metronome">Metronome</option>
-          <option value="jazz">Jazz Ride</option>
-          <option value="bossa">Bossa</option>
-          <option value="techno">Techno</option>
-        </select>
+          {advancedOpen ? "Hide" : "Show"} rhythm & meter
+        </button>
       </div>
 
-      {/* Bar / loop */}
+      {/* Advanced controls — collapsed by default, lives inline with transport */}
+      {advancedOpen && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 p-3 rounded-xl bg-black/30 border border-white/5">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Tempo</label>
+            <div className="flex items-center gap-2 text-xs font-mono text-neutral-300">
+              <input
+                type="range"
+                min={50}
+                max={240}
+                value={tempo}
+                onChange={(e) => setTempo(Number(e.target.value))}
+                className="flex-1 accent-purple-500"
+              />
+              <span className="w-12 text-right">{tempo} BPM</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Meter</label>
+            <select
+              value={meter}
+              onChange={(e) => setMeter(e.target.value)}
+              className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
+            >
+              <option value="4/4">4/4</option>
+              <option value="3/4">3/4</option>
+              <option value="6/8">6/8</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Backing</label>
+            <select
+              value={beat}
+              onChange={(e) => setBeat(e.target.value)}
+              className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
+            >
+              <option value="none">No beat</option>
+              <option value="metronome">Metronome</option>
+              <option value="jazz">Jazz Ride</option>
+              <option value="bossa">Bossa</option>
+              <option value="techno">Techno</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Position / step indicator */}
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs font-mono text-neutral-400">Position</span>
         <span className="text-xs font-mono text-neutral-200">
           Bar {currentBar} / {totalBars} — Step {activeStepIndex + 1} / {path.steps.length}
         </span>
-        <span className="ml-auto text-xs font-mono text-neutral-400">
-          Transpose {transposeShift > 0 ? "+" : ""}
-          {transposeShift} st
-        </span>
+        {/* Progress bar */}
+        <div
+          className="flex-1 h-1.5 rounded-full bg-neutral-800 overflow-hidden ml-2"
+          role="progressbar"
+          aria-label="Path playback position"
+          aria-valuemin={0}
+          aria-valuemax={path.steps.length}
+          aria-valuenow={activeStepIndex + 1}
+        >
+          <div
+            className="h-full bg-purple-500/70 transition-all duration-150"
+            style={{ width: `${((activeStepIndex + 1) / path.steps.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Transpose controls — single, labeled */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs font-mono text-neutral-400">{transposeLabel()}</span>
+        <span className="ml-auto" />
         <button
           onClick={() => setTransposeShift(transposeShift - 1)}
           className="px-2 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs"
+          title="Lower all chords by a semitone"
         >
           −
         </button>
         <button
           onClick={() => setTransposeShift(transposeShift + 1)}
           className="px-2 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs"
+          title="Raise all chords by a semitone"
         >
           +
         </button>
       </div>
 
-      {/* Strip of bars for direct seek + loop region */}
+      {/* Bar strip — visual progress + voicing preview (Fix #4 inline voicing) */}
       <div className="flex items-stretch gap-1 overflow-x-auto pb-2">
         {Array.from({ length: totalBars }).map((_, barIdx) => {
           const stepIdx = barIdx * 4;
           const chordName = path.steps[stepIdx]?.name ?? "";
           const isActiveBar = currentBar === barIdx + 1;
+          // Build a one-line voicing preview for the active bar from the
+          // currently-optimized notes. This is the "where am I" home that
+          // Fix #4 was asking for — the eye no longer has to ping-pong
+          // between the chord card up top and the inspect panel.
+          const previewVoicing = isActiveBar
+            ? (optimizedStepsNotes[stepIdx] ?? [])
+            : [];
           return (
             <button
               key={barIdx}
               onClick={() => {
-                // Step Chord is now musical:
-                // advance timeline cursor + audition the chord immediately.
+                // Step Chord is now musical: advance the cursor AND audition.
                 setActiveStepIndex(stepIdx);
                 const stepNotes = path.steps[stepIdx]?.notes ?? [];
                 if (stepNotes.length) onPlayChord(stepNotes);
               }}
               className={`flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition ${
                 isActiveBar
-                  ? "border-purple-500 bg-purple-700/30 text-white"
+                  ? "border-purple-500 bg-purple-700/30 text-white shadow-[0_0_15px_rgba(147,51,234,0.35)]"
                   : "border-white/10 bg-white/5 text-neutral-300 hover:border-purple-500/40"
               }`}
             >
-              <div className="text-[10px] font-mono text-neutral-500">Bar {barIdx + 1}</div>
+              <div className="text-[10px] font-mono text-neutral-500 flex items-center gap-1">
+                <span>Bar {barIdx + 1}</span>
+                <span className="flex-1" />
+                {isActiveBar && <span className="text-purple-300">· here</span>}
+              </div>
               <div className="font-bold truncate">{chordName}</div>
+              {isActiveBar && previewVoicing.length > 0 && (
+                <div
+                  className="text-[10px] font-mono text-neutral-300 mt-0.5 truncate"
+                  title={previewVoicing.map((n) => NOTE_NAMES[(n % 12 + 12) % 12] + (Math.floor(n / 12) - 1)).join(" · ")}
+                >
+                  {previewVoicing
+                    .map((n) => NOTE_NAMES[(n % 12 + 12) % 12] + (Math.floor(n / 12) - 1))
+                    .join(" ")}
+                </div>
+              )}
             </button>
           );
         })}
@@ -486,11 +545,28 @@ const CommitStage: React.FC<{
   path: HarmonicPath;
   onCommit: () => void;
   onExportMidi: () => void;
+  onExportWav: () => void;
+  isExportingWav: boolean;
   onOpenLeadSheet: () => void;
   onOpenInspector: () => void;
-}> = ({ path, onCommit, onExportMidi, onOpenLeadSheet, onOpenInspector }) => {
+  tempo: number;
+  wavMode: RenderMode;
+  setWavMode: (m: RenderMode) => void;
+  wavExportError?: string | null;
+  wavExportStatus?: string | null;
+  onDismissWavExportError?: () => void;
+}> = ({
+  path,
+  onCommit, onExportMidi, onExportWav, isExportingWav,
+  onOpenLeadSheet, onOpenInspector,
+  tempo, wavMode, setWavMode,
+  wavExportError, wavExportStatus, onDismissWavExportError,
+}) => {
+  // Compute expected duration so the user can verify the WAV will match
+  // the live loop length before exporting.
+  const expectedSec = Math.round(path.steps.length * (60 / tempo) * 4 * 10) / 10;
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
       <button
         onClick={onExportMidi}
         className="flex flex-col items-start gap-2 p-4 rounded-xl border border-white/10 bg-black/30 hover:border-purple-500/60 transition text-left"
@@ -499,9 +575,60 @@ const CommitStage: React.FC<{
         <div className="font-bold text-sm">Export MIDI</div>
         <div className="text-xs text-neutral-400">Download a .mid file of the current path.</div>
       </button>
+      <div className="flex flex-col gap-2 p-4 rounded-xl border border-white/10 bg-black/30 hover:border-cyan-500/60 transition">
+        <div className="flex items-start justify-between w-full">
+          <div className="flex flex-col items-start gap-2">
+            <FileDown size={20} className="text-cyan-400" />
+            <div className="font-bold text-sm">{isExportingWav ? "Rendering WAV…" : "Export WAV"}</div>
+            <div className="text-xs text-neutral-400">
+              Loop at {tempo} BPM · ~{expectedSec}s · browser-side render
+            </div>
+          </div>
+          <select
+            value={wavMode}
+            onChange={(e) => setWavMode(e.target.value as RenderMode)}
+            disabled={isExportingWav}
+            className="bg-neutral-900 border border-neutral-700 text-[11px] font-mono text-neutral-200 rounded px-2 py-1 outline-none"
+            title="Choose how the loop is rendered"
+            aria-label="WAV render mode"
+          >
+            <option value="block">Full chords</option>
+            <option value="arp">Arpeggio</option>
+            <option value="block_then_arp">Block + Arp</option>
+          </select>
+        </div>
+        <button
+          onClick={onExportWav}
+          disabled={isExportingWav}
+          className="w-full py-2 bg-cyan-900/30 hover:bg-cyan-900/50 disabled:opacity-50 disabled:cursor-wait text-cyan-200 text-xs rounded border border-cyan-800/50 transition-colors font-mono"
+        >
+          {isExportingWav
+            ? "Rendering…"
+            : `↓ Download ${wavMode === "block" ? "chord" : wavMode === "arp" ? "arpeggio" : "block+arp"} WAV`}
+        </button>
+
+        {/* Inline status — replaces old alert() popups. Sits inside the
+            tile so the error is anchored to the action that caused it. */}
+        {wavExportError && (
+          <div className="mt-1">
+            <InlineErrorPill onDismiss={() => onDismissWavExportError?.()}>
+              WAV render failed: {wavExportError}
+            </InlineErrorPill>
+          </div>
+        )}
+        {wavExportStatus && !wavExportError && (
+          <div
+            className="mt-1 t-small text-[color:var(--color-info)] font-mono"
+            role="status"
+            aria-live="polite"
+          >
+            {wavExportStatus}
+          </div>
+        )}
+      </div>
       <button
         onClick={onOpenLeadSheet}
-        className="flex flex-col items-start gap-2 p-4 rounded-xl border border-white/10 bg-black/30 hover:border-purple-500/60 transition text-left"
+        className="flex flex-col items-start gap-2 p-4 rounded-xl border border-white/10 bg-black/30 hover:border-emerald-500/60 transition text-left"
       >
         <FileDown size={20} className="text-emerald-400" />
         <div className="font-bold text-sm">Lead Sheet</div>
@@ -517,7 +644,7 @@ const CommitStage: React.FC<{
       </button>
       <button
         onClick={onCommit}
-        className="flex flex-col items-start gap-2 p-4 rounded-xl border border-white/10 bg-black/30 hover:border-emerald-500/60 transition text-left"
+        className="flex flex-col items-start gap-2 p-4 rounded-xl border border-white/10 bg-black/30 hover:border-rose-500/60 transition text-left"
       >
         <FileDown size={20} className="text-rose-400" />
         <div className="font-bold text-sm">Record Take</div>

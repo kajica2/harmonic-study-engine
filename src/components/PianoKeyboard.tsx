@@ -65,7 +65,7 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
               width: `${whiteKeyWidth}%`,
               backgroundColor: key.isActive ? key.color : undefined,
               boxShadow: key.isActive
-                ? `inset 0 0 20px rgba(0,0,0,0.4)`
+                ? `inset 0 0 0 2px rgba(255,255,255,0.9), inset 0 0 25px rgba(0,0,0,0.55)`
                 : "inset 0 -4px 6px rgba(0,0,0,0.1)",
             }}
             onMouseDown={() => onPlayNote?.(key.midi)}
@@ -80,8 +80,19 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
               onStopNote?.(key.midi);
             }}
           >
-            <div className="absolute bottom-4 w-full text-center text-xs font-mono text-gray-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Note name label — always visible on highlighted keys for
+                color-blind accessibility (Fix #6). On inactive keys the
+                label stays visible but faint for at-a-glance reading. */}
+            <div
+              className={`absolute bottom-4 w-full text-center text-xs font-mono font-bold ${
+                key.isActive ? "text-white drop-shadow" : "text-gray-400 opacity-60"
+              }`}
+              aria-hidden="true"
+            >
               {NOTE_NAMES[key.midi % 12]}
+              <span className="text-[10px] block leading-none opacity-80">
+                {Math.floor(key.midi / 12) - 1}
+              </span>
             </div>
           </div>
         ))}
@@ -98,7 +109,7 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
               width: `${whiteKeyWidth * 0.5}%`,
               backgroundColor: key.isActive ? key.color : "#1a202c",
               boxShadow: key.isActive
-                ? `0 0 15px ${key.color}`
+                ? `inset 0 0 0 2px rgba(255,255,255,0.9), 0 0 18px ${key.color}`
                 : "inset -2px -4px 6px rgba(255,255,255,0.1)",
             }}
             onMouseDown={() => onPlayNote?.(key.midi)}
@@ -112,7 +123,18 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
               e.preventDefault();
               onStopNote?.(key.midi);
             }}
-          />
+          >
+            {/* Always render black-key note name on top so the user can
+                read both color and the letter at a glance. */}
+            <div
+              className={`absolute bottom-1 w-full text-center font-mono text-[10px] font-bold ${
+                key.isActive ? "text-white drop-shadow" : "text-gray-400 opacity-60"
+              }`}
+              aria-hidden="true"
+            >
+              {NOTE_NAMES[key.midi % 12]}
+            </div>
+          </div>
         ))}
       </div>
     </div>
