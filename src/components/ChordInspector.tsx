@@ -26,6 +26,8 @@ import {
   X, Play, SkipForward, Undo2, Redo2, Check,
   ChevronDown, Music,
 } from "lucide-react";
+import { StageFrame, ToolGroup, ToolChip } from "./StageFrame";
+import { ModalShell, useModalLabel } from "./ModalShell";
 
 type TransposeInst = InstrumentPitch;
 
@@ -101,6 +103,7 @@ export const ChordInspector: React.FC<Props> = (props) => {
     originalNotes, currentNotes, prevNotes,
     onApply, onAudition, onStop,
   } = props;
+  const titleId = useModalLabel("chord-inspector");
 
   const [transpose, setTranspose] = useState<TransposeInst>("Concert");
   const [staging, setStaging] = useState<number[] | null>(null); // pre-apply edit
@@ -166,24 +169,22 @@ export const ChordInspector: React.FC<Props> = (props) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur z-50 flex items-center justify-center p-4" ref={stageRef}>
-      <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-white/5">
-          <div>
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Music size={18} className="text-purple-400" />
-              Chord Inspector
-            </h2>
-            <div className="text-xs text-neutral-400 font-mono">
-              bar {Math.floor(stepIndex / 4) + 1} · step {stepIndex + 1} of {path.steps.length} · {stepName}
-            </div>
-          </div>
+    <ModalShell
+      onDismiss={onClose}
+      labelledBy={titleId}
+      className="w-full max-w-4xl flex flex-col max-h-[92vh]"
+    >
+      <div className="flex justify-between items-center mb-3 px-1">
+        <h2 id={titleId} className="t-display-2 flex items-center gap-2">
+          <Music size={18} className="text-[color:var(--color-accent)]" />
+          Chord inspector
+        </h2>
           <div className="flex items-center gap-2">
             <select
               value={transpose}
               onChange={(e) => setTranspose(e.target.value as TransposeInst)}
-              className="bg-neutral-800 text-xs px-2 py-1.5 rounded font-mono text-neutral-200"
+              className="surface-1 text-xs px-2 py-1.5 rounded-[var(--radius-sm)] font-mono text-[color:var(--color-text-1)] border border-[color:var(--color-border)]"
+              aria-label="Transposition"
             >
               <option value="Concert">Concert</option>
               <option value="Bb">Bb trumpet (+2 st)</option>
@@ -191,16 +192,22 @@ export const ChordInspector: React.FC<Props> = (props) => {
             </select>
             <button
               onClick={onClose}
-              className="p-2 rounded hover:bg-white/10"
-              aria-label="Close"
+              className="p-2 rounded-[var(--radius-full)] surface-1 border border-[color:var(--color-border)] hover:bg-[color:var(--color-bg-2)] transition-colors"
+              aria-label="Close chord inspector"
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-auto p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StageFrame
+          accent
+          eyebrow={`bar ${Math.floor(stepIndex / 4) + 1} · step ${stepIndex + 1} of ${path.steps.length}`}
+          title={stepName}
+          density="tight"
+          className="flex-1 overflow-auto"
+        >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Left column: chord facts */}
           <div className="space-y-3">
             <div className="bg-black/30 rounded-xl p-3">
@@ -359,8 +366,8 @@ export const ChordInspector: React.FC<Props> = (props) => {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+        </StageFrame>
+    </ModalShell>
   );
 };
 

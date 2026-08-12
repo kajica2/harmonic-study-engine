@@ -8,9 +8,16 @@
  *                       reverb applied
  *
  * Both are reachable on the same FastAPI process.
+ *
+ * The base URL is read from `VITE_DDSP_API` at build time. When unset
+ * (dev / preview / no backend), it falls back to the local Python
+ * backend on the developer's machine: http://127.0.0.1:8765.
  */
 
-const DDSP_SERVER = "http://127.0.0.1:8765";
+const DEFAULT_BACKEND = "http://127.0.0.1:8765";
+export const DDSP_SERVER: string =
+  (import.meta.env.VITE_DDSP_API as string | undefined)?.replace(/\/$/, "") ||
+  DEFAULT_BACKEND;
 
 export interface DDSPStatus {
   running: boolean;

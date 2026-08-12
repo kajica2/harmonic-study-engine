@@ -3,6 +3,7 @@ import { HarmonicPath } from "../lib/paths";
 import { InstrumentPitch } from "../lib/scoreGenerator";
 import { renderLeadSheet } from "../lib/leadSheet";
 import { Download, FileText } from "lucide-react";
+import { StageFrame, ToolChip } from "./StageFrame";
 
 interface LeadSheetProps {
   path: HarmonicPath;
@@ -34,31 +35,49 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl p-4 text-black">
-      <div className="flex items-center gap-2 mb-3">
-        <FileText className="text-purple-600" size={16} />
-        <span className="font-bold text-sm">Lead Sheet — {path.title}</span>
-        <div className="ml-auto flex gap-1">
-          {(["Concert", "Bb", "F"] as InstrumentPitch[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setInstrument(p)}
-              className={`px-2 py-1 rounded text-xs font-mono ${
-                instrument === p ? "bg-purple-600 text-white" : "bg-neutral-200 hover:bg-neutral-300"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+    <StageFrame
+      accent
+      eyebrow="Lead Sheet"
+      title={path.title}
+      meta={`${path.steps.length} chords`}
+      actions={
         <button
           onClick={downloadAbc}
-          className="flex items-center gap-1 px-2 py-1 rounded bg-purple-600 text-white text-xs font-mono hover:bg-purple-500"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] t-mono text-xs hover:bg-[color:var(--color-brand-strong)]"
         >
           <Download size={12} /> ABC
         </button>
+      }
+    >
+      {/* Pitch selector — the only place the user picks concert vs Bb */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <span className="t-label text-[color:var(--color-text-3)] flex items-center gap-1.5">
+          <FileText size={12} />
+          Transposed for
+        </span>
+        <div className="inline-flex surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-md)] p-0.5">
+          {(["Concert", "Bb", "F"] as InstrumentPitch[]).map((p) => (
+            <ToolChip
+              key={p}
+              active={instrument === p}
+              onClick={() => setInstrument(p)}
+              title={
+                p === "Concert"
+                  ? "Concert pitch — original key"
+                  : `${p} trumpet transposition`
+              }
+            >
+              {p}
+            </ToolChip>
+          ))}
+        </div>
       </div>
-      <div ref={svgRef} className="text-black" />
-    </div>
+
+      {/* Score renders onto the abcjs container — it paints light-on-dark SVGs */}
+      <div
+        ref={svgRef}
+        className="bg-white text-black rounded-[var(--radius-md)] p-3 overflow-auto max-h-[60vh]"
+      />
+    </StageFrame>
   );
 };

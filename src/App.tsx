@@ -18,6 +18,7 @@ import {
   BookOpen,
   Music,
   Volume2,
+  Check,
 } from "lucide-react";
 import { audioEngine, InstrumentType } from "./lib/audio";
 import { rhythmEngine } from "./lib/rhythm";
@@ -35,11 +36,16 @@ import { synthesizeAndPlay, checkDDSPStatus } from "./lib/ddspSynth";
 import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { exportToMidiFile } from "./lib/midiExport";
+import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
+import { useAsyncAction } from "./lib/useAsyncAction";
+import { InlineErrorPill } from "./components/InlineStatus";
 import { RecordingModal } from "./components/RecordingModal";
 import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
 import { PlaySessionRail } from "./components/PlaySessionRail";
+import { MobileCommandBar } from "./components/MobileCommandBar";
 import { LeadSheet } from "./components/LeadSheet";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
+import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
 
 const NOTE_WHEEL = [
   "C",
@@ -176,7 +182,24 @@ export default function App() {
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
   const [isDDSPLoading, setIsDDSPLoading] = useState(false);
+  const ddspAction = useAsyncAction();
   const [ddspServerOnline, setDDSPServerOnline] = useState(false);
+  const [isRenderingWav, setIsRenderingWav] = useState(false);
+  const [wavExportError, setWavExportError] = useState<string | null>(null);
+  const [wavExportStatus, setWavExportStatus] = useState<string | null>(null);
+  const [wavMode, setWavMode] = useState<RenderMode>(() => {
+    try {
+      const saved = localStorage.getItem("synesthesia_wavMode");
+      return (saved ? JSON.parse(saved) : "block") as RenderMode;
+    } catch {
+      return "block";
+    }
+  });
+  // Whether the OpenRouter API key is configured at build time.
+  // The Gemini/Cloud options are disabled in the UI when this is false.
+  const hasOpenRouterKey = Boolean(
+    (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined)?.trim(),
+  );
 
   const [tempo, setTempo] = useState(() => {
     try {
@@ -653,10 +676,8 @@ export default function App() {
       localStorage.setItem("synesthesia_arpGate", String(arpGate));
       localStorage.setItem("synesthesia_arpOctaves", String(arpOctaves));
       localStorage.setItem("synesthesia_isLooping", JSON.stringify(isLooping));
-      localStorage.setItem(
-        "synesthesia_timeSignature",
-        JSON.stringify(timeSignature),
-      );
+      localStorage.setItem("synesthesia_timeSignature", JSON.stringify(timeSignature));
+      localStorage.setItem("synesthesia_wavMode", JSON.stringify(wavMode));
       localStorage.setItem("synesthesia_beatType", JSON.stringify(beatType));
       localStorage.setItem("synesthesia_kbRange", JSON.stringify(kbRange));
       localStorage.setItem("synesthesia_volume", String(volume));
@@ -696,6 +717,7 @@ export default function App() {
   const [etudeAlgorithm, setEtudeAlgorithm] =
     useState<EtudeAlgorithm>("magenta_rnn");
   const [isGeneratingML, setIsGeneratingML] = useState(false);
+  const [etudeStatus, setEtudeStatus] = useState<string | null>(null);
 
   const [isRecording, setIsRecording] = useState(false);
   const [showRecordingModal, setShowRecordingModal] = useState(false);
@@ -710,17 +732,22 @@ export default function App() {
     const rootMidi = 60 + transposeShift;
 
     const isGemini = etudeAlgorithm.startsWith("gemini_");
+    if (isGemini && !hasOpenRouterKey) {
+      // Cloud options are visually disabled in the select, but guard
+      // here too in case the user opened the DevTools and re-enabled.
+      setEtudeStatus(
+        "Cloud generation needs VITE_OPENROUTER_API_KEY in your .env. Pick a local model for now.",
+      );
+      return;
+    }
     if (etudeAlgorithm === "magenta_rnn" || isGemini) {
       try {
         setIsGeneratingML(true);
+        setEtudeStatus(null);
         let newPath: HarmonicPath;
         if (isGemini) {
           const geminiAlgo = etudeAlgorithm.replace("gemini_", "");
-          const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined;
-          if (!apiKey) {
-            alert("VITE_OPENROUTER_API_KEY is not set. Add it to your .env file.");
-            return;
-          }
+          const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string;
           newPath = await generateGeminiEtude(rootMidi, len, apiKey, geminiAlgo);
         } else {
           const { generateMagentaSequence } = await import("./lib/magentaHelper");
@@ -729,6 +756,11 @@ export default function App() {
           // (e.g. tfjs util-fetch broken in Vite). The path's
           // description makes the fallback obvious.
           newPath = await generateMagentaSequence(rootMidi, len, 1.2);
+          if (newPath.description.toLowerCase().includes("fallback")) {
+            setEtudeStatus(
+              "Magenta failed to load in this environment — used a melodic variation instead. The structure still matches the AI style.",
+            );
+          }
         }
         setPaths([newPath, ...paths]);
         setActivePathIndex(0);
@@ -736,7 +768,9 @@ export default function App() {
         setTransposeShift(0);
       } catch (err) {
         console.error("Etude generation failed:", err);
-        alert(`Generation failed: ${err instanceof Error ? err.message : String(err)}`);
+        setEtudeStatus(
+          `Generation failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       } finally {
         setIsGeneratingML(false);
       }
@@ -776,18 +810,47 @@ export default function App() {
   }, [selectedPersonaId]);
 
   return (
-    <div className="min-h-screen bg-neutral-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,0,255,0.15),rgba(0,0,0,0))] text-neutral-100 font-sans selection:bg-purple-900 selection:text-white flex flex-col">
-      <header className="px-6 py-4 border-b border-white/5 bg-black/20 flex flex-wrap gap-4 justify-between items-center backdrop-blur-xl sticky top-0 z-20">
-        <div>
-          <h1 className="text-xl font-medium tracking-tight text-neutral-100 flex items-center gap-2">
-            Kandinsky Synesthesia Lab<span className="text-purple-500">II</span>
+    <div className="min-h-screen surface-0 text-[color:var(--color-text-1)] font-sans selection:bg-[color:var(--color-brand-muted)] selection:text-[color:var(--color-brand-strong)] flex flex-col">
+      {/* Skip-to-main link for keyboard users */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-2 focus:bg-[color:var(--color-brand-strong)] focus:text-[color:var(--color-text-inverse)] focus:rounded"
+      >
+        Skip to main content
+      </a>
+
+      {/* Signature brass strip — single deliberate accent */}
+      <div className="brass-strip" aria-hidden="true" />
+
+      {/* Mobile-only fixed command bar (hidden on md+) */}
+      <MobileCommandBar
+        isPlayingAuto={isPlayingAuto}
+        setIsPlayingAuto={setIsPlayingAuto}
+        activeStepIndex={activeStepIndex}
+        setActiveStepIndex={(i) => {
+          setActiveStepIndex(Math.max(0, Math.min(i, path.steps.length - 1)));
+        }}
+        pathLength={path.steps.length}
+        onShowInspector={() => setShowChordInspector(true)}
+        onShowExport={() => setShowImportExport(true)}
+        onCommit={() => {
+          recorder.start();
+          setIsPlayingAuto(true);
+        }}
+      />
+
+      <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[color:var(--color-border)] surface-1 flex flex-wrap gap-3 sm:gap-4 justify-between items-center backdrop-blur-xl sticky top-0 z-30">
+        <div className="min-w-0">
+          <h1 className="t-display-2 text-[color:var(--color-text-1)] flex items-center gap-2">
+            Harmonic Study Engine
+            <span className="text-[color:var(--color-brand-strong)] t-mono">v2</span>
           </h1>
-          <p className="text-sm text-neutral-500 font-medium">
-            Harmonic Movement & Voicing Explorer
+          <p className="t-small text-[color:var(--color-text-3)] truncate">
+            Synesthesia-guided harmonic practice for trumpet
           </p>
         </div>
 
-        <div className="hidden md:flex items-center gap-4 text-xs font-mono text-neutral-400">
+        <div className="hidden md:flex items-center gap-2 lg:gap-3 t-mono text-[color:var(--color-text-2)]">
           <button
             onClick={() => setShowImportExport(true)}
             className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 px-3 py-1.5 rounded border border-neutral-800 transition-colors text-neutral-300 hover:text-white"
@@ -795,34 +858,55 @@ export default function App() {
             <FileCode size={14} className="text-purple-400" />
             <span>Import / Export</span>
           </button>
-          <div className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800">
-            <Settings2 size={12} className="text-purple-400" />
-            <select
-              value={selectedMidiOutId}
-              onChange={(e) => {
-                midiOut.selectOutput(e.target.value);
-                setSelectedMidiOutId(e.target.value);
+          {/* Fix #8 — MIDI Out is a real picker. Shows "MIDI: no devices" as a
+              status when nothing is connected, otherwise the active output. */}
+          <div
+            className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800"
+            title="Choose a Web MIDI output destination. macOS / ChromeOS / Edge have Web MIDI built in; Firefox needs an extension."
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor:
+                  midiOutputs.length === 0
+                    ? "#6b7280" // gray — no devices
+                    : selectedMidiOutId
+                      ? "#22c55e" // green — actively routed
+                      : "#a855f7", // purple — devices available, none selected
               }}
-              className="bg-transparent text-neutral-300 outline-none cursor-pointer"
-            >
-              <option value="">No MIDI Out</option>
-              {midiOutputs.map((out) => (
-                <option key={out.id} value={out.id}>
-                  {out.name}
-                </option>
-              ))}
-            </select>
+              aria-hidden="true"
+            />
+            <Settings2 size={12} className="text-purple-400" />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+              MIDI
+            </span>
+            {midiOutputs.length === 0 ? (
+              <span className="text-xs text-neutral-400 italic">no devices</span>
+            ) : (
+              <select
+                value={selectedMidiOutId}
+                onChange={(e) => {
+                  midiOut.selectOutput(e.target.value);
+                  setSelectedMidiOutId(e.target.value);
+                }}
+                className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+              >
+                <option value="">none</option>
+                {midiOutputs.map((out) => (
+                  <option key={out.id} value={out.id}>
+                    {out.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
-          <span className="flex items-center gap-1 bg-neutral-900 px-2 py-1 rounded">
-            <ChevronUp size={14} /> <ChevronDown size={14} /> Change Path
-          </span>
-          <span className="flex items-center gap-1 bg-neutral-900 px-2 py-1 rounded">
-            <ChevronLeft size={14} /> <ChevronRight size={14} /> Step Chord
-          </span>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col w-full max-w-7xl mx-auto p-4 gap-6">
+      <main
+        id="main"
+        className="flex-1 flex flex-col w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 gap-4 sm:gap-6 max-w-screen-2xl pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-6"
+      >
         {/* Play Session Rail — guided workflow */}
         <PlaySessionRail
           paths={paths}
@@ -857,6 +941,36 @@ export default function App() {
             a.download = `${path.id}.mid`;
             a.click();
           }}
+          onExportWav={async () => {
+            setIsRenderingWav(true);
+            setWavExportError(null);
+            setWavExportStatus("Rendering…");
+            try {
+              const wav = await renderPathToWav(path, {
+                tempo,
+                instrument,
+                meter: timeSignature,
+                mode: wavMode,
+              });
+              downloadWavFromBlob(wav, `${path.id}.${wavMode}.wav`);
+              setWavExportStatus(`Downloaded ${path.id}.${wavMode}.wav`);
+              // Auto-clear the success message after a few seconds
+              window.setTimeout(() => setWavExportStatus(null), 4000);
+            } catch (e) {
+              setWavExportError(
+                e instanceof Error ? e.message : String(e),
+              );
+              setWavExportStatus(null);
+            } finally {
+              setIsRenderingWav(false);
+            }
+          }}
+          wavExportError={wavExportError}
+          wavExportStatus={wavExportStatus}
+          onDismissWavExportError={() => setWavExportError(null)}
+          isExportingWav={isRenderingWav}
+          wavMode={wavMode}
+          setWavMode={setWavMode}
           onOpenLeadSheet={() => setShowLeadSheet(true)}
           onOpenInspector={() => setShowChordInspector(true)}
           optimizedStepsNotes={optimizedStepsNotes}
@@ -875,17 +989,20 @@ export default function App() {
         />
 
         {/* Synesthesia Composer Personas Ribbon */}
-        <div className="bg-black/30 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col gap-3">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <User size={16} className="text-purple-400" />
-              <h2 className="text-xs uppercase tracking-widest text-neutral-400 font-bold">
-                Synesthetic Artist Personas
-              </h2>
+        <div className="bg-[color:var(--color-bg-1)] border border-[color:var(--color-border)] rounded-[var(--radius-xl)] p-4 sm:p-5 flex flex-col gap-4 shadow-[0_4px_18px_rgba(0,0,0,0.35)]">
+          <div className="flex items-baseline justify-between gap-3 px-1 flex-wrap">
+            <div className="flex items-baseline gap-3">
+              <User size={18} className="text-[color:var(--color-brand-strong)]" aria-hidden="true" />
+              <div>
+                <div className="t-label text-[color:var(--color-text-3)]">Personas</div>
+                <h2 className="t-display-2 text-[color:var(--color-text-1)]">
+                  Choose a mastermind
+                </h2>
+              </div>
             </div>
-            <p className="text-[11px] text-neutral-500 font-medium hidden sm:block">
-              Choose a mastermind to instantly load their custom scaling, audio
-              synthesis parameters, and synesthesia canvas visualization.
+            <p className="t-small text-[color:var(--color-text-2)] max-w-[24ch] sm:max-w-[36ch] text-right">
+              Each persona loads their own synesthesia canvas, instrument
+              voicing, and color story.
             </p>
           </div>
 
@@ -896,19 +1013,21 @@ export default function App() {
                 <button
                   key={p.id}
                   onClick={() => handleSelectPersona(p.id)}
+                  aria-pressed={isActive}
                   className={`relative text-left p-3 rounded-xl border transition-all duration-300 flex flex-col justify-between h-28 group ${
                     isActive
-                      ? `bg-gradient-to-br ${p.gradientFrom} ${p.gradientTo} border-neutral-700 shadow-[0_4px_20px_rgba(0,0,0,0.4)]`
+                      ? `bg-gradient-to-br ${p.gradientFrom} ${p.gradientTo} shadow-[0_4px_20px_rgba(0,0,0,0.4)]`
                       : "bg-neutral-900/40 border-transparent hover:bg-neutral-900/80 hover:border-neutral-800"
                   }`}
                   style={{
-                    borderColor: isActive ? p.accentColor + "30" : undefined,
+                    borderColor: isActive ? p.accentColor : undefined,
+                    borderWidth: isActive ? 2 : undefined,
                     boxShadow: isActive
-                      ? `0 0 15px ${p.accentColor}10`
+                      ? `0 0 0 2px ${p.accentColor}40, 0 4px 20px rgba(0,0,0,0.4)`
                       : undefined,
                   }}
                 >
-                  {/* Active Highlighter line */}
+                  {/* Active top-strip — non-color signal (shape) */}
                   {isActive && (
                     <div
                       className="absolute top-0 inset-x-0 h-1 rounded-t-xl"
@@ -933,14 +1052,30 @@ export default function App() {
                         .join("")}
                     </div>
 
-                    {/* Little active light */}
+                    {/* Non-color active indicator: a check mark + a
+                        solid ring. Color-blind safe because the shape
+                        (✓) and ring carry the meaning, not the color. */}
                     {isActive ? (
                       <span
-                        className="w-2 h-2 rounded-full animate-pulse"
-                        style={{ backgroundColor: p.accentColor }}
-                      />
+                        className="flex items-center gap-1 px-1.5 py-0.5 surface-1 border rounded-[var(--radius-sm)]"
+                        style={{ borderColor: p.accentColor }}
+                        title="Currently selected"
+                        aria-label="Active persona"
+                      >
+                        <Check size={10} style={{ color: p.accentColor }} aria-hidden="true" />
+                        <span
+                          className="text-[8px] font-mono uppercase tracking-wider"
+                          style={{ color: p.accentColor }}
+                        >
+                          active
+                        </span>
+                      </span>
                     ) : (
-                      <span className="w-1.5 h-1.5 rounded-full bg-neutral-700 group-hover:bg-neutral-600" />
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-neutral-700 group-hover:bg-neutral-600"
+                        title="Click to select this persona"
+                        aria-hidden="true"
+                      />
                     )}
                   </div>
 
@@ -1173,20 +1308,32 @@ export default function App() {
                             setEtudeAlgorithm(e.target.value as EtudeAlgorithm)
                           }
                           className="bg-neutral-900 border border-neutral-700 text-xs text-neutral-300 rounded px-2 py-2 outline-none w-full"
+                          aria-label="Generation model"
                         >
-                          <option value="fibonacci">Fibonacci Intervals</option>
-                          <option value="sacred_geometry">
-                            Sacred Geometry
-                          </option>
-                          <option value="coltrane_fractal">
-                            Coltrane Fractal
-                          </option>
-                          <option value="magenta_rnn">Magenta AI (RNN)</option>
-                          <option value="trumpet_etude">Trumpet Etude</option>
-                          <option value="gemini_jazz">Gemini Jazz (ii-V-I)</option>
-                          <option value="gemini_classical">Gemini Classical</option>
-                          <option value="gemini_modern">Gemini Modern</option>
-                          <option value="gemini_romantic">Gemini Romantic</option>
+                          <optgroup label="Local deterministic (always works)">
+                            <option value="fibonacci">Fibonacci Intervals</option>
+                            <option value="sacred_geometry">
+                              Sacred Geometry
+                            </option>
+                            <option value="coltrane_fractal">
+                              Coltrane Fractal
+                            </option>
+                            <option value="trumpet_etude">Trumpet Etude</option>
+                          </optgroup>
+                          <optgroup label="Local ML">
+                            <option value="magenta_rnn">Magenta AI (RNN)</option>
+                          </optgroup>
+                          <optgroup
+                            label={`Cloud (requires VITE_OPENROUTER_API_KEY)${
+                              hasOpenRouterKey ? " ✓" : " — not configured"
+                            }`}
+                            disabled={!hasOpenRouterKey}
+                          >
+                            <option value="gemini_jazz">Gemini Jazz (ii-V-I)</option>
+                            <option value="gemini_classical">Gemini Classical</option>
+                            <option value="gemini_modern">Gemini Modern</option>
+                            <option value="gemini_romantic">Gemini Romantic</option>
+                          </optgroup>
                         </select>
                         <button
                           onClick={handleGenerateEtude}
@@ -1196,8 +1343,64 @@ export default function App() {
                           {isGeneratingML ? "GENERATING..." : "GENERATE ETUDE"}
                         </button>
 
+                        {/* Inline status — replaces old alert() popups for both
+                            the Magenta-fallback case and the missing-key case. */}
+                        {etudeStatus && (
+                          <div
+                            role="status"
+                            aria-live="polite"
+                            className="text-[11px] t-mono text-[color:var(--color-warn)] leading-snug mt-1 px-1"
+                          >
+                            {etudeStatus}
+                          </div>
+                        )}
+
                         {/* Score export — MusicXML & Score21 of the most recent path */}
                         <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            onClick={async () => {
+                              setIsRenderingWav(true);
+                              setWavExportError(null);
+                              setWavExportStatus("Rendering…");
+                              try {
+                                const wavBlob = await renderPathToWav(path, {
+                                  tempo,
+                                  instrument,
+                                  meter: timeSignature,
+                                });
+                                downloadWavFromBlob(wavBlob, `${path.id}.wav`);
+                                setWavExportStatus(
+                                  `Downloaded ${path.id}.wav`,
+                                );
+                                window.setTimeout(
+                                  () => setWavExportStatus(null),
+                                  4000,
+                                );
+                              } catch (e) {
+                                setWavExportError(
+                                  e instanceof Error ? e.message : String(e),
+                                );
+                                setWavExportStatus(null);
+                              } finally {
+                                setIsRenderingWav(false);
+                              }
+                            }}
+                            disabled={isRenderingWav}
+                            title={`Render the loop offline and download as a ${tempo} BPM WAV using the ${instrument} instrument. No backend needed.`}
+                            className="py-1.5 bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-200 text-[11px] rounded border border-cyan-800/50 transition-colors font-mono disabled:opacity-50 disabled:cursor-wait"
+                          >
+                            {isRenderingWav ? "RENDERING…" : `↓ Loop WAV (${tempo})`}
+                          </button>
+                          <button
+                            onClick={() => {
+                              const s21 = toScore21(path, { transpose: transposeShift });
+                              downloadText(`${path.id}.s21.md`, s21, "text/markdown");
+                            }}
+                            title="Download Score21 markdown — scorable chord-and-pitch representation"
+                            className="py-1.5 bg-amber-900/30 hover:bg-amber-900/50 text-amber-200 text-[11px] rounded border border-amber-800/50 transition-colors font-mono"
+                          >
+                            ↓ Score21
+                          </button>
                           <button
                             onClick={() => {
                               const xml = toMusicXml(path, {
@@ -1213,23 +1416,31 @@ export default function App() {
                               );
                             }}
                             title="Download MusicXML — open in MuseScore, Finale, Sibelius, Dorico"
-                            className="py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-200 text-[11px] rounded border border-emerald-800/50 transition-colors font-mono"
+                            className="py-1.5 bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-200 text-[11px] rounded border border-emerald-800/50 transition-colors font-mono col-span-2"
                           >
                             ↓ MusicXML
-                          </button>
-                          <button
-                            onClick={() => {
-                              const s21 = toScore21(path, { transpose: transposeShift });
-                              downloadText(`${path.id}.s21.md`, s21, "text/markdown");
-                            }}
-                            title="Download Score21 markdown — scorable chord-and-pitch representation"
-                            className="py-1.5 bg-amber-900/30 hover:bg-amber-900/50 text-amber-200 text-[11px] rounded border border-amber-800/50 transition-colors font-mono"
-                          >
-                            ↓ Score21
                           </button>
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+                {/* Inline status / error for the export cluster — same shared
+                    state as the rail, so the rail also surfaces the result. */}
+                {wavExportError && (
+                  <div className="mt-2">
+                    <InlineErrorPill onDismiss={() => setWavExportError(null)}>
+                      WAV render failed: {wavExportError}
+                    </InlineErrorPill>
+                  </div>
+                )}
+                {wavExportStatus && !wavExportError && (
+                  <div
+                    className="mt-2 t-small text-[color:var(--color-info)] font-mono"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {wavExportStatus}
                   </div>
                 )}
               </div>
@@ -1321,85 +1532,128 @@ export default function App() {
           </div>
 
           {/* Right Content: Visualization & Keyboard */}
-          <div className="flex-1 flex flex-col gap-6">
+          <div className="flex-1 flex flex-col gap-4 sm:gap-6 min-w-0">
             {/* Active Step Info / Stage */}
-            <div className="bg-black/40 backdrop-blur-xl border border-white/5 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center min-h-[120px] shadow-2xl shadow-black/50">
-              <div>
-                <div className="text-purple-400 font-mono text-xs mb-2">
-                  CURRENT VOICING
+            <StageFrame
+              accent
+              active
+              eyebrow={`Step ${activeStepIndex + 1} of ${path.steps.length}`}
+              title={transposeChordName(step.name, transposeShift)}
+              meta={
+                <span className="flex items-center gap-2">
+                  <span className="t-mono text-[10px] text-[color:var(--color-text-3)] uppercase tracking-wider">
+                    Transpose
+                  </span>
+                  <ToolChip
+                    active
+                    onClick={() => setTransposeShift((p) => p - 7)}
+                    title="Down a perfect fifth"
+                  >
+                    ♭5th
+                  </ToolChip>
+                  <ToolChip active onClick={() => setTransposeShift(0)} title="Reset transpose">
+                    {transposeShift > 0 ? "+" : ""}{transposeShift} st
+                  </ToolChip>
+                  <ToolChip
+                    active
+                    onClick={() => setTransposeShift((p) => p + 7)}
+                    title="Up a perfect fifth"
+                  >
+                    ♯5th
+                  </ToolChip>
+                </span>
+              }
+              actions={
+                <div className="flex items-center gap-2 self-end">
+                  <button
+                    onClick={() => setActiveStepIndex(Math.max(activeStepIndex - 1, 0))}
+                    disabled={activeStepIndex === 0}
+                    aria-label="Previous chord"
+                    className="w-11 h-11 flex items-center justify-center rounded-full surface-1 border border-[color:var(--color-border)] active:bg-[color:var(--color-bg-2)] disabled:opacity-30 transition-colors"
+                  >
+                    <ChevronLeft />
+                  </button>
+                  {activeMidis.length > 0 ? (
+                    <button
+                      onClick={() => {
+                        audioEngine.stopAll();
+                        midiOut.stopAll();
+                        setActiveMidis([]);
+                        setIsPlayingAuto(false);
+                      }}
+                      aria-label="Stop chord"
+                      className="w-11 h-11 flex items-center justify-center rounded-full surface-1 border border-[color:var(--color-border)] active:bg-[color:var(--color-bg-2)] transition-colors"
+                    >
+                      <Square size={18} className="fill-current text-[color:var(--color-brand)]" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        audioEngine.playChord(currentChordNotes);
+                        midiOut.playChord(currentChordNotes);
+                        setActiveMidis(currentChordNotes);
+                      }}
+                      aria-label="Play chord"
+                      className="w-11 h-11 flex items-center justify-center rounded-full bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] hover:bg-[color:var(--color-brand-strong)] active:scale-95 transition-transform"
+                    >
+                      <Play size={20} className="fill-current translate-x-[1px]" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() =>
+                      setActiveStepIndex(
+                        Math.min(activeStepIndex + 1, path.steps.length - 1),
+                      )
+                    }
+                    disabled={activeStepIndex === path.steps.length - 1}
+                    aria-label="Next chord"
+                    className="w-11 h-11 flex items-center justify-center rounded-full bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] hover:bg-[color:var(--color-brand-strong)] disabled:opacity-30 disabled:hover:bg-[color:var(--color-brand)] active:scale-95 transition-transform"
+                  >
+                    <ChevronRight />
+                  </button>
                 </div>
-                <h2 className="text-4xl font-semibold tracking-tighter text-white mb-2">
-                  {transposeChordName(step.name, transposeShift)}
-                </h2>
-                <p className="text-neutral-400 text-sm">{step.descriptions}</p>
+              }
+            >
+              {step.descriptions && (
+                <p className="t-small text-[color:var(--color-text-2)] -mt-1 mb-3">
+                  {step.descriptions}
+                </p>
+              )}
 
-                {/* Toggles */}
-                <div className="flex flex-wrap gap-4 mt-5">
-                  <div className="flex bg-black/60 rounded-lg p-1 border border-white/5 shadow-inner">
-                    <button
-                      onClick={() => setTransposeShift((p) => p - 7)}
-                      className="px-3 py-1.5 text-xs text-neutral-400 hover:text-white hover:bg-white/10 rounded transition-colors"
-                      title="Down a 5th"
-                    >
-                      ♭5th
-                    </button>
-                    <div className="px-3 py-1.5 text-xs text-purple-400 font-mono bg-black/80 rounded flex items-center min-w-[3.5rem] justify-center shadow-inner">
-                      {transposeShift > 0 ? "+" : ""}
-                      {transposeShift} ST
-                    </div>
-                    <button
-                      onClick={() => setTransposeShift((p) => p + 7)}
-                      className="px-3 py-1.5 text-xs text-neutral-400 hover:text-white hover:bg-white/10 rounded transition-colors"
-                      title="Up a 5th"
-                    >
-                      ♯5th
-                    </button>
-                    <button
-                      onClick={() => setTransposeShift(0)}
-                      className="px-3 py-1.5 text-xs text-neutral-500 hover:text-white hover:bg-white/10 rounded transition-colors"
-                      title="Reset Key"
-                    >
-                      ⟲
-                    </button>
-                  </div>
-
-                  <div className="flex bg-black/60 rounded-lg p-1 border border-white/5 shadow-inner">
-                    <button
-                      onClick={() => setVoicingType("closed")}
-                      className={`px-3 py-1.5 text-xs rounded transition-colors ${voicingType === "closed" ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]" : "text-neutral-400 hover:text-white hover:bg-white/10"}`}
-                    >
+              {/* Tool palette — 3 rows of labeled groups, scales from mobile up */}
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <ToolGroup label="Voicing">
+                    <ToolChip active={voicingType === "closed"} onClick={() => setVoicingType("closed")}>
                       Closed
-                    </button>
-                    <button
-                      onClick={() => setVoicingType("open")}
-                      className={`px-3 py-1.5 text-xs rounded transition-colors ${voicingType === "open" ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]" : "text-neutral-400 hover:text-white hover:bg-white/10"}`}
-                    >
+                    </ToolChip>
+                    <ToolChip active={voicingType === "open"} onClick={() => setVoicingType("open")}>
                       Open
-                    </button>
-                  </div>
+                    </ToolChip>
+                  </ToolGroup>
 
-                  <div className="flex bg-black/60 rounded-lg p-1 border border-white/5 shadow-inner">
-                    <button
-                      onClick={() =>
-                        setOptimizeVoiceLeading(!optimizeVoiceLeading)
-                      }
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${optimizeVoiceLeading ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]" : "text-neutral-400 hover:text-white hover:bg-white/10"}`}
+                  <ToolGroup label="Voicing">
+                    <ToolChip
+                      active={optimizeVoiceLeading}
+                      onClick={() => setOptimizeVoiceLeading(!optimizeVoiceLeading)}
+                      title="Optimize lead — voice-leads from the previous chord"
                     >
-                      <Waypoints size={14} /> Optimize Lead
-                    </button>
-                    <button
+                      Optimize Lead
+                    </ToolChip>
+                    <ToolChip
+                      active={showTheoryLabels}
                       onClick={() => setShowTheoryLabels(!showTheoryLabels)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${showTheoryLabels ? "bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]" : "text-neutral-400 hover:text-white hover:bg-white/10"}`}
                     >
                       Theory Labels
-                    </button>
-                  </div>
+                    </ToolChip>
+                  </ToolGroup>
 
-                  <div className="flex items-center bg-black/60 rounded-lg p-1 border border-white/5 gap-2 px-3 shadow-inner">
+                  <ToolGroup label="Instrument">
                     <select
                       value={instrument}
                       onChange={(e) => setInstrument(e.target.value as any)}
-                      className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer hover:text-white font-medium"
+                      className="bg-transparent text-xs text-[color:var(--color-text-1)] outline-none cursor-pointer hover:text-[color:var(--color-brand-strong)] font-medium px-1 py-1 flex-1 min-w-0"
+                      aria-label="Instrument"
                     >
                       <option value="epiano">E-Piano</option>
                       <option value="sine">Pure Sine</option>
@@ -1409,87 +1663,85 @@ export default function App() {
                       <option value="guitar">Guitar</option>
                       <option value="sax">Saxophone</option>
                     </select>
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-                    <button
-                      onClick={async () => {
-                        setIsDDSPLoading(true);
-                        try {
-                          const notes = path.steps.map((s) =>
-                            s.notes.map((n) => n + transposeShift),
-                          );
-                          const chordDur = 60 / tempo;
+                  </ToolGroup>
 
-                          // Record notes in real time so the user
-                          // can export the DDSP-rendered progression as MIDI.
-                          // auto-enabled per click: starts a fresh session
-                          // and emits a chord at every step.
-                          recorder.start();
-
-                          // Emit first chord immediately so it's captured
-                          // before the network round-trip latency.
-                          for (const p of notes[0]) recorder.recordNoteOn(p);
-
-                          // Hook into playback timing: each chord starts
-                          // after `chordDur` seconds the previous one played.
-                          // synthesizeAndPlay returns when playback ends,
-                          // which we'll map to NoteOff then close the session.
-                          const stepStarts = [0];
-                          for (let i = 1; i < notes.length; i++) {
-                            stepStarts.push(stepStarts[i - 1] + chordDur);
-                          }
-                          stepStarts.forEach((atSec, i) => {
-                            if (i === 0) return; // first chord already on
-                            setTimeout(
-                              () => {
-                                // NoteOff previous chord
-                                for (const p of notes[i - 1])
-                                  recorder.recordNoteOff(p);
-                                // NoteOn this chord
-                                for (const p of notes[i]) recorder.recordNoteOn(p);
-                              },
-                              atSec * 1000,
-                            );
-                          });
-
-                          await synthesizeAndPlay(notes, chordDur);
-
-                          // NoteOff final chord, close session.
-                          for (const p of notes[notes.length - 1])
-                            recorder.recordNoteOff(p);
-                          recorder.stop();
-                          setShowRecordingModal(true);
-                        } catch (e) {
-                          console.error("DDSP synth failed:", e);
-                          recorder.stop();
-                          alert("DDSP server not running. Restart the app with:\n\n  npm run dev");
-                        } finally {
-                          setIsDDSPLoading(false);
-                        }
-                      }}
-                      disabled={isDDSPLoading}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs rounded transition-colors ${isDDSPLoading ? "text-yellow-400 animate-pulse" : "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/30"}`}
-                      title="Render the full progression with DDSP — recording is captured for MIDI/PDF export"
+                  <ToolGroup label="Backing">
+                    <select
+                      value={beatType}
+                      onChange={(e) => setBeatType(e.target.value as any)}
+                      className="bg-transparent text-xs text-[color:var(--color-text-1)] outline-none cursor-pointer hover:text-[color:var(--color-brand-strong)] font-medium px-1 py-1 flex-1 min-w-0"
+                      aria-label="Backing"
                     >
-                      <Hexagon size={14} />
-                      {isDDSPLoading ? "Synth…" : "DDSP"}
-                    </button>
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-                    <button
+                      <option value="none">None</option>
+                      <option value="metronome">Metronome</option>
+                      <option value="jazz">Jazz Ride</option>
+                      <option value="bossa">Bossa Nova</option>
+                      <option value="techno">Techno</option>
+                    </select>
+                  </ToolGroup>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <ToolGroup label="Meter">
+                    <select
+                      value={timeSignature}
+                      onChange={(e) => setTimeSignature(e.target.value as any)}
+                      className="bg-transparent text-xs text-[color:var(--color-text-1)] outline-none cursor-pointer hover:text-[color:var(--color-brand-strong)] font-medium px-1 py-1 flex-1 min-w-0"
+                      aria-label="Time signature"
+                    >
+                      <option value="4/4">4/4</option>
+                      <option value="6/8">6/8</option>
+                      <option value="7/8">7/8</option>
+                      <option value="11/4">11/4</option>
+                      <option value="tintal">Tintal (16)</option>
+                    </select>
+                  </ToolGroup>
+
+                  <ToolGroup label={`Tempo · ${tempo}`}>
+                    <input
+                      type="range"
+                      min={30}
+                      max={180}
+                      value={tempo}
+                      onChange={(e) => setTempo(parseInt(e.target.value))}
+                      className="flex-1 accent-[color:var(--color-brand)] min-w-0"
+                      aria-label="Tempo"
+                    />
+                  </ToolGroup>
+
+                  <ToolGroup label={`Volume · ${volume}%`}>
+                    <Volume2 size={14} className="text-[color:var(--color-text-3)] ml-1" aria-hidden="true" />
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={volume}
+                      onChange={(e) => setVolume(parseInt(e.target.value))}
+                      className="flex-1 accent-[color:var(--color-brand)] min-w-0"
+                      aria-label="Volume"
+                    />
+                  </ToolGroup>
+
+                  <ToolGroup label="Transport">
+                    <ToolChip
+                      active={isPlayingAuto}
                       onClick={() => setIsPlayingAuto(!isPlayingAuto)}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs rounded transition-colors ${isPlayingAuto ? "text-purple-400 font-medium" : "text-neutral-400 hover:text-white"}`}
+                      title={isPlayingAuto ? "Pause auto-playback" : "Audition in tempo"}
                     >
-                      {isPlayingAuto ? <Pause size={14} /> : <Play size={14} />}{" "}
-                      Auto
-                    </button>
-                    <button
+                      {isPlayingAuto ? <><Pause size={12} /> Pause</> : <><Play size={12} /> Auto</>}
+                    </ToolChip>
+                    <ToolChip
+                      active={isLooping}
                       onClick={() => setIsLooping(!isLooping)}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs rounded transition-colors ${isLooping ? "text-purple-400 font-medium" : "text-neutral-500 hover:text-neutral-400"}`}
-                      title="Loop Sequence"
+                      title="Loop playback over the current selection"
                     >
-                      <RefreshCw size={14} /> Loop
-                    </button>
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-                    <button
+                      Loop
+                    </ToolChip>
+                  </ToolGroup>
+
+                  <ToolGroup label="Capture">
+                    <ToolChip
+                      active={isRecording}
                       onClick={() => {
                         if (isRecording) {
                           recorder.stop();
@@ -1500,145 +1752,126 @@ export default function App() {
                           setIsRecording(true);
                         }
                       }}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs rounded transition-colors ${isRecording ? "text-red-500 font-bold bg-red-500/20 animate-pulse" : "text-neutral-500 hover:text-red-400"}`}
-                      title="Record to Score"
+                      title="Capture your performance as MIDI"
                     >
-                      <div
-                        className={`w-2 h-2 rounded-full ${isRecording ? "bg-red-500" : "bg-red-900"}`}
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${isRecording ? "bg-[color:var(--color-err)] animate-pulse" : "bg-[color:var(--color-text-3)]"}`}
+                        aria-hidden="true"
                       />
                       {isRecording ? "REC" : "Record"}
-                    </button>
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-                    <button
+                    </ToolChip>
+                    <ToolChip
+                      active={showLiveScore}
                       onClick={() => setShowLiveScore(!showLiveScore)}
-                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs rounded transition-colors ${showLiveScore ? "text-purple-400 font-medium bg-purple-500/10" : "text-neutral-500 hover:text-white"}`}
-                      title="Toggle Live Score View"
+                      title="Toggle live score view under the canvas"
                     >
-                      <BookOpen size={14} /> Score
-                    </button>
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-                    <select
-                      value={timeSignature}
-                      onChange={(e) => setTimeSignature(e.target.value as any)}
-                      className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer hover:text-white"
-                    >
-                      <option value="4/4">4/4</option>
-                      <option value="6/8">6/8</option>
-                      <option value="7/8">7/8</option>
-                      <option value="11/4">11/4</option>
-                      <option value="tintal">Tintal (16)</option>
-                    </select>
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-                    <select
-                      value={beatType}
-                      onChange={(e) => setBeatType(e.target.value as any)}
-                      className="bg-transparent text-xs text-neutral-400 outline-none cursor-pointer hover:text-white"
-                    >
-                      <option value="none">No Beat</option>
-                      <option value="metronome">Metronome</option>
-                      <option value="jazz">Jazz Ride</option>
-                      <option value="bossa">Bossa Nova</option>
-                      <option value="techno">Techno</option>
-                    </select>
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-                    <input
-                      type="range"
-                      min="30"
-                      max="180"
-                      value={tempo}
-                      onChange={(e) => setTempo(parseInt(e.target.value))}
-                      className="w-20 accent-purple-500"
-                      title="Tempo (BPM)"
-                    />
-                    <span className="text-xs text-neutral-500 font-mono w-[50px] text-right">
-                      {tempo} BPM
-                    </span>
-
-                    <div className="h-4 w-px bg-neutral-700 mx-1"></div>
-
-                    <div className="flex items-center gap-1.5 text-neutral-400">
-                      <Volume2 size={14} />
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={volume}
-                        onChange={(e) => setVolume(parseInt(e.target.value))}
-                        className="w-16 accent-purple-500"
-                        title="Volume"
-                      />
-                    </div>
-                    <span className="text-xs text-neutral-500 font-mono w-[30px] text-right">
-                      {volume}%
-                    </span>
-                  </div>
+                      <BookOpen size={12} /> Score
+                    </ToolChip>
+                  </ToolGroup>
                 </div>
-              </div>
 
-              <div className="mt-8 md:mt-0 flex gap-2 self-start md:self-center">
+                {/* DDSP render — full-width, secondary tone. When running,
+                    the same button becomes a Stop control. */}
                 <button
-                  onClick={() =>
-                    setActiveStepIndex(Math.max(activeStepIndex - 1, 0))
+                  onClick={async () => {
+                    if (ddspAction.status === "running") {
+                      ddspAction.cancel();
+                      recorder.stop();
+                      setIsDDSPLoading(false);
+                      return;
+                    }
+                    setIsDDSPLoading(true);
+                    await ddspAction.run(async (signal) => {
+                      const notes = path.steps.map((s) =>
+                        s.notes.map((n) => n + transposeShift),
+                      );
+                      const chordDur = 60 / tempo;
+                      recorder.start();
+                      for (const p of notes[0]) recorder.recordNoteOn(p);
+                      const stepStarts = [0];
+                      for (let i = 1; i < notes.length; i++) {
+                        if (signal.aborted) {
+                          recorder.stop();
+                          return;
+                        }
+                        stepStarts.push(stepStarts[i - 1] + chordDur);
+                      }
+                      let cancelled = false;
+                      // Schedule chord transitions; each one checks the
+                      // abort flag before firing.
+                      for (let i = 1; i < stepStarts.length; i++) {
+                        if (signal.aborted) {
+                          cancelled = true;
+                          break;
+                        }
+                        await new Promise<void>((resolve) => {
+                          const t = setTimeout(() => {
+                            if (signal.aborted) {
+                              resolve();
+                              return;
+                            }
+                            for (const p of notes[i - 1]) recorder.recordNoteOff(p);
+                            for (const p of notes[i]) recorder.recordNoteOn(p);
+                            resolve();
+                          }, (stepStarts[i] - stepStarts[i - 1]) * 1000);
+                          // If the user cancels while we're waiting, abort.
+                          signal.addEventListener("abort", () => {
+                            clearTimeout(t);
+                            resolve();
+                          });
+                        });
+                      }
+                      if (signal.aborted) {
+                        cancelled = true;
+                      } else {
+                        await synthesizeAndPlay(notes, chordDur);
+                      }
+                      for (const p of notes[notes.length - 1]) recorder.recordNoteOff(p);
+                      recorder.stop();
+                      if (!cancelled) setShowRecordingModal(true);
+                    });
+                    setIsDDSPLoading(false);
+                  }}
+                  disabled={false}
+                  className={`w-full py-2 t-mono text-xs surface-1 border rounded-[var(--radius-md)] flex items-center justify-center gap-2 transition-colors ${
+                    ddspAction.status === "running"
+                      ? "border-[color:var(--color-err)] text-[color:var(--color-err)] hover:bg-[color:var(--color-err)]/10"
+                      : "border-[color:var(--color-border)] text-[color:var(--color-text-1)] hover:border-[color:var(--color-brand-strong)] hover:text-[color:var(--color-brand-strong)]"
+                  }`}
+                  title={
+                    ddspAction.status === "running"
+                      ? "Stop the DDSP render"
+                      : "Render the full progression with DDSP — recording is captured for MIDI/PDF export"
                   }
-                  disabled={activeStepIndex === 0}
-                  className="w-12 h-12 flex items-center justify-center rounded-full bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition-colors"
-                  aria-label="Previous Voicing"
                 >
-                  <ChevronLeft />
+                  {ddspAction.status === "running" ? (
+                    <>
+                      <Square size={12} fill="currentColor" /> Stop DDSP
+                    </>
+                  ) : (
+                    <>
+                      <Hexagon size={14} className="text-[color:var(--color-brand)]" />
+                      Render with DDSP
+                    </>
+                  )}
                 </button>
-
-                {activeMidis.length > 0 ? (
-                  <button
-                    onClick={() => {
-                      audioEngine.stopAll();
-                      midiOut.stopAll();
-                      setActiveMidis([]);
-                      setIsPlayingAuto(false);
-                    }}
-                    className="w-12 h-12 flex items-center justify-center rounded-full bg-neutral-800 hover:bg-neutral-700 fill-current transition-colors"
-                    aria-label="Stop Chord"
-                  >
-                    <Square
-                      size={20}
-                      className="fill-current text-purple-400"
-                    />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      audioEngine.playChord(currentChordNotes);
-                      midiOut.playChord(currentChordNotes);
-                      setActiveMidis(currentChordNotes);
-                    }}
-                    className="w-12 h-12 flex items-center justify-center rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors"
-                    aria-label="Play Chord"
-                  >
-                    <Play
-                      size={22}
-                      className="fill-current text-purple-400 translate-x-[2px]"
-                    />
-                  </button>
+                {ddspAction.status === "error" && ddspAction.error && (
+                  <div className="mt-2">
+                    <InlineErrorPill onDismiss={() => ddspAction.cancel()}>
+                      DDSP render failed: {String(
+                        (ddspAction.error as Error)?.message ||
+                          ddspAction.error,
+                      )}
+                    </InlineErrorPill>
+                  </div>
                 )}
-
-                <button
-                  onClick={() =>
-                    setActiveStepIndex(
-                      Math.min(activeStepIndex + 1, path.steps.length - 1),
-                    )
-                  }
-                  disabled={activeStepIndex === path.steps.length - 1}
-                  className="w-12 h-12 flex items-center justify-center rounded-full bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-30 disabled:hover:bg-purple-600 transition-colors shadow-[0_0_20px_rgba(147,51,234,0.3)]"
-                  aria-label="Next Voicing"
-                >
-                  <ChevronRight />
-                </button>
               </div>
-            </div>
+            </StageFrame>
 
             {/* Canvas Area */}
             <div
               ref={canvasContainerRef}
-              className="flex-1 min-h-[300px] w-full relative bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-2xl"
+              className="flex-1 min-h-[260px] sm:min-h-[320px] w-full relative bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-2xl"
             >
               <SynesthesiaCanvas
                 visualTheme={activePersonaVisualTheme}
@@ -1652,6 +1885,19 @@ export default function App() {
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
                 Synesthesia Matrix Active
               </div>
+            </div>
+
+            {/* Fix #5: legend so the shapes have meaning */}
+            <div
+              className="mt-2 px-3 py-2 rounded-lg bg-black/30 border border-white/5 text-[11px] font-mono text-neutral-400 flex flex-wrap items-center gap-x-4 gap-y-1"
+              aria-label="Synesthesia canvas legend"
+            >
+              <span className="text-neutral-500 uppercase tracking-wider text-[10px]">Legend:</span>
+              <span><span className="inline-block w-3 h-3 rounded-full align-middle mr-1" style={{ background: "#E67E22" }} />● chord tone</span>
+              <span><span className="inline-block w-3 h-3 mr-1" style={{ background: "#E67E22", clipPath: "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)" }} />◆ 3rd / 5th</span>
+              <span><span className="inline-block w-3 h-3 mr-1" style={{ background: "#E67E22", clipPath: "polygon(50% 0%, 100% 100%, 0% 100%)" }} />▲ strong</span>
+              <span><span className="inline-block w-3 h-3 mr-1 border" style={{ background: "transparent", borderColor: "#E67E22" }} />✕ tension</span>
+              <span><span className="inline-block w-3 h-0.5 align-middle mr-1" style={{ background: "#E67E22" }} />─ line (passing)</span>
             </div>
 
             {showLiveScore && (
@@ -1740,8 +1986,11 @@ export default function App() {
       {showImportExport && (
         <ImportExportModal
           currentPath={path}
-          onImport={(newPath) => {
-            setPaths([newPath, ...paths]);
+          onImport={(newPaths) => {
+            if (newPaths.length === 0) return;
+            // Append imported charts to the path list, active = first
+            const merged = [...newPaths, ...paths];
+            setPaths(merged);
             setActivePathIndex(0);
             setActiveStepIndex(0);
             setTransposeShift(0);
