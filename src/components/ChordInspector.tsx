@@ -22,6 +22,7 @@ import {
 } from "../lib/theory";
 import { InstrumentPitch, TRANSPOSITIONS } from "../lib/scoreGenerator";
 import abcjs from "abcjs";
+import { loadSavedVoicings, saveVoicing, deleteVoicing, SavedVoicing } from "../lib/savedVoicings";
 import {
   X, Play, SkipForward, Undo2, Redo2, Check,
   ChevronDown, Music,
@@ -110,6 +111,15 @@ export const ChordInspector: React.FC<Props> = (props) => {
   const [transpose, setTranspose] = useState<TransposeInst>("Concert");
   const [staging, setStaging] = useState<number[] | null>(null); // pre-apply edit
   const [staffOpen, setStaffOpen] = useState(false);
+  // Tabs: "edit" (transforms + ABC), "saved" (saved-voicings list)
+  const [tab, setTab] = useState<"edit" | "saved">("edit");
+  const [savedVoicings, setSavedVoicings] = useState<SavedVoicing[]>([]);
+  const [saveName, setSaveName] = useState("");
+
+  // Reload saved voicings every time the inspector opens
+  useEffect(() => {
+    if (open) setSavedVoicings(loadSavedVoicings());
+  }, [open]);
   const stageRef = useRef<HTMLDivElement>(null);
   const abcRef = useRef<HTMLDivElement>(null);
 
@@ -315,6 +325,117 @@ export const ChordInspector: React.FC<Props> = (props) => {
                 Piano roll — {transpose}
               </div>
               <PianoRoll notes={transposedNotes} />
+            </div>
+
+            {/* Tab strip — Edit / Saved */}
+            <div className="bg-black/30 rounded-xl p-3">
+              <div className="flex gap-1 mb-3" role="tablist" aria-label="Voicing tools">
+                <button
+                  role="tab"
+                  aria-selected={tab === "edit"}
+                  onClick={() => setTab("edit")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
+                    tab === "edit"
+                      ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)]"
+                      : "surface-1 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+                  }`}
+                >
+                  Edit
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={tab === "saved"}
+                  onClick={() => setTab("saved")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
+                    tab === "saved"
+                      ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)]"
+                      : "surface-1 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+                  }`}
+                >
+                  Saved ({savedVoicings.length})
+                </button>
+              </div>
+
+              {tab === "edit" ? (
+                <>
+                  {/* (existing edit-tab content — quick transforms + audition + ABC staff) */}
+                </>
+              ) : (
+                /* Saved-voicings tab */
+                <div className="space-y-2">
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Name this voicing (e.g. 'My F#m7b5')"
+                      value={saveName}
+                      onChange={(e) => setSaveName(e.target.value)}
+                      className="flex-1 bg-black/30 border border-white/10 rounded-md px-2 py-1.5 text-xs text-neutral-100 placeholder:text-neutral-600"
+                      aria-label="Voicing name"
+                    />
+                    <button
+                      onClick={() => {
+                        if (!liveNotes.length) return;
+                        const name = saveName.trim() || `Voicing ${savedVoicings.length + 1}`;
+                        const saved = saveVoicing({
+                          name,
+                          notes: liveNotes,
+                          tags: [stepName, transpose],
+                        });
+                        setSavedVoicings((prev) => [...prev, saved]);
+                        setSaveName("");
+                      }}
+                      disabled={!liveNotes.length}
+                      className="px-3 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-mono disabled:opacity-30"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  {savedVoicings.length === 0 ? (
+                    <div className="text-[10px] text-neutral-500 text-center py-4">
+                      No saved voicings yet. Edit a chord and click Save.
+                    </div>
+                  ) : (
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {savedVoicings.map((v) => (
+                        <div
+                          key={v.id}
+                          className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md surface-1 border border-white/5"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs text-neutral-100 truncate">{v.name}</div>
+                            <div className="text-[10px] t-mono text-neutral-500">
+                              {v.notes.length} notes · {new Date(v.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                setStaging([...v.notes]);
+                                onAudition("block", v.notes);
+                              }}
+                              className="px-2 py-1 rounded text-[10px] font-mono surface-2 border border-white/10 hover:border-[color:var(--color-brand-strong)]"
+                              title="Audition this voicing"
+                            >
+                              ▶
+                            </button>
+                            <button
+                              onClick={() => {
+                                deleteVoicing(v.id);
+                                setSavedVoicings((prev) => prev.filter((x) => x.id !== v.id));
+                              }}
+                              className="px-2 py-1 rounded text-[10px] font-mono surface-2 border border-white/10 hover:border-red-500/60 hover:text-red-300"
+                              title="Delete this voicing"
+                              aria-label={`Delete ${v.name}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="bg-black/30 rounded-xl p-3">
