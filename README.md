@@ -1,13 +1,13 @@
 ---
 title: Harmonic Study Engine
 emoji: 🎺
-colorFrom: amber
-colorTo: purple
+colorFrom: yellow
+colorTo: indigo
 sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: Trumpet practice engine — harmonic etudes, backing tracks, MIDI/MusicXML export, recording
+short_description: Trumpet practice engine for jazz etudes
 ---
 
 # Harmonic Study Engine

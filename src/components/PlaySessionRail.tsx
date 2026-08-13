@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { HarmonicPath } from "../lib/paths";
+import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
 import { NOTE_NAMES } from "../lib/theory";
 import { RenderMode } from "../lib/loopWav";
@@ -20,7 +21,7 @@ import {
   Circle,
 } from "lucide-react";
 
-type Stage = "choose" | "perform" | "commit";
+type Stage = "choose" | "perform" | "commit" | "masterclass";
 
 interface RailProps {
   paths: HarmonicPath[];
@@ -71,12 +72,13 @@ interface RailProps {
 }
 
 const STAGE_LABELS: Record<Stage, { title: string; subtitle: string }> = {
-  choose:  { title: "Choose Path",     subtitle: "Pick a curated 16-bar harmonic preset" },
-  perform: { title: "Perform",         subtitle: "Audition / practice / revise" },
-  commit:  { title: "Record & Export", subtitle: "Capture your take — MIDI, lead sheet, performance" },
+  choose:       { title: "Choose Path",     subtitle: "Pick a curated 16-bar harmonic preset" },
+  perform:      { title: "Perform",         subtitle: "Audition / practice / revise" },
+  commit:       { title: "Record & Export", subtitle: "Capture your take — MIDI, lead sheet, performance" },
+  masterclass:  { title: "Masterclass",     subtitle: "33 working tunes from the WCJA curriculum (MC 1–40 + PJ 1–4)" },
 };
 
-const STAGE_ORDER: Stage[] = ["choose", "perform", "commit"];
+const STAGE_ORDER: Stage[] = ["choose", "perform", "commit", "masterclass"];
 
 export const PlaySessionRail: React.FC<RailProps> = (p) => {
   // Stage is derived from user actions; user can still navigate explicitly.
@@ -209,6 +211,16 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           setWavMode={p.setWavMode}
         />
       )}
+      {stage === "masterclass" && (
+        <MasterclassStage
+          activePathId={p.activePath?.id}
+          onPickInApp={(id) => {
+            const i = p.paths.findIndex((x) => x.id === id);
+            if (i >= 0) p.setActivePathIndex(i);
+            setStage("perform");
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -216,6 +228,84 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
 // =====================================================================
 // Sub-stages
 // =====================================================================
+
+const MasterclassStage: React.FC<{
+  activePathId?: string;
+  onPickInApp: (id: string) => void;
+}> = ({ activePathId, onPickInApp }) => {
+  // Group by class family so the user can scan MC 1-10, MC 11-20, etc.
+  const groups: { label: string; entries: MasterclassEntry[] }[] = [];
+  for (let lo = 1; lo <= 40; lo += 10) {
+    const hi = lo + 9;
+    const entries = MASTERCLASS_TUNES.filter((t) =>
+      t.classes.some((c) => {
+        const m = c.match(/MC (\d+)/);
+        if (!m) return false;
+        const n = parseInt(m[1], 10);
+        return n >= lo && n <= hi;
+      }),
+    );
+    if (entries.length > 0) groups.push({ label: `MC ${lo}–${hi}`, entries });
+  }
+  return (
+    <div>
+      <div className="text-[10px] t-mono text-neutral-500 mb-2">
+        {availableTunes().length} of {MASTERCLASS_TUNES.length} tunes are wired into the app right now;
+        the rest are listed as <em>coming soon</em> — picking one from the app set opens the path immediately.
+      </div>
+      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+        {groups.map((g) => (
+          <div key={g.label}>
+            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-mono mb-1.5 sticky top-0 surface-2 py-1">
+              {g.label}
+            </div>
+            <div className="space-y-1.5">
+              {g.entries.map((t) => {
+                const isActive = t.inApp && t.id === activePathId;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => t.inApp && onPickInApp(t.id)}
+                    disabled={!t.inApp}
+                    title={t.inApp ? `Open ${t.title}` : `${t.title} — coming soon`}
+                    className={`w-full text-left rounded-lg border p-2.5 transition ${
+                      isActive
+                        ? "border-[color:var(--color-brand-strong)] bg-[color:var(--color-brand-muted)]"
+                        : t.inApp
+                          ? "border-white/10 surface-2 hover:border-[color:var(--color-brand-muted)] cursor-pointer"
+                          : "border-white/5 surface-1 opacity-50 cursor-not-allowed"
+                    }`}
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className={`font-bold text-xs ${isActive ? "text-white" : t.inApp ? "text-neutral-100" : "text-neutral-500"}`}>
+                        {t.title}
+                      </span>
+                      <span className="text-[9px] t-mono text-neutral-500">
+                        {t.classes.join(" · ")}
+                      </span>
+                      {isActive && (
+                        <span className="ml-auto text-[9px] t-mono text-emerald-400 border border-emerald-700/40 px-1 py-0.5 rounded">
+                          ● now
+                        </span>
+                      )}
+                    </div>
+                    <div className={`text-[10px] mt-1 ${t.inApp ? "text-neutral-400" : "text-neutral-600"}`}>
+                      {t.description}
+                    </div>
+                    <div className="text-[10px] mt-1.5 text-neutral-300 italic">
+                      <span className="text-[9px] text-neutral-500 not-italic font-mono mr-1">→</span>
+                      {t.mainExercise}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const FilterChip: React.FC<{
   active: boolean;
