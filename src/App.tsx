@@ -35,8 +35,11 @@ import { useBassNotes } from "./lib/useBassNotes";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
+import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
 import { PianoKeyboard } from "./components/PianoKeyboard";
 import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
+import { PracticeSetBrowser } from "./components/PracticeSetBrowser";
+import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
@@ -124,6 +127,13 @@ export default function App() {
       return ALL_PATHS;
     }
   });
+
+  const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
+  const [recentSessions] = useState(() => getRecentSessions(5));
+  const [activePracticeSet, setActivePracticeSet] = useState<{
+    set: Parameters<typeof PracticeSessionPlayer>[0]["set"];
+    options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
+  } | null>(null);
 
   const [activePathIndex, setActivePathIndex] = useState(() => {
     try {
@@ -248,6 +258,7 @@ export default function App() {
   // Collapsible / Foldable states for space optimization
   const [isArpFolded, setIsArpFolded] = useState(false);
   const [isGenFolded, setIsGenFolded] = useState(true); // default folded to conserve screen height
+  const [activePanel, setActivePanel] = useState<"paths" | "practice">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
 
   const [kbRange, setKbRange] = useState<{ from: number; to: number }>(() => {
@@ -1810,89 +1821,171 @@ export default function App() {
                 )}
               </div>
 
-              {/* Harmonic Paths Selector */}
-              <div className="mb-2">
-                <div
-                  onClick={() => setIsPathsFolded(!isPathsFolded)}
-                  className="flex items-center justify-between mb-3 cursor-pointer select-none group"
-                >
-                  <h2 className="text-sm uppercase tracking-widest text-neutral-500 font-semibold group-hover:text-neutral-300 transition-colors">
-                    Harmonic Paths
-                  </h2>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-neutral-600 font-mono">
-                      ({paths.length} items)
-                    </span>
-                    <button className="text-neutral-500 hover:text-neutral-300 transition-colors">
-                      {isPathsFolded ? (
-                        <ChevronDown size={14} />
-                      ) : (
-                        <ChevronUp size={14} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {!isPathsFolded && (
-                  <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                    {paths.map((p, idx) => (
-                      <button
-                        key={p.id}
-                        onClick={() => {
-                          setActivePathIndex(idx);
-                          setActiveStepIndex(0);
-                        }}
-                        className={`text-left p-3 rounded-xl border transition-all ${
-                          activePathIndex === idx
-                            ? "bg-purple-900/20 border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)]"
-                            : "bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10"
-                        }`}
-                      >
-                        <div className="font-medium text-sm text-neutral-200">
-                          {p.title}
-                        </div>
-                        {p.id.startsWith("generated-") && (
-                          <div className="text-[10px] text-purple-400 mt-1 uppercase">
-                            Generated
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              {/* Panel tab switcher */}
+              <div className="flex gap-1 mb-3">
+                {(["paths", "practice"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActivePanel(tab)}
+                    className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      activePanel === tab
+                        ? "bg-purple-900/30 text-purple-300 border border-purple-500/30"
+                        : "text-neutral-500 hover:text-neutral-300 border border-transparent"
+                    }`}
+                  >
+                    {tab === "paths" ? "Paths" : "Practice"}
+                  </button>
+                ))}
               </div>
 
-              <div className="mt-6 pt-6 border-t border-neutral-800">
-                <h3 className="text-lg font-medium text-purple-300 mb-2">
-                  {path.title}
-                </h3>
-                <p className="text-sm text-neutral-400 leading-relaxed mb-6">
-                  {path.description}
-                </p>
-
-                <div className="flex flex-col gap-3">
-                  {path.steps.map((s, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveStepIndex(idx)}
-                      className={`flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
-                        activeStepIndex === idx
-                          ? "bg-purple-500/20 text-purple-200"
-                          : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
-                      }`}
+              {/* Paths tab */}
+              {activePanel === "paths" && (
+                <>
+                  {/* Harmonic Paths Selector */}
+                  <div className="mb-2">
+                    <div
+                      onClick={() => setIsPathsFolded(!isPathsFolded)}
+                      className="flex items-center justify-between mb-3 cursor-pointer select-none group"
                     >
-                      <span className="font-mono text-xs opacity-50">
-                        {idx + 1}
-                      </span>
-                      <span
-                        className={`font-medium text-sm ${activeStepIndex === idx ? "text-purple-100" : ""}`}
-                      >
-                        {s.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      <h2 className="text-sm uppercase tracking-widest text-neutral-500 font-semibold group-hover:text-neutral-300 transition-colors">
+                        Harmonic Paths
+                      </h2>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-neutral-600 font-mono">
+                          ({paths.length} items)
+                        </span>
+                        <button className="text-neutral-500 hover:text-neutral-300 transition-colors">
+                          {isPathsFolded ? (
+                            <ChevronDown size={14} />
+                          ) : (
+                            <ChevronUp size={14} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {!isPathsFolded && (
+                      <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                        {paths.map((p, idx) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              setActivePathIndex(idx);
+                              setActiveStepIndex(0);
+                            }}
+                            className={`text-left p-3 rounded-xl border transition-all ${
+                              activePathIndex === idx
+                                ? "bg-purple-900/20 border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)]"
+                                : "bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10"
+                            }`}
+                          >
+                            <div className="font-medium text-sm text-neutral-200">
+                              {p.title}
+                            </div>
+                            {p.id.startsWith("generated-") && (
+                              <div className="text-[10px] text-purple-400 mt-1 uppercase">
+                                Generated
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Path detail — always visible so canvas/keyboard render */}
+                  <div className="mt-6 pt-6 border-t border-neutral-800">
+                    <h3 className="text-lg font-medium text-purple-300 mb-2">
+                      {path.title}
+                    </h3>
+                    <p className="text-sm text-neutral-400 leading-relaxed mb-6">
+                      {path.description}
+                    </p>
+
+                    <div className="flex flex-col gap-3">
+                      {path.steps.map((s, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActiveStepIndex(idx)}
+                          className={`flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
+                            activeStepIndex === idx
+                              ? "bg-purple-500/20 text-purple-200"
+                              : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
+                          }`}
+                        >
+                          <span className="font-mono text-xs opacity-50">
+                            {idx + 1}
+                          </span>
+                          <span
+                            className={`font-medium text-sm ${activeStepIndex === idx ? "text-purple-100" : ""}`}
+                          >
+                            {s.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Practice tab */}
+              {activePanel === "practice" && (
+                <>
+                  {/* Path detail visible during practice too — drives canvas/keyboard */}
+                  <div className="mb-4 pb-4 border-b border-neutral-800">
+                    <h3 className="text-sm font-medium text-purple-300 mb-1">
+                      {path.title}
+                    </h3>
+                    <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">
+                      {path.description}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {path.steps.slice(0, 8).map((s, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActiveStepIndex(idx)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                            activeStepIndex === idx
+                              ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                              : "bg-white/5 text-neutral-500 border border-white/10 hover:bg-white/10"
+                          }`}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Session player OR set browser */}
+                  {activePracticeSet ? (
+                    <PracticeSessionPlayer
+                      set={activePracticeSet.set}
+                      options={activePracticeSet.options}
+                      onStop={() => setActivePracticeSet(null)}
+                      onStepChange={(pathIndex, stepIndex) => {
+                        setActivePathIndex(pathIndex);
+                        setActiveStepIndex(stepIndex);
+                      }}
+                    />
+                  ) : (
+                    <PracticeSetBrowser
+                      sets={practiceSets}
+                      recentSessions={recentSessions}
+                      onMutate={setPracticeSets}
+                      onStart={(set) => {
+                        setActivePracticeSet({
+                          set,
+                          options: {
+                            tempo: set.defaultTempo,
+                            reps: set.defaultReps,
+                            transposeSemitones: set.defaultTransposeSemitones,
+                          },
+                        });
+                      }}
+                    />
+                  )}
+                </>
+              )}
             </div>
           </div>
 
