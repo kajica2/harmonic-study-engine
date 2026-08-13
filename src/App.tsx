@@ -30,6 +30,7 @@ import { playbackClock } from "./lib/playbackClock";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { useHistory } from "./lib/useHistory";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
+import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
@@ -393,6 +394,12 @@ export default function App() {
   const [scaleMode, setScaleMode] = useState<string>("auto");
   const [scaleBusy, setScaleBusy] = useState(false);
   const [scaleModeOpen, setScaleModeOpen] = useState(false);
+
+  // Rhythm drill state — same pattern as scaleBusy. We keep it
+  // tiny because the drill is mostly self-scheduling on the audio
+  // clock; only the button label needs to flip.
+  const [drillBusy, setDrillBusy] = useState(false);
+  const [drillIter, setDrillIter] = useState<DrillSubdivision | null>(null);
 
   const [isLooping, setIsLooping] = useState(() => {
     try {
@@ -1931,6 +1938,82 @@ export default function App() {
                       }`}
                     >
                       {scaleBusy ? "▶ Playing scale…" : "↗ Scale"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (drillBusy) return;
+                        audioEngine.stopAll();
+                        midiOut.stopAll();
+                        // Pick a 2-bar phrase: current chord + next
+                        // chord's notes. If we're on the last chord,
+                        // just use the current chord's notes for both
+                        // iterations (the drill still works).
+                        const nextIdx = Math.min(activeStepIndex + 1, path.steps.length - 1);
+                        const phraseNotes = [
+                          ...step.notes.map((n) => n + transposeShift),
+                          ...path.steps[nextIdx].notes.map((n) => n + transposeShift),
+                        ];
+                        // Run the three iterations with progress
+                        // callbacks so the UI can show which
+                        // subdivision is currently sounding. Total
+                        // duration ≈ (12 / tempo) + 0.4s of gaps.
+                        const beatSec = 60 / tempo;
+                        const totalBars = 2;
+                        const subSpecs: Array<{ sub: DrillSubdivision; durationSec: number; startAt: number }> = [];
+                        let cursor = 0.05;
+                        (["quarter", "eighth", "sixteenth"] as DrillSubdivision[]).forEach((sub) => {
+                          const divisor = sub === "quarter" ? 1 : sub === "eighth" ? 2 : 4;
+                          const noteDurSec = beatSec / divisor;
+                          const totalNotes = 4 * divisor * totalBars;
+                          subSpecs.push({
+                            sub,
+                            startAt: cursor,
+                            durationSec: totalNotes * noteDurSec,
+                          });
+                          cursor += totalNotes * noteDurSec + 0.2;
+                        });
+                        const totalSec = cursor;
+                        setDrillBusy(true);
+                        setHDSoundsTick((t) => t + 1); // noop re-render
+                        // Tick the iteration indicator per the spec
+                        subSpecs.forEach((spec) => {
+                          tm.set(() => setDrillIter(spec.sub), Math.max(0, spec.startAt * 1000));
+                          tm.set(() => setDrillIter(null), Math.max(0, (spec.startAt + spec.durationSec) * 1000));
+                        });
+                        // Schedule the actual audio
+                        const ctx = audioEngine.getCtx();
+                        if (ctx) {
+                          const baseSec = ctx.currentTime;
+                          subSpecs.forEach((spec) => {
+                            const sub = spec.sub;
+                            const divisor = sub === "quarter" ? 1 : sub === "eighth" ? 2 : 4;
+                            const noteDurSec = beatSec / divisor;
+                            const totalNotes = 4 * divisor * totalBars;
+                            const iterStart = baseSec + spec.startAt;
+                            for (let n = 0; n < totalNotes; n++) {
+                              const phraseIdx = n % phraseNotes.length;
+                              const midi = phraseNotes[phraseIdx];
+                              const when = iterStart + n * noteDurSec;
+                              audioEngine.playNote(midi);
+                              const stopAt = when + noteDurSec * 0.9;
+                              setTimeout(() => audioEngine.stopNote(midi), Math.max(0, (stopAt - ctx.currentTime) * 1000));
+                            }
+                          });
+                        }
+                        tm.set(() => setDrillBusy(false), totalSec * 1000 + 200);
+                      }}
+                      disabled={drillBusy}
+                      title="Play the same phrase 3× — quarter notes, then 8ths, then 16ths (the masterclass 3-iteration rhythm drill)"
+                      aria-label="Run rhythm drill: 3 iterations"
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-md)] text-xs font-mono border transition-colors ${
+                        drillBusy
+                          ? "border-[color:var(--color-brand)] text-[color:var(--color-brand)] bg-[color:var(--color-brand)]/10"
+                          : "surface-1 border-[color:var(--color-border)] text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)] hover:border-[color:var(--color-brand-strong)]"
+                      }`}
+                    >
+                      {drillBusy
+                        ? `▶ Drill · ${drillIter ?? "starting"}…`
+                        : "▶ Drill → 3×"}
                     </button>
                     <button
                       onClick={() => setScaleModeOpen(!scaleModeOpen)}
