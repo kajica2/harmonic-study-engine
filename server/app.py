@@ -4,14 +4,29 @@ FastAPI server that exposes DDSP synthesis via a REST API.
 
 import os
 import struct
-from fastapi import FastAPI, UploadFile, File, Form
+import logging
+from pathlib import Path
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 
-from .synthesizer import synthesize_progression
-from .fx import apply_reverb
+logger = logging.getLogger(__name__)
+
+# DDSP is heavy and the upstream v3.7.0 tag is gone. The HF
+# Dockerfile omits ddsp from the install; the synthesizer and fx
+# modules are imported lazily and 503 if ddsp isn't available.
+_DDSP_AVAILABLE = False
+try:
+    from .synthesizer import synthesize_progression
+    from .fx import apply_reverb
+    _DDSP_AVAILABLE = True
+except Exception as e:
+    logger.warning("ddsp not available: %s", e)
+    synthesize_progression = None
+    apply_reverb = None
 
 _DEFAULT_ORIGINS = [
     "http://localhost:3000",
@@ -56,8 +71,11 @@ class HealthResponse(BaseModel):
 
 @app.get("/health", response_model=HealthResponse)
 def health():
-    import ddsp
-    return HealthResponse(status="ok", ddsp_version=ddsp.__version__)
+    if _DDSP_AVAILABLE:
+        import ddsp
+        return HealthResponse(status="ok", ddsp_version=ddsp.__version__)
+    # No ddsp — degraded mode (HF free tier). App still works.
+    return HealthResponse(status="degraded", ddsp_version="unavailable")
 
 
 @app.post("/synthesize")
@@ -68,6 +86,13 @@ def synthesize(req: SynthesizeRequest):
     Accepts a list of chords, each with MIDI note numbers.
     Returns a WAV audio file.
     """
+    if not _DDSP_AVAILABLE or synthesize_progression is None:
+        return Response(
+            status_code=503,
+            content="ddsp not available in this build. The /synthesize "
+                    "endpoint requires a forked ddsp repo + paid CPU tier.",
+            media_type="text/plain",
+        )
     wav_bytes = synthesize_progression(
         req.chord_notes,
         chord_duration=req.chord_duration,
@@ -97,6 +122,12 @@ async def fx_reverb(
     Parameters sent as form fields.
     Returns: WAV (16-bit PCM, mono, original sample rate).
     """
+    if not _DDSP_AVAILABLE or apply_reverb is None:
+        return Response(
+            status_code=503,
+            content="ddsp not available in this build.",
+            media_type="text/plain",
+        )
     raw = await audio.read()
     if not raw:
         return Response(status_code=400, content="empty audio")
@@ -210,6 +241,31 @@ async def recordings_upload(
 
 def main():
     uvicorn.run("server.app:app", host="127.0.0.1", port=8765, reload=False)
+
+
+# ---------- Static frontend (SPA) ----------
+# Only mounts when the Vite build directory exists. In the HF
+# Dockerfile the `dist/` is copied to /app/server/static so the
+# same URL serves both the SPA and the API. In local dev the
+# frontend is served by `npm run dev` on :3000, so the static
+# mount is a no-op and the dev server takes precedence.
+_STATIC_DIR = Path(__file__).parent / "static"
+if _STATIC_DIR.exists() and any(_STATIC_DIR.iterdir()):
+    # Mount assets under /assets so Vite's hashed filenames resolve.
+    if (_STATIC_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=_STATIC_DIR / "assets"), name="assets")
+    # Serve the SPA — every non-API path falls through to index.html
+    # so client-side routes resolve correctly on hard refresh.
+    @app.get("/", include_in_schema=False)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa_fallback(full_path: str = ""):
+        # Don't shadow API routes — but they're already declared
+        # above so FastAPI handles them first. This catch-all
+        # only fires for paths the API didn't match.
+        index = _STATIC_DIR / "index.html"
+        if index.exists():
+            return Response(content=index.read_bytes(), media_type="text/html")
+        return Response(status_code=404, content="frontend not built")
 
 
 if __name__ == "__main__":
