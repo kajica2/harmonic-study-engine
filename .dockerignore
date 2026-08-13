@@ -1,0 +1,61 @@
+# Build context exclusions for the HF Dockerfile.
+# We DO want src/, server/, package.json, package-lock.json, tsconfig.json,
+# vite.config.ts, index.html, and the Dockerfile itself to be in context.
+# Everything below is excluded.
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+.npm/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# CI / docs
+.github/
+docs/
+
+# Misc
+*.log
+*.pid
+*.seed
+*.pid.lock
+.env
+.env.local
+.env.*.local
+coverage/
+*.tgz
+yarn-error.log
+npm-debug.log*
+
+# HF metadata we don't need in the build
+README.md
+.huggingface.yml
