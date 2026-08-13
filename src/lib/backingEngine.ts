@@ -103,6 +103,13 @@ class BackingEngine {
   private bassPlayer: any = null;
   private pianoPlayer: any = null;
   private isPlaying = false;
+  // MIDI notes currently sounding on the bass line. Tracked so
+  // the React layer can light up the matching piano keys in
+  // real time. Updated by playBass (add) and via setTimeout
+  // (remove) at the same offset the soundfont release happens.
+  // Exposed via getActiveBassMidis() for the useBassNotes hook.
+  private activeBassMidis = new Set<number>();
+  private bassListeners = new Set<(m: number[], removed: number) => void>();
 
   init() {
     if (this.ctx) return;
@@ -160,6 +167,34 @@ class BackingEngine {
 
   setStyle(style: BackingStyle) {
     this.style = style;
+  }
+
+  /**
+   * Subscribe to bass-note changes. The callback fires whenever
+   * a bass note is added or removed from the active set. Used
+   * by the useBassNotes React hook to keep the piano's bass
+   * layer in sync with the audio.
+   */
+  onBassNotes(cb: (m: number[], removed: number) => void): () => void {
+    this.bassListeners.add(cb);
+    return () => {
+      this.bassListeners.delete(cb);
+    };
+  }
+
+  /** Snapshot of currently-sounding bass notes. */
+  getActiveBassMidis(): number[] {
+    return Array.from(this.activeBassMidis);
+  }
+
+  private _addBassNote(midi: number) {
+    this.activeBassMidis.add(midi);
+    for (const cb of this.bassListeners) cb(Array.from(this.activeBassMidis), -1);
+  }
+
+  private _removeBassNote(midi: number) {
+    this.activeBassMidis.delete(midi);
+    for (const cb of this.bassListeners) cb(Array.from(this.activeBassMidis), midi);
   }
 
   /**
@@ -226,6 +261,10 @@ class BackingEngine {
   stop() {
     this.isPlaying = false;
     this.scheduledSteps = 0;
+    // Clear any in-flight bass notes so the piano layer resets
+    // to "nothing sounding" the moment the user hits Stop.
+    this.activeBassMidis.clear();
+    for (const cb of this.bassListeners) cb([], -1);
   }
 
   /**
@@ -682,6 +721,13 @@ class BackingEngine {
       const inst = STYLE_INSTRUMENTS[this.style].bass;
       const gain = inst === "electric_bass_finger" ? 0.85 : inst === "slap_bass_1" ? 0.7 : 0.55;
       player.play(noteName, time, { duration: durSec * 0.95, gain });
+      // Track the note in the active set so the piano layer can
+      // light it up. The setTimeout fires at the same offset the
+      // soundfont starts its release, so the visual matches the
+      // audible decay.
+      this._addBassNote(midi);
+      const releaseAt = (time + durSec * 0.95 - this.ctx.currentTime) * 1000;
+      setTimeout(() => this._removeBassNote(midi), Math.max(0, releaseAt));
     } catch {
       /* ignore */
     }
