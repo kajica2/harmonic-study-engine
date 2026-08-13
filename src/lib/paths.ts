@@ -859,3 +859,41 @@ import { STUDIES_PATHS as GENERATED_STUDIES_PATHS } from "./studies";
 export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS;
 
 export const ALL_PATHS: HarmonicPath[] = [...PATHS, ...STUDIES_PATHS];
+
+// ─── Practice Sets ─────────────────────────────────────────────────────────────
+
+export interface PracticeSetItem {
+  pathId: string;
+  /** 1-indexed bar number, inclusive. Omit to use the full path. */
+  startBar?: number;
+  /** 1-indexed bar number, inclusive. Omit to play to end. */
+  endBar?: number;
+}
+
+export interface PracticeSet {
+  id: string;
+  title: string;
+  description: string;
+  focusTags: string[];
+  items: PracticeSetItem[];
+  /** Default BPM. User can override per session. */
+  defaultTempo: number;
+  /** Default repetitions of the full set. */
+  defaultReps: number;
+  /** Default transpose in semitones. */
+  defaultTransposeSemitones: number;
+  suggestedFrequency?: "daily" | "weekly" | "as-needed";
+  /** Built-in seed set — cannot be deleted or edited by the user. */
+  seed?: boolean;
+}
+
+export interface PracticeSession {
+  setId: string;
+  setTitle: string;
+  completedAt: string; // ISO 8601
+  reps: number;
+  tempo: number;
+  transposeSemitones: number;
+  stepsCompleted: number;
+  durationSeconds: number;
+}
