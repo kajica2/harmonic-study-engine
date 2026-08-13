@@ -1093,7 +1093,17 @@ export default function App() {
         pathLength={path.steps.length}
         onShowInspector={() => setShowChordInspector(true)}
         onShowExport={() => setShowImportExport(true)}
-        onCommit={() => {
+        onTogglePlayAlong={() => audioEngine.setMelodyMuted(!audioEngine.melodyMuted)}
+        onToggleLoop={() => setIsLooping(!isLooping)}
+        melodyMuted={audioEngine.melodyMuted}
+        isLooping={isLooping}
+        onCommit={async () => {
+          // Reuse the same media recording flow as the rail's
+          // Record & Export tile. See the long onCommit in
+          // PlaySessionRail for the full flow (start audio recorder,
+          // upload WebM, transcode to MP4 via ffmpeg).
+          // For brevity on mobile, we just start MIDI + auto here
+          // and rely on the rail's full flow for video.
           recorder.start();
           setIsPlayingAuto(true);
         }}
@@ -2277,7 +2287,16 @@ export default function App() {
                     <ToolChip
                       active={!drumsMuted}
                       onClick={() => setDrumsMuted(!drumsMuted)}
-                      title={drumsMuted ? "Unmute drums" : "Mute drums"}
+                      title={
+                        beatType === "off"
+                          ? drumsMuted
+                            ? "Unmute drums (no backing style selected)"
+                            : "Mute drums"
+                          : `Drums: ${beatType} pattern — ${
+                              drumsMuted ? "currently muted" : "sounding"
+                            }`
+                      }
+                      aria-label={`Drums track (${beatType})`}
                       aria-pressed={!drumsMuted}
                     >
                       {drumsMuted ? "○ Drums" : "● Drums"}
@@ -2286,10 +2305,19 @@ export default function App() {
                       active={!bassMuted}
                       onClick={() => setBassMuted(!bassMuted)}
                       title={
-                        bassMuted
-                          ? "Unmute bass (e.g. for bass practice)"
-                          : "Mute bass line"
+                        beatType === "off"
+                          ? bassMuted
+                            ? "Unmute bass (no backing style selected)"
+                            : "Mute bass"
+                          : `Bass: ${
+                              beatType === "bossa"
+                                ? "fingered electric"
+                                : beatType === "funk"
+                                  ? "slap electric"
+                                  : "upright acoustic"
+                            } — ${bassMuted ? "currently muted" : "sounding"}`
                       }
+                      aria-label={`Bass track (${beatType})`}
                       aria-pressed={!bassMuted}
                     >
                       {bassMuted ? "○ Bass" : "● Bass"}
@@ -2297,10 +2325,25 @@ export default function App() {
                     <ToolChip
                       active={!pianoMuted}
                       onClick={() => setPianoMuted(!pianoMuted)}
-                      title={pianoMuted ? "Unmute piano comping" : "Mute piano comping"}
+                      title={
+                        beatType === "off"
+                          ? pianoMuted
+                            ? "Unmute keys (no backing style selected)"
+                            : "Mute keys"
+                          : `Keys: ${
+                              beatType === "bossa"
+                                ? "nylon guitar comp"
+                                : beatType === "latin" || beatType === "ballad"
+                                  ? "acoustic grand piano"
+                                  : beatType === "funk" || beatType === "swing"
+                                    ? "Rhodes electric piano"
+                                    : "Rhodes electric piano"
+                            } — ${pianoMuted ? "currently muted" : "sounding"}`
+                      }
+                      aria-label={`Keys track (${beatType})`}
                       aria-pressed={!pianoMuted}
                     >
-                      {pianoMuted ? "○ Piano" : "● Piano"}
+                      {pianoMuted ? "○ Keys" : "● Keys"}
                     </ToolChip>
                   </ToolGroup>
 
@@ -2722,6 +2765,7 @@ export default function App() {
           originalNotes={path.steps[Math.max(0, activeStepIndex - 1)]?.notes ?? []}
           currentNotes={optimizedStepsNotes[activeStepIndex] ?? path.steps[activeStepIndex]?.notes ?? []}
           prevNotes={optimizedStepsNotes[Math.max(0, activeStepIndex - 1)] ?? []}
+          nextNotes={optimizedStepsNotes[Math.min(path.steps.length - 1, activeStepIndex + 1)] ?? []}
           onApply={(stepIndex, newNotes) => {
             const key = `${path.id}::${stepIndex}`;
             const prevNotes = path.steps[stepIndex]?.notes ?? [];
