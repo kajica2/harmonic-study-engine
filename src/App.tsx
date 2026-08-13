@@ -2261,7 +2261,7 @@ export default function App() {
                     a real session. Tracks, HD, and Generator live in
                     the Advanced disclosure below. */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <ToolGroup label="Backing">
+                  <ToolGroup label={`Backing${beatType !== "off" ? ` · ${beatType}` : ""}`}>
                     <select
                       value={beatType}
                       onChange={(e) => setBeatType(e.target.value as BackingStyle)}
@@ -2283,7 +2283,7 @@ export default function App() {
                     </select>
                   </ToolGroup>
 
-                  <ToolGroup label="Tracks">
+                  <ToolGroup label={`Tracks${(drumsMuted && bassMuted && pianoMuted) ? " · muted" : ""}`}>
                     <ToolChip
                       active={!drumsMuted}
                       onClick={() => setDrumsMuted(!drumsMuted)}
@@ -2347,7 +2347,7 @@ export default function App() {
                     </ToolChip>
                   </ToolGroup>
 
-                  <ToolGroup label="Voicing">
+                  <ToolGroup label={`Voicing · ${voicingType}${optimizeVoiceLeading ? " · opt" : ""}`}>
                     <ToolChip
                       active={voicingType === "closed"}
                       onClick={() => setVoicingType("closed")}
@@ -2673,6 +2673,9 @@ export default function App() {
             <div className="w-full bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 p-4 shadow-2xl">
               <PianoKeyboard
                 activeMidis={activeMidis}
+                chordMidis={currentChordNotes}
+                soundingMidis={activeMidis}
+                bassMidis={[]}
                 onPlayNote={(midi) => {
                   audioEngine.playNote(midi);
                   midiOut.playNote(midi);
