@@ -6,10 +6,22 @@ export const TRANSPOSITIONS = {
   Concert: 0,
   Bb: 2, // Bb instrument reads 2 semitones higher than concert pitch
   F: 7, // F instrument reads 7 semitones higher
-};
+} as const;
 
 export type InstrumentPitch = keyof typeof TRANSPOSITIONS;
 export type ClefPrefs = "treble" | "bass" | "both";
+
+/**
+ * Shift every note in the list by the given number of semitones.
+ * Used by the lead-sheet / score generators to transpose a chord
+ * voicing for Bb trumpet (+2) or F horn (+7). Returned notes are
+ * sorted low-to-high so the arpeggio builder can read them in
+ * ascending order.
+ */
+export function transposeMidiList(notes: number[], shift: number): number[] {
+  if (!shift) return [...notes];
+  return notes.map((n) => n + shift).sort((a, b) => a - b);
+}
 
 export function midiToABCName(midiPitch: number): string {
   // ABC notes: C, D, E, F, G, A, B

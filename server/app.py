@@ -117,6 +117,97 @@ async def fx_reverb(
     )
 
 
+@app.post("/recordings/upload")
+async def recordings_upload(
+    audio: UploadFile = File(...),
+    duration_sec: float = Form(0.0),
+):
+    """
+    Accept a browser-recorded WebM (VP8/Opus) blob from
+    MediaRecorder and transcode to MP4 (H.264 + AAC) via ffmpeg.
+
+    The browser produces WebM because MediaRecorder's
+    `video/mp4` support is inconsistent across browsers; this
+    endpoint normalises every take to a single MP4 that plays
+    on every device and uploads to every social platform.
+
+    Audio: any browser-emitted MediaRecorder blob
+            (typically `video/webm;codecs=vp8,opus`).
+    duration_sec: optional client-supplied elapsed seconds
+            (recorded before the stop event); used for the
+            filename only.
+    Returns: MP4 (H.264 video + AAC audio, faststart for
+            streaming) on success, or the original WebM blob
+            if ffmpeg isn't available.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    import uuid
+
+    raw = await audio.read()
+    if not raw:
+        return Response(status_code=400, content="empty recording")
+
+    if not shutil.which("ffmpeg"):
+        # Fall back to the original WebM; the client can re-encode
+        # if needed. This is the path used when the server runs
+        # without ffmpeg installed (e.g. the ffmpeg-free Docker
+        # build). Most production deploys will have ffmpeg.
+        return Response(
+            content=raw,
+            media_type=audio.content_type or "video/webm",
+            headers={
+                "Content-Disposition": f'inline; filename="recording-{uuid.uuid4().hex}.webm"',
+                "Content-Length": str(len(raw)),
+                "X-Transcoded": "false",
+            },
+        )
+
+    with tempfile.TemporaryDirectory() as td:
+        in_path = os.path.join(td, "in.webm")
+        out_path = os.path.join(td, "out.mp4")
+        with open(in_path, "wb") as f:
+            f.write(raw)
+        # ffmpeg args: copy video stream (no re-encode), transcode
+        # audio to AAC (Opus → AAC for Apple/Safari support),
+        # faststart for progressive download. -y overwrites.
+        # Errors on stderr are non-fatal — ffmpeg still produces
+        # output even when the input has minor metadata issues.
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", in_path,
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "22",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            out_path,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            return Response(
+                status_code=500,
+                content=f"ffmpeg failed: {e.stderr.decode('utf-8', errors='ignore')[-500:]}",
+            )
+        with open(out_path, "rb") as f:
+            mp4_bytes = f.read()
+
+    label = f"recording-{uuid.uuid4().hex[:8]}-{int(duration_sec)}s"
+    return Response(
+        content=mp4_bytes,
+        media_type="video/mp4",
+        headers={
+            "Content-Disposition": f'inline; filename="{label}.mp4"',
+            "Content-Length": str(len(mp4_bytes)),
+            "X-Transcoded": "true",
+        },
+    )
+
+
 def main():
     uvicorn.run("server.app:app", host="127.0.0.1", port=8765, reload=False)
 

@@ -3,6 +3,8 @@ import { HarmonicPath } from "../lib/paths";
 import { Persona } from "../lib/personas";
 import { NOTE_NAMES } from "../lib/theory";
 import { RenderMode } from "../lib/loopWav";
+import { playbackClock } from "../lib/playbackClock";
+import { useTick } from "../lib/useTick";
 import { InspectPanel } from "./InspectPanel";
 import { InlineErrorPill } from "./InlineStatus";
 import {
@@ -55,10 +57,12 @@ interface RailProps {
   wavMode: RenderMode;
   setWavMode: (m: RenderMode) => void;
   onOpenLeadSheet: () => void;
-  // progress (optional external override; default derived from current state)
-  loopBarFrom?: number;
-  loopBarTo?: number;
-  setLoopBar?: (from: number, to: number) => void;
+  // loop range (sub-path). When loopStartBar is set and isLooping,
+  // the auto-advance wraps between loopStartBar and loopEndBar
+  // instead of the full path. Set via shift+click in the bar strip.
+  loopStartBar?: number | null;
+  loopEndBar?: number | null;
+  setLoopBar?: (from: number | null, to: number | null) => void;
   // inspect / voicing control
   optimizedStepsNotes: number[][];
   onPlayChord: (notes: number[]) => void;
@@ -69,7 +73,7 @@ interface RailProps {
 const STAGE_LABELS: Record<Stage, { title: string; subtitle: string }> = {
   choose:  { title: "Choose Path",     subtitle: "Pick a curated 16-bar harmonic preset" },
   perform: { title: "Perform",         subtitle: "Audition / practice / revise" },
-  commit:  { title: "Commit & Export", subtitle: "Save the take — MIDI, lead sheet, session" },
+  commit:  { title: "Record & Export", subtitle: "Capture your take — MIDI, lead sheet, performance" },
 };
 
 const STAGE_ORDER: Stage[] = ["choose", "perform", "commit"];
@@ -169,6 +173,9 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           setIsPlayingAuto={p.setIsPlayingAuto}
           isLooping={p.isLooping}
           setIsLooping={p.setIsLooping}
+          loopStartBar={p.loopStartBar}
+          loopEndBar={p.loopEndBar}
+          setLoopBar={p.setLoopBar}
           tempo={p.tempo}
           setTempo={p.setTempo}
           meter={p.meter}
@@ -210,6 +217,27 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
 // Sub-stages
 // =====================================================================
 
+const FilterChip: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  title?: string;
+}> = ({ active, onClick, label, title }) => (
+  <button
+    onClick={onClick}
+    title={title ?? label}
+    aria-pressed={active}
+    className={
+      "px-2 py-0.5 text-[10px] font-mono rounded transition-colors border " +
+      (active
+        ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] border-[color:var(--color-brand-strong)]"
+        : "bg-white/5 text-neutral-400 border-transparent hover:bg-white/10 hover:text-neutral-200")
+    }
+  >
+    {label}
+  </button>
+);
+
 const ChooseStage: React.FC<{
   paths: HarmonicPath[];
   activePathId?: string;
@@ -219,11 +247,80 @@ const ChooseStage: React.FC<{
   onPersona: (id: string) => void;
 }> = ({ paths, activePathId, onSelectById, personas, selectedPersonaId, onPersona }) => {
   const [showAll, setShowAll] = useState(false);
+  const [composerFilter, setComposerFilter] = useState<string | null>(null);
+  const [keyFilter, setKeyFilter] = useState<string | null>(null);
   const curated = paths.filter((x) => x.mvpReady);
   const others = paths.filter((x) => !x.mvpReady);
-  const visible = showAll ? paths : curated;
+
+  // Build filter facets from whatever is currently shown. Capped at
+  // 8 composers / 8 keys to avoid runaway rows on a heavily-curated
+  // set; a "More" affordance could be added later if needed.
+  const composerFacets = Array.from(
+    new Set(
+      paths
+        .map((p) => p.composer)
+        .filter((c): c is string => Boolean(c)),
+    ),
+  ).sort();
+  const keyFacets = Array.from(
+    new Set(
+      paths.map((p) => p.key).filter((k): k is string => Boolean(k)),
+    ),
+  ).sort();
+
+  // Apply filters to the path set.
+  const filteredByMeta = paths.filter((p) => {
+    if (composerFilter && p.composer !== composerFilter) return false;
+    if (keyFilter && p.key !== keyFilter) return false;
+    return true;
+  });
+  const baseVisible = showAll ? filteredByMeta : curated.filter((p) => filteredByMeta.includes(p));
+  const visible = baseVisible;
   return (
     <div>
+      {/* Filter chips — Composer + Key. Hidden if no facets present
+          (e.g. when only MVP paths are loaded and none have metadata). */}
+      {(composerFacets.length > 0 || keyFacets.length > 0) && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+          {composerFacets.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-mono mr-1">Composer</span>
+              <FilterChip
+                active={composerFilter === null}
+                onClick={() => setComposerFilter(null)}
+                label="All"
+              />
+              {composerFacets.slice(0, 8).map((c) => (
+                <FilterChip
+                  key={c}
+                  active={composerFilter === c}
+                  onClick={() => setComposerFilter(c)}
+                  label={c}
+                />
+              ))}
+            </div>
+          )}
+          {keyFacets.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500 font-mono mr-1">Key</span>
+              <FilterChip
+                active={keyFilter === null}
+                onClick={() => setKeyFilter(null)}
+                label="All"
+              />
+              {keyFacets.slice(0, 8).map((k) => (
+                <FilterChip
+                  key={k}
+                  active={keyFilter === k}
+                  onClick={() => setKeyFilter(k)}
+                  label={k}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:gap-2 sm:overflow-x-auto sm:pb-2 mb-3 gap-2">
         {visible.map((path) => {
           const isActive = path.id === activePathId;
@@ -308,6 +405,9 @@ const PerformStage: React.FC<{
   setIsPlayingAuto: (v: boolean) => void;
   isLooping: boolean;
   setIsLooping: (v: boolean) => void;
+  loopStartBar?: number | null;
+  loopEndBar?: number | null;
+  setLoopBar?: (from: number | null, to: number | null) => void;
   tempo: number;
   setTempo: (v: number) => void;
   meter: string;
@@ -330,6 +430,7 @@ const PerformStage: React.FC<{
   path,
   isPlayingAuto, setIsPlayingAuto,
   isLooping, setIsLooping,
+  loopStartBar = null, loopEndBar = null, setLoopBar,
   tempo, setTempo,
   meter, beat, setMeter, setBeat,
   transposeShift, setTransposeShift,
@@ -340,6 +441,11 @@ const PerformStage: React.FC<{
   const totalBars = Math.ceil(path.steps.length / 4);
   const currentBar = Math.floor(activeStepIndex / 4) + 1;
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Subscribe to the playback tick so the bar strip shows a moving
+  // playhead between chord changes. Smooth 60fps; one rAF source
+  // shared across the whole app via the shared useTick hook.
+  const tickDetail = useTick();
 
   const transposeLabel = () => {
     if (transposeShift === 0) return "Global transpose (path-level)";
@@ -489,18 +595,56 @@ const PerformStage: React.FC<{
           return (
             <button
               key={barIdx}
-              onClick={() => {
+              onClick={(e) => {
+                // Shift-click: set loop range. Plain click: step + audition.
+                if (e.shiftKey && setLoopBar) {
+                  if (loopStartBar === null || (loopStartBar !== null && loopEndBar !== null)) {
+                    setLoopBar(barIdx, null);
+                  } else if (barIdx >= loopStartBar) {
+                    setLoopBar(loopStartBar, barIdx);
+                  } else {
+                    setLoopBar(barIdx, loopStartBar);
+                  }
+                  // also set the cursor so the user sees the range
+                  setActiveStepIndex(stepIdx);
+                  return;
+                }
                 // Step Chord is now musical: advance the cursor AND audition.
                 setActiveStepIndex(stepIdx);
                 const stepNotes = path.steps[stepIdx]?.notes ?? [];
                 if (stepNotes.length) onPlayChord(stepNotes);
               }}
-              className={`flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition ${
+              title={
+                loopStartBar !== null &&
+                barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
+                barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar)
+                  ? `Bar ${barIdx + 1} — in loop range. Shift+click another bar to resize, shift+click the same bar to clear.`
+                  : `Bar ${barIdx + 1} — click to jump here, shift+click to set loop range.`
+              }
+              className={`relative flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition overflow-hidden ${
                 isActiveBar
                   ? "border-purple-500 bg-purple-700/30 text-white shadow-[0_0_15px_rgba(147,51,234,0.35)]"
                   : "border-white/10 bg-white/5 text-neutral-300 hover:border-purple-500/40"
               }`}
             >
+              {/* Loop-range background band — translucent brass when
+                  this bar is in the active loop range. */}
+              {loopStartBar !== null &&
+                barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
+                barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar) && (
+                  <div
+                    className="absolute inset-0 rounded-lg pointer-events-none"
+                    style={{
+                      background:
+                        "linear-gradient(180deg, rgba(212,168,87,0.22), rgba(212,168,87,0.10))",
+                      boxShadow: "inset 0 0 0 1px rgba(212,168,87,0.45)",
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
+              {/* Content wrapper — relative so it sits above the loop
+                  band overlay. */}
+              <div className="relative">
               <div className="text-[10px] font-mono text-neutral-500 flex items-center gap-1">
                 <span>Bar {barIdx + 1}</span>
                 <span className="flex-1" />
@@ -517,6 +661,27 @@ const PerformStage: React.FC<{
                     .join(" ")}
                 </div>
               )}
+              {/* Tick playhead — 4 cells per bar (one per beat in 4/4).
+                  Only the active bar shows the moving highlight; other
+                  bars are dim placeholder ticks. */}
+              <div className="mt-1 grid grid-cols-4 gap-0.5 h-1" aria-hidden="true">
+                {[0, 1, 2, 3].map((b) => {
+                  const isCurrentBeat = isActiveBar && tickDetail.isRunning && Math.floor(tickDetail.beat) === b;
+                  return (
+                    <div
+                      key={b}
+                      className={`h-full rounded-sm transition-colors duration-100 ${
+                        isCurrentBeat
+                          ? "bg-[color:var(--color-brand-strong)]"
+                          : isActiveBar
+                            ? "bg-[color:var(--color-brand)]/30"
+                            : "bg-white/5"
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+              </div>
             </button>
           );
         })}

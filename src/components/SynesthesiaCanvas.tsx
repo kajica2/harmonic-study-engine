@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import { getShapeForNote, getColorForNote } from "../lib/theory";
 import { VisualTheme } from "../lib/personas";
 
@@ -82,6 +82,16 @@ interface CanvasProps {
   showLabels?: boolean;
   rootMidi?: number;
   visualTheme?: VisualTheme;
+  /** Optional click handler — fired with the MIDI number of the
+   *  closest artifact to the click point. Used for click-to-play. */
+  onNoteClick?: (midi: number) => void;
+  /** Optional hover handler — receives the hovered MIDI or null when
+   *  the cursor leaves. Used to surface a tooltip. */
+  onNoteHover?: (midi: number | null) => void;
+  /** Called once the canvas DOM node is mounted, so the parent can
+   *  hold a ref to it (used by the audio recorder to capture the
+   *  canvas video stream via `canvas.captureStream()`). */
+  onCanvasReady?: (canvas: HTMLCanvasElement | null) => void;
 }
 
 // Kandinsky inspired visualization
@@ -92,6 +102,9 @@ export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
   showLabels,
   rootMidi,
   visualTheme = "default",
+  onNoteClick,
+  onNoteHover,
+  onCanvasReady,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -210,6 +223,73 @@ export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
         ctx.moveTo(width * 0.8, height * 0.15);
         ctx.lineTo(width * 0.2, height * 0.85);
         ctx.stroke();
+      } else if (visualTheme === "miles") {
+        // Cool restraint — soft, slow, very low contrast
+        ctx.strokeStyle = "rgba(91, 124, 153, 0.025)";
+        ctx.lineWidth = 0.5;
+        for (let yOff = 60; yOff < height; yOff += 80) {
+          ctx.beginPath();
+          ctx.moveTo(0, yOff);
+          ctx.bezierCurveTo(
+            width * 0.3,
+            yOff + 8,
+            width * 0.7,
+            yOff - 8,
+            width,
+            yOff,
+          );
+          ctx.stroke();
+        }
+      } else if (visualTheme === "chet") {
+        // Lyrical ballad — gentle verticals like breath marks
+        ctx.strokeStyle = "rgba(232, 200, 160, 0.04)";
+        ctx.lineWidth = 1;
+        const cx2 = width / 2;
+        for (let i = 0; i < 5; i++) {
+          const x = cx2 - 80 + i * 40;
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+        }
+      } else if (visualTheme === "dizzy") {
+        // Bebop — tight, fast diagonals (rotated each frame)
+        ctx.strokeStyle = "rgba(255, 51, 102, 0.05)";
+        ctx.lineWidth = 1.5;
+        const angle = performance.now() / 800;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        for (let off = -maxDist; off < maxDist; off += 22) {
+          ctx.beginPath();
+          ctx.moveTo(off, -maxDist);
+          ctx.lineTo(off + maxDist, maxDist);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (visualTheme === "hubbard") {
+        // Quartal — concentric squares (4-sided polyrhythm feel)
+        ctx.strokeStyle = "rgba(46, 134, 171, 0.04)";
+        ctx.lineWidth = 1.2;
+        const sideMax = Math.max(width, height);
+        for (let s = 50; s < sideMax; s += 60) {
+          ctx.strokeRect(cx - s / 2, cy - s / 2, s, s);
+        }
+      } else if (visualTheme === "shorter") {
+        // Modal cartographer — topographical contour lines
+        ctx.strokeStyle = "rgba(155, 93, 229, 0.04)";
+        ctx.lineWidth = 1;
+        for (let r = 30; r < maxDist; r += 28) {
+          ctx.beginPath();
+          for (let t = 0; t < Math.PI * 2; t += 0.05) {
+            const wobble = Math.sin(t * 5 + performance.now() / 3000) * 12;
+            const x = cx + (r + wobble) * Math.cos(t);
+            const y = cy + (r + wobble) * Math.sin(t);
+            if (t === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
       }
 
       // Add new active notes to artifacts if not present or boost their alpha
@@ -371,11 +451,64 @@ export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
     };
   }, [activeMidis, width, height, visualTheme]);
 
+  // Find the artifact whose center is within HIT_RADIUS px of the
+  // given canvas-relative point. Returns the closest one or null.
+  const hitTest = useCallback(
+    (px: number, py: number): number | null => {
+      const HIT_RADIUS = 36;
+      let bestMidi: number | null = null;
+      let bestDist = HIT_RADIUS;
+      for (const a of artifactsRef.current) {
+        if (a.alpha <= 0) continue;
+        const dx = a.x - px;
+        const dy = a.y - py;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestMidi = a.midi;
+        }
+      }
+      return bestMidi;
+    },
+    [],
+  );
+
+  // Surface the canvas DOM node to the parent so the audio
+  // recorder can capture it via canvas.captureStream(). We do
+  // this in a useEffect (not a callback ref) so the contract is
+  // a single source of truth.
+  useEffect(() => {
+    onCanvasReady?.(canvasRef.current);
+    return () => onCanvasReady?.(null);
+  }, [onCanvasReady]);
+
   return (
     <canvas
       ref={canvasRef}
       width={width}
       height={height}
+      onClick={(e) => {
+        if (!onNoteClick) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+        const hit = hitTest(px, py);
+        if (hit !== null) onNoteClick(hit);
+      }}
+      onMouseMove={(e) => {
+        if (!onNoteHover) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+        const hit = hitTest(px, py);
+        onNoteHover(hit);
+        e.currentTarget.style.cursor = hit !== null ? "pointer" : "default";
+      }}
+      onMouseLeave={() => {
+        if (!onNoteHover) return;
+        onNoteHover(null);
+        if (canvasRef.current) canvasRef.current.style.cursor = "default";
+      }}
       className="bg-gray-950 rounded-xl shadow-inner outline outline-1 outline-gray-800"
     />
   );

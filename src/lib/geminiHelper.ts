@@ -72,7 +72,7 @@ Rules:
         "X-Title": "Harmonic Study Engine",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-thinking-exp-01-21",
+        model: "google/gemini-2.5-flash",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 2048,
         temperature: 0.8,

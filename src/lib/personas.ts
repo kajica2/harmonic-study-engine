@@ -1,4 +1,5 @@
 import { InstrumentType } from "./audio";
+import PERSONA_DATA from "../data/personas.json";
 
 export type VisualTheme =
   | "kandinsky"
@@ -8,6 +9,11 @@ export type VisualTheme =
   | "eno"
   | "glass"
   | "monk"
+  | "miles"
+  | "chet"
+  | "dizzy"
+  | "hubbard"
+  | "shorter"
   | "default";
 
 export interface Persona {
@@ -36,125 +42,44 @@ export interface Persona {
   gradientTo: string; // tailwind gradient
 }
 
-export const PERSONAS: Persona[] = [
-  {
-    id: "kandinsky",
-    name: "Wassily Kandinsky",
-    role: "Visual Synesthete",
-    quote: "Color is a power which directly influences the soul.",
-    originalSongId: "path-2", // Neo-Soul Borrowing (colourful)
-    instrument: "sine",
-    tempo: 65,
-    arpType: "converge",
-    arpRate: 3,
-    arpGate: 90,
-    arpOctaves: 1.5,
-    visualTheme: "kandinsky",
-    accentColor: "#FFC107",
-    gradientFrom: "from-amber-500/25",
-    gradientTo: "to-red-500/5",
-  },
-  {
-    id: "coltrane",
-    name: "John Coltrane",
-    role: "Symmetrical Titan",
-    quote: "My music is the spiritual expression of what I am.",
-    originalSongId: "path-9", // Giant Steps
-    instrument: "sax",
-    tempo: 130,
-    arpType: "up",
-    arpRate: 4,
-    arpGate: 70,
-    arpOctaves: 2,
-    visualTheme: "coltrane",
-    accentColor: "#20B2AA",
-    gradientFrom: "from-teal-500/25",
-    gradientTo: "to-cyan-500/5",
-  },
-  {
-    id: "bach",
-    name: "J.S. Bach",
-    role: "Mathematical Architect",
-    quote:
-      "There is nothing remarkable about it. All one has to do is hit the right keys.",
-    originalSongId: "path-5", // Perfect Cadence
-    instrument: "guitar",
-    tempo: 75,
-    arpType: "upDown",
-    arpRate: 2,
-    arpGate: 80,
-    arpOctaves: 1,
-    visualTheme: "bach",
-    accentColor: "#D4AF37",
-    gradientFrom: "from-yellow-600/25",
-    gradientTo: "to-amber-500/5",
-  },
-  {
-    id: "debussy",
-    name: "Claude Debussy",
-    role: "Sonorous Water-Colorist",
-    quote: "Music is the spacing between the notes.",
-    originalSongId: "path-7", // Planing & Whole Tone
-    instrument: "pad",
-    tempo: 55,
-    arpType: "diverge",
-    arpRate: 2,
-    arpGate: 100,
-    arpOctaves: 3,
-    visualTheme: "debussy",
-    accentColor: "#3498DB",
-    gradientFrom: "from-blue-500/25",
-    gradientTo: "to-purple-500/5",
-  },
-  {
-    id: "eno",
-    name: "Brian Eno",
-    role: "Spatial Ambient Pioneer",
-    quote: "Ambient music must be able to accommodate all levels of interest.",
-    originalSongId: "path-8", // Ambient Stasis
-    instrument: "pad",
-    tempo: 40,
-    arpType: "random",
-    arpRate: 1,
-    arpGate: 100,
-    arpOctaves: 4,
-    visualTheme: "eno",
-    accentColor: "#9B59B6",
-    gradientFrom: "from-purple-500/25",
-    gradientTo: "to-indigo-500/5",
-  },
-  {
-    id: "glass",
-    name: "Philip Glass",
-    role: "Rhythmic Minimalist",
-    quote: "Music is a place where we exist; it can be continuous.",
-    originalSongId: "path-10", // Minimalist Oscillation
-    instrument: "pluck",
-    tempo: 112,
-    arpType: "up",
-    arpRate: 4,
-    arpGate: 60,
-    arpOctaves: 2,
-    visualTheme: "glass",
-    accentColor: "#E74C3C",
-    gradientFrom: "from-rose-600/25",
-    gradientTo: "to-violet-600/5",
-  },
-  {
-    id: "monk",
-    name: "Thelonious Monk",
-    role: "Angular Maverick",
-    quote: "The piano ain't got no wrong notes.",
-    originalSongId: "path-11", // Monk Angular Chromaticism
-    instrument: "trumpet",
-    tempo: 85,
-    arpType: "random",
-    arpRate: 3,
-    arpGate: 45,
-    arpOctaves: 1,
-    visualTheme: "monk",
-    accentColor: "#E67E22",
-    gradientFrom: "from-orange-500/25",
-    gradientTo: "to-amber-600/5",
-  },
-];
+/**
+ * Built-in personas. Source of truth is `src/data/personas.json`
+ * — edit the JSON to add / tweak personas without touching code.
+ *
+ * To use the JSON directly (avoid the wrapper): import PERSONA_DATA.
+ */
+export const PERSONAS: Persona[] = PERSONA_DATA as Persona[];
+
+/**
+ * Load personas from a JSON drop (drag-drop or pasted text).
+ * Validates the shape — returns the entries that pass minimal
+ * validation and silently skips malformed ones. Throws only when
+ * the top-level JSON isn't an array at all.
+ *
+ * Useful for "bring your own persona" workflows.
+ */
+export function loadPersonasFromJson(jsonText: string): Persona[] {
+  const parsed = JSON.parse(jsonText);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Personas JSON must be an array");
+  }
+  const valid = parsed.filter(
+    (p): p is Persona =>
+      p &&
+      typeof p.id === "string" &&
+      typeof p.name === "string" &&
+      typeof p.instrument === "string",
+  );
+  if (valid.length === 0) {
+    throw new Error("No valid persona entries found");
+  }
+  return valid;
+}
+
+/** Merge custom personas onto the built-in set, deduped by id. */
+export function mergePersonas(custom: Persona[]): Persona[] {
+  const map = new Map<string, Persona>();
+  for (const p of PERSONAS) map.set(p.id, p);
+  for (const p of custom) map.set(p.id, p);
+  return Array.from(map.values());
+}

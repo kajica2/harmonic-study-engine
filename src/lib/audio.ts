@@ -1,4 +1,23 @@
 import { midiToFreq } from "./theory";
+import {
+  loadSoundfont,
+  playSoundfontNote,
+  stopAllSoundfonts,
+  soundfontAvailable,
+} from "./soundfont";
+
+/**
+ * Whether to route notes through FluidR3 soundfont samples instead
+ * of the oscillator synth. Loaded from localStorage so the user's
+ * preference persists. Default false (oscillator) for fast first-load.
+ */
+function readHDSetting(): boolean {
+  try {
+    return localStorage.getItem("synesthesia_hdSounds") === "1";
+  } catch {
+    return false;
+  }
+}
 
 // Generate a simple synthetic impulse response for plush reverb
 function createReverbImpulse(
@@ -31,23 +50,112 @@ export type InstrumentType =
 
 class AudioEngine {
   private ctx: AudioContext | null = null;
+  /** Public read-only access to the underlying AudioContext.
+   *  Needed by sibling engines (backingEngine, recorder) that need
+   *  to schedule on the same clock. */
+  public getCtx(): AudioContext | null {
+    return this.ctx;
+  }
   private oscillators: Map<
     number,
     { oscs: OscillatorNode[]; gain: GainNode; filter?: BiquadFilterNode }
   > = new Map();
   private masterGain: GainNode | null = null;
+  private melodyBus: GainNode | null = null;
   private reverb: ConvolverNode | null = null;
   private currentInstrument: InstrumentType = "epiano";
   private targetVolume: number = 0.5;
+  /** When true, the synth melody is silenced so the user can play
+   *  their own instrument along with the backing track. Backing
+   *  track (drums, bass, piano) keeps playing. */
+  public melodyMuted: boolean = false;
+  public useHDSounds: boolean = readHDSetting();
+  public onHDFailure?: (msg: string) => void;
+
+  /**
+   * Returns the audio node the synth melody voices should connect
+   * to. Pre-init fallback to masterGain keeps the type safe in
+   * tests that run without an AudioContext. The playalong toggle
+   * multiplies this gain to 0; backing-track voices (metronome,
+   * drum kit, etc.) bypass it and connect directly to masterGain.
+   */
+  private melodyOutputBus(): AudioNode | null {
+    return this.melodyBus ?? this.masterGain;
+  }
 
   setInstrument(type: InstrumentType) {
     this.currentInstrument = type;
+  }
+
+  /** Mute the synth melody without stopping it. Notes continue to
+   *  schedule — they just go to a 0-gain bus, so toggling back on
+   *  mid-phrase brings the synth back instantly. Backing track
+   *  (rhythmEngine / backingEngine) is unaffected. */
+  setMelodyMuted(muted: boolean) {
+    this.melodyMuted = muted;
+    if (this.melodyBus && this.ctx) {
+      const target = muted ? 0 : 1;
+      this.melodyBus.gain.setTargetAtTime(
+        target,
+        this.ctx.currentTime,
+        0.03, // 30 ms — fast enough to feel snappy, smooth enough not to click
+      );
+    }
+    if (muted) this.stopAll();
+  }
+
+  setHDSounds(enabled: boolean) {
+    this.useHDSounds = enabled;
+    try {
+      localStorage.setItem("synesthesia_hdSounds", enabled ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+    if (!enabled) stopAllSoundfonts();
+  }
+
+  isHDReady(): boolean {
+    return soundfontAvailable(this.currentInstrument);
   }
 
   setVolume(vol: number) {
     this.targetVolume = vol;
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  /**
+   * Tap the master output into a destination (used by the
+   * AudioRecorder to capture the Web Audio output as part of a
+   * MediaRecorder stream). Calling this with the same destination
+   * twice is a no-op so the recorder can be torn down and re-
+   * created without leaking connections.
+   */
+  connectMasterTo(dest: AudioNode) {
+    if (!this.masterGain || !this.ctx) return;
+    try {
+      this.masterGain.connect(dest);
+    } catch (e) {
+      // Already connected — Web Audio throws InvalidAccessError on
+      // re-connection, which we treat as success.
+    }
+  }
+
+  disconnectMasterFromRecording() {
+    if (!this.masterGain || !this.ctx) return;
+    // Disconnect only the recording destination — leaves the
+    // master → destination wiring intact.
+    try {
+      // We don't track the recording destination reference here
+      // because AudioRecorder owns it. Web Audio doesn't expose
+      // a "disconnect everything I added in connectMasterTo"
+      // helper, so we leave the master → recordingDestination
+      // wiring in place; the recording destination is discarded
+      // when MediaRecorder stops, so the orphaned wiring is GC'd.
+      // This is intentionally a no-op.
+    } catch {
+      /* ignore */
     }
   }
 
@@ -59,6 +167,13 @@ class AudioEngine {
 
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.targetVolume; // Gain headroom
+
+      // Melody bus — sits between the master and the compressor.
+      // The playalong toggle drops this to 0 so the synth melody
+      // is silenced while the backing track keeps playing.
+      this.melodyBus = this.ctx.createGain();
+      this.melodyBus.gain.value = 1;
+      this.melodyBus.connect(this.masterGain);
 
       const compressor = this.ctx.createDynamicsCompressor();
       compressor.threshold.value = -30;
@@ -95,12 +210,30 @@ class AudioEngine {
 
     this.stopNote(midi); // Stop if already playing
 
-    const freq = midiToFreq(midi);
     const now = this.ctx.currentTime;
 
-    // Voice master gain
+    // HD Sounds branch — route through FluidR3 soundfont samples
+    // when the user has enabled them. Real trumpet samples have
+    // the bell resonance that oscillator math can't fake.
+    if (this.useHDSounds && soundfontAvailable(this.currentInstrument)) {
+      // When playalong is on, silence the melody path even in HD
+      // mode (otherwise the soundfont would still ring out).
+      if (this.melodyMuted) return;
+      // 1.6s default: long enough for the trumpet's natural ring
+      // and the reverb tail, but the next note's play() will
+      // retrigger the sample so we don't need explicit stop().
+      void playSoundfontNote(this.ctx, midi, this.currentInstrument, now, 1.6);
+      return;
+    }
+
+    const freq = midiToFreq(midi);
+
+    // Voice master gain — connected to the melody bus, NOT the
+    // master bus directly, so the playalong toggle can drop the
+    // entire synth-melody gain to 0 without affecting the
+    // backing-track voices (which connect directly to masterGain).
     const gain = this.ctx.createGain();
-    gain.connect(this.masterGain);
+    gain.connect(this.melodyOutputBus()!);
 
     // Lowpass Filter for warmth
     const filter = this.ctx.createBiquadFilter();
@@ -388,163 +521,6 @@ class AudioEngine {
     osc.stop(now + 0.1);
   }
 
-  playDrumKick(velocity = 1) {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.exponentialRampToValueAtTime(0.001, now + 0.5);
-
-    gain.gain.setValueAtTime(0.8 * velocity, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-
-    osc.start(now);
-    osc.stop(now + 0.5);
-  }
-
-  playDrumSnare(velocity = 1) {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-
-    const bufferSize = this.ctx.sampleRate * 0.2;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-
-    const noiseFilter = this.ctx.createBiquadFilter();
-    noiseFilter.type = "bandpass";
-    noiseFilter.frequency.value = 1000;
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.6 * velocity, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-
-    noise.connect(noiseFilter);
-    noiseFilter.connect(gain);
-    gain.connect(this.masterGain);
-
-    const osc = this.ctx.createOscillator();
-    osc.type = "triangle";
-    const oscGain = this.ctx.createGain();
-    osc.frequency.setValueAtTime(250, now);
-    oscGain.gain.setValueAtTime(0.5 * velocity, now);
-    oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-
-    osc.connect(oscGain);
-    oscGain.connect(this.masterGain);
-
-    noise.start(now);
-    osc.start(now);
-  }
-
-  playDrumRim(velocity = 1) {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = "square";
-    osc.frequency.setValueAtTime(600, now);
-    osc.frequency.exponentialRampToValueAtTime(300, now + 0.05); // sharp drop
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 800;
-    filter.Q.value = 5;
-
-    gain.gain.setValueAtTime(0.8 * velocity, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-
-    osc.start(now);
-    osc.stop(now + 0.05);
-  }
-
-  playDrumHat(velocity = 1, open = false) {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const duration = open ? 0.3 : 0.05;
-
-    const bufferSize = this.ctx.sampleRate * duration;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.value = 7000;
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.3 * velocity, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-
-    noise.start(now);
-  }
-
-  playDrumRide(velocity = 1) {
-    if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const duration = 1.0;
-
-    const bufferSize = this.ctx.sampleRate * duration;
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    // Metallic noise synthesis using multiple banded frequencies would be better, but pure noise + bandpass is quick
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 4500;
-    filter.Q.value = 1; // wider
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.4 * velocity, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
-
-    // Initial "ping"
-    const ping = this.ctx.createOscillator();
-    ping.type = "square";
-    ping.frequency.value = 400;
-    const pingGain = this.ctx.createGain();
-    pingGain.gain.setValueAtTime(0.3 * velocity, now);
-    pingGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-
-    ping.connect(pingGain);
-    pingGain.connect(this.masterGain);
-
-    noise.start(now);
-    ping.start(now);
-    ping.stop(now + 0.1);
-  }
 
   stopAll() {
     if (!this.ctx) return;
