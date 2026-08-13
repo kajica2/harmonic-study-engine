@@ -31,6 +31,7 @@ import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { useHistory } from "./lib/useHistory";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
+import { useBassNotes } from "./lib/useBassNotes";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
@@ -342,6 +343,10 @@ export default function App() {
 
   const [showImportExport, setShowImportExport] = useState(false);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
+
+  // Live bass notes from the backing engine. Empty until the
+  // user picks a backing style and presses Auto.
+  const bassMidis = useBassNotes();
 
   const [arpType, setArpType] = useState<
     | "none"
@@ -2675,7 +2680,7 @@ export default function App() {
                 activeMidis={activeMidis}
                 chordMidis={currentChordNotes}
                 soundingMidis={activeMidis}
-                bassMidis={[]}
+                bassMidis={bassMidis}
                 onPlayNote={(midi) => {
                   audioEngine.playNote(midi);
                   midiOut.playNote(midi);
