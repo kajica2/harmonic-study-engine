@@ -42,6 +42,8 @@ interface Props {
   currentNotes: number[];
   /** previous step notes (for "Closest voice-leading") */
   prevNotes: number[];
+  /** next step notes (for the +1 chord context display) */
+  nextNotes?: number[];
   /** apply current transformed notes to the path (commit) */
   onApply: (stepIndex: number, newNotes: number[]) => void;
   /** audition the chord through audioEngine */
@@ -100,7 +102,7 @@ export function makeInspectorHistory(): InspectorHistory {
 export const ChordInspector: React.FC<Props> = (props) => {
   const {
     open, onClose, path, stepIndex,
-    originalNotes, currentNotes, prevNotes,
+    originalNotes, currentNotes, prevNotes, nextNotes = [],
     onApply, onAudition, onStop,
   } = props;
   const titleId = useModalLabel("chord-inspector");
@@ -207,6 +209,18 @@ export const ChordInspector: React.FC<Props> = (props) => {
           density="tight"
           className="flex-1 overflow-auto"
         >
+        {/* Context strip — the previous chord, this chord, the next chord.
+            Lets the user see the voice-leading motion while they edit. */}
+        <div className="bg-black/30 rounded-xl p-3 mb-4">
+          <div className="text-[10px] uppercase font-mono text-neutral-500 mb-2">
+            Context — voice-leading window
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <ContextChord label="Previous" name={path.steps[Math.max(0, stepIndex - 1)]?.name ?? "—"} notes={prevNotes} active={false} />
+            <ContextChord label="This" name={stepName} notes={liveNotes} active={true} />
+            <ContextChord label="Next" name={path.steps[Math.min(path.steps.length - 1, stepIndex + 1)]?.name ?? "—"} notes={nextNotes} active={false} />
+          </div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Left column: chord facts */}
           <div className="space-y-3">
@@ -372,6 +386,26 @@ export const ChordInspector: React.FC<Props> = (props) => {
 };
 
 // ---- helpers ----
+
+const ContextChord: React.FC<{ label: string; name: string; notes: number[]; active: boolean }> = ({ label, name, notes, active }) => (
+  <div className={`rounded-lg p-2 ${active ? "bg-emerald-900/40 border border-emerald-700/60" : "bg-black/40 border border-white/5"}`}>
+    <div className={`text-[10px] uppercase font-mono tracking-wider mb-1 ${active ? "text-emerald-300" : "text-neutral-500"}`}>
+      {label}
+    </div>
+    <div className={`text-sm font-bold ${active ? "text-emerald-200" : "text-neutral-200"}`}>
+      {name}
+    </div>
+    <div className="flex flex-wrap gap-0.5 mt-1">
+      {notes.length === 0 && <span className="text-[9px] text-neutral-600">—</span>}
+      {notes.slice(0, 5).map((n) => (
+        <span key={n} className="text-[9px] font-mono px-1 py-0.5 rounded bg-black/40 text-neutral-300">
+          {((n % 12 + 12) % 12 === 0 ? "C" : (n % 12 + 12) % 12 === 1 ? "C#" : (n % 12 + 12) % 12 === 2 ? "D" : (n % 12 + 12) % 12 === 3 ? "D#" : (n % 12 + 12) % 12 === 4 ? "E" : (n % 12 + 12) % 12 === 5 ? "F" : (n % 12 + 12) % 12 === 6 ? "F#" : (n % 12 + 12) % 12 === 7 ? "G" : (n % 12 + 12) % 12 === 8 ? "G#" : (n % 12 + 12) % 12 === 9 ? "A" : (n % 12 + 12) % 12 === 10 ? "A#" : "B")}{Math.floor(n / 12) - 1}
+        </span>
+      ))}
+      {notes.length > 5 && <span className="text-[9px] text-neutral-500">+{notes.length - 5}</span>}
+    </div>
+  </div>
+);
 
 const Cell: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="bg-black/30 rounded-lg p-2">
