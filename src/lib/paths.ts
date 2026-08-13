@@ -11,6 +11,11 @@ export interface HarmonicPath {
   steps: HarmonicStep[];
   mvpReady?: boolean;
   feel?: string;
+  /** Composer / writer (for standards). Optional — only present on
+   *  curated studies / standards. */
+  composer?: string;
+  /** Musical key (concert pitch). Optional. Examples: "F", "Bb", "G-", "Eb". */
+  key?: string;
 }
 
 export const PATHS: HarmonicPath[] = [

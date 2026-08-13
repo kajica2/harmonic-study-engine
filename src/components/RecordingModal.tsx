@@ -16,12 +16,17 @@ import { ModalShell, useModalLabel } from "./ModalShell";
 interface RecordingModalProps {
   notes: RecordedNote[];
   tempo: number;
+  /** URL to an MP4 blob (from the media recorder + ffmpeg transcode).
+   *  When present, an inline video player is shown above the score
+   *  so the user can watch their take. */
+  mp4Url?: string | null;
   onClose: () => void;
 }
 
 export const RecordingModal: React.FC<RecordingModalProps> = ({
   notes,
   tempo,
+  mp4Url = null,
   onClose,
 }) => {
   const titleId = useModalLabel("recording");
@@ -93,6 +98,29 @@ export const RecordingModal: React.FC<RecordingModalProps> = ({
         </div>
       </div>
 
+        {mp4Url && (
+          <div className="mb-3 rounded-[var(--radius-md)] overflow-hidden border border-[color:var(--color-border)] bg-black/40">
+            <video
+              src={mp4Url}
+              controls
+              autoPlay={false}
+              className="w-full"
+              style={{ maxHeight: "320px" }}
+            >
+              Your browser does not support the video tag.
+            </video>
+            <div className="flex items-center justify-between px-3 py-2 text-[10px] t-mono text-[color:var(--color-text-3)] bg-black/40">
+              <span>MP4 · ready to share</span>
+              <a
+                href={mp4Url}
+                download="harmonic-study-recording.mp4"
+                className="text-[color:var(--color-brand)] hover:underline"
+              >
+                ↓ download
+              </a>
+            </div>
+          </div>
+        )}
         <StageFrame
           accent
           eyebrow="Performance capture"

@@ -9,6 +9,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Star Eyes — Gene de Paul",
     description: "F · 130 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
+    composer: "Gene de Paul",
+    key: "F",
     steps: [
       {
         name: "Fmaj7",
@@ -177,6 +179,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Is You Is or Is You Ain't My Baby — Billy Austin",
     description: "F · 130 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
+    composer: "Billy Austin",
+    key: "F",
     steps: [
       {
         name: "F6",
@@ -345,6 +349,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Yardbird Suite — Charlie Parker",
     description: "F · 220 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
+    composer: "Charlie Parker",
+    key: "F",
     steps: [
       {
         name: "F7",
@@ -513,6 +519,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Sometimes I'm Happy — Vincent Youmans",
     description: "Bb · 120 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
+    composer: "Vincent Youmans",
+    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -681,6 +689,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Solar — Miles Davis",
     description: "G- · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
+    composer: "Miles Davis",
+    key: "G-",
     steps: [
       {
         name: "Gm7",
@@ -849,6 +859,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "What Is This Thing Called Love — Cole Porter",
     description: "Ab · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
+    composer: "Cole Porter",
+    key: "Ab",
     steps: [
       {
         name: "Abmaj7",
@@ -1017,6 +1029,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Lady Be Good — George Gershwin",
     description: "G · 180 BPM · Swing Up · 36 bars",
     feel: "Swing Up",
+    composer: "George Gershwin",
+    key: "F",
     steps: [
       {
         name: "Gmaj7",
@@ -1205,6 +1219,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Cherokee — Ray Noble",
     description: "Bb · 200 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
+    composer: "Ray Noble",
+    key: "Bb",
     steps: [
       {
         name: "Bb",
@@ -1373,6 +1389,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "I Got Rhythm — George Gershwin",
     description: "Bb · 180 BPM · Swing Up · 28 bars",
     feel: "Swing Up",
+    composer: "George Gershwin",
+    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -1521,6 +1539,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Stella by Starlight — Victor Young",
     description: "Bb · 120 BPM · Ballad Medium · 32 bars",
     feel: "Ballad Medium",
+    composer: "Victor Young",
+    key: "Bb",
     steps: [
       {
         name: "Bbmaj7",
@@ -1689,6 +1709,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Bird Feathers — Charlie Parker",
     description: "F · 220 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
+    composer: "Charlie Parker",
+    key: "F",
     steps: [
       {
         name: "F7",
@@ -1857,6 +1879,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "There Will Never Be Another You — Harry Warren",
     description: "Eb · 120 BPM · Ballad Medium · 32 bars",
     feel: "Ballad Medium",
+    composer: "Harry Warren",
+    key: "Eb",
     steps: [
       {
         name: "Ebmaj7",
@@ -2025,6 +2049,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Out of Nowhere — Johnny Green",
     description: "G · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
+    composer: "Johnny Green",
+    key: "G",
     steps: [
       {
         name: "Gmaj7",
@@ -2193,6 +2219,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Nostalgia in October — Walter Gross",
     description: "Bb · 110 BPM · Ballad Medium · 32 bars",
     feel: "Ballad Medium",
+    composer: "Walter Gross",
+    key: "Bb",
     steps: [
       {
         name: "Bbmaj7",
@@ -2361,6 +2389,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "I'll Remember April — Gene de Paul",
     description: "F · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
+    composer: "Gene de Paul",
+    key: "F",
     steps: [
       {
         name: "Fmaj7",
@@ -2529,6 +2559,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Groovin' High — Dizzy Gillespie",
     description: "Bb · 220 BPM · Swing Up · 28 bars",
     feel: "Swing Up",
+    composer: "Dizzy Gillespie",
+    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -2677,6 +2709,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Hot House — Dizzy Gillespie",
     description: "Bb · 200 BPM · Swing Up · 28 bars",
     feel: "Swing Up",
+    composer: "Dizzy Gillespie",
+    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -2825,6 +2859,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Confirmation — Charlie Parker",
     description: "F · 200 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
+    composer: "Charlie Parker",
+    key: "F",
     steps: [
       {
         name: "F7",
@@ -2993,6 +3029,8 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Confirmation Blues — Charlie Parker",
     description: "F · 140 BPM · Blues · 12 bars",
     feel: "Blues",
+    composer: "Charlie Parker",
+    key: "F",
     steps: [
       {
         name: "F7",
