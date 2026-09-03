@@ -8,21 +8,17 @@
 # Local install (Apple Silicon or x86_64):
 #   source .venv/bin/activate
 #   pip install -r requirements-ddsp.txt
-#
-# Render / HF Spaces: install via the project Dockerfile, which uses
-# the same shape as this file but trims it for the image (see the
-# repo-root Dockerfile, lines 60-68).
 
-# DDSP and TF (CPU-only — no GPU on Render free tier)
+# DDSP and TF (CPU-only)
 tensorflow-cpu==2.15.0
 # Note: TF 2.21 (Apple Silicon M1) is pinned via ddsp-install-macos-arm64
-# but Render runs Linux x86_64, where TF 2.21 lacks an Apple-specific build
-# but still publishes a CPU wheel. If 2.21 fails to install on Render's
-# amd64 image, fall back to 2.15.0 (LTS) — see Dockerfile fallback.
+# but on Linux x86_64 it lacks an Apple-specific build yet still publishes
+# a CPU wheel. If 2.21 fails to install on Linux amd64, fall back to
+# 2.15.0 (LTS).
 
 ddsp @ git+https://github.com/magenta/ddsp.git@v3.7.0
-# When installing from git on a venv-free Render image, the dependency
-# resolver will try to resolve all of ddsp's pinned deps (librosa<=0.10,
+# When installing from git into an existing venv, the dependency resolver
+# will try to resolve all of ddsp's pinned deps (librosa<=0.10,
 # protobuf<=3.20, etc.). Override them:
 crepe<=0.0.16
 tensorflow-hub

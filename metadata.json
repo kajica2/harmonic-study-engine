@@ -1,6 +1,6 @@
 {
-  "name": "Kandinsky Synesthesia Lab II",
-  "description": "Visualizing piano harmonic movement and voicings through Kandinsky-style geometry and color.",
+  "name": "Harmonic Study Engine",
+  "description": "Trumpet practice engine for jazz etudes — backing tracks, scale practice, and full MIDI/MusicXML/Score21/MP4 export.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

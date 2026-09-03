@@ -1,6 +1,6 @@
 # Core FastAPI backend — what every install needs.
-# Python 3.9+ compatible (system Python on macOS is 3.9; the Dockerfile
-# uses 3.10 — the differences matter only for DDSP, not for this core).
+# Python 3.9+ compatible (system Python on macOS is 3.9; DDSP needs 3.10
+# but only matters when you opt into requirements-ddsp.txt).
 #
 # The app is designed to run without DDSP: /health returns
 #   {"status":"degraded","ddsp_version":"unavailable"}
@@ -10,7 +10,7 @@
 #
 # For the optional offline DDSP render + FFT reverb path, install
 # requirements-ddsp.txt on top. That file pins Magenta/DDSP and pulls
-# ~1.5 GB of TF + librosa; do not install it on the HF free tier.
+# ~1.5 GB of TF + librosa.
 
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
