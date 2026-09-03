@@ -47,19 +47,63 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   `ddsp-install-macos-arm64` to produce a local copy), then
   install via `pip install <fork-url>` in a paid CPU tier Space.
 
-## Local development
+## Local development (no Docker)
+
+[Permalink: Local development (no Docker)](#local-development-no-docker)
+
+The repo's `dev.sh` creates a `.venv`, installs the lean core backend
+deps (FastAPI only — no DDSP/TF), and boots both processes:
 
 ```bash
-# 1. install python deps (heavy: ddsp + tf 2.21)
+npm install            # first time only
+bash dev.sh            # or: npm run dev
+```
+
+This opens `http://localhost:5173` (Vite) and `http://127.0.0.1:8765`
+(FastAPI). Both ports are gated on health checks before the browser
+opens, so you'll only see the page once everything is up. (Vite's
+default port — 5173 — is whitelisted in the backend CORS config; set
+`FRONTEND_PORT` to override if it's busy.)
+
+### What works without DDSP
+
+Everything except `/synthesize` and `/fx/reverb`. `/health` returns
+`{"status":"degraded","ddsp_version":"unavailable"}`; the two
+heavy endpoints return 503 with a clear error message. All of the
+following are unaffected:
+
+- 33-tune catalog with composer + key filters
+- 11 backing styles (swing, bossa, funk, latin, ballad, clave 3-2/3-3,
+  African 4:4/4:3/3:4) with per-style instrument mapping
+- Diatonic scale practice (auto / manual)
+- 3-iteration rhythm drill
+- Sub-range loop, live score window, mobile command bar
+- MediaRecorder → MP4 transcode (via system ffmpeg if installed;
+  falls back to WebM if ffmpeg is missing)
+- MIDI / MusicXML / Score21 / etude export
+- Masterclass personas (Wynton, Coltrane, Bach, Eno, …)
+
+### Optional: enable the DDSP render + reverb path
+
+```bash
 source .venv/bin/activate
-pip install -r server/requirements.txt
+pip install -r server/requirements-ddsp.txt
+# restart bash dev.sh — /health will now return "ok"
+```
 
-# 2. start the backend
-python -m server.app    # -> http://127.0.0.1:8765
+This pulls TensorFlow CPU + Magenta/DDSP (~1.5 GB). Skip it unless
+you need offline chord-progression rendering or FFT reverb on a
+recorded take. The HF Spaces free tier cannot run this build — the
+production Dockerfile omits it for the same reason.
 
-# 3. start the frontend
-npm install
-npm run dev             # -> http://localhost:3000
+### Running backend and frontend separately
+
+```bash
+# terminal 1
+npm run dev:backend    # http://127.0.0.1:8765
+
+# terminal 2
+npm run dev:vite       # http://localhost:5173
 ```
 
 `npm run build` produces `dist/`; if you put `dist/` at
