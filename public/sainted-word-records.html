@@ -200,6 +200,85 @@
       color: var(--ink);
       align-items: center; justify-content: center;
     }
+
+    /* Version badge — sits in the nav between primary links and
+       the Launch Engine CTA. The chip pairs a current version label
+       with a "newer available" caret so it reads as an in-product
+       affordance for hopping between engine iterations. Hides on
+       mobile (the burger menu already shows the primary links). */
+    .nav-version {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 12px;
+      background: transparent;
+      border: 1px solid var(--glass-line-2);
+      border-radius: var(--r);
+      color: var(--ink-2);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
+      position: relative;
+    }
+    .nav-version:hover {
+      border-color: var(--uv);
+      background: rgba(180, 105, 255, 0.06);
+      color: var(--ink);
+    }
+    .nav-version .v-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--uv);
+      box-shadow: 0 0 8px var(--uv);
+    }
+    .nav-version .v-label strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .nav-version .v-sub {
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .nav-version .v-menu {
+      position: absolute; top: calc(100% + 6px); right: 0;
+      min-width: 240px;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      padding: 6px;
+      box-shadow: 0 20px 48px rgba(0,0,0,0.5);
+      opacity: 0; pointer-events: none;
+      transform: translateY(-4px);
+      transition: opacity var(--t-fast), transform var(--t-fast);
+      z-index: 60;
+    }
+    .nav-version[aria-expanded="true"] .v-menu {
+      opacity: 1; pointer-events: auto; transform: translateY(0);
+    }
+    .v-menu a {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--r-sm);
+      color: var(--ink-2);
+      font-family: var(--font-body);
+      font-size: 13px;
+      transition: background var(--t-fast), color var(--t-fast);
+    }
+    .v-menu a:hover { background: var(--bg-3); color: var(--ink); }
+    .v-menu a.active { color: var(--lime); }
+    .v-menu a .v-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .v-menu a.active .v-tag { color: var(--lime); }
+    .v-menu .v-divider {
+      height: 1px; background: var(--line); margin: 6px 4px;
+    }
+
     @media (max-width: 900px) {
       .nav-links { display: none; }
       .nav-links.open {
@@ -213,6 +292,23 @@
       .nav-links.open a { padding: 12px; border-radius: var(--r-sm); }
       .nav-burger { display: inline-flex; }
       .nav-cta { display: none; }
+      .nav-version { display: none; }
+      .nav-version.open {
+        display: inline-flex;
+        position: absolute; top: 64px; left: 0; right: 0;
+        justify-content: space-between;
+        background: var(--bg-2);
+        border: none;
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        padding: 14px 20px;
+      }
+      .nav-version.open .v-menu {
+        position: static; opacity: 1; pointer-events: auto;
+        transform: none; box-shadow: none; border: none;
+        background: transparent; padding: 8px 0 0;
+        min-width: 0;
+      }
     }
 
     /* ============================================================
@@ -1157,6 +1253,37 @@
         <a href="#showcase">Gallery</a>
         <a href="#pricing">Pricing</a>
       </nav>
+
+      <button
+        class="nav-version"
+        id="navVersion"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-label="Engine versions — currently viewing v1.0 (visual). Open the menu to switch."
+        title="Different engine versions"
+      >
+        <span class="v-dot" aria-hidden="true"></span>
+        <span class="v-label">Engine <strong>v1.0</strong></span>
+        <span class="v-sub" aria-hidden="true">visual</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="v-menu" role="menu" aria-label="Engine versions">
+          <a href="#top" role="menuitem" class="active" data-version="visual">
+            <span>Visual Engine</span>
+            <span class="v-tag">v1.0 · live</span>
+          </a>
+          <a href="https://github.com/kajica2/harmonic-study-engine/tree/main/src/magenta" role="menuitem" data-version="magenta" target="_blank" rel="noopener noreferrer">
+            <span>Magenta MVP</span>
+            <span class="v-tag">v0.1 · new</span>
+          </a>
+          <div class="v-divider" aria-hidden="true"></div>
+          <a href="https://github.com/kajica2/harmonic-study-engine/commits/main" role="menuitem" data-version="changelog" target="_blank" rel="noopener noreferrer">
+            <span>Changelog</span>
+            <span class="v-tag">all versions</span>
+          </a>
+        </div>
+      </button>
+
       <a class="nav-cta" href="#engine">
         Launch Engine
         <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
@@ -2491,14 +2618,58 @@
     function bindNav() {
       const burger = $('#navBurger');
       const links = $('#navLinks');
+      const version = $('#navVersion');
       burger.addEventListener('click', () => {
         const open = links.classList.toggle('open');
         burger.setAttribute('aria-expanded', open);
+        // Close the version dropdown when opening the burger menu
+        if (open && version) {
+          version.classList.remove('open');
+          version.setAttribute('aria-expanded', 'false');
+        }
       });
       $$('#navLinks a').forEach(a => a.addEventListener('click', () => {
         links.classList.remove('open');
         burger.setAttribute('aria-expanded', 'false');
       }));
+
+      // Version dropdown — opens on click, closes on outside click
+      // or ESC. The menu items themselves are plain <a> tags so
+      // they navigate normally on click; we only manage the open
+      // state, not the routing.
+      if (version) {
+        const closeVersion = () => {
+          version.classList.remove('open');
+          version.setAttribute('aria-expanded', 'false');
+        };
+        version.addEventListener('click', (e) => {
+          // Don't toggle when the click is on a menu item — let the
+          // link navigate normally and close on the next tick.
+          if (e.target.closest('.v-menu a')) {
+            setTimeout(closeVersion, 0);
+            return;
+          }
+          const open = version.classList.toggle('open');
+          version.setAttribute('aria-expanded', open);
+        });
+        document.addEventListener('click', (e) => {
+          if (!version.contains(e.target)) closeVersion();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') closeVersion();
+        });
+        // When a version link is chosen, mark it active and demote
+        // the others. External links (Magenta, Changelog) don't
+        // navigate in-page so we leave the "Visual Engine" item
+        // marked active — but if the user clicked it, we reset.
+        $$('.v-menu a').forEach((a) => {
+          a.addEventListener('click', () => {
+            if (a.dataset.version === 'visual') {
+              $$('.v-menu a').forEach((b) => b.classList.toggle('active', b === a));
+            }
+          });
+        });
+      }
     }
 
     /* =========================================================
