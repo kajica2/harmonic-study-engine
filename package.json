@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "bash dev.sh",
-    "dev:vite": "vite --port=3000 --host=0.0.0.0",
+    "dev:nodocker": "bash dev.sh",
+    "dev:vite": "vite --port=5173 --host=0.0.0.0",
+    "dev:backend": "python3 -m server.app",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
-    "dev:ddsp": "bash dev.sh"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

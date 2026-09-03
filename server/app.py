@@ -29,9 +29,13 @@ except Exception as e:
     apply_reverb = None
 
 _DEFAULT_ORIGINS = [
+    # Vite default (used by dev.sh and `npm run dev:vite`).
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    # Legacy / npm run dev (dev.sh now defaults to 5173, but some users
+    # override FRONTEND_PORT=3000).
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:5173",
 ]
 
 

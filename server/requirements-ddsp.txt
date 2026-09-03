@@ -1,0 +1,33 @@
+# Optional DDSP backend — installs on top of requirements.txt.
+#
+# Pulls TensorFlow + Magenta/DDSP + a few legacy pinned deps. Heavy
+# (~1.5 GB) and not needed for normal app use: the FastAPI server
+# already 503s the /synthesize and /fx/reverb endpoints cleanly when
+# these aren't present, and /health reports `status: "degraded"`.
+#
+# Local install (Apple Silicon or x86_64):
+#   source .venv/bin/activate
+#   pip install -r requirements-ddsp.txt
+#
+# Render / HF Spaces: install via the project Dockerfile, which uses
+# the same shape as this file but trims it for the image (see the
+# repo-root Dockerfile, lines 60-68).
+
+# DDSP and TF (CPU-only — no GPU on Render free tier)
+tensorflow-cpu==2.15.0
+# Note: TF 2.21 (Apple Silicon M1) is pinned via ddsp-install-macos-arm64
+# but Render runs Linux x86_64, where TF 2.21 lacks an Apple-specific build
+# but still publishes a CPU wheel. If 2.21 fails to install on Render's
+# amd64 image, fall back to 2.15.0 (LTS) — see Dockerfile fallback.
+
+ddsp @ git+https://github.com/magenta/ddsp.git@v3.7.0
+# When installing from git on a venv-free Render image, the dependency
+# resolver will try to resolve all of ddsp's pinned deps (librosa<=0.10,
+# protobuf<=3.20, etc.). Override them:
+crepe<=0.0.16
+tensorflow-hub
+gin-config>=0.3.0
+librosa<=0.10.1
+protobuf<3.20
+numpy<1.24
+scipy<=1.10.1

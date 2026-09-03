@@ -1,23 +1,18 @@
+# Core FastAPI backend — what every install needs.
+# Python 3.9+ compatible (system Python on macOS is 3.9; the Dockerfile
+# uses 3.10 — the differences matter only for DDSP, not for this core).
+#
+# The app is designed to run without DDSP: /health returns
+#   {"status":"degraded","ddsp_version":"unavailable"}
+# and /synthesize + /fx/reverb return 503 with a clear error.
+# Everything else (backing tracks, recording, scale playback, mobile bar,
+# MIDI/MusicXML/Score21 export, practice sets) works fine on this core set.
+#
+# For the optional offline DDSP render + FFT reverb path, install
+# requirements-ddsp.txt on top. That file pins Magenta/DDSP and pulls
+# ~1.5 GB of TF + librosa; do not install it on the HF free tier.
+
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
 python-multipart==0.0.12
-
-# DDSP and TF (CPU-only — no GPU on Render free tier)
-tensorflow-cpu==2.15.0
-# Note: TF 2.21 (Apple Silicon M1) is pinned via ddsp-install-macos-arm64
-# but Render runs Linux x86_64, where TF 2.21 lacks an Apple-specific build
-# but still publishes a CPU wheel. If 2.21 fails to install on Render's
-# amd64 image, fall back to 2.15.0 (LTS) — see Dockerfile fallback.
-
-ddsp @ git+https://github.com/magenta/ddsp.git@v3.7.0
-# When installing from git on a venv-free Render image, the dependency
-# resolver will try to resolve all of ddsp's pinned deps (librosa<=0.10,
-# protobuf<=3.20, etc.). Override them:
-crepe<=0.0.16
-tensorflow-hub
-gin-config>=0.3.0
-librosa<=0.10.1
-protobuf<3.20
-numpy<1.24
-scipy<=1.10.1
