@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bash dev.sh",
     "dev:vite": "vite --port=5173 --host=0.0.0.0",
-    "dev:backend": "python3 -m server.app",
+    "dev:backend": "python3 -m uvicorn server.app:app --host 127.0.0.1 --port 8765",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

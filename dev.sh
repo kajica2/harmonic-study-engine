@@ -76,7 +76,11 @@ fi
 # ---------- 1. Backend ------------------------------------------------------
 echo "[1/3] Backend on :$BACKEND_PORT"
 kill_port "$BACKEND_PORT"
-"$VENV_DIR/bin/python" -m server.app >/tmp/hse-backend.log 2>&1 &
+# Invoke via uvicorn (not `python -m server.app`) so the module is
+# loaded under a single name. `python -m server.app` runs the body
+# twice — once as `__main__`, once as `server.app` when uvicorn
+# imports it for the ASGI loader — which spams duplicate warnings.
+"$VENV_DIR/bin/python" -m uvicorn server.app:app --host 127.0.0.1 --port "$BACKEND_PORT" >/tmp/hse-backend.log 2>&1 &
 BACKEND_PID=$!
 wait_for "http://127.0.0.1:$BACKEND_PORT/health" "backend" 60 || {
   echo "  backend log tail:"

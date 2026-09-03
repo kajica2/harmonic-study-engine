@@ -21,6 +21,7 @@ export interface Persona {
   name: string;
   role: string;
   quote: string;
+  tagline?: string; // optional short descriptor rendered in the masterclass rail
   originalSongId: string; // references PATH id
   instrument: InstrumentType;
   tempo: number;

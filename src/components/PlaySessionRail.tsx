@@ -35,10 +35,6 @@ interface RailProps {
   setIsLooping: (v: boolean) => void;
   tempo: number;
   setTempo: (v: number) => void;
-  meter: string; // "4/4" | "3/4" | ...
-  beat: string;  // "metronome" | "jazz" | ...
-  setMeter: (v: string) => void;
-  setBeat: (v: string) => void;
   transposeShift: number;
   setTransposeShift: (v: number) => void;
   selectedPersonaId: string;
@@ -64,6 +60,7 @@ interface RailProps {
   loopStartBar?: number | null;
   loopEndBar?: number | null;
   setLoopBar?: (from: number | null, to: number | null) => void;
+  onOpenInspector: () => void;
   // inspect / voicing control
   optimizedStepsNotes: number[][];
   onPlayChord: (notes: number[]) => void;
@@ -180,10 +177,6 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           setLoopBar={p.setLoopBar}
           tempo={p.tempo}
           setTempo={p.setTempo}
-          meter={p.meter}
-          beat={p.beat}
-          setMeter={p.setMeter}
-          setBeat={p.setBeat}
           transposeShift={p.transposeShift}
           setTransposeShift={p.setTransposeShift}
           persona={persona}
@@ -206,6 +199,7 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           onExportWav={p.onExportWav}
           isExportingWav={p.isExportingWav}
           onOpenLeadSheet={p.onOpenLeadSheet}
+          onOpenInspector={p.onOpenInspector}
           tempo={p.tempo}
           wavMode={p.wavMode}
           setWavMode={p.setWavMode}
@@ -500,10 +494,6 @@ const PerformStage: React.FC<{
   setLoopBar?: (from: number | null, to: number | null) => void;
   tempo: number;
   setTempo: (v: number) => void;
-  meter: string;
-  beat: string;
-  setMeter: (v: string) => void;
-  setBeat: (v: string) => void;
   transposeShift: number;
   setTransposeShift: (v: number) => void;
   persona: Persona;
@@ -522,7 +512,6 @@ const PerformStage: React.FC<{
   isLooping, setIsLooping,
   loopStartBar = null, loopEndBar = null, setLoopBar,
   tempo, setTempo,
-  meter, beat, setMeter, setBeat,
   transposeShift, setTransposeShift,
   persona, personas, selectedPersonaId, onPersona,
   activeStepIndex, setActiveStepIndex,
@@ -577,13 +566,13 @@ const PerformStage: React.FC<{
           onClick={() => setAdvancedOpen(!advancedOpen)}
           className="px-2.5 py-2 rounded-xl text-xs font-mono text-neutral-500 hover:text-white"
         >
-          {advancedOpen ? "Hide" : "Show"} rhythm & meter
+          {advancedOpen ? "Hide" : "Show"} tempo
         </button>
       </div>
 
       {/* Advanced controls — collapsed by default, lives inline with transport */}
       {advancedOpen && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 p-3 rounded-xl bg-black/30 border border-white/5">
+        <div className="grid grid-cols-1 gap-3 mb-3 p-3 rounded-xl bg-black/30 border border-white/5">
           <div className="flex flex-col gap-1">
             <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Tempo</label>
             <div className="flex items-center gap-2 text-xs font-mono text-neutral-300">
@@ -597,32 +586,6 @@ const PerformStage: React.FC<{
               />
               <span className="w-12 text-right">{tempo} BPM</span>
             </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Meter</label>
-            <select
-              value={meter}
-              onChange={(e) => setMeter(e.target.value)}
-              className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
-            >
-              <option value="4/4">4/4</option>
-              <option value="3/4">3/4</option>
-              <option value="6/8">6/8</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Backing</label>
-            <select
-              value={beat}
-              onChange={(e) => setBeat(e.target.value)}
-              className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
-            >
-              <option value="none">No beat</option>
-              <option value="metronome">Metronome</option>
-              <option value="jazz">Jazz Ride</option>
-              <option value="bossa">Bossa</option>
-              <option value="techno">Techno</option>
-            </select>
           </div>
         </div>
       )}
