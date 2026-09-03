@@ -12,11 +12,25 @@ export class RhythmEngine {
   private currentStep = 0;
   private isPlaying = false;
   private tempo = 60; // BPM
+  // When false, playStep() schedules its interval ticks but does
+  // not fire audioEngine.playMetronomeClick. The backing track
+  // (BackingEngine) is independent and keeps playing — only the
+  // metronome click track mutes. Defaults to true so existing
+  // behavior is unchanged.
+  private metronomeEnabled = true;
   // Metronome-only click is gated by time signature in playStep();
   // the backing-style drum patterns are handled by BackingEngine,
   // so this engine no longer needs a beat-type selector.
   private stepsPerMeasure = 16;
   private timeSignature = "4/4";
+
+  setMetronomeEnabled(on: boolean) {
+    this.metronomeEnabled = on;
+  }
+
+  isMetronomeEnabled(): boolean {
+    return this.metronomeEnabled;
+  }
 
   setTimeSignature(ts: TimeSignature) {
     this.timeSignature = ts;
@@ -99,6 +113,9 @@ export class RhythmEngine {
     // afro-4-4 / afro-4-3 / afro-3-4) are scheduled by
     // BackingEngine.schedulePattern(), which runs in parallel and
     // would double-trigger if this engine also emitted drums.
+    // When the user has muted the metronome via the UI, skip the
+    // click entirely — the BackingEngine keeps running unaffected.
+    if (!this.metronomeEnabled) return;
     if (step === 0) {
       audioEngine.playMetronomeClick(true);
     } else if (

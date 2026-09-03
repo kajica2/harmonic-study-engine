@@ -19,3 +19,4 @@ __pycache__/
 # Lockfile drift between system Python and the venv (if a dev runs
 # `pip freeze` on either side, the result differs).
 /server/requirements-dev.lock
+.vercel

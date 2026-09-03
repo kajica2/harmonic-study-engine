@@ -8,6 +8,7 @@ import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { InspectPanel } from "./InspectPanel";
 import { InlineErrorPill } from "./InlineStatus";
+import { ToolChip } from "./StageFrame";
 import {
   Music,
   Play,
@@ -54,6 +55,10 @@ interface RailProps {
   wavMode: RenderMode;
   setWavMode: (m: RenderMode) => void;
   onOpenLeadSheet: () => void;
+  // metronome click toggle — when false, the rhythmEngine skips
+  // playMetronomeClick on every step. Backing track is unaffected.
+  metronomeOn: boolean;
+  setMetronomeOn: (v: boolean) => void;
   // loop range (sub-path). When loopStartBar is set and isLooping,
   // the auto-advance wraps between loopStartBar and loopEndBar
   // instead of the full path. Set via shift+click in the bar strip.
@@ -179,6 +184,8 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           setTempo={p.setTempo}
           transposeShift={p.transposeShift}
           setTransposeShift={p.setTransposeShift}
+          metronomeOn={p.metronomeOn}
+          setMetronomeOn={p.setMetronomeOn}
           persona={persona}
           personas={p.personas}
           selectedPersonaId={p.selectedPersonaId}
@@ -496,6 +503,8 @@ const PerformStage: React.FC<{
   setTempo: (v: number) => void;
   transposeShift: number;
   setTransposeShift: (v: number) => void;
+  metronomeOn: boolean;
+  setMetronomeOn: (v: boolean) => void;
   persona: Persona;
   personas: Persona[];
   selectedPersonaId: string;
@@ -513,6 +522,7 @@ const PerformStage: React.FC<{
   loopStartBar = null, loopEndBar = null, setLoopBar,
   tempo, setTempo,
   transposeShift, setTransposeShift,
+  metronomeOn, setMetronomeOn,
   persona, personas, selectedPersonaId, onPersona,
   activeStepIndex, setActiveStepIndex,
   optimizedStepsNotes, onPlayChord, onStopChord, onCommitVoicing,
@@ -585,6 +595,23 @@ const PerformStage: React.FC<{
                 className="flex-1 accent-purple-500"
               />
               <span className="w-12 text-right">{tempo} BPM</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Metronome</label>
+            <div className="flex items-center gap-2">
+              <ToolChip
+                active={metronomeOn}
+                onClick={() => setMetronomeOn(!metronomeOn)}
+                title={metronomeOn ? "Mute the metronome click" : "Unmute the metronome click"}
+              >
+                {metronomeOn ? "● On" : "○ Off"}
+              </ToolChip>
+              <span className="text-[10px] font-mono text-neutral-500">
+                {metronomeOn
+                  ? "Click track plays during playback"
+                  : "Silent — backing track keeps running"}
+              </span>
             </div>
           </div>
         </div>

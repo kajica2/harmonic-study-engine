@@ -163,4 +163,24 @@ describe("useSessionStore hydration", () => {
     });
     expect(result.current.tempo).toBe(130);
   });
+
+  it("metronomeOn defaults to true (historical 'always click' behavior)", () => {
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.metronomeOn).toBe(true);
+  });
+
+  it("metronomeOn hydrates from localStorage when set", () => {
+    localStorage.setItem("synesthesia_metronomeOn", "false");
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.metronomeOn).toBe(false);
+  });
+
+  it("setMetronomeOn functional update works", () => {
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.metronomeOn).toBe(true);
+    act(() => {
+      result.current.setMetronomeOn((v) => !v);
+    });
+    expect(result.current.metronomeOn).toBe(false);
+  });
 });

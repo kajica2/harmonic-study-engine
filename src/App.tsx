@@ -166,6 +166,8 @@ export default function App() {
     setLoopStartBar,
     loopEndBar,
     setLoopEndBar,
+    metronomeOn,
+    setMetronomeOn,
   } = session;
 
   // Practice sets (separate storage system; loaded once at mount)
@@ -551,6 +553,10 @@ export default function App() {
   useEffect(() => {
     rhythmEngine.setTimeSignature(timeSignature);
   }, [timeSignature]);
+
+  useEffect(() => {
+    rhythmEngine.setMetronomeEnabled(metronomeOn);
+  }, [metronomeOn]);
 
   useEffect(() => {
     rhythmEngine.setOnMeasureStart(() => {
@@ -1046,6 +1052,8 @@ export default function App() {
           setTempo={setTempo}
           transposeShift={transposeShift}
           setTransposeShift={setTransposeShift}
+          metronomeOn={metronomeOn}
+          setMetronomeOn={setMetronomeOn}
           selectedPersonaId={selectedPersonaId}
           setSelectedPersonaId={setSelectedPersonaId}
           personas={PERSONAS}

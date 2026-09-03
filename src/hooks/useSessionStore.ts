@@ -166,6 +166,11 @@ export interface SessionStore {
   loopEndBar: number | null;
   setLoopEndBar: Setter<number | null>;
 
+  // metronome click (rhythmEngine-driven, independent of the
+  // backing-style drum patterns)
+  metronomeOn: boolean;
+  setMetronomeOn: Setter<boolean>;
+
   // WAV export mode (block / arpeggio / block-then-arp)
   wavMode: RenderMode;
   setWavMode: Setter<RenderMode>;
@@ -345,6 +350,13 @@ export function useSessionStore(): SessionStore {
     }
   });
 
+  // metronome click — user-toggleable, default ON (matches the
+  // historical "always click while playing" behavior). Persisted so
+  // the preference survives reloads.
+  const [metronomeOn, setMetronomeOn] = useState(() =>
+    loadBool("synesthesia_metronomeOn", true),
+  );
+
   // WAV export mode
   const [wavMode, setWavMode] = useState<RenderMode>(() =>
     loadJSON<RenderMode>("synesthesia_wavMode", "block"),
@@ -400,6 +412,8 @@ export function useSessionStore(): SessionStore {
     setLoopStartBar,
     loopEndBar,
     setLoopEndBar,
+    metronomeOn,
+    setMetronomeOn,
     wavMode,
     setWavMode,
   };
