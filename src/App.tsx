@@ -53,7 +53,7 @@ import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
 import { exportToMidiFile } from "./lib/midiExport";
-import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
+import { renderPathToWav, downloadWavFromBlob, RenderMode, stepsPerBar } from "./lib/loopWav";
 import { useAsyncAction } from "./lib/useAsyncAction";
 import { InlineErrorPill } from "./components/InlineStatus";
 import { RecordingModal } from "./components/RecordingModal";
@@ -564,12 +564,17 @@ export default function App() {
         // Sub-range loop wins when active and a start bar is set.
         const useLoop = isLoopingRef.current && loopStartBar !== null;
         if (useLoop) {
-          const totalBars = Math.ceil(path.steps.length / 4);
-          const fromStep = loopStartBar! * 4;
+          // Bar <-> step conversion uses the active time signature's
+          // stepsPerBar (4 for 4/4, 6 for 6/8, 7 for 7/8, 11 for 11/4,
+          // 16 for tintal). The previous code hard-coded / 4 which
+          // was only correct for 4/4 — see commit fixing this.
+          const stepsPerBarNow = stepsPerBar(timeSignature);
+          const totalBars = Math.ceil(path.steps.length / stepsPerBarNow);
+          const fromStep = loopStartBar! * stepsPerBarNow;
           // Inclusive end bar; +1 because we want the wrap to land on
           // the start of (loopEndBar + 1).
           const toStep =
-            (Math.min(loopEndBar ?? totalBars - 1, totalBars - 1) + 1) * 4;
+            (Math.min(loopEndBar ?? totalBars - 1, totalBars - 1) + 1) * stepsPerBarNow;
           if (prev + 1 >= toStep) return fromStep;
           if (prev < fromStep) return fromStep;
           return prev + 1;
@@ -2179,7 +2184,7 @@ export default function App() {
                       title={
                         isLooping
                           ? loopStartBar !== null
-                            ? `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / 4) - 1) + 1} — click to stop`
+                            ? `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / stepsPerBar(timeSignature)) - 1) + 1} — click to stop`
                             : "Looping whole path — click to stop"
                           : "Loop playback"
                       }
@@ -2187,7 +2192,7 @@ export default function App() {
                     >
                       {isLooping
                         ? loopStartBar !== null
-                          ? `↻ Bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / 4) - 1) + 1}`
+                          ? `↻ Bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / stepsPerBar(timeSignature)) - 1) + 1}`
                           : "↻ Loop"
                         : "○ Loop"}
                     </ToolChip>
@@ -2590,6 +2595,7 @@ export default function App() {
                   activeStepIndex={activeStepIndex}
                   transposeShift={transposeShift}
                   tempo={tempo}
+                  timeSignature={timeSignature}
                 />
               </div>
             )}

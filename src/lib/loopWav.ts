@@ -174,6 +174,44 @@ export function beatsPerBar(meter: string): number {
 }
 
 /**
+ * Steps per bar — the number of `HarmonicStep` entries that fill
+ * one bar in the given time signature. One step = one chord, and
+ * one step = one beat (the bottom number of the meter = the
+ * beat unit: 4 = quarter, 8 = eighth, etc.).
+ *
+ * Examples:
+ *   "4/4"   -> 4   (4 quarter notes)
+ *   "6/8"   -> 6   (6 eighth notes)
+ *   "7/8"   -> 7   (7 eighth notes)
+ *   "11/4"  -> 11  (11 quarter notes)
+ *   "tintal"-> 16  (16-beat Hindustani cycle; notated 4/4 but
+ *                    with 4 grouped beats per count = 16 steps)
+ *
+ * This is the single source of truth for the bar-strip and
+ * loop-range math in App.tsx. Replaces the hard-coded `/ 4` and
+ * `* 4` constants that were only correct for 4/4. Mirrors the
+ * existing `beatsPerBar` parser but adds explicit support for
+ * "tintal" and any future meter the catalog may add.
+ */
+export function stepsPerBar(timeSignature: string): number {
+  switch (timeSignature) {
+    case "4/4":
+      return 4;
+    case "6/8":
+      return 6;
+    case "7/8":
+      return 7;
+    case "11/4":
+      return 11;
+    case "tintal":
+      return 16;
+    default:
+      // Fall back to the regex parser for any future meter.
+      return beatsPerBar(timeSignature);
+  }
+}
+
+/**
  * Render shapes for the loop WAV export.
  *  - block:           every chord as one block (sustained for the full bar).
  *  - arp:             every chord broken into a sweeping arpeggio.
