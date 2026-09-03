@@ -11,3 +11,11 @@ coverage/
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
+
+# Vitest coverage HTML report (default `coverage/` dir from --coverage)
+/coverage/
+
+# Lockfile drift between system Python and the venv (if a dev runs
+# `pip freeze` on either side, the result differs).
+/server/requirements-dev.lock
