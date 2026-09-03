@@ -4,6 +4,8 @@ import { HarmonicPath } from "../lib/paths";
 import { midiToABCName, transposeMidiList } from "../lib/scoreGenerator";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
+import { TimeSignature } from "../lib/rhythm";
+import { stepsPerBar } from "../lib/loopWav";
 
 const NOTE_WHEEL = [
   "C",
@@ -45,6 +47,11 @@ interface LiveScoreDisplayProps {
   activeStepIndex: number;
   transposeShift: number;
   tempo: number;
+  /** Time signature — used to compute the steps-per-bar ratio for
+   *  the 4-bar context window. Defaults to 4/4 for backward
+   *  compat (the component is also used in places that don't pass
+   *  a signature). */
+  timeSignature?: TimeSignature;
 }
 
 /**
@@ -68,6 +75,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   activeStepIndex,
   transposeShift,
   tempo,
+  timeSignature = "4/4",
 }) => {
   const svgRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,15 +109,20 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   // 4-bar window computation. The active bar gets 1 bar before +
   // 1 bar after for context (4 bars total). Computed at render so
   // the JSX can display "Bars X-Y of N".
-  const stepsPerBar = 4;
-  const activeBar = Math.floor(activeStepIndex / stepsPerBar);
-  const totalBars = Math.ceil((path?.steps.length ?? 0) / stepsPerBar);
+  //
+  // stepsPerBar used to be a hard-coded 4 — only correct for 4/4.
+  // Now derived from the active time signature via the shared
+  // helper in lib/loopWav. For 6/8 that's 6, for 7/8 it's 7, for
+  // 11/4 it's 11, for tintal it's 16.
+  const stepsPerBarValue = stepsPerBar(timeSignature);
+  const activeBar = Math.floor(activeStepIndex / stepsPerBarValue);
+  const totalBars = Math.ceil((path?.steps.length ?? 0) / stepsPerBarValue);
   const windowBarStart = Math.max(0, activeBar - 1);
   const windowBarEnd = Math.min(totalBars, windowBarStart + 4);
-  const windowStepStart = windowBarStart * stepsPerBar;
+  const windowStepStart = windowBarStart * stepsPerBarValue;
   const windowStepEnd = Math.min(
     path?.steps.length ?? 0,
-    windowBarEnd * stepsPerBar,
+    windowBarEnd * stepsPerBarValue,
   );
   const windowSteps =
     path?.steps.slice(windowStepStart, windowStepEnd) ?? [];
