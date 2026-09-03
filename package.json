@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "bash dev.sh",
-    "dev:nodocker": "bash dev.sh",
     "dev:vite": "vite --port=5173 --host=0.0.0.0",
     "dev:backend": "python3 -m server.app",
     "build": "vite build",

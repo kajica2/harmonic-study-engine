@@ -5,19 +5,18 @@ FastAPI server that exposes DDSP synthesis via a REST API.
 import os
 import struct
 import logging
-from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 
 logger = logging.getLogger(__name__)
 
-# DDSP is heavy and the upstream v3.7.0 tag is gone. The HF
-# Dockerfile omits ddsp from the install; the synthesizer and fx
-# modules are imported lazily and 503 if ddsp isn't available.
+# DDSP is heavy and the upstream v3.7.0 tag is gone. Install
+# server/requirements-ddsp.txt on top of the venv if you want
+# offline render + reverb; the modules below are imported lazily
+# and 503 if ddsp isn't available.
 _DDSP_AVAILABLE = False
 try:
     from .synthesizer import synthesize_progression
@@ -187,8 +186,7 @@ async def recordings_upload(
     if not shutil.which("ffmpeg"):
         # Fall back to the original WebM; the client can re-encode
         # if needed. This is the path used when the server runs
-        # without ffmpeg installed (e.g. the ffmpeg-free Docker
-        # build). Most production deploys will have ffmpeg.
+        # without ffmpeg installed. Most installs will have it.
         return Response(
             content=raw,
             media_type=audio.content_type or "video/webm",
@@ -245,31 +243,6 @@ async def recordings_upload(
 
 def main():
     uvicorn.run("server.app:app", host="127.0.0.1", port=8765, reload=False)
-
-
-# ---------- Static frontend (SPA) ----------
-# Only mounts when the Vite build directory exists. In the HF
-# Dockerfile the `dist/` is copied to /app/server/static so the
-# same URL serves both the SPA and the API. In local dev the
-# frontend is served by `npm run dev` on :3000, so the static
-# mount is a no-op and the dev server takes precedence.
-_STATIC_DIR = Path(__file__).parent / "static"
-if _STATIC_DIR.exists() and any(_STATIC_DIR.iterdir()):
-    # Mount assets under /assets so Vite's hashed filenames resolve.
-    if (_STATIC_DIR / "assets").exists():
-        app.mount("/assets", StaticFiles(directory=_STATIC_DIR / "assets"), name="assets")
-    # Serve the SPA — every non-API path falls through to index.html
-    # so client-side routes resolve correctly on hard refresh.
-    @app.get("/", include_in_schema=False)
-    @app.get("/{full_path:path}", include_in_schema=False)
-    def spa_fallback(full_path: str = ""):
-        # Don't shadow API routes — but they're already declared
-        # above so FastAPI handles them first. This catch-all
-        # only fires for paths the API didn't match.
-        index = _STATIC_DIR / "index.html"
-        if index.exists():
-            return Response(content=index.read_bytes(), media_type="text/html")
-        return Response(status_code=404, content="frontend not built")
 
 
 if __name__ == "__main__":
