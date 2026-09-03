@@ -145,6 +145,74 @@ canonical domain plus `localhost:5173` for local dev. If you add
 a custom domain to the Vercel project, add it to that env var on
 the Render side and redeploy.
 
+## Testing
+
+Two test suites, run from the project root with `npm test` and
+`npm run test:py`:
+
+### Frontend (Vitest)
+
+```bash
+npm test             # run once
+npm run test:watch   # watch mode
+```
+
+Coverage:
+
+- `tests/smoke.test.ts` — vitest infrastructure + src import paths
+- `tests/theory.test.ts` — note names, MIDI conversion, voice-leading
+- `tests/paths.test.ts` — catalog invariants (every path has notes, unique ids)
+- `tests/scoreExport.test.ts` — MusicXML 4.0 + Score21 output shapes
+- `tests/midiExport.test.ts` — SMF header bytes + format
+- `tests/useSessionStore.test.ts` — localStorage hydration + the
+  legacy `beatType` migration map
+
+62 tests as of this commit. Run `npm test -- --coverage` for an
+HTML coverage report (defaults to `coverage/`).
+
+**Not covered** (intentionally): React components in `src/components/`
+and `src/App.tsx` — they're tightly coupled to the audio engine
+singleton instances (rhythmEngine, audioEngine, backingEngine),
+and the test ROI for mocking all that is low. UI bugs surface in
+browser-browser tests; the unit tests cover the deterministic,
+importable logic that the UI composes.
+
+### Backend (pytest)
+
+```bash
+npm run test:py      # wrapper that prefers .venv/bin/python
+```
+
+Requires `server/requirements-dev.txt` installed in the venv
+(`pip install -r server/requirements-dev.txt`). The wrapper
+falls back to `python3 -m pytest` if no venv exists, but
+pytest-asyncio must be installed in that Python for tests to run.
+
+Coverage (29 tests):
+
+- `server/tests/test_app.py` — every API route registered
+- `server/tests/test_health.py` — `/health` shape + status contract
+- `server/tests/test_synthesize.py` — 503/400/422 contract paths
+- `server/tests/test_fx_reverb.py` — multipart upload + 503/400
+- `server/tests/test_recordings_upload.py` — ffmpeg fallback path
+  + Content-Disposition + X-Transcoded headers
+- `server/tests/test_cors.py` — DDSP_CORS_ORIGINS env var + defaults
+
+**Not covered**: `server/synthesizer.py` and `server/fx.py` — these
+require Magenta/DDSP installed to even import. The `/synthesize`
+and `/fx/reverb` 503 paths are tested instead, which is what
+production deploys actually hit without the DDSP stack.
+
+### What to add next
+
+If you tackle more coverage, the highest-leverage targets are:
+
+- `src/lib/useBassNotes.ts` — wraps the backing engine's bass MIDI
+  stream; testable with a mocked backingEngine
+- `src/lib/importRealBook.ts` and `src/lib/ireal.ts` — file-format
+  parsers; high regression value
+- `src/lib/recorder.ts` — needs the MediaRecorder mock; complex
+
 ## License
 
 MIT
