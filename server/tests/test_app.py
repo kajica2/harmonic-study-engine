@@ -2,23 +2,11 @@
 infrastructure is wired correctly. Real coverage goes in the
 session-B tests (test_health.py, test_synthesize.py, etc.)."""
 
-import pytest
-from fastapi.testclient import TestClient
 
-from server.app import app
-
-
-@pytest.fixture
-def client():
-    # TestClient runs the ASGI app in-process; no uvicorn subprocess.
-    # It's sync (not async) because httpx.AsyncClient setup adds noise
-    # the first test doesn't need.
-    with TestClient(app) as c:
-        yield c
-
-
-def test_app_loads(client):
+def test_app_loads():
     """The app object imported successfully and routes registered."""
+    from server.app import app
+
     paths = {r.path for r in app.routes if hasattr(r, "path")}
     # Every real API route we ship should be present. If a route
     # is removed accidentally this list will catch it.
