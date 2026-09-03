@@ -202,5 +202,41 @@
     "accentColor": "#9B5DE5",
     "gradientFrom": "from-violet-500/25",
     "gradientTo": "to-fuchsia-500/5"
+  },
+  {
+    "id": "simone",
+    "name": "Nina Simone",
+    "role": "High Priestess of Song",
+    "quote": "I have a duty to sing that song. I have to sing it.",
+    "tagline": "Tells the story. You supply the silence.",
+    "originalSongId": "path-6",
+    "instrument": "epiano",
+    "tempo": 64,
+    "arpType": "random",
+    "arpRate": 6,
+    "arpGate": 95,
+    "arpOctaves": 1.5,
+    "visualTheme": "simone",
+    "accentColor": "#7B2D8E",
+    "gradientFrom": "from-purple-700/30",
+    "gradientTo": "to-rose-900/10"
+  },
+  {
+    "id": "novaro",
+    "name": "Augusto Novaro",
+    "role": "Sight-Reading Drill Sergeant",
+    "quote": "Primero el ritmo, después la nota.",
+    "tagline": "First the rhythm, then the note.",
+    "originalSongId": "path-3",
+    "instrument": "trumpet",
+    "tempo": 100,
+    "arpType": "none",
+    "arpRate": 1,
+    "arpGate": 80,
+    "arpOctaves": 1,
+    "visualTheme": "novaro",
+    "accentColor": "#C2542A",
+    "gradientFrom": "from-orange-600/25",
+    "gradientTo": "to-amber-900/5"
   }
 ]
