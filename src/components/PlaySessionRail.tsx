@@ -813,6 +813,7 @@ const CommitStage: React.FC<{
             <option value="block">Full chords</option>
             <option value="arp">Arpeggio</option>
             <option value="block_then_arp">Block + Arp</option>
+            <option value="mono">Top-voice (mono)</option>
           </select>
         </div>
         <button
@@ -822,7 +823,7 @@ const CommitStage: React.FC<{
         >
           {isExportingWav
             ? "Rendering…"
-            : `↓ Download ${wavMode === "block" ? "chord" : wavMode === "arp" ? "arpeggio" : "block+arp"} WAV`}
+            : `↓ Download ${wavMode === "block" ? "chord" : wavMode === "arp" ? "arpeggio" : wavMode === "mono" ? "top-voice" : "block+arp"} WAV`}
         </button>
 
         {/* Inline status — replaces old alert() popups. Sits inside the
