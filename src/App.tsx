@@ -953,6 +953,19 @@ export default function App() {
         }}
       />
 
+      {/* Recording bar — peripheral "REC" indicator at the very top
+          of the viewport. The corner pill (below) carries the
+          elapsed-time detail; this bar is for peripheral vision
+          while the user is looking at the score. aria-hidden because
+          the pill already has aria-live=polite for screen readers. */}
+      {isMediaRecording && (
+        <div
+          className="recording-bar"
+          aria-hidden="true"
+          data-testid="recording-bar"
+        />
+      )}
+
       <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[color:var(--color-border)] surface-1 flex flex-wrap gap-3 sm:gap-4 justify-between items-center backdrop-blur-xl sticky top-0 z-30">
         <div className="min-w-0">
           <h1 className="t-display-2 text-[color:var(--color-text-1)] flex items-center gap-2">
