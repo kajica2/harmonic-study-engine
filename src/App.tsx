@@ -24,11 +24,11 @@ import {
   Video,
   StopCircle,
 } from "lucide-react";
-import { audioEngine, InstrumentType } from "./lib/audio";
+import { audioEngine } from "./lib/audio";
 import { rhythmEngine, TimeSignature } from "./lib/rhythm";
 import { playbackClock } from "./lib/playbackClock";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
-import { useHistory } from "./lib/useHistory";
+import { useSessionStore } from "./hooks/useSessionStore";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
@@ -110,24 +110,65 @@ function downloadText(filename: string, content: string, mime: string) {
 }
 
 export default function App() {
-  const [paths, setPaths] = useState<HarmonicPath[]>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_paths");
-      const parsed = saved ? JSON.parse(saved) : ALL_PATHS;
-      // Bump: when v2 (study materials + new PATHS shape) ships and the
-      // user has stale localStorage from before, merge in any missing
-      // built-in paths so study materials appear without a manual reset.
-      if (saved) {
-        const ids = new Set(parsed.map((p: HarmonicPath) => p.id));
-        const missing = ALL_PATHS.filter((p) => !ids.has(p.id));
-        if (missing.length) return [...parsed, ...missing];
-      }
-      return parsed;
-    } catch {
-      return ALL_PATHS;
-    }
-  });
+  // Persistent session state — paths, transport, voicing, mutes,
+  // arpeggiator, persona, loop range. Hydrated from localStorage
+  // by the hook; this is the only place these defaults live.
+  const session = useSessionStore();
+  const {
+    paths,
+    setPaths,
+    activePathIndex,
+    setActivePathIndex,
+    activeStepIndex,
+    setActiveStepIndex,
+    transposeShift,
+    setTransposeShift,
+    voicingType,
+    setVoicingType,
+    instrument,
+    setInstrument,
+    tempo,
+    setTempo,
+    tempoHistory,
+    wavMode,
+    setWavMode,
+    timeSignature,
+    setTimeSignature,
+    beatType,
+    setBeatType,
+    drumsMuted,
+    setDrumsMuted,
+    bassMuted,
+    setBassMuted,
+    pianoMuted,
+    setPianoMuted,
+    optimizeVoiceLeading,
+    setOptimizeVoiceLeading,
+    volume,
+    setVolume,
+    selectedPersonaId,
+    setSelectedPersonaId,
+    showTheoryLabels,
+    setShowTheoryLabels,
+    kbRange,
+    setKbRange,
+    arpType,
+    setArpType,
+    arpRate,
+    setArpRate,
+    arpGate,
+    setArpGate,
+    arpOctaves,
+    setArpOctaves,
+    isLooping,
+    setIsLooping,
+    loopStartBar,
+    setLoopStartBar,
+    loopEndBar,
+    setLoopEndBar,
+  } = session;
 
+  // Practice sets (separate storage system; loaded once at mount)
   const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
   const [recentSessions] = useState(() => getRecentSessions(5));
   const [activePracticeSet, setActivePracticeSet] = useState<{
@@ -135,74 +176,11 @@ export default function App() {
     options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
   } | null>(null);
 
-  const [activePathIndex, setActivePathIndex] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_activePathIndex");
-      if (saved !== null) {
-        const val = Number(saved);
-        const savedPaths = localStorage.getItem("synesthesia_paths");
-        const currentPaths = savedPaths ? JSON.parse(savedPaths) : PATHS;
-        if (val >= 0 && val < currentPaths.length) return val;
-      }
-    } catch {}
-    return 0;
-  });
-
-  const [activeStepIndex, setActiveStepIndex] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_activeStepIndex");
-      if (saved !== null) {
-        const val = Number(saved);
-        const savedPaths = localStorage.getItem("synesthesia_paths");
-        const currentPaths = savedPaths ? JSON.parse(savedPaths) : PATHS;
-
-        const activePathIdxSaved = localStorage.getItem(
-          "synesthesia_activePathIndex",
-        );
-        const activePathIdx = activePathIdxSaved
-          ? Number(activePathIdxSaved)
-          : 0;
-
-        const currentPath = currentPaths[activePathIdx] || currentPaths[0];
-        if (currentPath && val >= 0 && val < currentPath.steps.length)
-          return val;
-      }
-    } catch {}
-    return 0;
-  });
-
   const [activeMidis, setActiveMidis] = useState<number[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 400 });
 
-  const [transposeShift, setTransposeShift] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_transposeShift");
-      return saved !== null ? Number(saved) : 0;
-    } catch {
-      return 0;
-    }
-  });
-
-  const [voicingType, setVoicingType] = useState<"closed" | "open">(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_voicingType");
-      return saved === "open" ? "open" : "closed";
-    } catch {
-      return "closed";
-    }
-  });
-
   const [midiOutputs, setMidiOutputs] = useState<any[]>([]);
   const [selectedMidiOutId, setSelectedMidiOutId] = useState<string>("");
-
-  const [instrument, setInstrument] = useState<InstrumentType>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_instrument");
-      return (saved ? JSON.parse(saved) : "epiano") as InstrumentType;
-    } catch {
-      return "epiano";
-    }
-  });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
   const [isDDSPLoading, setIsDDSPLoading] = useState(false);
@@ -211,49 +189,11 @@ export default function App() {
   const [isRenderingWav, setIsRenderingWav] = useState(false);
   const [wavExportError, setWavExportError] = useState<string | null>(null);
   const [wavExportStatus, setWavExportStatus] = useState<string | null>(null);
-  const [wavMode, setWavMode] = useState<RenderMode>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_wavMode");
-      return (saved ? JSON.parse(saved) : "block") as RenderMode;
-    } catch {
-      return "block";
-    }
-  });
   // Whether the OpenRouter API key is configured at build time.
   // The Gemini/Cloud options are disabled in the UI when this is false.
   const hasOpenRouterKey = Boolean(
     (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined)?.trim(),
   );
-
-  const [tempo, setTempo, tempoHistory] = useHistory<number>(
-    () => {
-      try {
-        const saved = localStorage.getItem("synesthesia_tempo");
-        return saved !== null ? Number(saved) : 60;
-      } catch {
-        return 60;
-      }
-    },
-  );
-
-  const [volume, setVolume] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_volume");
-      return saved !== null ? Number(saved) : 50;
-    } catch {
-      return 50;
-    }
-  });
-
-  // Persona Sync
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_selectedPersonaId");
-      return saved ? JSON.parse(saved) : "";
-    } catch {
-      return "";
-    }
-  });
 
   // Collapsible / Foldable states for space optimization
   const [isArpFolded, setIsArpFolded] = useState(false);
@@ -261,94 +201,12 @@ export default function App() {
   const [activePanel, setActivePanel] = useState<"paths" | "practice">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
 
-  const [kbRange, setKbRange] = useState<{ from: number; to: number }>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_kbRange");
-      return saved ? JSON.parse(saved) : { from: 36, to: 72 };
-    } catch {
-      return { from: 36, to: 72 };
-    }
-  });
-
   useEffect(() => {
     audioEngine.setInstrument(instrument);
   }, [instrument]);
 
-  const [timeSignature, setTimeSignature] = useState<TimeSignature>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_timeSignature");
-      return (saved ? JSON.parse(saved) : "4/4") as TimeSignature;
-    } catch {
-      return "4/4";
-    }
-  });
-
-  const [beatType, setBeatType] = useState<BackingStyle>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_beatType");
-      // Migrate old beat-type strings to the new BackingStyle names
-      if (saved) {
-        const legacy = JSON.parse(saved);
-        const map: Record<string, BackingStyle> = {
-          none: "off",
-          metronome: "off",
-          jazz: "swing",
-          bossa: "bossa",
-          techno: "funk",
-        };
-        return (map[legacy] ?? "off");
-      }
-      return "off";
-    } catch {
-      return "off";
-    }
-  });
-
-  // Per-track backing mute toggles. Default all on. Lets the user
-  // practice with just drums + piano comping (mute bass for bass
-  // practice) or strip everything but the bass (drums + piano muted).
-  const [drumsMuted, setDrumsMuted] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("synesthesia_drumsMuted") === "1";
-    } catch {
-      return false;
-    }
-  });
-  const [bassMuted, setBassMuted] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("synesthesia_bassMuted") === "1";
-    } catch {
-      return false;
-    }
-  });
-  const [pianoMuted, setPianoMuted] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("synesthesia_pianoMuted") === "1";
-    } catch {
-      return false;
-    }
-  });
-
   const [genLength, setGenLength] = useState(1);
   const [genComplexity, setGenComplexity] = useState(1);
-
-  const [optimizeVoiceLeading, setOptimizeVoiceLeading] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_optimizeVoiceLeading");
-      return saved ? JSON.parse(saved) : false;
-    } catch {
-      return false;
-    }
-  });
-
-  const [showTheoryLabels, setShowTheoryLabels] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_showTheoryLabels");
-      return saved ? JSON.parse(saved) : false;
-    } catch {
-      return false;
-    }
-  });
 
   const [showImportExport, setShowImportExport] = useState(false);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
@@ -356,51 +214,6 @@ export default function App() {
   // Live bass notes from the backing engine. Empty until the
   // user picks a backing style and presses Auto.
   const bassMidis = useBassNotes();
-
-  const [arpType, setArpType] = useState<
-    | "none"
-    | "up"
-    | "down"
-    | "upDown"
-    | "downUp"
-    | "random"
-    | "converge"
-    | "diverge"
-  >(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpType");
-      return (saved ? JSON.parse(saved) : "none") as any;
-    } catch {
-      return "none";
-    }
-  });
-
-  const [arpRate, setArpRate] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpRate");
-      return saved !== null ? Number(saved) : 4;
-    } catch {
-      return 4;
-    }
-  });
-
-  const [arpGate, setArpGate] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpGate");
-      return saved !== null ? Number(saved) : 80;
-    } catch {
-      return 80;
-    }
-  });
-
-  const [arpOctaves, setArpOctaves] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpOctaves");
-      return saved !== null ? Number(saved) : 1;
-    } catch {
-      return 1;
-    }
-  });
 
   // Diatonic-scale practice mode. "auto" picks the mode from
   // the chord's quality (maj / min / mix / locrian), or the user
@@ -415,39 +228,7 @@ export default function App() {
   const [drillBusy, setDrillBusy] = useState(false);
   const [drillIter, setDrillIter] = useState<DrillSubdivision | null>(null);
 
-  const [isLooping, setIsLooping] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_isLooping");
-      return saved !== null ? JSON.parse(saved) : true;
-    } catch {
-      return true;
-    }
-  });
   const isLoopingRef = useRef(isLooping);
-
-  // Loop a sub-range of bars within a path. Both inclusive.
-  // `null` for loopEndBar means "loop to the end of the path".
-  // The user sets these by clicking bars in the bar strip (see
-  // PlaySessionRail). When `isLooping` is true, the auto-advance
-  // wraps between loopStartBar and loopEndBar instead of the full
-  // path. When isLooping is false, the range is ignored (full-path
-  // playback) but still visible as a hint.
-  const [loopStartBar, setLoopStartBar] = useState<number | null>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_loopStartBar");
-      return saved !== null ? Number(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [loopEndBar, setLoopEndBar] = useState<number | null>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_loopEndBar");
-      return saved !== null ? Number(saved) : null;
-    } catch {
-      return null;
-    }
-  });
 
   useEffect(() => {
     isLoopingRef.current = isLooping;
