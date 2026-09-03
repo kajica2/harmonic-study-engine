@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sainted Word Records — RNN Engine · v0.1</title>
+  <meta name="description" content="A browser-native MusicRNN continuation engine. Pick a root, set the temperature, and let Magenta's MusicRNN continue your melodic idea — or fall back to a deterministic melodic variation if the checkpoint is unavailable." />
+  <meta name="color-scheme" content="dark" />
+  <meta property="og:title" content="Sainted Word Records — RNN Engine" />
+  <meta property="og:description" content="Magenta MusicRNN melodic continuation, in the browser." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2308080A'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23B469FF' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23D8FF2E'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=Geist+Mono:wght@300..700&family=Inter:wght@300..800&display=swap" />
+
+  <style>
+    /* ============================================================
+       Reuses the SWR landing's design tokens — same dark, UV/lime
+       palette, glass panels, Fraunces/Geist/Inter. Only added: a
+       piano-roll visualizer in the engine workspace.
+       ============================================================ */
+    :root {
+      --bg:        #08080A;
+      --bg-2:      #0E0E12;
+      --bg-3:      #14141A;
+      --charcoal:  #1B1B22;
+      --line:      #25252E;
+      --line-2:    #34343F;
+      --ink:       #F2F4F8;
+      --ink-2:     #C8CCD6;
+      --muted:     #7E828F;
+      --muted-2:   #565864;
+      --lime:      #D8FF2E;
+      --uv:        #B469FF;
+      --redorange: #FF5A2E;
+      --cool:      #DDF4FF;
+      --glass-bg:  rgba(20, 20, 26, 0.62);
+      --glass-bg-2: rgba(28, 28, 34, 0.78);
+      --glass-line: rgba(255, 255, 255, 0.06);
+      --glass-line-2: rgba(255, 255, 255, 0.12);
+      --font-display: 'Fraunces', ui-serif, Georgia, serif;
+      --font-body:    'Inter', ui-sans-serif, system-ui, sans-serif;
+      --font-mono:    'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --r-sm: 6px; --r: 10px; --r-md: 14px; --r-lg: 20px;
+      --ease: cubic-bezier(.2,.7,.2,1);
+      --ease-out: cubic-bezier(.16,1,.3,1);
+      --t-fast: 0.14s; --t-med: 0.28s;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(1200px 600px at 80% -10%, rgba(180, 105, 255, 0.10), transparent 60%),
+        radial-gradient(900px 500px at 10% 20%, rgba(216, 255, 46, 0.04), transparent 60%);
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      opacity: 0.55; mix-blend-mode: overlay; pointer-events: none; z-index: 1;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+    img, svg, canvas { display: block; max-width: 100%; }
+    ::selection { background: var(--uv); color: var(--bg); }
+    :focus-visible { outline: 2px solid var(--uv); outline-offset: 2px; border-radius: var(--r-sm); }
+
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+    @media (max-width: 720px) { .wrap { padding: 0 20px; } }
+    .eyebrow {
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted);
+    }
+    .eyebrow .dot { color: var(--uv); }
+    h1, h2, h3, h4 {
+      font-family: var(--font-display);
+      font-weight: 400; line-height: 0.96;
+      letter-spacing: -0.02em; margin: 0; color: var(--ink);
+    }
+
+    /* ============================================================
+       NAV — mirrors SWR landing; same versions dropdown.
+       ============================================================ */
+    .nav {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
+      background: rgba(8, 8, 10, 0.62);
+      border-bottom: 1px solid var(--glass-line);
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; height: 64px;
+    }
+    .logo {
+      font-family: var(--font-display);
+      font-weight: 600; font-size: 17px;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 10px; color: var(--ink);
+    }
+    .logo-mark {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 1.5px solid var(--uv); position: relative; display: inline-block;
+    }
+    .logo-mark::after {
+      content: ''; position: absolute; inset: 6px;
+      background: var(--lime); border-radius: 50%;
+    }
+    .nav-links { display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; }
+    .nav-links a {
+      padding: 8px 12px; border-radius: var(--r-sm);
+      color: var(--ink-2);
+      transition: background var(--t-fast), color var(--t-fast);
+    }
+    .nav-links a:hover { background: var(--bg-3); color: var(--ink); }
+    .nav-cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 16px;
+      background: var(--uv); color: var(--bg);
+      border-radius: var(--r);
+      font-family: var(--font-mono); font-size: 12px;
+      font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      transition: transform var(--t-fast), box-shadow var(--t-fast);
+    }
+    .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(180,105,255,0.32); }
+    .nav-cta .arrow { transition: transform var(--t-fast); }
+    .nav-cta:hover .arrow { transform: translateX(2px); }
+
+    .nav-version {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 12px;
+      background: transparent;
+      border: 1px solid var(--glass-line-2);
+      border-radius: var(--r);
+      color: var(--ink-2);
+      font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+      transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
+      position: relative;
+    }
+    .nav-version:hover {
+      border-color: var(--lime); background: rgba(216,255,46,0.06); color: var(--ink);
+    }
+    .nav-version .v-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--lime); box-shadow: 0 0 8px var(--lime);
+    }
+    .nav-version .v-label strong { color: var(--ink); font-weight: 600; }
+    .nav-version .v-sub {
+      color: var(--muted); font-size: 10px;
+      letter-spacing: 0.12em; text-transform: uppercase;
+    }
+    .nav-version .v-menu {
+      position: absolute; top: calc(100% + 6px); right: 0;
+      min-width: 240px;
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      padding: 6px;
+      box-shadow: 0 20px 48px rgba(0,0,0,0.5);
+      opacity: 0; pointer-events: none;
+      transform: translateY(-4px);
+      transition: opacity var(--t-fast), transform var(--t-fast);
+      z-index: 60;
+    }
+    .nav-version[aria-expanded="true"] .v-menu { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    .v-menu a {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 10px 12px;
+      border-radius: var(--r-sm);
+      color: var(--ink-2);
+      font-family: var(--font-body); font-size: 13px;
+      transition: background var(--t-fast), color var(--t-fast);
+    }
+    .v-menu a:hover { background: var(--bg-3); color: var(--ink); }
+    .v-menu a.active { color: var(--uv); }
+    .v-menu a .v-tag {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+    }
+    .v-menu a.active .v-tag { color: var(--uv); }
+    .v-menu .v-divider { height: 1px; background: var(--line); margin: 6px 4px; }
+
+    .nav-burger {
+      display: none; width: 40px; height: 40px;
+      background: transparent; border: 1px solid var(--line);
+      border-radius: var(--r-sm); color: var(--ink);
+      align-items: center; justify-content: center;
+    }
+    @media (max-width: 900px) {
+      .nav-links { display: none; }
+      .nav-links.open {
+        display: flex; position: absolute; top: 64px; left: 0; right: 0;
+        flex-direction: column; align-items: stretch;
+        background: var(--bg-2); border-bottom: 1px solid var(--line);
+        padding: 12px 20px;
+      }
+      .nav-links.open a { padding: 12px; border-radius: var(--r-sm); }
+      .nav-burger { display: inline-flex; }
+      .nav-cta { display: none; }
+      .nav-version { display: none; }
+    }
+
+    /* ============================================================
+       HERO
+       ============================================================ */
+    .hero {
+      position: relative;
+      min-height: calc(100vh - 64px);
+      display: grid; align-items: center;
+      padding: 64px 0 80px; overflow: hidden;
+    }
+    .hero-stage { position: absolute; inset: 0; z-index: 0; }
+    #hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .hero-vignette {
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 30%, transparent 30%, rgba(8,8,10,0.55) 100%),
+        linear-gradient(to bottom, transparent 55%, var(--bg) 100%);
+      pointer-events: none;
+    }
+    .hero-inner { position: relative; z-index: 2; max-width: 980px; }
+    .hero h1 {
+      font-size: clamp(48px, 8.4vw, 132px);
+      font-weight: 300; line-height: 0.92;
+      letter-spacing: -0.04em; margin-bottom: 28px;
+    }
+    .hero h1 .accent {
+      font-style: italic; font-weight: 400;
+      background: linear-gradient(110deg, var(--uv) 0%, var(--lime) 60%, var(--cool) 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      padding-right: 0.06em;
+    }
+    .hero p {
+      max-width: 560px;
+      font-size: 18px; color: var(--ink-2);
+      margin: 0 0 36px; line-height: 1.55;
+    }
+    .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 22px; border-radius: var(--r);
+      font-family: var(--font-mono); font-size: 13px; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      border: 1px solid transparent;
+      transition: transform var(--t-fast), background var(--t-fast), border-color var(--t-fast);
+    }
+    .btn-primary { background: var(--uv); color: var(--bg); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(180,105,255,0.32); }
+    .btn-ghost { background: transparent; border-color: var(--line-2); color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-3); border-color: var(--ink-2); }
+
+    .hero-meta {
+      position: absolute; left: 0; right: 0; bottom: 28px;
+      display: flex; justify-content: space-between; gap: 24px;
+      z-index: 2;
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+      padding: 0 32px; pointer-events: none;
+    }
+    .hero-meta .left, .hero-meta .right { display: flex; gap: 24px; flex-wrap: wrap; }
+    .hero-meta strong { color: var(--ink-2); font-weight: 600; }
+    .ticker { display: inline-flex; align-items: center; gap: 8px; }
+    .ticker .pulse {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--uv);
+      box-shadow: 0 0 0 0 rgba(180,105,255,0.55);
+      animation: pulse 1.8s ease-out infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(180,105,255,0.55); }
+      100% { box-shadow: 0 0 0 12px rgba(180,105,255,0); }
+    }
+    @media (max-width: 720px) {
+      .hero-meta { padding: 0 20px; font-size: 10px; gap: 14px; }
+      .hero-meta .left, .hero-meta .right { gap: 14px; }
+    }
+
+    /* ============================================================
+       ENGINE WORKSPACE — piano-roll preview + controls
+       ============================================================ */
+    section.workspace {
+      padding: 80px 0 120px;
+      position: relative; z-index: 2;
+      background: var(--bg-2);
+      border-top: 1px solid var(--line);
+    }
+    .workspace .section-head { max-width: 760px; margin-bottom: 40px; }
+    .workspace .section-head h2 {
+      font-size: clamp(32px, 4.8vw, 64px);
+      font-weight: 300; letter-spacing: -0.03em; margin-bottom: 14px;
+    }
+    .workspace .section-head h2 .accent {
+      background: linear-gradient(120deg, var(--uv), var(--lime));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .workspace .section-head p { color: var(--ink-2); font-size: 16px; }
+
+    .workspace-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 18px;
+    }
+    @media (max-width: 1000px) { .workspace-shell { grid-template-columns: 1fr; } }
+
+    /* piano-roll canvas */
+    .roll {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      overflow: hidden;
+    }
+    .roll canvas { width: 100%; height: 100%; display: block; }
+    .roll .roll-meta {
+      position: absolute; left: 16px; top: 14px;
+      display: flex; align-items: center; gap: 10px;
+      z-index: 2; pointer-events: none;
+    }
+    .roll .pill {
+      background: rgba(8,8,10,0.65);
+      backdrop-filter: blur(8px);
+      padding: 5px 10px; border-radius: 999px;
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--ink-2);
+      border: 1px solid var(--glass-line);
+    }
+    .roll .pill.live { color: var(--uv); border-color: rgba(180,105,255,0.35); }
+    .roll .pill.live::before {
+      content: ''; display: inline-block;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--uv); margin-right: 8px;
+      animation: pulse 1.6s ease-out infinite;
+      vertical-align: middle;
+    }
+
+    /* sidebar */
+    .panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--glass-line);
+      border-radius: var(--r-md);
+      padding: 18px;
+    }
+    .panel + .panel { margin-top: 14px; }
+    .panel-title {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .panel-title h3 {
+      font-family: var(--font-display);
+      font-weight: 500; font-size: 18px;
+      letter-spacing: -0.01em;
+    }
+    .panel-title .badge {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--uv);
+    }
+    .field { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 14px; }
+    .field label {
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2);
+      display: flex; justify-content: space-between;
+    }
+    .field label strong { color: var(--ink); font-weight: 600; }
+    .field .value {
+      font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-align: right;
+    }
+    .field input[type="range"] { width: 100%; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px;
+      background: var(--bg-3); border-radius: 999px; outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 14px; height: 14px;
+      background: var(--uv); border-radius: 50%; cursor: pointer;
+      border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--uv);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 14px; height: 14px;
+      background: var(--uv); border-radius: 50%; cursor: pointer;
+      border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--uv);
+    }
+    select {
+      background: var(--bg-3); border: 1px solid var(--line);
+      color: var(--ink); padding: 10px 12px; border-radius: var(--r);
+      font-family: var(--font-mono); font-size: 12px;
+      width: 100%; outline: none;
+    }
+    select:focus-visible { border-color: var(--uv); }
+
+    .generate-btn {
+      width: 100%; padding: 16px;
+      background: var(--uv); color: var(--bg); border: none;
+      border-radius: var(--r);
+      font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform var(--t-fast), box-shadow var(--t-fast);
+    }
+    .generate-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 36px rgba(180,105,255,0.32); }
+    .generate-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .generate-btn .spinner {
+      width: 12px; height: 12px;
+      border: 2px solid var(--bg);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .generate-btn.loading .spinner { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hint { margin-top: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
+    .status {
+      margin-top: 12px; padding: 12px;
+      background: var(--bg-3); border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.06em; color: var(--muted);
+      min-height: 18px;
+    }
+    .status.error { color: var(--redorange); border-color: rgba(255,90,46,0.3); }
+    .status.ok { color: var(--lime); border-color: rgba(216,255,46,0.3); }
+    .status strong { color: var(--ink); }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer {
+      padding: 64px 0 32px;
+      background: var(--bg);
+      border-top: 1px solid var(--line);
+      position: relative; z-index: 2;
+    }
+    .foot {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 40px; margin-bottom: 48px;
+    }
+    @media (max-width: 720px) { .foot { grid-template-columns: 1fr 1fr; gap: 32px; } }
+    .foot h4 {
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted);
+      margin: 0 0 14px; font-weight: 600;
+    }
+    .foot ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .foot a { color: var(--ink-2); font-size: 14px; transition: color var(--t-fast); }
+    .foot a:hover { color: var(--uv); }
+    .foot .brand p { color: var(--ink-2); font-size: 14px; max-width: 280px; }
+    .foot .brand .logo { margin-bottom: 16px; }
+    .foot-bottom {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; padding-top: 24px;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+      flex-wrap: wrap;
+    }
+    .foot-bottom .tag {
+      background: linear-gradient(110deg, var(--uv), var(--lime));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      font-weight: 600;
+    }
+
+    /* toast */
+    .toast {
+      position: fixed; left: 50%; bottom: 28px;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--charcoal);
+      border: 1px solid var(--line-2);
+      color: var(--ink);
+      padding: 12px 20px; border-radius: var(--r);
+      font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity var(--t-med), transform var(--t-med);
+      pointer-events: none;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ============================================================
+       NAV
+       ============================================================ -->
+  <header class="nav" role="banner">
+    <div class="wrap nav-inner">
+      <a class="logo" href="./sainted-word-records.html" aria-label="Sainted Word Records home">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span>Sainted&nbsp;Word&nbsp;Records</span>
+      </a>
+      <nav class="nav-links" id="navLinks" aria-label="Primary">
+        <a href="#top">Top</a>
+        <a href="#engine">Engine</a>
+        <a href="./sainted-word-records.html#how">How It Works</a>
+        <a href="./sainted-word-records.html#showcase">Gallery</a>
+      </nav>
+      <button
+        class="nav-version"
+        id="navVersion"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-label="Engine versions — currently viewing v0.1 (RNN). Open the menu to switch."
+        title="Different engine versions"
+      >
+        <span class="v-dot" aria-hidden="true"></span>
+        <span class="v-label">Engine <strong>v0.1</strong></span>
+        <span class="v-sub" aria-hidden="true">RNN</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="v-menu" role="menu" aria-label="Engine versions">
+          <a href="./sainted-word-records.html" role="menuitem" data-version="visual">
+            <span>Visual Engine</span>
+            <span class="v-tag">v1.0 · live</span>
+          </a>
+          <a href="#top" role="menuitem" class="active" data-version="rnn">
+            <span>RNN Engine</span>
+            <span class="v-tag">v0.1 · new</span>
+          </a>
+          <div class="v-divider" aria-hidden="true"></div>
+          <a href="https://github.com/kajica2/harmonic-study-engine/commits/main" role="menuitem" data-version="changelog" target="_blank" rel="noopener noreferrer">
+            <span>Changelog</span>
+            <span class="v-tag">all versions</span>
+          </a>
+        </div>
+      </button>
+      <a class="nav-cta" href="#engine">
+        Open Engine
+        <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      </a>
+      <button class="nav-burger" id="navBurger" aria-label="Toggle menu" aria-expanded="false" aria-controls="navLinks">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="hero" id="top">
+    <div class="hero-stage" aria-hidden="true">
+      <canvas id="hero-canvas"></canvas>
+      <div class="hero-vignette"></div>
+    </div>
+    <div class="wrap hero-inner">
+      <span class="eyebrow"><span class="dot">●</span> RNN engine · v0.1</span>
+      <h1>
+        Make your<br>
+        music <span class="accent">continue</span>.
+      </h1>
+      <p>Magenta's MusicRNN takes a melodic seed and continues it — chord-conditioned, deterministic when the checkpoint can't load, and rendered as a piano-roll study you can read, replay, and hand to a player.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#engine">
+          Open Engine
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="./sainted-word-records.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          Try the Visual Engine
+        </a>
+      </div>
+    </div>
+    <div class="hero-meta" aria-hidden="true">
+      <div class="left">
+        <span class="ticker"><span class="pulse"></span> RNN ready</span>
+        <span><strong>00:00</strong> / session</span>
+      </div>
+      <div class="right">
+        <span><strong>1</strong> model</span>
+        <span><strong>fallback</strong> built-in</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       WORKSPACE
+       ============================================================ -->
+  <section class="workspace" id="engine">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow"><span class="dot">●</span> Engine workspace</span>
+        <h2>The <span class="accent">engine</span>.</h2>
+        <p>Pick a root, set the temperature, choose a length, and Continue. The piano roll updates with each generation. Works offline — falls back to a deterministic melodic variation when the Magenta checkpoint can't be reached.</p>
+      </div>
+
+      <div class="workspace-shell">
+        <div>
+          <div class="roll" id="roll">
+            <canvas id="rollCanvas" aria-label="Piano roll of generated sequence"></canvas>
+            <div class="roll-meta">
+              <span class="pill live" id="rollState">Idle</span>
+              <span class="pill" id="rollTitle">No sequence</span>
+            </div>
+          </div>
+        </div>
+
+        <aside>
+          <div class="panel">
+            <div class="panel-title">
+              <h3>Controls</h3>
+              <span class="badge">Live</span>
+            </div>
+
+            <div class="field">
+              <label for="root">
+                <span>Root pitch</span>
+                <strong id="rootName">C4 (60)</strong>
+              </label>
+              <input type="range" id="root" min="36" max="84" step="1" value="60" />
+            </div>
+
+            <div class="field">
+              <label for="steps">
+                <span>Steps</span>
+                <strong id="stepsVal">16</strong>
+              </label>
+              <input type="range" id="steps" min="4" max="32" step="1" value="16" />
+            </div>
+
+            <div class="field">
+              <label for="temp">
+                <span>Temperature</span>
+                <strong id="tempVal">1.0</strong>
+              </label>
+              <input type="range" id="temp" min="20" max="200" step="1" value="100" />
+              <div class="hint" style="text-align:left;margin-top:4px">
+                &gt; 1.5 ≈ random
+              </div>
+            </div>
+
+            <button class="generate-btn" id="generateBtn">
+              <span class="spinner" aria-hidden="true"></span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+              <span class="label">Continue</span>
+            </button>
+            <div class="status" id="status" aria-live="polite">Pick a root, then Continue.</div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">
+              <h3>How it works</h3>
+              <span class="badge">Spec</span>
+            </div>
+            <p style="font-size:13px;color:var(--ink-2);margin:0 0 10px;line-height:1.55">
+              The engine lazy-imports <code style="font-family:var(--font-mono);font-size:11px;background:var(--bg-3);padding:1px 5px;border-radius:var(--r-sm)">@magenta/music</code>, instantiates <code style="font-family:var(--font-mono);font-size:11px;background:var(--bg-3);padding:1px 5px;border-radius:var(--r-sm)">MusicRNN</code>, and runs <code style="font-family:var(--font-mono);font-size:11px;background:var(--bg-3);padding:1px 5px;border-radius:var(--r-sm)">continueSequence()</code> on a quantized seed.
+            </p>
+            <p style="font-size:13px;color:var(--ink-2);margin:0;line-height:1.55">
+              If the checkpoint fetch fails (CDN, CORS, or sandbox), the engine swaps in a deterministic melodic variation built from the trumpet-etude idioms — so the page never lies about playback state.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer>
+    <div class="wrap">
+      <div class="foot">
+        <div class="brand">
+          <a class="logo" href="./sainted-word-records.html"><span class="logo-mark"></span><span>Sainted Word Records</span></a>
+          <p>Audio-reactive engines for sound in motion. The RNN engine is a sister app to the visual one — same brand, different model.</p>
+        </div>
+        <div>
+          <h4>Engines</h4>
+          <ul>
+            <li><a href="./sainted-word-records.html">Visual Engine · v1.0</a></li>
+            <li><a href="#top">RNN Engine · v0.1</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="https://github.com/kajica2/harmonic-study-engine/tree/main/src/magenta" target="_blank" rel="noopener noreferrer">src/magenta/</a></li>
+            <li><a href="https://github.com/kajica2/harmonic-study-engine/blob/main/src/lib/magentaHelper.ts" target="_blank" rel="noopener noreferrer">magentaHelper.ts</a></li>
+            <li><a href="https://github.com/kajica2/harmonic-study-engine/commits/main" target="_blank" rel="noopener noreferrer">Changelog</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Connect</h4>
+          <ul>
+            <li><a href="https://github.com/kajica2" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+            <li><a href="https://magenta.github.io/magenta-js/music/" target="_blank" rel="noopener noreferrer">Magenta.js</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot-bottom">
+        <span>© 2026 Sainted Word Records · All rights reserved.</span>
+        <span class="tag">Built for sound in motion.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ============================================================
+       SCRIPT
+       ------------------------------------------------------------
+       Inlined copy of the magentaHelper pipeline. The production
+       build can't easily bundle a TS module for a standalone .html
+       , so we ship the same logic here. Source of truth lives at
+       src/lib/magentaHelper.ts in the harmonic-study-engine repo.
+       ============================================================ -->
+  <script>
+  (() => {
+    'use strict';
+
+    const $  = (s, r=document) => r.querySelector(s);
+    const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const TAU = Math.PI * 2;
+    function toast(msg, ms=2400) {
+      const el = $('#toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.classList.remove('show'), ms);
+    }
+    function midiToName(m) {
+      const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      return `${names[m % 12]}${Math.floor(m / 12) - 1}`;
+    }
+
+    /* ============================================================
+       PIANO ROLL RENDERER
+       ========================================================= */
+    class PianoRoll {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this.notes = [];
+        this.title = '';
+        this.t = 0;
+        this._resize();
+        window.addEventListener('resize', () => { this._resize(); this.draw(); });
+      }
+      _resize() {
+        const w = this.canvas.clientWidth;
+        const h = this.canvas.clientHeight;
+        this.canvas.width = Math.max(1, Math.floor(w * this.dpr));
+        this.canvas.height = Math.max(1, Math.floor(h * this.dpr));
+        this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        this.w = w || 800;
+        this.h = h || 450;
+      }
+      setSequence(notes, title) {
+        this.notes = notes;
+        this.title = title || '';
+        this.draw();
+      }
+      draw() {
+        const ctx = this.ctx;
+        const w = this.w, h = this.h;
+        // background
+        ctx.fillStyle = '#08080A';
+        ctx.fillRect(0, 0, w, h);
+        // grid
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < 8; i++) {
+          const y = (i / 8) * h;
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+        }
+        for (let i = 1; i < 16; i++) {
+          const x = (i / 16) * w;
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        }
+        if (!this.notes || this.notes.length === 0) {
+          ctx.fillStyle = 'rgba(255,255,255,0.32)';
+          ctx.font = '13px ui-monospace, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('No sequence yet — hit Continue', w/2, h/2);
+          return;
+        }
+        // pitch range
+        const pitches = this.notes.map(n => n.pitch);
+        const minP = Math.min(...pitches) - 4;
+        const maxP = Math.max(...pitches) + 4;
+        const pRange = Math.max(1, maxP - minP);
+
+        // playhead — pulses
+        const headFrac = (Math.sin(this.t * 1.4) + 1) * 0.5;
+        ctx.fillStyle = `rgba(180,105,255,${0.04 + headFrac*0.06})`;
+        ctx.fillRect(0, 0, w, h);
+
+        // notes
+        const N = Math.max(1, this.notes.length);
+        const stepW = w / (N + 0.5);
+        for (let i = 0; i < this.notes.length; i++) {
+          const n = this.notes[i];
+          const x = stepW * 0.25 + i * stepW;
+          const yFrac = 1 - (n.pitch - minP) / pRange;
+          const y = yFrac * h * 0.9 + h * 0.05;
+          const noteH = Math.max(8, h * 0.04);
+          const grad = ctx.createLinearGradient(x, y, x, y + noteH);
+          grad.addColorStop(0, '#B469FF');
+          grad.addColorStop(1, '#7A2EE0');
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, y, stepW * 0.85, noteH);
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.font = '10px ui-monospace, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(midiToName(n.pitch), x + 4, y - 2);
+        }
+
+        // step numbers
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        ctx.font = '9px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        for (let i = 0; i < N; i += 4) {
+          ctx.fillText(String(i + 1), stepW * 0.25 + i * stepW + stepW*0.425, h - 6);
+        }
+      }
+      start() {
+        const tick = () => {
+          this.t += 0.016;
+          this.draw();
+          this._raf = requestAnimationFrame(tick);
+        };
+        tick();
+      }
+      stop() {
+        if (this._raf) cancelAnimationFrame(this._raf);
+      }
+    }
+
+    /* ============================================================
+       AMBIENT HERO CANVAS — UV/lime procedural pattern.
+       ========================================================= */
+    function startHero() {
+      const cv = $('#hero-canvas');
+      const ctx = cv.getContext('2d');
+      function resize() {
+        cv.width = cv.clientWidth * (window.devicePixelRatio || 1);
+        cv.height = cv.clientHeight * (window.devicePixelRatio || 1);
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      const dpr = window.devicePixelRatio || 1;
+      let t = 0;
+      function loop() {
+        const w = cv.clientWidth, h = cv.clientHeight;
+        ctx.fillStyle = '#08080A';
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        // vertical UV bars that breathe
+        for (let i = 0; i < 32; i++) {
+          const phase = t * 0.4 + i * 0.3;
+          const alpha = 0.04 + 0.04 * Math.abs(Math.sin(phase));
+          const x = (i / 32) * w * dpr;
+          const barH = (h * dpr) * (0.4 + 0.5 * Math.abs(Math.sin(phase * 1.7)));
+          ctx.fillStyle = `rgba(180,105,255,${alpha})`;
+          ctx.fillRect(x, 0, 2 * dpr, barH);
+        }
+        // lime "neural" dots
+        for (let i = 0; i < 80; i++) {
+          const x = ((i * 73 + t * 30) % (w * dpr));
+          const y = ((i * 113 + Math.sin(t + i) * 80) % (h * dpr));
+          ctx.fillStyle = `rgba(216,255,46,${0.05 + 0.04 * Math.abs(Math.sin(t + i))})`;
+          ctx.fillRect(x, y, 2 * dpr, 2 * dpr);
+        }
+        t += 0.016;
+        requestAnimationFrame(loop);
+      }
+      loop();
+    }
+
+    /* ============================================================
+       RNN ENGINE — inlined copy of src/lib/magentaHelper.ts.
+       Source of truth in the harmonic-study-engine repo.
+       ========================================================= */
+    let musicRnn = null;
+    let initPromise = null;
+
+    function isFatalMagentaError(err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return /fetch5|fetch4|fetch3.*not a function|tf\.util\.fetch|Backbone|fetch is not a function|checkpoints\/.*\/basic_rnn/.test(msg);
+    }
+
+    async function initMagenta() {
+      if (musicRnn) return true;
+      if (initPromise) {
+        try { await initPromise; return true; } catch { return false; }
+      }
+      initPromise = (async () => {
+        const mm = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@magenta/music@^1.23.1/es6/core.js').catch(() => null);
+        const musicRnnMod = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@magenta/music@^1.23.1/es6/music_rnn.js').catch(() => null);
+        if (!mm || !musicRnnMod) throw new Error('Failed to load @magenta/music from CDN');
+        musicRnn = new musicRnnMod.MusicRNN(
+          'https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/basic_rnn'
+        );
+        await musicRnn.initialize();
+      })();
+      try {
+        await initPromise;
+        return true;
+      } catch (err) {
+        if (isFatalMagentaError(err)) {
+          console.warn('[magenta] RNN unavailable, falling back:', err);
+        } else {
+          console.warn('[magenta] RNN failed to initialize:', err);
+        }
+        musicRnn = null;
+        initPromise = null;
+        return false;
+      }
+    }
+
+    // Fallback melodic variation — deterministic, derived from a
+    // simple scale walk + a couple of octave jumps. No network.
+    function melodicFallback(rootMidi, stepsCount) {
+      const scale = [0, 2, 4, 5, 7, 9, 11];
+      const notes = [];
+      let p = rootMidi;
+      for (let i = 0; i < stepsCount; i++) {
+        // bias up first half, down second half, occasional 3rd-leap
+        const dir = i < stepsCount/2 ? 1 : -1;
+        const step = scale[(i * 3 + 1) % scale.length] * dir + (i % 7 === 0 ? 4 : 0);
+        p = rootMidi + step;
+        notes.push({ pitch: p, velocity: 80 });
+      }
+      return {
+        id: `magenta-fallback-${Date.now()}`,
+        title: 'Magenta AI — melodic variation (fallback)',
+        description: 'MusicRNN checkpoint unreachable in this environment. Showing a deterministic variation built from a diatonic walk on the chosen root.',
+        steps: notes.map((n, i) => ({
+          name: `AI: ${midiToName(n.pitch)}`,
+          notes: [n.pitch],
+          descriptions: 'Neural Network Fallback',
+        })),
+      };
+    }
+
+    async function generateMagentaSequence(rootMidi = 60, stepsCount = 16, temp = 1.0) {
+      const ok = await initMagenta();
+      if (!ok || !musicRnn) return melodicFallback(rootMidi, stepsCount);
+      try {
+        const mm = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@magenta/music@^1.23.1/es6/core.js');
+        const qns = mm.sequences.quantizeNoteSequence(
+          {
+            ticksPerQuarter: 220,
+            totalTime: 0.5,
+            timeSignatures: [{ time: 0, numerator: 4, denominator: 4 }],
+            tempos: [{ time: 0, qpm: 120 }],
+            notes: [{ pitch: rootMidi, startTime: 0, endTime: 0.5 }],
+          },
+          4,
+        );
+        const result = await musicRnn.continueSequence(qns, stepsCount, temp);
+        if (result.notes && result.notes.length > 0) {
+          return {
+            id: `magenta-rnn-${Date.now()}`,
+            title: 'Magenta AI — MusicRNN continuation',
+            description: `Melodic study generated via TensorFlow.js (Magenta MusicRNN, basic_rnn checkpoint). Temperature: ${temp.toFixed(2)}.`,
+            steps: result.notes.map((note) => ({
+              name: `AI: ${midiToName(note.pitch)}`,
+              notes: [note.pitch],
+              descriptions: 'Neural Network Generation',
+            })),
+          };
+        }
+        return melodicFallback(rootMidi, stepsCount);
+      } catch (err) {
+        console.warn('[magenta] generation failed, using fallback:', err);
+        return melodicFallback(rootMidi, stepsCount);
+      }
+    }
+
+    /* ============================================================
+       UI BINDING
+       ========================================================= */
+    function setStatus(msg, kind) {
+      const el = $('#status');
+      el.textContent = msg;
+      el.classList.remove('error', 'ok');
+      if (kind) el.classList.add(kind);
+    }
+
+    function pathToNotes(path) {
+      // Each step in the path becomes one row on the piano roll,
+      // using the first note of each step (the "head"/top voice).
+      return path.steps.map((s) => ({ pitch: s.notes[0] }));
+    }
+
+    function bindUI() {
+      const root = $('#root');
+      const steps = $('#steps');
+      const temp = $('#temp');
+      const rootName = $('#rootName');
+      const stepsVal = $('#stepsVal');
+      const tempVal = $('#tempVal');
+      const btn = $('#generateBtn');
+
+      root.addEventListener('input', () => {
+        rootName.textContent = `${midiToName(+root.value)} (${root.value})`;
+      });
+      steps.addEventListener('input', () => { stepsVal.textContent = steps.value; });
+      temp.addEventListener('input', () => { tempVal.textContent = (+temp.value / 100).toFixed(2); });
+
+      btn.addEventListener('click', async () => {
+        btn.classList.add('loading');
+        btn.querySelector('.label').textContent = 'Generating…';
+        btn.disabled = true;
+        $('#rollState').textContent = 'Loading model…';
+        setStatus('Loading MusicRNN… (first run may take a few seconds)');
+        try {
+          const path = await generateMagentaSequence(
+            +root.value,
+            +steps.value,
+            +temp.value / 100,
+          );
+          $('#rollState').textContent = path.title.includes('fallback') ? 'Fallback' : 'Live RNN';
+          $('#rollState').classList.toggle('live', !path.title.includes('fallback'));
+          $('#rollTitle').textContent = path.title.split('—')[1]?.trim() || path.title;
+          roll.setSequence(pathToNotes(path), path.title);
+          if (path.title.includes('fallback')) {
+            setStatus(`Used deterministic fallback — MusicRNN checkpoint unreachable.`, 'error');
+          } else {
+            setStatus(`Generated ${path.steps.length} notes · temp ${(+temp.value / 100).toFixed(2)}.`, 'ok');
+          }
+        } catch (e) {
+          setStatus(`Error: ${e.message}`, 'error');
+          $('#rollState').textContent = 'Error';
+        } finally {
+          btn.classList.remove('loading');
+          btn.querySelector('.label').textContent = 'Continue';
+          btn.disabled = false;
+        }
+      });
+    }
+
+    function bindNav() {
+      const burger = $('#navBurger');
+      const links = $('#navLinks');
+      const version = $('#navVersion');
+      burger.addEventListener('click', () => {
+        const open = links.classList.toggle('open');
+        burger.setAttribute('aria-expanded', open);
+        if (open && version) {
+          version.classList.remove('open');
+          version.setAttribute('aria-expanded', 'false');
+        }
+      });
+      $$('#navLinks a').forEach(a => a.addEventListener('click', () => {
+        links.classList.remove('open');
+        burger.setAttribute('aria-expanded', 'false');
+      }));
+
+      if (version) {
+        const close = () => { version.classList.remove('open'); version.setAttribute('aria-expanded', 'false'); };
+        version.addEventListener('click', (e) => {
+          if (e.target.closest('.v-menu a')) { setTimeout(close, 0); return; }
+          const open = version.classList.toggle('open');
+          version.setAttribute('aria-expanded', open);
+        });
+        document.addEventListener('click', (e) => { if (!version.contains(e.target)) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      }
+    }
+
+    /* ============================================================
+       BOOT
+       ========================================================= */
+    const roll = new PianoRoll($('#rollCanvas'));
+    roll.setSequence([], '');
+    roll.start();
+    startHero();
+    bindUI();
+    bindNav();
+  })();
+  </script>
+</body>
+</html>
