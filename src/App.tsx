@@ -990,6 +990,53 @@ export default function App() {
   const ddspApiUrl =
     (import.meta.env.VITE_DDSP_API as string | undefined) ||
     "http://127.0.0.1:8765";
+  // Surface the backend's reachability so users on the static
+  // deployment (https://harmonic-study-engine.vercel.app/) know
+  // whether their local `bash dev.sh` is reachable from the tab.
+  // The status pill renders in the toolbar; colors follow the
+  // design tokens (emerald-700 for ok, amber-600 for degraded,
+  // rose-600 for unreachable).
+  const [backend, setBackend] = useState<
+    | { state: "checking" }
+    | { state: "ok"; ddspVersion: string }
+    | { state: "degraded"; ddspVersion: string }
+    | { state: "unreachable"; reason: string }
+  >({ state: "checking" });
+  useEffect(() => {
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        const res = await fetch(`${ddspApiUrl}/health`, {
+          signal: AbortSignal.timeout(2500),
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          setBackend({ state: "unreachable", reason: `HTTP ${res.status}` });
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setBackend({
+          state: data.status === "ok" ? "ok" : "degraded",
+          ddspVersion: data.ddsp_version ?? "unknown",
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setBackend({
+          state: "unreachable",
+          reason: err instanceof Error ? err.message : "fetch failed",
+        });
+      }
+    };
+    probe();
+    // Re-probe on focus so users coming back to the tab after
+    // starting `bash dev.sh` see the green pill without a reload.
+    window.addEventListener("focus", probe);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", probe);
+    };
+  }, [ddspApiUrl]);
   const synesthesiaCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [showLeadSheet, setShowLeadSheet] = useState(false);
   const [showChordInspector, setShowChordInspector] = useState(false);
@@ -2349,6 +2396,37 @@ export default function App() {
                     a real session. Tracks, HD, and Generator live in
                     the Advanced disclosure below. */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <ToolGroup label="API">
+                      {backend.state === "checking" ? (
+                        <span
+                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono text-[color:var(--color-text-3)]"
+                          title={`Probing ${ddspApiUrl}/health…`}
+                        >
+                          ⏳ checking
+                        </span>
+                      ) : backend.state === "ok" ? (
+                        <span
+                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono bg-emerald-700/30 text-emerald-200"
+                          title={`Backend at ${ddspApiUrl} — DDSP ${backend.ddspVersion}`}
+                        >
+                          ● live · DDSP {backend.ddspVersion}
+                        </span>
+                      ) : backend.state === "degraded" ? (
+                        <span
+                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono bg-amber-600/30 text-amber-100"
+                          title={`Backend at ${ddspApiUrl} reachable; DDSP not installed. /synthesize and /fx/reverb will 503.`}
+                        >
+                          ● degraded
+                        </span>
+                      ) : (
+                        <span
+                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono bg-rose-600/30 text-rose-100"
+                          title={`Backend at ${ddspApiUrl} unreachable (${backend.reason}). Run \`bash dev.sh\` locally and reload, or set VITE_DDSP_API in .env.`}
+                        >
+                          ● offline
+                        </span>
+                      )}
+                    </ToolGroup>
                   <ToolGroup label={`Backing${beatType !== "off" ? ` · ${beatType}` : ""}`}>
                     <select
                       value={beatType}

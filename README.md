@@ -85,6 +85,47 @@ the ddsp-import warning from printing twice during startup.
 
 `npm run build` produces `dist/`.
 
+## Live deployment
+
+The static frontend is hosted at
+<https://harmonic-study-engine.vercel.app> via Vercel's GitHub
+integration: every push to `main` triggers a build + alias. The
+build output is a plain Vite SPA — no serverless functions, no
+backend in the deployment. FastAPI is intentionally *not* on Vercel:
+
+- `/recordings/upload` runs `ffmpeg` and can take 1–2 minutes per
+  recording — far over Vercel's 10 s Hobby / 60 s Pro serverless
+  timeout
+- `/synthesize` and `/fx/reverb` use TensorFlow + Magenta/DDSP
+  weights (~1.5 GB) — the cold-start cost would dominate every
+  request
+- Both endpoints need a persistent host (ffmpeg installed, scratch
+  disk, a real process model)
+
+For the deployed UI to do anything beyond the local-only paths
+(33-tune catalog, scales, rhythm drill, sub-range loop, live score,
+mobile bar, MIDI/MusicXML/Score21 export), the tab needs to reach
+a FastAPI backend. The toolbar's **API** status pill reflects this:
+
+- ● live — backend reachable, DDSP installed
+- ● degraded — backend reachable, DDSP not installed (`/synthesize`
+  and `/fx/reverb` will 503)
+- ● offline — backend unreachable (default state on the deployed
+  tab unless `VITE_DDSP_API` points at a reachable host)
+
+To wire the deployed UI to your own backend, set `VITE_DDSP_API`
+in `.env` before `npm run build` (or via the Vercel project's
+environment variables for a redeploy):
+
+```bash
+VITE_DDSP_API="https://your-backend.example.com" npm run build
+```
+
+For local use, the default `http://127.0.0.1:8765` is correct —
+start the backend with `bash dev.sh` (or `npm run dev:backend`),
+then load the deployed tab in the same browser session; the API
+pill will turn green once `/health` responds.
+
 ## License
 
 MIT
