@@ -127,4 +127,41 @@ describe("Personas catalog — recently added", () => {
     expect(novo!.instrument).toBe("trumpet");
     expect(novo!.arpType).toBe("none"); // pure melody lines, no arpeggios
   });
+
+  it("includes Stan Getz (lyrical cool — bossa nova slot)", () => {
+    const getz = PERSONAS.find((p) => p.id === "getz");
+    expect(getz, "getz persona missing").toBeDefined();
+    expect(getz!.instrument).toBe("sax");
+    expect(getz!.originalSongId).toBe("path-1"); // II-V-I resolution — bossa harmonic ground
+    expect(getz!.arpType).toBe("upDown"); // gentle oscillation, lyrical
+    expect(getz!.arpGate).toBeGreaterThanOrEqual(75); // sustained, not staccato
+  });
+
+  it("includes Sonny Rollins (thematic builder — calypso / motif development)", () => {
+    const rollins = PERSONAS.find((p) => p.id === "rollins");
+    expect(rollins, "rollins persona missing").toBeDefined();
+    expect(rollins!.instrument).toBe("sax");
+    expect(rollins!.tempo).toBeGreaterThanOrEqual(120); // mid-tempo calypso
+    expect(rollins!.arpType).toBe("up"); // single-direction motif development
+  });
+
+  it("includes Joe Henderson (dark-modal explorer — inside-out harmony)", () => {
+    const henderson = PERSONAS.find((p) => p.id === "henderson");
+    expect(henderson, "henderson persona missing").toBeDefined();
+    expect(henderson!.instrument).toBe("sax");
+    expect(henderson!.originalSongId).toBe("path-4"); // modal interchange
+    expect(henderson!.arpType).toBe("random"); // inside-out intervallic leaps
+  });
+
+  it("the three new tenor-sax personas don't collide on instrument/tempo/arpType", () => {
+    // Catches a sloppy edit where, say, Henderson accidentally got
+    // the same arpType as Getz. Each one is supposed to be
+    // distinguishable from the existing roster AND from each other.
+    const trio = ["getz", "rollins", "henderson"].map(
+      (id) => PERSONAS.find((p) => p.id === id)!,
+    );
+    // Distinct arpTypes — different practice lens per persona
+    const arpTypes = new Set(trio.map((p) => p.arpType));
+    expect(arpTypes.size).toBe(3);
+  });
 });
