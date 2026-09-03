@@ -69,11 +69,6 @@ app.add_middleware(
 )
 
 
-class ChordStep(BaseModel):
-    name: str = ""
-    notes: list[int]
-
-
 class SynthesizeRequest(BaseModel):
     chord_notes: list[list[int]]
     chord_duration: float = 2.0
