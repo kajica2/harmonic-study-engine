@@ -33,6 +33,7 @@ import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlaye
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
 import { createHumanizeBacking } from "./magenta/humanizeBacking";
+import { createMixHumanizer } from "./magenta/mixHumanizer";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
@@ -674,6 +675,38 @@ export default function App() {
     // No teardown — the engine reads the closure each call. Rebuilding
     // on dep change replaces the function reference with a fresh one.
   }, [humanizeAmount, humanizePersonaId, beatType, isPlayingAuto]);
+
+  // Mix humanizer (plan §6 item 4). When the Human feel dial is
+  // active, every backing-track setLevels call pulls a fresh ±1 dB
+  // wobble from a shared seeded RNG and multiplies it into each bus
+  // gain. The result: the record never "loops" exactly — each
+  // pass sounds like a slightly different take. Reseed on persona
+  // change so a different player gets a different wobble pattern.
+  useEffect(() => {
+    if (humanizeAmount <= 0.001) {
+      backingEngine.mixHumanizer = null;
+      // Re-apply static levels so the bus gains snap back to the
+      // user's chosen values rather than staying at the last wobble.
+      backingEngine.setLevels({});
+      return;
+    }
+    // Hash persona id into a 32-bit seed so each persona produces a
+    // distinct wobble signature without us hand-tuning 17 seeds.
+    const seedStr = `mix-humanizer-${humanizePersonaId || "kandinsky"}`;
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < seedStr.length; i++) {
+      h ^= seedStr.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const handle = createMixHumanizer({ seed: h >>> 0 });
+    backingEngine.mixHumanizer = handle;
+    // Re-apply levels once so the first wobble is heard immediately
+    // rather than waiting for the next setLevels call.
+    backingEngine.setLevels({});
+    return () => {
+      backingEngine.mixHumanizer = null;
+    };
+  }, [humanizeAmount, humanizePersonaId]);
 
   // Each tick: schedule a window of backing-track beats ahead so
   // the rhythm section stays in phase with the melody playback

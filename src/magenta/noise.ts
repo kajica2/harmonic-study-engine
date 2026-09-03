@@ -42,31 +42,46 @@ export function mulberry32(seed: number): () => number {
 }
 
 /**
- * Module-private cache for Box–Muller's spare sample.
- * Lives at module scope (not on the function object) because attaching
- * arbitrary fields to a function expression triggers TS2395 / TS2339
- * in strict mode — easier to keep it here than to fight the merger.
+ * Box–Muller transform. The spare sample from one transform is
+ * cached per-RNG-instance, NOT module-globally — a module-global
+ * cache would mean two independent `mulberry32(seed)` calls share
+ * state, breaking the "same seed ⇒ identical sequence" guarantee
+ * that the mix humanizer and golden tests require.
  */
-let _spareNormal: number | undefined;
-
-/**
- * Standard normal sample (mean 0, sd 1) via Box–Muller.
- * Each call consumes two uniform draws; we cache the second so
- * successive calls don't waste entropy.
- */
-export function gaussian(rng: () => number, mean = 0, sd = 1): number {
+function _gaussian(rng: () => number, mean: number, sd: number, cache: { spare?: number }): number {
   // Reuse the cached second sample when available
-  if (_spareNormal !== undefined) {
-    const v = _spareNormal * sd + mean;
-    _spareNormal = undefined;
+  if (cache.spare !== undefined) {
+    const v = cache.spare * sd + mean;
+    cache.spare = undefined;
     return v;
   }
   // Avoid log(0) — clamp u away from 0
   const u = Math.max(1e-12, 1 - rng());
   const v = rng();
   const mag = sd * Math.sqrt(-2 * Math.log(u));
-  _spareNormal = (mag * Math.sin(2 * Math.PI * v)) / sd;
+  cache.spare = (mag * Math.sin(2 * Math.PI * v)) / sd;
   return mean + mag * Math.cos(2 * Math.PI * v);
+}
+
+/**
+ * Standard normal sample (mean 0, sd 1) via Box–Muller.
+ * Public wrapper that allocates a tiny cache object per call so
+ * the "two-handles with the same seed produce identical sequences"
+ * property holds. For hot loops, use `createGaussian` to share a
+ * single cache across many calls.
+ */
+export function gaussian(rng: () => number, mean = 0, sd = 1): number {
+  return _gaussian(rng, mean, sd, {});
+}
+
+/**
+ * Build a Gaussian sampler bound to a per-handle Box–Muller cache.
+ * Use this when sampling thousands of normals from the same RNG
+ * to avoid allocating one throwaway object per call.
+ */
+export function createGaussian(rng: () => number) {
+  const cache: { spare?: number } = {};
+  return (mean = 0, sd = 1) => _gaussian(rng, mean, sd, cache);
 }
 
 /**
