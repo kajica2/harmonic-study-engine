@@ -1,18 +1,24 @@
 import { audioEngine } from "./audio";
 
-export type BeatType = "none" | "metronome" | "jazz" | "bossa" | "techno";
+export type TimeSignature =
+  | "4/4"
+  | "6/8"
+  | "7/8"
+  | "11/4"
+  | "tintal";
 
 export class RhythmEngine {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private currentStep = 0;
   private isPlaying = false;
   private tempo = 60; // BPM
-  private beatType: BeatType = "none";
-
+  // Metronome-only click is gated by time signature in playStep();
+  // the backing-style drum patterns are handled by BackingEngine,
+  // so this engine no longer needs a beat-type selector.
   private stepsPerMeasure = 16;
   private timeSignature = "4/4";
 
-  setTimeSignature(ts: string) {
+  setTimeSignature(ts: TimeSignature) {
     this.timeSignature = ts;
     switch (ts) {
       case "4/4":
@@ -44,10 +50,6 @@ export class RhythmEngine {
 
   setOnMeasureStart(cb: () => void) {
     this.onMeasureStart = cb;
-  }
-
-  setBeat(type: BeatType) {
-    this.beatType = type;
   }
 
   setTempo(bpm: number) {
@@ -92,31 +94,25 @@ export class RhythmEngine {
   }
 
   private playStep(step: number) {
-    // Legacy metronome/drum patterns were superseded by the
-    // BackingEngine, which runs in parallel via scheduleAhead().
-    // The new engine handles all 11 styles (swing / bossa / funk /
-    // latin / ballad / clave3-2 / clave3-3 / afro-4-4 / afro-4-3 /
-    // afro-3-4). Keeping a parallel playStep() here would cause
-    // double-triggers and conflicting drum hits. We only keep the
-    // legacy audio click for the dedicated "metronome" mode, which
-    // is the only beat type the new backing engine doesn't cover.
-    if (this.beatType === "metronome") {
-      if (step === 0) audioEngine.playMetronomeClick(true);
-      else if (
-        (this.timeSignature === "6/8" || this.timeSignature === "7/8") &&
-        step % 2 === 0
-      ) {
-        audioEngine.playMetronomeClick(false);
-      } else if (
-        this.timeSignature !== "6/8" &&
-        this.timeSignature !== "7/8" &&
-        step % 4 === 0
-      ) {
-        audioEngine.playMetronomeClick(false);
-      }
+    // Metronome click only. The 11-style backing tracks (swing /
+    // bossa / funk / latin / ballad / clave3-2 / clave3-3 /
+    // afro-4-4 / afro-4-3 / afro-3-4) are scheduled by
+    // BackingEngine.schedulePattern(), which runs in parallel and
+    // would double-trigger if this engine also emitted drums.
+    if (step === 0) {
+      audioEngine.playMetronomeClick(true);
+    } else if (
+      (this.timeSignature === "6/8" || this.timeSignature === "7/8") &&
+      step % 2 === 0
+    ) {
+      audioEngine.playMetronomeClick(false);
+    } else if (
+      this.timeSignature !== "6/8" &&
+      this.timeSignature !== "7/8" &&
+      step % 4 === 0
+    ) {
+      audioEngine.playMetronomeClick(false);
     }
-    // The old jazz/bossa/techno branches were removed because
-    // they're replaced by BackingEngine.schedulePattern() above.
   }
 }
 

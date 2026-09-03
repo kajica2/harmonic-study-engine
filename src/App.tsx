@@ -25,7 +25,7 @@ import {
   StopCircle,
 } from "lucide-react";
 import { audioEngine, InstrumentType } from "./lib/audio";
-import { rhythmEngine } from "./lib/rhythm";
+import { rhythmEngine, TimeSignature } from "./lib/rhythm";
 import { playbackClock } from "./lib/playbackClock";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { useHistory } from "./lib/useHistory";
@@ -274,12 +274,10 @@ export default function App() {
     audioEngine.setInstrument(instrument);
   }, [instrument]);
 
-  const [timeSignature, setTimeSignature] = useState<
-    "4/4" | "6/8" | "7/8" | "11/4" | "tintal"
-  >(() => {
+  const [timeSignature, setTimeSignature] = useState<TimeSignature>(() => {
     try {
       const saved = localStorage.getItem("synesthesia_timeSignature");
-      return (saved ? JSON.parse(saved) : "4/4") as any;
+      return (saved ? JSON.parse(saved) : "4/4") as TimeSignature;
     } catch {
       return "4/4";
     }
@@ -774,10 +772,6 @@ export default function App() {
   }, [timeSignature]);
 
   useEffect(() => {
-    rhythmEngine.setBeat(beatType);
-  }, [beatType]);
-
-  useEffect(() => {
     rhythmEngine.setOnMeasureStart(() => {
       setActiveStepIndex((prev) => {
         // Sub-range loop wins when active and a start bar is set.
@@ -1222,10 +1216,6 @@ export default function App() {
           }}
           tempo={tempo}
           setTempo={setTempo}
-          meter={timeSignature}
-          beat={beatType}
-          setMeter={setTimeSignature}
-          setBeat={setBeatType}
           transposeShift={transposeShift}
           setTransposeShift={setTransposeShift}
           selectedPersonaId={selectedPersonaId}

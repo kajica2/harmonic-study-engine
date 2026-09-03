@@ -118,7 +118,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
     if (!svgRef.current || !path) return;
 
     let abc = `X:1\n`;
-    abc += `T:${path.name}\n`;
+    abc += `T:${path.title}\n`;
     abc += `M:4/4\n`;
     abc += `L:1/4\n`;
     abc += `Q:1/4=${tempo}\n`;

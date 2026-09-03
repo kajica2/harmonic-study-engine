@@ -73,11 +73,15 @@ recorded take.
 
 ```bash
 # terminal 1
-npm run dev:backend    # http://127.0.0.1:8765
+npm run dev:backend    # http://127.0.0.1:8765 (uvicorn server.app:app)
 
 # terminal 2
 npm run dev:vite       # http://localhost:5173
 ```
+
+`npm run dev:backend` shells out to `python -m uvicorn server.app:app`.
+Invoking uvicorn directly (rather than `python -m server.app`) keeps
+the ddsp-import warning from printing twice during startup.
 
 `npm run build` produces `dist/`.
 

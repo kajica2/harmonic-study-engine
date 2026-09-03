@@ -3,13 +3,11 @@ FastAPI server that exposes DDSP synthesis via a REST API.
 """
 
 import os
-import struct
 import logging
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
-import uvicorn
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +16,28 @@ logger = logging.getLogger(__name__)
 # offline render + reverb; the modules below are imported lazily
 # and 503 if ddsp isn't available.
 _DDSP_AVAILABLE = False
+_DDSP_IMPORT_ERROR = None  # typed as Exception | None; annotation
+# omitted because PEP 604 union syntax needs Python 3.10+, and the
+# project supports 3.9. Use `is not None` to narrow before use.
+_DDSP_WARNED = False
 try:
     from .synthesizer import synthesize_progression
     from .fx import apply_reverb
     _DDSP_AVAILABLE = True
 except Exception as e:
-    logger.warning("ddsp not available: %s", e)
+    _DDSP_IMPORT_ERROR = e
     synthesize_progression = None
     apply_reverb = None
+
+# Log once at module import. Invoking the server with `python -m
+# server.app` causes the body to run twice — once as `__main__`,
+# once as `server.app` when uvicorn imports it for the ASGI loader
+# — which spams the same warning line. The guard dedupes within a
+# single module body run; the dev.sh / dev:backend scripts avoid the
+# double-import by invoking uvicorn directly.
+if not _DDSP_AVAILABLE and not _DDSP_WARNED:
+    _DDSP_WARNED = True
+    logger.warning("ddsp not available: %s", _DDSP_IMPORT_ERROR)
 
 _DEFAULT_ORIGINS = [
     # Vite default (used by dev.sh and `npm run dev:vite`).
@@ -241,9 +253,6 @@ async def recordings_upload(
     )
 
 
-def main():
-    uvicorn.run("server.app:app", host="127.0.0.1", port=8765, reload=False)
-
-
-if __name__ == "__main__":
-    main()
+# Run with: python -m uvicorn server.app:app --host 127.0.0.1 --port 8765
+# Avoid `python -m server.app` — that double-imports the module body
+# (once as __main__, once as server.app) and spams the ddsp warning.
