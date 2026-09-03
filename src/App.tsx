@@ -32,6 +32,8 @@ import { useSessionStore } from "./hooks/useSessionStore";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
+import { createHumanizeBacking } from "./magenta/humanizeBacking";
+import { HumanFeelDial } from "./components/HumanFeelDial";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
@@ -132,6 +134,10 @@ export default function App() {
     tempoHistory,
     wavMode,
     setWavMode,
+    humanizeAmount,
+    setHumanizeAmount,
+    humanizePersonaId,
+    setHumanizePersonaId,
     timeSignature,
     setTimeSignature,
     beatType,
@@ -645,6 +651,29 @@ export default function App() {
       pianoMuted,
     });
   }, [drumsMuted, bassMuted, pianoMuted]);
+
+  // Magenta humanizer — when `humanizeAmount` is non-zero, route
+  // every backing note's absolute time through createHumanizeBacking.
+  // The humanizer is recreated when amount/persona/style change so
+  // the RNG seed refreshes; rebuilding on every note would be
+  // cheaper but lose the per-call determinism we test for.
+  useEffect(() => {
+    if (humanizeAmount <= 0.001) {
+      backingEngine.humanizer = null;
+      return;
+    }
+    const ctx = backingEngine as unknown as { ctx?: AudioContext | null };
+    const ctxNow = ctx.ctx?.currentTime ?? 0;
+    const handle = createHumanizeBacking({
+      amount: humanizeAmount,
+      personaId: humanizePersonaId || "kandinsky",
+      style: beatType,
+      ctxNow,
+    });
+    backingEngine.humanizer = (time, track) => handle.adjust(time, track);
+    // No teardown — the engine reads the closure each call. Rebuilding
+    // on dep change replaces the function reference with a fresh one.
+  }, [humanizeAmount, humanizePersonaId, beatType, isPlayingAuto]);
 
   // Each tick: schedule a window of backing-track beats ahead so
   // the rhythm section stays in phase with the melody playback
@@ -2202,7 +2231,7 @@ export default function App() {
                 {/* Backing band — second row, only what's essential for
                     a real session. Tracks, HD, and Generator live in
                     the Advanced disclosure below. */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <ToolGroup label="API">
                       {backend.state === "checking" ? (
                         <span
@@ -2319,6 +2348,17 @@ export default function App() {
                       {pianoMuted ? "○ Keys" : "● Keys"}
                     </ToolChip>
                   </ToolGroup>
+
+                  {/* Magenta humanizer dial — drives BackingEngine.humanizer
+                      via the useEffect above. amount=0 leaves the backing
+                      grid-perfect (the default); >0 routes every backing
+                      note's absolute time through createHumanizeBacking. */}
+                  <HumanFeelDial
+                    amount={humanizeAmount}
+                    setAmount={setHumanizeAmount}
+                    personaId={humanizePersonaId}
+                    setPersonaId={setHumanizePersonaId}
+                  />
 
                   <ToolGroup label={`Voicing · ${voicingType}${optimizeVoiceLeading ? " · opt" : ""}`}>
                     <ToolChip

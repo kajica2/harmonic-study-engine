@@ -14,7 +14,7 @@
  * effect dependency arrays in the rest of App.tsx.
  */
 
-import { Dispatch, SetStateAction, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { HarmonicPath, ALL_PATHS } from "../lib/paths";
 import { InstrumentType } from "../lib/audio";
 import { BackingStyle } from "../lib/backingEngine";
@@ -174,6 +174,12 @@ export interface SessionStore {
   // WAV export mode (block / arpeggio / block-then-arp)
   wavMode: RenderMode;
   setWavMode: Setter<RenderMode>;
+  /** Humanizer blend amount, 0 = grid, 1 = full persona profile. */
+  humanizeAmount: number;
+  setHumanizeAmount: Setter<number>;
+  /** Persona id driving the humanizer's placement / timing σ. */
+  humanizePersonaId: string;
+  setHumanizePersonaId: Setter<string>;
 }
 
 // ---------- the hook itself ----------------------------------------------
@@ -362,6 +368,25 @@ export function useSessionStore(): SessionStore {
     loadJSON<RenderMode>("synesthesia_wavMode", "block"),
   );
 
+  // Magenta humanizer — amount dial (0=grid, 1=full persona) and
+  // persona id that supplies placement / timing σ. Persisted to
+  // localStorage so a session that left the dial at .7 resumes at .7.
+  const [humanizeAmount, setHumanizeAmount] = useState(() =>
+    loadNumber("synesthesia_humanizeAmount", 0),
+  );
+  const [humanizePersonaId, setHumanizePersonaId] = useState<string>(() =>
+    loadString("synesthesia_humanizePersonaId", ""),
+  );
+
+  // Persist on change. useState's setter identity is stable, so this
+  // effect runs only when the value actually changes.
+  useEffect(() => {
+    try { localStorage.setItem("synesthesia_humanizeAmount", String(humanizeAmount)); } catch {}
+  }, [humanizeAmount]);
+  useEffect(() => {
+    try { localStorage.setItem("synesthesia_humanizePersonaId", humanizePersonaId); } catch {}
+  }, [humanizePersonaId]);
+
   return {
     paths,
     setPaths,
@@ -416,5 +441,9 @@ export function useSessionStore(): SessionStore {
     setMetronomeOn,
     wavMode,
     setWavMode,
+    humanizeAmount,
+    setHumanizeAmount,
+    humanizePersonaId,
+    setHumanizePersonaId,
   };
 }

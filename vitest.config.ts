@@ -24,6 +24,13 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
+      // `@magenta/music@1.23.1` declares `main: es5/index.js` in its
+      // package.json but that file is missing from the installed
+      // bundle — only `esm/index.js` is shipped. Vitest's bare
+      // resolver fails on the missing entry; aliasing to the ESM
+      // barrel fixes it. The production Vite config handles this
+      // differently via nodePolyfills.
+      "@magenta/music": path.resolve(__dirname, "node_modules/@magenta/music/esm/index.js"),
     },
   },
 });
