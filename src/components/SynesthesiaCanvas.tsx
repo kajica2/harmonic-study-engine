@@ -290,6 +290,43 @@ export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
           }
           ctx.stroke();
         }
+      } else if (visualTheme === "simone") {
+        // High Priestess of Song — a single slow breathing silhouette
+        // like a horizon waiting for the song to begin. Very low
+        // amplitude, very low alpha, deep purple. The breath cycle
+        // is 4 seconds; Simone's tempos (64 BPM) are slow and the
+        // visual should match.
+        ctx.strokeStyle = "rgba(123, 45, 142, 0.05)";
+        ctx.lineWidth = 1.5;
+        const breathe = performance.now() / 4000;
+        ctx.beginPath();
+        for (let xOffset = 0; xOffset <= width; xOffset += 8) {
+          const yOffset =
+            height * 0.55 +
+            Math.sin(xOffset * 0.004 + breathe) * 18 +
+            Math.sin(xOffset * 0.011 + breathe * 1.7) * 6;
+          if (xOffset === 0) ctx.moveTo(xOffset, yOffset);
+          else ctx.lineTo(xOffset, yOffset);
+        }
+        ctx.stroke();
+      } else if (visualTheme === "novaro") {
+        // Sight-Reading Drill Sergeant — a faint 5-line musical staff
+        // in the background. Terracotta accent at very low alpha so it
+        // reads as structure (the page the etude is printed on), not
+        // content. Pairs with Novaro's tagline "First the rhythm,
+        // then the note."
+        ctx.strokeStyle = "rgba(194, 84, 42, 0.06)";
+        ctx.lineWidth = 1;
+        const staffHeight = height * 0.6;
+        const staffTop = (height - staffHeight) / 2;
+        const lineSpacing = staffHeight / 4;
+        for (let lineIdx = 0; lineIdx < 5; lineIdx++) {
+          const y = staffTop + lineIdx * lineSpacing;
+          ctx.beginPath();
+          ctx.moveTo(width * 0.1, y);
+          ctx.lineTo(width * 0.9, y);
+          ctx.stroke();
+        }
       }
 
       // Add new active notes to artifacts if not present or boost their alpha

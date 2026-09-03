@@ -14,6 +14,8 @@ export type VisualTheme =
   | "dizzy"
   | "hubbard"
   | "shorter"
+  | "simone"
+  | "novaro"
   | "default";
 
 export interface Persona {
