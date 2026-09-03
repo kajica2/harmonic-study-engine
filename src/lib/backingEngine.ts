@@ -111,6 +111,18 @@ class BackingEngine {
   private activeBassMidis = new Set<number>();
   private bassListeners = new Set<(m: number[], removed: number) => void>();
 
+  /**
+   * Optional humanizer hook for the Magenta pipeline. When set,
+   * every backing-track note's absolute time is wrapped through
+   * `humanizer(time, track)` before scheduling. The hook is
+   * supplied by the React layer (see HumanFeelDial) and reflects
+   * the current "Human feel" amount + persona.
+   *
+   * Public so App.tsx can wire it. Default null = no humanization
+   * (grid playback — what every existing test expects).
+   */
+  public humanizer: ((time: number, track: "drums" | "bass" | "piano") => number) | null = null;
+
   init() {
     if (this.ctx) return;
     this.ctx = new (window.AudioContext ||
@@ -285,25 +297,31 @@ class BackingEngine {
     // Find the chord root for bass/piano voicing
     const rootMidi = Math.min(...step.notes);
 
+    // Humanizer wrapper — no-op if `humanizer` is null (default).
+    // Every backing-track play-arg goes through this so the dial
+    // controls all three lanes from one place.
+    const t = (raw: number, track: "drums" | "bass" | "piano") =>
+      this.humanizer ? this.humanizer(raw, track) : raw;
+
     // ----- Drum pattern -----
     const kick = (time: number, gain = 1.0) =>
-      this.playKick(time, this.drumBus!, gain);
+      this.playKick(t(time, "drums"), this.drumBus!, gain);
     const snare = (time: number, gain = 0.85) =>
-      this.playSnare(time, this.drumBus!, gain);
+      this.playSnare(t(time, "drums"), this.drumBus!, gain);
     const hat = (time: number, gain = 0.4) =>
-      this.playHat(time, this.drumBus!, gain);
+      this.playHat(t(time, "drums"), this.drumBus!, gain);
     const rim = (time: number, gain = 1.0) =>
-      this.playRim(time, this.drumBus!, gain);
+      this.playRim(t(time, "drums"), this.drumBus!, gain);
     const ride = (time: number, gain = 0.55) =>
-      this.playRide(time, this.drumBus!, gain);
+      this.playRide(t(time, "drums"), this.drumBus!, gain);
 
     // ----- Bass line (walking) -----
     const bass = (time: number, midi: number, durSec = q) =>
-      this.playBass(time, midi, durSec);
+      this.playBass(t(time, "bass"), midi, durSec);
 
     // ----- Piano comp (block chord stab) -----
     const piano = (time: number, midis: number[], durSec = q * 1.5) =>
-      this.playPiano(time, midis, durSec);
+      this.playPiano(t(time, "piano"), midis, durSec);
 
     const pianoVoicing = step.notes.slice(0, 4); // top 4 chord tones
 

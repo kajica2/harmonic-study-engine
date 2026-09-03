@@ -159,12 +159,14 @@ export const ToolChip: React.FC<ToolChipProps> = ({
   onClick,
   children,
   title,
+  ...rest
 }) => {
   return (
     <button
       onClick={onClick}
       title={title}
       aria-pressed={active}
+      {...rest}
       className={`px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono transition-colors ${
         active
           ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] shadow-[0_0_0_1px_rgba(255,230,168,0.35)]"
