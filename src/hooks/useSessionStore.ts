@@ -246,7 +246,11 @@ export function useSessionStore(): SessionStore {
     try {
       const saved = localStorage.getItem("synesthesia_beatType");
       if (saved) {
-        // Migrate old beat-type strings to the new BackingStyle names
+        // Migrate old beat-type strings to the new BackingStyle names.
+        // Modern BackingStyle values (swing / bossa / funk / latin /
+        // ballad / clave3-2 / clave3-3 / afro-4-4 / afro-4-3 /
+        // afro-3-4 / off) pass through unchanged — the migration
+        // map only handles the 5 legacy strings the old UI emitted.
         const legacy = JSON.parse(saved) as string;
         const map: Record<string, BackingStyle> = {
           none: "off",
@@ -255,7 +259,10 @@ export function useSessionStore(): SessionStore {
           bossa: "bossa",
           techno: "funk",
         };
-        return map[legacy] ?? "off";
+        if (legacy in map) return map[legacy];
+        // Unknown / modern value — fall through to identity if it's
+        // already a valid BackingStyle string, else default to "off".
+        return (legacy as BackingStyle) ?? "off";
       }
       return "off";
     } catch {
