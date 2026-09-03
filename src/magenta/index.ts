@@ -44,3 +44,13 @@ export {
   type HumanizeInput,
   type HumanizedSequence,
 } from "./humanizer";
+export {
+  createMixHumanizer,
+  applyMixWobble,
+  gainToDb,
+  dbToGain,
+  MIX_HUMANIZER_SMOOTHING,
+  type TrackId,
+  type MixHumanizerOptions,
+  type MixHumanizerHandle,
+} from "./mixHumanizer";

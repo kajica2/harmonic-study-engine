@@ -27,7 +27,7 @@
 import type { INoteSequence, NoteSequence } from "./INoteSequence";
 import { quantize, unquantize } from "./quantize";
 import { STEPS_PER_QUARTER, DEFAULT_QPM } from "./adapter";
-import { OUDrift, gaussian, mulberry32 } from "./noise";
+import { OUDrift, mulberry32, createGaussian } from "./noise";
 import type { PersonaProfile } from "./personaProfiles";
 import type { StyleGroove } from "./styleGrooves";
 
@@ -126,6 +126,10 @@ export async function humanize(
   const { persona, groove, seed } = opts;
   const amount = clamp(opts.amount ?? 1, 0, 1);
   const rng = mulberry32(seed);
+  // Per-handle Box-Muller cache. Without this, two humanizer()
+  // calls with the same seed would diverge on every other sample
+  // because the spare normal cache lives at module scope.
+  const gauss = createGaussian(rng);
   const ensembleClock = opts.ensembleClock ?? new OUDrift(rng, 0.3, persona.driftSigma);
 
   // 1. Normalize to quantized form so we can compute offsets relative to the grid
@@ -149,7 +153,7 @@ export async function humanize(
     // velocity: weight × base × jitter — rule 3 (beat-strength hierarchy)
     let velocity = (n.velocity ?? 80) * beatStrength;
     if (amount > 0) {
-      velocity *= 1 + gaussian(rng, 0, persona.velSigma * amount);
+      velocity *= 1 + gauss(0, persona.velSigma * amount);
       if (isUpbeat(startStep)) velocity += persona.accentUpbeat * amount;
     }
     velocity = clamp(Math.round(velocity), 1, 127);
@@ -162,7 +166,7 @@ export async function humanize(
       const ensemble = ensembleClock.next() * 0.002 * amount;
       const swingMs = swingOffsetSeconds(startStep, persona.swing, qpm) * amount;
       const placementMs = (persona.placementMs + trackOffset * 1000) * amount;
-      const jitterMs = gaussian(rng, 0, persona.timSigmaMs / 1000) * amount;
+      const jitterMs = gauss(0, persona.timSigmaMs / 1000) * amount;
       startTime += ensemble + swingMs + (placementMs / 1000) + rush + jitterMs;
     }
 
@@ -170,7 +174,7 @@ export async function humanize(
     const baseDur = quantizedStepToSeconds(endStep - startStep, qpm);
     let lengthSec = baseDur;
     if (amount > 0) {
-      lengthSec = baseDur * persona.legato * (1 + gaussian(rng, 0, 0.05 * amount));
+      lengthSec = baseDur * persona.legato * (1 + gauss(0, 0.05 * amount));
     }
 
     return {

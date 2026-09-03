@@ -123,6 +123,14 @@ class BackingEngine {
    */
   public humanizer: ((time: number, track: "drums" | "bass" | "piano") => number) | null = null;
 
+  /**
+   * Optional mix humanizer (plan §6 item 4). When set, `setLevels`
+   * pulls a per-pass wobble from this handle and multiplies it
+   * into each bus gain before pushing to setTargetAtTime. Default
+   * null = static mix (what every existing test expects).
+   */
+  public mixHumanizer: import("../magenta/mixHumanizer").MixHumanizerHandle | null = null;
+
   init() {
     if (this.ctx) return;
     this.ctx = new (window.AudioContext ||
@@ -163,17 +171,26 @@ class BackingEngine {
    *  bus to zero gain without stopping scheduled events. */
   setLevels(next: Partial<BackingLevels>) {
     this.levels = { ...this.levels, ...next };
+    // Pull a fresh wobble pass from the shared mix humanizer if
+    // one is wired. Single source of randomness so drums/bass/piano
+    // drift together rather than independently.
+    const wob = this.mixHumanizer
+      ? this.mixHumanizer.nextPass()
+      : { drums: 1, bass: 1, piano: 1 };
     if (this.drumBus && this.ctx) {
-      const drumsGain = this.levels.drumsMuted ? 0 : this.levels.drums;
-      this.drumBus.gain.setTargetAtTime(drumsGain, this.ctx.currentTime, 0.05);
+      const userGain = this.levels.drumsMuted ? 0 : this.levels.drums;
+      const target = userGain * wob.drums;
+      this.drumBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
     }
     if (this.bassBus && this.ctx) {
-      const bassGain = this.levels.bassMuted ? 0 : this.levels.bass;
-      this.bassBus.gain.setTargetAtTime(bassGain, this.ctx.currentTime, 0.05);
+      const userGain = this.levels.bassMuted ? 0 : this.levels.bass;
+      const target = userGain * wob.bass;
+      this.bassBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
     }
     if (this.pianoBus && this.ctx) {
-      const pianoGain = this.levels.pianoMuted ? 0 : this.levels.piano;
-      this.pianoBus.gain.setTargetAtTime(pianoGain, this.ctx.currentTime, 0.05);
+      const userGain = this.levels.pianoMuted ? 0 : this.levels.piano;
+      const target = userGain * wob.piano;
+      this.pianoBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
     }
   }
 
