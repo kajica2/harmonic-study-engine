@@ -87,11 +87,23 @@ the ddsp-import warning from printing twice during startup.
 
 ## Live deployment
 
-The static frontend is hosted at
-<https://harmonic-study-engine.vercel.app> via Vercel's GitHub
-integration: every push to `main` triggers a build + alias. The
-build output is a plain Vite SPA — no serverless functions, no
-backend in the deployment. FastAPI is intentionally *not* on Vercel:
+Two hosts, one repo:
+
+- **Frontend** — <https://harmonic-study-engine.vercel.app> on
+  Vercel. Auto-deploys on every push to `main` via the GitHub
+  integration; the build output is a plain Vite SPA, no serverless
+  functions. Project settings in `vercel.json`-equivalent form
+  (build command, output dir) are read from `package.json` and
+  Vercel's auto-detected Vite preset.
+- **Backend** — FastAPI on Render, native Python runtime (no Docker).
+  Provisioned via `render.yaml` (Render Blueprint spec). Connect
+  the repo at <https://dashboard.render.com> → New → Blueprint →
+  point at this repo. The free tier sleeps after 15 min of
+  inactivity (cold-start latency 30–60 s on the first request).
+
+### Why the split
+
+FastAPI doesn't fit Vercel's shape:
 
 - `/recordings/upload` runs `ffmpeg` and can take 1–2 minutes per
   recording — far over Vercel's 10 s Hobby / 60 s Pro serverless
@@ -102,29 +114,36 @@ backend in the deployment. FastAPI is intentionally *not* on Vercel:
 - Both endpoints need a persistent host (ffmpeg installed, scratch
   disk, a real process model)
 
-For the deployed UI to do anything beyond the local-only paths
-(33-tune catalog, scales, rhythm drill, sub-range loop, live score,
-mobile bar, MIDI/MusicXML/Score21 export), the tab needs to reach
-a FastAPI backend. The toolbar's **API** status pill reflects this:
+Render's native Python runtime gives all three.
+
+### Wiring them together
+
+After Render gives the backend a `*.onrender.com` URL, point the
+deployed Vercel frontend at it:
+
+1. Vercel dashboard → Project → Settings → Environment Variables
+2. Add `VITE_DDSP_API` = `https://harmonic-study-engine-api.onrender.com`
+3. Trigger a redeploy (Vercel picks the new value at build time)
+
+Locally, the default `VITE_DDSP_API=http://127.0.0.1:8765` is
+correct — start the backend with `bash dev.sh` (or
+`npm run dev:backend`) and load the deployed tab in the same
+browser session. The toolbar's **API** status pill reflects the
+state:
 
 - ● live — backend reachable, DDSP installed
 - ● degraded — backend reachable, DDSP not installed (`/synthesize`
-  and `/fx/reverb` will 503)
-- ● offline — backend unreachable (default state on the deployed
-  tab unless `VITE_DDSP_API` points at a reachable host)
+  and `/fx/reverb` will 503). Default on Render — uncomment the
+  `requirements-ddsp.txt` line in `render.yaml` to opt in
+- ● offline — backend unreachable (the default state on the deployed
+  tab until Render is set up)
 
-To wire the deployed UI to your own backend, set `VITE_DDSP_API`
-in `.env` before `npm run build` (or via the Vercel project's
-environment variables for a redeploy):
+### CORS
 
-```bash
-VITE_DDSP_API="https://your-backend.example.com" npm run build
-```
-
-For local use, the default `http://127.0.0.1:8765` is correct —
-start the backend with `bash dev.sh` (or `npm run dev:backend`),
-then load the deployed tab in the same browser session; the API
-pill will turn green once `/health` responds.
+Render's `DDSP_CORS_ORIGINS` env var whitelists the Vercel
+canonical domain plus `localhost:5173` for local dev. If you add
+a custom domain to the Vercel project, add it to that env var on
+the Render side and redeploy.
 
 ## License
 

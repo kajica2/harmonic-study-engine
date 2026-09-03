@@ -1,0 +1,48 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Provisions the FastAPI backend on Render's native Python runtime
+# (no Docker — matches the no-docker decision). Connected via
+# https://dashboard.render.com → New → Blueprint → point at this repo.
+#
+# After deploy:
+#   1. Render gives the service a URL on .onrender.com
+#   2. Set VITE_DDSP_API on the Vercel project to that URL
+#      so the deployed SPA can reach the API
+#   3. /health returns {"status":"degraded","ddsp_version":"unavailable"}
+#      unless you also install the DDSP stack (see below)
+
+services:
+  - type: web
+    name: harmonic-study-engine-api
+    runtime: python
+    plan: starter   # free tier, sleeps after 15 min of inactivity
+    # rootDir = repo root so uvicorn can resolve the `server` package
+    # (cwd is on sys.path) while build commands run with repo-root as cwd.
+    rootDir: .
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r server/requirements.txt
+      # Optional: enable the DDSP render + reverb path (adds ~1.5 GB of
+      # TF + Magenta weights and ~5 min to the build). Uncomment to opt in:
+      # pip install -r server/requirements-ddsp.txt
+    startCommand: "uvicorn server.app:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.10"
+      - key: DDSP_HOST
+        value: "0.0.0.0"
+      # CORS for the deployed Vercel frontend (canonical domain).
+      # Local dev at http://localhost:5173 is whitelisted too.
+      - key: DDSP_CORS_ORIGINS
+        value: "https://harmonic-study-engine.vercel.app,https://harmonic-study-engine-git-*.vercel.app,http://localhost:5173,http://127.0.0.1:5173"
+
+# Note about scale:
+#   - Render free plan sleeps after 15 min of inactivity; first-load
+#     latency on cold start is ~30-60 s for the first request.
+#   - Upgrade to "Standard" to keep the service warm 24/7.
+# Note about DDSP size:
+#   - Uncomment the requirements-ddsp.txt line in buildCommand to
+#     enable offline chord-progression rendering and FFT reverb.
+#     ~1.5 GB of weights; ~5 min added to the build.
