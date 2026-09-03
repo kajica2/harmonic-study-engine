@@ -10,6 +10,7 @@
   <meta property="og:description" content="Magenta MusicRNN melodic continuation, in the browser." />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2308080A'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23B469FF' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23D8FF2E'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&family=Geist+Mono:wght@300..700&family=Inter:wght@300..800&display=swap" />
@@ -725,6 +726,22 @@
        , so we ship the same logic here. Source of truth lives at
        src/lib/magentaHelper.ts in the harmonic-study-engine repo.
        ============================================================ -->
+
+  <!--
+    Pre-built engine bundle (dist/rnn-engine.bundle.js, ~2.9 MB /
+    591 KB gzipped). Bundled with Vite using vite.rnn.config.ts so
+    that Magenta + tfjs + all their transitive deps resolve through
+    nodePolyfills at build time — no importmap, no dynamic-import
+    failure modes, no "bare specifier" surprises on the CDN.
+
+    Built with:
+      npx vite build --config vite.rnn.config.ts
+
+    The IIFE assigns window.SWRRNN = { generateMagentaSequence,
+    getLastStatus } which the inline IIFE below consumes.
+  -->
+  <script src="./rnn-engine.bundle.js" defer></script>
+
   <script>
   (() => {
     'use strict';
@@ -891,104 +908,49 @@
     }
 
     /* ============================================================
-       RNN ENGINE — inlined copy of src/lib/magentaHelper.ts.
-       Source of truth in the harmonic-study-engine repo.
-       ========================================================= */
-    let musicRnn = null;
-    let initPromise = null;
+       RNN ENGINE — thin wrapper around the pre-built bundle.
 
-    function isFatalMagentaError(err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return /fetch5|fetch4|fetch3.*not a function|tf\.util\.fetch|Backbone|fetch is not a function|checkpoints\/.*\/basic_rnn/.test(msg);
+       History of this section:
+         The original implementation inlined a copy of
+         src/lib/magentaHelper.ts and tried to load Magenta via
+         `import('https://cdn.jsdelivr.net/...')`. That failed in
+         production with two compounding issues:
+           1. The deep `esm/music_rnn.js` is a UMD bundle whose
+              top-level export is `music_rnn` (a namespace function),
+              not `MusicRNN` — `new musicRnnMod.MusicRNN(...)` throws
+              "MusicRNN is not a constructor".
+           2. The Magenta ESM barrel pulls `@tensorflow/tfjs` as a
+              bare specifier. The tfjs barrel in turn pulls tfjs-core,
+              tfjs-converter, tfjs-data, tfjs-layers, plus tslib,
+              fft.js, ndarray-resample, … — a graph too deep to map
+              by hand into an importmap.
+
+         The fix is to bundle Magenta + tfjs at build time and ship
+         a single self-contained IIFE (dist/rnn-engine.bundle.js,
+         ~2.9 MB / 591 KB gzipped) that the HTML loads with a plain
+         `<script src=…>` tag. The bundle exposes `window.SWRRNN`
+         with the same API the React app uses internally.
+
+         Source of truth: src/lib/magentaHelper.ts and
+         src/rnn-engine.ts in the harmonic-study-engine repo.
+       ============================================================ */
+
+    // Bridge SWRRNN to the page-local naming the UI expects.
+    // generateMagentaSequence returns a HarmonicPath-shaped object
+    // with `{ id, title, description, steps: [{ name, notes, descriptions }] }`.
+    async function generateMagentaSequence(rootMidi, stepsCount, temp) {
+      if (!window.SWRRNN || typeof window.SWRRNN.generateMagentaSequence !== 'function') {
+        throw new Error('RNN bundle not loaded — check rnn-engine.bundle.js');
+      }
+      return window.SWRRNN.generateMagentaSequence(rootMidi, stepsCount, temp);
     }
 
-    async function initMagenta() {
-      if (musicRnn) return true;
-      if (initPromise) {
-        try { await initPromise; return true; } catch { return false; }
-      }
-      initPromise = (async () => {
-        const mm = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@magenta/music@^1.23.1/es6/core.js').catch(() => null);
-        const musicRnnMod = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@magenta/music@^1.23.1/es6/music_rnn.js').catch(() => null);
-        if (!mm || !musicRnnMod) throw new Error('Failed to load @magenta/music from CDN');
-        musicRnn = new musicRnnMod.MusicRNN(
-          'https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/basic_rnn'
-        );
-        await musicRnn.initialize();
-      })();
-      try {
-        await initPromise;
-        return true;
-      } catch (err) {
-        if (isFatalMagentaError(err)) {
-          console.warn('[magenta] RNN unavailable, falling back:', err);
-        } else {
-          console.warn('[magenta] RNN failed to initialize:', err);
-        }
-        musicRnn = null;
-        initPromise = null;
-        return false;
-      }
-    }
-
-    // Fallback melodic variation — deterministic, derived from a
-    // simple scale walk + a couple of octave jumps. No network.
-    function melodicFallback(rootMidi, stepsCount) {
-      const scale = [0, 2, 4, 5, 7, 9, 11];
-      const notes = [];
-      let p = rootMidi;
-      for (let i = 0; i < stepsCount; i++) {
-        // bias up first half, down second half, occasional 3rd-leap
-        const dir = i < stepsCount/2 ? 1 : -1;
-        const step = scale[(i * 3 + 1) % scale.length] * dir + (i % 7 === 0 ? 4 : 0);
-        p = rootMidi + step;
-        notes.push({ pitch: p, velocity: 80 });
-      }
-      return {
-        id: `magenta-fallback-${Date.now()}`,
-        title: 'Magenta AI — melodic variation (fallback)',
-        description: 'MusicRNN checkpoint unreachable in this environment. Showing a deterministic variation built from a diatonic walk on the chosen root.',
-        steps: notes.map((n, i) => ({
-          name: `AI: ${midiToName(n.pitch)}`,
-          notes: [n.pitch],
-          descriptions: 'Neural Network Fallback',
-        })),
-      };
-    }
-
-    async function generateMagentaSequence(rootMidi = 60, stepsCount = 16, temp = 1.0) {
-      const ok = await initMagenta();
-      if (!ok || !musicRnn) return melodicFallback(rootMidi, stepsCount);
-      try {
-        const mm = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@magenta/music@^1.23.1/es6/core.js');
-        const qns = mm.sequences.quantizeNoteSequence(
-          {
-            ticksPerQuarter: 220,
-            totalTime: 0.5,
-            timeSignatures: [{ time: 0, numerator: 4, denominator: 4 }],
-            tempos: [{ time: 0, qpm: 120 }],
-            notes: [{ pitch: rootMidi, startTime: 0, endTime: 0.5 }],
-          },
-          4,
-        );
-        const result = await musicRnn.continueSequence(qns, stepsCount, temp);
-        if (result.notes && result.notes.length > 0) {
-          return {
-            id: `magenta-rnn-${Date.now()}`,
-            title: 'Magenta AI — MusicRNN continuation',
-            description: `Melodic study generated via TensorFlow.js (Magenta MusicRNN, basic_rnn checkpoint). Temperature: ${temp.toFixed(2)}.`,
-            steps: result.notes.map((note) => ({
-              name: `AI: ${midiToName(note.pitch)}`,
-              notes: [note.pitch],
-              descriptions: 'Neural Network Generation',
-            })),
-          };
-        }
-        return melodicFallback(rootMidi, stepsCount);
-      } catch (err) {
-        console.warn('[magenta] generation failed, using fallback:', err);
-        return melodicFallback(rootMidi, stepsCount);
-      }
+    // Display a status string for the humanizer's last call. The
+    // bundle's getLastStatus() returns 'ok', 'fallback', or an
+    // error message — we surface that next to the roll-state pill.
+    function lastStatus() {
+      try { return window.SWRRNN?.getLastStatus?.() ?? 'unknown'; }
+      catch { return 'unknown'; }
     }
 
     /* ============================================================
@@ -1034,12 +996,23 @@
             +steps.value,
             +temp.value / 100,
           );
-          $('#rollState').textContent = path.title.includes('fallback') ? 'Fallback' : 'Live RNN';
-          $('#rollState').classList.toggle('live', !path.title.includes('fallback'));
-          $('#rollTitle').textContent = path.title.split('—')[1]?.trim() || path.title;
+          const status = lastStatus();
+          const isFallback = (path.title || '').toLowerCase().includes('fallback')
+            || status === 'fallback'
+            || (typeof status === 'string' && status.startsWith('error'));
+          $('#rollState').textContent = isFallback ? 'Fallback' : 'Live RNN';
+          $('#rollState').classList.toggle('live', !isFallback);
+          $('#rollTitle').textContent = (path.title || '').split('—')[1]?.trim() || path.title || '';
           roll.setSequence(pathToNotes(path), path.title);
-          if (path.title.includes('fallback')) {
-            setStatus(`Used deterministic fallback — MusicRNN checkpoint unreachable.`, 'error');
+          if (isFallback) {
+            // Surface the bundle's status string so the user sees
+            // *why* the model didn't run — the previous build hid
+            // this behind a generic "MusicRNN checkpoint unreachable"
+            // message that was true most of the time but didn't
+            // tell the user whether the issue was the model, the
+            // CORS proxy, the Magenta bundle, etc.
+            const detail = (status && status !== 'fallback') ? status : 'MusicRNN checkpoint unreachable';
+            setStatus(`Used deterministic fallback — ${detail}`, 'error');
           } else {
             setStatus(`Generated ${path.steps.length} notes · temp ${(+temp.value / 100).toFixed(2)}.`, 'ok');
           }
