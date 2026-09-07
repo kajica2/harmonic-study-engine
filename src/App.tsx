@@ -66,6 +66,7 @@ import { MobileCommandBar } from "./components/MobileCommandBar";
 import { LeadSheet } from "./components/LeadSheet";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { PathBriefing } from "./components/PathBriefing";
+import { PracticeHeader } from "./components/PracticeHeader";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
 
 import { transposeChordName, PITCH_CLASSES } from "./lib/chordTranspose";
@@ -1856,6 +1857,24 @@ export default function App() {
 
           {/* Right Content: Visualization & Keyboard */}
           <div className="flex-1 flex flex-col gap-4 sm:gap-6 min-w-0">
+            {/* Practice loop header — the dominant start flow */}
+            <PracticeHeader
+              path={path}
+              activeStepIndex={activeStepIndex}
+              chordName={transposeChordName(step.name, transposeShift)}
+              timeSignature={timeSignature}
+              isPlaying={isPlayingAuto}
+              onPlayPause={() => setIsPlayingAuto((p) => !p)}
+              tempo={tempo}
+              onTempoChange={setTempo}
+              isLooping={isLooping}
+              onLoopToggle={() => setIsLooping((p) => !p)}
+              backingStyle={beatType}
+              onBackingStyleChange={setBeatType}
+              volume={volume}
+              onVolumeChange={setVolume}
+            />
+
             {/* Active Step Info / Stage */}
             <StageFrame
               accent

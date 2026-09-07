@@ -31,7 +31,7 @@ it. When you change a value, update every site in the same commit.
     + concept files" — needs an update if you bump this; check the
     comment stays in lockstep with the array)
 
-### 3. Tests — **232** (203 frontend + 29 backend)
+### 3. Tests — **242** (213 frontend + 29 backend)
 
 - Source of truth: re-derive with `npm test` and `npm run test:py`.
   The frontend total is the count of `it(` blocks in `tests/*.test.ts`
