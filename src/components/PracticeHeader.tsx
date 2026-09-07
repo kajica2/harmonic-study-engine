@@ -9,6 +9,12 @@ import { GuideToneFeedback } from "./GuideToneFeedback";
 import type { BackingStyle } from "../lib/backingEngine";
 import type { HarmonicPath } from "../lib/paths";
 import type { TimeSignature } from "../lib/rhythm";
+import {
+  SCORE_MODE_HINT,
+  SCORE_MODE_LABEL,
+  allScoreModes,
+  type ScoreDisplayMode,
+} from "../lib/displayMode";
 
 /**
  * PracticeHeader — the dominant practice-loop strip.
@@ -60,6 +66,10 @@ interface PracticeHeaderProps {
   // Volume
   volume: number;
   onVolumeChange: (v: number) => void;
+
+  // Score display mode (full / zoom)
+  scoreDisplayMode: ScoreDisplayMode;
+  onScoreDisplayModeChange: (m: ScoreDisplayMode) => void;
 }
 
 const BACKING_STYLE_LABELS: Record<BackingStyle, string> = {
@@ -92,6 +102,8 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onBackingStyleChange,
   volume,
   onVolumeChange,
+  scoreDisplayMode,
+  onScoreDisplayModeChange,
 }) => {
   const readout = formatChordReadout(
     path,
@@ -230,6 +242,28 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
             aria-label="Volume"
             className="w-20 accent-[color:var(--color-brand)]"
           />
+        </label>
+
+        {/* Score display mode (full / zoom) */}
+        <label className="flex items-center gap-2 text-xs text-neutral-400">
+          <span className="t-mono uppercase tracking-wider text-[10px]">
+            Score
+          </span>
+          <select
+            value={scoreDisplayMode}
+            onChange={(e) =>
+              onScoreDisplayModeChange(e.target.value as ScoreDisplayMode)
+            }
+            aria-label="Score display mode"
+            title={SCORE_MODE_HINT[scoreDisplayMode]}
+            className="bg-transparent border border-[color:var(--color-border)] rounded-[var(--radius-md)] px-2 py-1 text-xs text-neutral-200"
+          >
+            {allScoreModes().map((m) => (
+              <option key={m} value={m}>
+                {SCORE_MODE_LABEL[m]}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
     </div>
