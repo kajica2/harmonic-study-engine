@@ -67,4 +67,4 @@ respect when adding model-touching tests.
   output, Miles drops notes, Glass doesn't, shared-clock continuity,
   Box–Muller / OUDrift statistical sanity.
 
-Total: 255 tests passing across the repo (226 frontend it() + 29 backend def test_).
+Total: 276 tests passing across the repo (247 frontend it() + 29 backend def test_).

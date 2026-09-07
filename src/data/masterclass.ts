@@ -38,7 +38,46 @@ export interface MasterclassEntry {
    *  picker shows it as "Coming soon" — we'd add the path in a
    *  follow-up commit. */
   inApp: boolean;
+  /**
+   * Filter tags for the masterclass picker filter bar (TOP10
+   * step 4). Each entry is one of a small fixed vocabulary;
+   * see PathTags in src/lib/pathFilters.ts for the source of
+   * truth. Curated by hand — only ~10 entries are tagged today.
+   * The filter UI shows "no matches" if a query doesn't intersect
+   * with any tagged entry, so untagged entries are excluded from
+   * filter results but still appear when no filters are active.
+   *
+   * Tags are additive within a category — a path can be both
+   * "intermediate" and "advanced" if the catalog says so (it
+   * shouldn't, but the schema allows it). For "Goal", a path can
+   * have multiple goals (e.g. voice-leading + ear-training).
+   */
+  tags?: PathTag[];
 }
+
+/**
+ * The vocabulary of filter tags. Re-exported here for convenience
+ * — the canonical declaration lives in src/lib/pathFilters.ts so
+ * the filter UI and the masterclass data can share a single
+ * source of truth.
+ */
+export type PathTag =
+  // Difficulty
+  | "foundation"
+  | "intermediate"
+  | "advanced"
+  // Topic
+  | "ii-v-i"
+  | "modal-interchange"
+  | "rhythm-changes"
+  | "chromatic-approach"
+  | "coltrane-cycle"
+  // Goal
+  | "voice-leading"
+  | "ear-training"
+  | "sight-reading"
+  | "transposition"
+  | "improv";
 
 export const MASTERCLASS_TUNES: MasterclassEntry[] = [
   // ----- PJ 1-4 (introductory mini-series) -----
@@ -46,14 +85,17 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
     mainExercise: "Up the chord, 3rd & 7th twice — and up the chord, down the scale. Sing the melody before playing.",
     description: "Foundational diatonic exercise; uses higher intervals of the chord as a melodic line.",
     objective: "Sing the melody first, then hold guide tones (3rd & 7th) while the bass walks underneath.",
+    tags: ["foundation", "voice-leading", "ear-training"],
     inApp: true },
   { id: "is-you-is-or-is-you-aint", title: "Is You Is or Is You Ain't My Baby", classes: ["MC 3", "MC 5"],
     mainExercise: "3-to-9 chromatic Dorian arpeggios through the changes.",
     description: "Sing-along tune; learn the melody first, then 3-to-9 over each chord.",
+    tags: ["intermediate", "chromatic-approach", "improv"],
     inApp: false },
   { id: "yardbird-suite", title: "Yardbird Suite", classes: ["MC 4", "MC 19"],
     mainExercise: "Bird Feathers — vary phrase length; long meter on the bridge.",
     description: "Phrase-length study; Bird's prosody is the teaching tradition.",
+    tags: ["advanced", "improv", "sight-reading"],
     inApp: false },
   { id: "sometimes-im-happy", title: "Sometimes I'm Happy", classes: ["MC 6", "MC 12", "MC 14-P1"],
     mainExercise: "Melody Game — wave in / wave out; sing the diminished and harmonic minor in the changes.",
@@ -64,24 +106,29 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
   { id: "solar", title: "Solar", classes: ["MC 6", "MC 7", "MC 8", "MC 11", "MC 14-P1", "MC 21"],
     mainExercise: "Diatonic Solar solo (and harmonic-minor / melodic-minor variations). Motif = Bach sequences.",
     description: "The flagship harmonic-minor study. Most heavy-rotated tune in the series.",
+    tags: ["advanced", "transposition", "improv"],
     inApp: false },
 
   // ----- Cherokee / What Is This Thing Called Love (the deep-dive block) -----
   { id: "what-is-this-thing-called-love", title: "What Is This Thing Called Love", classes: ["MC 7", "MC 9", "MC 10", "MC 11", "MC 14-P2"],
     mainExercise: "Three stages of singing a tune; scat *Hot House* against it; harmonic-minor on tension, melodic-minor on resolution.",
     description: "Rhythmic concept study; 2-5-1 voice-leading line.",
+    tags: ["intermediate", "ii-v-i", "voice-leading"],
     inApp: false },
   { id: "cherokee", title: "Cherokee", classes: ["MC 13", "MC 15", "MC 16", "MC 20", "MC 21", "MC 34"],
     mainExercise: "Three diminished chords, one key per day; sing the changes including II–V–I through the bridge keys.",
     description: "Diminished-trail study. House-of-Harmony anchor (two keys a flatted-fifth apart).",
+    tags: ["advanced", "transposition", "coltrane-cycle"],
     inApp: false },
   { id: "i-got-rhythm", title: "I Got Rhythm", classes: ["MC 3", "MC 8", "MC 17", "MC 18"],
     mainExercise: "Twin-key syncopation; back door #1 (1 → 1m → 2-5 → 2-5 → 1) and #2 (half-diminished before the IV minor).",
     description: "Back-cycling study; the bridge is 3 minor-3rd related keys.",
+    tags: ["rhythm-changes", "intermediate", "coltrane-cycle"],
     inApp: false },
   { id: "stella-by-starlight", title: "Stella by Starlight", classes: ["MC 18"],
     mainExercise: "F♯m7b5 → F minor 7 (the half-diminished back door before the IV minor).",
     description: "Back-cycling study; sing the function through the changes.",
+    tags: ["modal-interchange", "intermediate", "voice-leading"],
     inApp: false },
 
   // ----- There Will Never Be Another You / Out of Nowhere (the paraphrase arc) -----
