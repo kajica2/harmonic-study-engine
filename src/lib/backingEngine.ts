@@ -26,6 +26,7 @@
 
 import { HarmonicStep } from "./paths";
 import { loadSoundfont, playSoundfontNote } from "./soundfont";
+import { newAudioContext } from "./webAudio";
 
 export type BackingStyle =
   | "off"
@@ -133,8 +134,7 @@ class BackingEngine {
 
   init() {
     if (this.ctx) return;
-    this.ctx = new (window.AudioContext ||
-      (window as any).webkitAudioContext)();
+    this.ctx = newAudioContext();
 
     this.masterBus = this.ctx.createGain();
     this.masterBus.gain.value = 0.6;
