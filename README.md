@@ -6,10 +6,12 @@ and full export to MIDI / MusicXML / Score21 / MP4.
 
 ## Features
 
-- 12 masterclass personas (Wynton Marsalis, Coltrane, Bach, Eno, …)
-  with persona-driven visual themes in the canvas
-- 33-tune working catalog (Star Eyes, Cherokee, Solar, Out of
+- 17 masterclass personas (Wynton Marsalis, Coltrane, Bach, Eno,
+  Miles, Monk, Kandinsky, …) with persona-driven visual themes
+  in the canvas
+- 38-tune working catalog (Star Eyes, Cherokee, Solar, Out of
   Nowhere, I'll Remember April, …) with composer + key filters
+  (37 entries marked "Coming soon" — full paths land in follow-up commits)
 - 11 backing styles: swing / bossa nova / funk / latin / ballad /
   clave 3-2 / clave 3-3 / African 4:4 / 4:3 / 3:4
 - Per-style instrument mapping — bossa uses nylon guitar + fingered
@@ -46,7 +48,7 @@ Everything except `/synthesize` and `/fx/reverb`. `/health` returns
 heavy endpoints return 503 with a clear error message. All of the
 following are unaffected:
 
-- 33-tune catalog with composer + key filters
+- 38-tune catalog with composer + key filters (37 marked "Coming soon")
 - 11 backing styles (swing, bossa, funk, latin, ballad, clave 3-2/3-3,
   African 4:4/4:3/3:4) with per-style instrument mapping
 - Diatonic scale practice (auto / manual)
@@ -167,8 +169,8 @@ Coverage:
 - `tests/useSessionStore.test.ts` — localStorage hydration + the
   legacy `beatType` migration map
 
-62 tests as of this commit. Run `npm test -- --coverage` for an
-HTML coverage report (defaults to `coverage/`).
+174 tests passing as of this commit (145 frontend it() + 29 backend def test_).
+Run `npm test -- --coverage` for an HTML coverage report (defaults to `coverage/`).
 
 **Not covered** (intentionally): React components in `src/components/`
 and `src/App.tsx` — they're tightly coupled to the audio engine
