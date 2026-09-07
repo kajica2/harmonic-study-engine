@@ -169,8 +169,10 @@ Coverage:
 - `tests/useSessionStore.test.ts` — localStorage hydration + the
   legacy `beatType` migration map
 
-174 tests passing as of this commit (145 frontend it() + 29 backend def test_).
-Run `npm test -- --coverage` for an HTML coverage report (defaults to `coverage/`).
+177 tests passing as of this commit (148 frontend it() + 29 backend def test_).
+Both counts verified by `npm test` and `npm run test:py` against the
+repo today. Run `npm test -- --coverage` for an HTML coverage report
+(defaults to `coverage/`).
 
 **Not covered** (intentionally): React components in `src/components/`
 and `src/App.tsx` — they're tightly coupled to the audio engine

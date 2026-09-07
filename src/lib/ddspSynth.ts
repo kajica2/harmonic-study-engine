@@ -15,6 +15,7 @@
  */
 
 const DEFAULT_BACKEND = "http://127.0.0.1:8765";
+import { newAudioContext } from "./webAudio";
 export const DDSP_SERVER: string =
   (import.meta.env.VITE_DDSP_API as string | undefined)?.replace(/\/$/, "") ||
   DEFAULT_BACKEND;
@@ -70,7 +71,7 @@ export async function synthesizeAndPlay(
   const blob = await res.blob();
   const arrayBuffer = await blob.arrayBuffer();
 
-  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const audioCtx = newAudioContext();
   if (audioCtx.state === "suspended") await audioCtx.resume();
 
   const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
