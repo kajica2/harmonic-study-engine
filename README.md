@@ -4,6 +4,18 @@ A practice engine for trumpet (and any instrument) that pairs curated
 harmonic etudes with iReal-Pro-style backing tracks, scale practice,
 and full export to MIDI / MusicXML / Score21 / MP4.
 
+## Surfaces
+
+Three user-facing surfaces, all from one repo:
+
+| URL | Purpose | Local entry |
+|---|---|---|
+| `/` (or `https://harmonic-study-engine.vercel.app`) | Main React 19 SPA — full practice engine with personas, scales, rhythm drill | `npm run dev:vite` (port 5173) |
+| `/engine` (or `https://harmonic-study-engine.vercel.app/engine`) | Audio-reactive engine v2 (sainted-word-records) | `public/sainted-word-records.html` |
+| `/rnn` (or `https://harmonic-study-engine.vercel.app/rnn`) | Magenta RNN-driven generator | `public/rnn.html` + `public/rnn-engine.bundle.js` |
+
+The `/engine` and `/rnn` rewrites are configured in `vercel.json`.
+
 ## Features
 
 - 17 masterclass personas (Wynton Marsalis, Coltrane, Bach, Eno,
@@ -46,18 +58,9 @@ default port — 5173 — is whitelisted in the backend CORS config; set
 Everything except `/synthesize` and `/fx/reverb`. `/health` returns
 `{"status":"degraded","ddsp_version":"unavailable"}`; the two
 heavy endpoints return 503 with a clear error message. All of the
-following are unaffected:
-
-- 38-tune catalog with composer + key filters (37 marked "Coming soon")
-- 11 backing styles (swing, bossa, funk, latin, ballad, clave 3-2/3-3,
-  African 4:4/4:3/3:4) with per-style instrument mapping
-- Diatonic scale practice (auto / manual)
-- 3-iteration rhythm drill
-- Sub-range loop, live score window, mobile command bar
-- MediaRecorder → MP4 transcode (via system ffmpeg if installed;
-  falls back to WebM if ffmpeg is missing)
-- MIDI / MusicXML / Score21 / etude export
-- Masterclass personas (Wynton, Coltrane, Bach, Eno, …)
+features above (personas, scales, rhythm drill, ride-along, masterclass
+catalog, backing styles, MIDI/MusicXML/Score21/MP4 export) are
+unaffected — they don't touch the DDSP stack.
 
 ### Optional: enable the DDSP render + reverb path
 
@@ -171,15 +174,19 @@ Coverage:
 
 215 tests passing as of this commit (186 frontend it() + 29 backend def test_).
 Both counts verified by `npm test` and `npm run test:py` against the
-repo today. Run `npm test -- --coverage` for an HTML coverage report
-(defaults to `coverage/`).
+repo today. New tests added for previously-untested lib files
+(useBassNotes, importRealBook, ireal — the ones the older "What to
+add next" section listed). Run `npm test -- --coverage` for an HTML
+coverage report (defaults to `coverage/`).
 
 **Not covered** (intentionally): React components in `src/components/`
-and `src/App.tsx` — they're tightly coupled to the audio engine
-singleton instances (rhythmEngine, audioEngine, backingEngine),
-and the test ROI for mocking all that is low. UI bugs surface in
-browser-browser tests; the unit tests cover the deterministic,
-importable logic that the UI composes.
+beyond the few that use `@testing-library/react` (useBassNotes is
+covered). The audio/score/visualization engines in `src/components/`
+are tightly coupled to audio-engine singleton instances
+(rhythmEngine, audioEngine, backingEngine), and the test ROI for
+mocking all that is low. UI bugs surface in browser-browser tests;
+the unit tests cover the deterministic, importable logic that the
+UI composes.
 
 ### Backend (pytest)
 
@@ -211,11 +218,12 @@ production deploys actually hit without the DDSP stack.
 
 If you tackle more coverage, the highest-leverage targets are:
 
-- `src/lib/useBassNotes.ts` — wraps the backing engine's bass MIDI
-  stream; testable with a mocked backingEngine
-- `src/lib/importRealBook.ts` and `src/lib/ireal.ts` — file-format
-  parsers; high regression value
 - `src/lib/recorder.ts` — needs the MediaRecorder mock; complex
+- `src/lib/scoreGenerator.ts` — the MusicXML/abcjs renderer; medium
+  effort, high regression value
+- `src/lib/backingEngine.ts` — the rhythm-section synth singleton;
+  AudioContext-coupled, but pattern tables could be extracted into
+  pure helpers and tested
 
 ## License
 
