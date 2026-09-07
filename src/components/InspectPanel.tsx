@@ -53,8 +53,8 @@ export const InspectPanel: React.FC<Props> = ({
     out.push({
       kind: "smooth",
       notes: alternativeVoicing(prevNotes, origNotes, "smooth"),
-      label: "Smoothest next voicing",
-      desc: "applied voice-leading from previous chord",
+      label: "Minimum-motion voicing",
+      desc: "fewest semitones of total voice movement from the previous chord",
     });
     out.push({
       kind: "inversion",
@@ -210,8 +210,8 @@ export const InspectPanel: React.FC<Props> = ({
       </div>
 
       <div className="text-[10px] font-mono text-neutral-600 mt-1">
-        Step Chord now moves a timeline cursor and plays the chosen voicing. Pick "Smoothest" for the
-        smallest motion, "Drop-2" for a jazz feel, or commit your choice back into the path.
+        Choose a voicing, audition it, then commit it to advance the cursor. Pick
+        "Minimum-motion" for the smallest movement, "Drop-2" for a jazz feel.
       </div>
     </div>
   );

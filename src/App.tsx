@@ -1256,6 +1256,8 @@ export default function App() {
                   key={p.id}
                   onClick={() => handleSelectPersona(p.id)}
                   aria-pressed={isActive}
+                  title={`${p.name} — ${p.role}`}
+                  aria-label={`${p.name} — ${p.role}`}
                   className={`relative text-left p-3 rounded-xl border transition-all duration-300 flex flex-col justify-between h-28 group ${
                     isActive
                       ? `bg-gradient-to-br ${p.gradientFrom} ${p.gradientTo} shadow-[0_4px_20px_rgba(0,0,0,0.4)]`
@@ -2371,27 +2373,27 @@ export default function App() {
                     setPersonaId={setHumanizePersonaId}
                   />
 
-                  <ToolGroup label={`Voicing · ${voicingType}${optimizeVoiceLeading ? " · opt" : ""}`}>
+                  <ToolGroup label={`Voicing · ${voicingType === "closed" ? "Closed" : "Open"}${optimizeVoiceLeading ? " · Optimize on" : ""}`}>
                     <ToolChip
                       active={voicingType === "closed"}
                       onClick={() => setVoicingType("closed")}
-                      title="Closed voicing — notes clustered"
+                      title="Closed voicing — chord tones clustered within an octave"
                     >
-                      Closed
+                      Closed voicing
                     </ToolChip>
                     <ToolChip
                       active={voicingType === "open"}
                       onClick={() => setVoicingType("open")}
-                      title="Open voicing — spread across the keyboard"
+                      title="Open voicing — chord tones spread across two or more octaves"
                     >
-                      Open
+                      Open voicing
                     </ToolChip>
                     <ToolChip
                       active={optimizeVoiceLeading}
                       onClick={() => setOptimizeVoiceLeading(!optimizeVoiceLeading)}
-                      title="Voice-lead from the previous chord"
+                      title="Optimize voicing — choose each chord's notes to minimize motion from the previous chord"
                     >
-                      {optimizeVoiceLeading ? "● Optimize" : "○ Optimize"}
+                      {optimizeVoiceLeading ? "● Optimize voicing" : "○ Optimize voicing"}
                     </ToolChip>
                   </ToolGroup>
                 </div>
