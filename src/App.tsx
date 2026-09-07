@@ -74,6 +74,7 @@ import { transposeChordName, PITCH_CLASSES } from "./lib/chordTranspose";
 import { downloadText } from "./lib/download";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
 import { usePathGenerator } from "./hooks/usePathGenerator";
+import type { ScoreDisplayMode } from "./lib/displayMode";
 
 export default function App() {
   // Persistent session state — paths, transport, voicing, mutes,
@@ -819,6 +820,27 @@ export default function App() {
   const [showChordInspector, setShowChordInspector] = useState(false);
   const inspectorHistory = useMemo(() => makeInspectorHistory(), []);
   const [showLiveScore, setShowLiveScore] = useState(true);
+  // Display mode for the live score — full vs active-bar zoom.
+  // Persisted to localStorage so the user's preference survives
+  // reload. Picker lives in <PracticeHeader>; the actual dim
+  // treatment is applied inside <LiveScoreDisplay>.
+  const [scoreDisplayMode, setScoreDisplayMode] =
+    useState<ScoreDisplayMode>(() => {
+      try {
+        const saved = localStorage.getItem("hse.scoreDisplayMode");
+        if (saved === "full" || saved === "zoom") return saved;
+      } catch {
+        /* localStorage unavailable; fall through */
+      }
+      return "full";
+    });
+  useEffect(() => {
+    try {
+      localStorage.setItem("hse.scoreDisplayMode", scoreDisplayMode);
+    } catch {
+      /* ignore */
+    }
+  }, [scoreDisplayMode]);
 
   const handleGenerateEtude = async () => {
     const lengthMap = [8, 16, 32];
@@ -1839,6 +1861,8 @@ export default function App() {
               onBackingStyleChange={setBeatType}
               volume={volume}
               onVolumeChange={setVolume}
+              scoreDisplayMode={scoreDisplayMode}
+              onScoreDisplayModeChange={setScoreDisplayMode}
             />
 
             {/* Active Step Info / Stage */}
@@ -2615,6 +2639,7 @@ export default function App() {
                   transposeShift={transposeShift}
                   tempo={tempo}
                   timeSignature={timeSignature}
+                  displayMode={scoreDisplayMode}
                 />
               </div>
             )}

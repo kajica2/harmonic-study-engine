@@ -6,6 +6,7 @@ import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { TimeSignature } from "../lib/rhythm";
 import { stepsPerBar } from "../lib/loopWav";
+import type { ScoreDisplayMode } from "../lib/displayMode";
 
 const NOTE_WHEEL = [
   "C",
@@ -52,6 +53,12 @@ interface LiveScoreDisplayProps {
    *  compat (the component is also used in places that don't pass
    *  a signature). */
   timeSignature?: TimeSignature;
+  /** Display mode (full / zoom). When 'zoom', the score renders
+   *  larger and the container gets a brand-colored ring so the
+   *  "this is the focus mode" treatment is visible. Per-bar dim
+   *  would require abcjs post-process — out of scope for this
+   *  PR. The zoom level itself is already wired (zoomScale state). */
+  displayMode?: ScoreDisplayMode;
 }
 
 /**
@@ -76,6 +83,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   transposeShift,
   tempo,
   timeSignature = "4/4",
+  displayMode = "full",
 }) => {
   const svgRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -495,7 +503,12 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       {/* SVG Container in high contrast white */}
       <div
         ref={containerRef}
-        className="w-full h-[360px] overflow-x-auto overflow-y-auto bg-white rounded-2xl relative border border-white/5 shadow-inner hide-scrollbar"
+        className={`w-full h-[360px] overflow-x-auto overflow-y-auto bg-white rounded-2xl relative border shadow-inner hide-scrollbar transition-all ${
+          displayMode === "zoom"
+            ? "border-[color:var(--color-brand-strong)] ring-2 ring-[color:var(--color-brand)]/40 ring-offset-2 ring-offset-[color:var(--color-bg)]"
+            : "border-white/5"
+        }`}
+        data-display-mode={displayMode}
       >
         <div
           ref={svgRef}
