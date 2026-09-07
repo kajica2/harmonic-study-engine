@@ -67,6 +67,7 @@ import { LeadSheet } from "./components/LeadSheet";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
+import { PersonaLensBanner } from "./components/PersonaLensBanner";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
 
 import { transposeChordName, PITCH_CLASSES } from "./lib/chordTranspose";
@@ -2645,6 +2646,7 @@ export default function App() {
             {showLiveScore && (
               <div className="w-full mt-2">
                 <PathBriefing pathId={path?.id} />
+                <PersonaLensBanner personaId={selectedPersonaId} />
                 <LiveScoreDisplay
                   path={path}
                   activeStepIndex={activeStepIndex}
@@ -2657,6 +2659,7 @@ export default function App() {
             {!showLiveScore && (
               <div className="w-full mt-2">
                 <PathBriefing pathId={path?.id} />
+                <PersonaLensBanner personaId={selectedPersonaId} />
               </div>
             )}
 
