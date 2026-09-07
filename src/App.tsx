@@ -72,6 +72,8 @@ import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
 
 import { transposeChordName, PITCH_CLASSES } from "./lib/chordTranspose";
 import { downloadText } from "./lib/download";
+import { useDDSPProbe } from "./hooks/useDDSPProbe";
+import { usePathGenerator } from "./hooks/usePathGenerator";
 
 export default function App() {
   // Persistent session state — paths, transport, voicing, mutes,
@@ -774,13 +776,15 @@ export default function App() {
     volume,
   ]);
 
-  const handleGeneratePath = () => {
-    const newPath = generateHarmonicPath(genLength, genComplexity);
-    setPaths([newPath, ...paths]);
-    setActivePathIndex(0);
-    setActiveStepIndex(0);
-    setTransposeShift(0);
-  };
+  const handleGeneratePath = usePathGenerator({
+    currentPaths: paths,
+    setPaths,
+    setActivePathIndex,
+    setActiveStepIndex,
+    setTransposeShift,
+    length: [8, 16, 32][genLength - 1] ?? 8,
+    complexity: genComplexity,
+  });
 
   const [etudeAlgorithm, setEtudeAlgorithm] =
     useState<EtudeAlgorithm>("magenta_rnn");
@@ -805,53 +809,11 @@ export default function App() {
   const ddspApiUrl =
     (import.meta.env.VITE_DDSP_API as string | undefined) ||
     "http://127.0.0.1:8765";
-  // Surface the backend's reachability so users on the static
-  // deployment (https://harmonic-study-engine.vercel.app/) know
-  // whether their local `bash dev.sh` is reachable from the tab.
-  // The status pill renders in the toolbar; colors follow the
-  // design tokens (emerald-700 for ok, amber-600 for degraded,
-  // rose-600 for unreachable).
-  const [backend, setBackend] = useState<
-    | { state: "checking" }
-    | { state: "ok"; ddspVersion: string }
-    | { state: "degraded"; ddspVersion: string }
-    | { state: "unreachable"; reason: string }
-  >({ state: "checking" });
-  useEffect(() => {
-    let cancelled = false;
-    const probe = async () => {
-      try {
-        const res = await fetch(`${ddspApiUrl}/health`, {
-          signal: AbortSignal.timeout(2500),
-        });
-        if (cancelled) return;
-        if (!res.ok) {
-          setBackend({ state: "unreachable", reason: `HTTP ${res.status}` });
-          return;
-        }
-        const data = await res.json();
-        if (cancelled) return;
-        setBackend({
-          state: data.status === "ok" ? "ok" : "degraded",
-          ddspVersion: data.ddsp_version ?? "unknown",
-        });
-      } catch (err) {
-        if (cancelled) return;
-        setBackend({
-          state: "unreachable",
-          reason: err instanceof Error ? err.message : "fetch failed",
-        });
-      }
-    };
-    probe();
-    // Re-probe on focus so users coming back to the tab after
-    // starting `bash dev.sh` see the green pill without a reload.
-    window.addEventListener("focus", probe);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", probe);
-    };
-  }, [ddspApiUrl]);
+  // Health-probe state for the DDSP backend — extracted to
+  // src/hooks/useDDSPProbe.ts. The hook handles the focus-reprobe
+  // lifecycle; the discriminated-union shape renders directly
+  // in the toolbar's status pill.
+  const backend = useDDSPProbe(ddspApiUrl);
   const synesthesiaCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [showLeadSheet, setShowLeadSheet] = useState(false);
   const [showChordInspector, setShowChordInspector] = useState(false);
