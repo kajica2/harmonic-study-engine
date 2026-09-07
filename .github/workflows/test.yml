@@ -1,12 +1,15 @@
 name: test
 
-# Runs the full gate on every push to main and on every PR. The gate
-# is: tsc --noEmit (type safety), vitest (frontend unit tests),
-# pytest (backend contract tests). The npm install step takes the
-# longest of the three; running lint and test in parallel saves ~30s
-# on cold cache. The drift-check job is gated by the `drift` job that
-# assets/check-links.js owns (added in a follow-up commit); when that
-# job is absent, the workflow still runs the three core jobs.
+# Runs the full gate on every push to main and on every PR.
+# The gate, in order:
+#   1. assets/check-links.cjs — drift lock-in (counts & name).
+#      Asserts every cited count in README.md / src/magenta/README.md
+#      matches its source of truth (see SPEC.md). Fails before lint
+#      because drift fixes are usually the smallest possible commit
+#      and shouldn't get tangled with a tsc regression.
+#   2. tsc --noEmit — type safety.
+#   3. vitest — frontend unit tests (matrix across ubuntu + macos).
+#   4. pytest — backend contract tests against server/tests/.
 
 on:
   push:
@@ -20,6 +23,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  drift:
+    name: drift lock-in (SPEC.md)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node assets/check-links.cjs
+
   lint:
     name: tsc --noEmit
     runs-on: ubuntu-latest
