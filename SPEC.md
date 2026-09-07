@@ -84,11 +84,24 @@ The repo has three user-facing surfaces:
 |---|---|---|
 | Main app | `/` | React 19 SPA, `src/App.tsx` |
 | Engine v2 | `/engine` | `public/sainted-word-records.html`, redirect via `vercel.json` |
-| RNN engine | `/rnn` | `public/rnn.html` + `public/rnn-engine.bundle.js`, redirect via `vercel.json` |
+| RNN engine | `/rnn` | `public/rnn.html` + `public/rnn-engine.bundle.js` (build artifact), redirect via `vercel.json` |
 
 The Vercel rewrites that map `/engine` and `/rnn` to the static files
 in `public/` are in `vercel.json`. Keep that file's source list and
 the `public/` directory in sync — adding a surface means both files.
+
+### Build artifacts
+
+The RNN engine bundle (`public/rnn-engine.bundle.js`, ~2.8 MB) is a
+build artifact, not source-of-truth. It's produced by `npm run build`
+(via `vite build --config vite.rnn.config.ts` → writes to `public/`,
+then `vite build` copies `public/` into `dist/`). Vercel serves it
+from `dist/rnn-engine.bundle.js` after running `npm run build` in CI
+(configured by `buildCommand` + `outputDirectory` in `vercel.json`).
+
+The bundle is **gitignored** — don't commit it. Source-of-truth is
+`src/rnn-engine.ts`. If you delete the bundle from disk, `npm run build`
+recreates it.
 
 ## Deploy env vars
 
