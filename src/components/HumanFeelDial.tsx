@@ -12,9 +12,8 @@
  * list of humanizer-supported personas because getPersonaProfile()
  * falls back to Kandinsky for any id we haven't tuned.
  *
- * The label "Human feel" matches the language in `harmonic-magenta-plan.md`
- * §7 — "Practice tab: Human feel dial". Keeping it short so the
- * ToolGroup stays single-line on mobile.
+ * The label "Human feel" matches the practice-rail control language.
+ * Keeping it short so the ToolGroup stays single-line on mobile.
  */
 import React from "react";
 import { ToolGroup, ToolChip } from "./StageFrame";
