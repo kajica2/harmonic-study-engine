@@ -1,9 +1,7 @@
 # src/magenta/
 
 Audio-reactive *humanizer* pipeline for the Harmonic Study Engine.
-Part of the broader [Magenta integration plan](https://github.com/kajica2/harmonic-study-engine/blob/main/Downloads/harmonic-magenta-plan.md) —
-this folder ships the MVP (§3.4 adapter + §5 humanizer) without any
-Magenta model downloads.
+Ships the MVP (adapter + humanizer rules); no Magenta model downloads.
 
 ## What's here
 

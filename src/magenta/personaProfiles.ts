@@ -5,7 +5,7 @@
  * `src/lib/personas.ts` (currently 17 — the original 12 from the
  * Magenta plan plus the five added since).
  *
- * Fields map directly onto the §5.3 table in `harmonic-magenta-plan.md`:
+ * Fields map directly onto the per-persona humanizer table:
  *   - `placementMs`  — fixed timing bias, in ms. Positive = ahead of
  *                      the beat, negative = behind (e.g. Miles −14ms).
  *   - `timSigmaMs`   — per-note timing jitter σ, in ms. Coltrane is
