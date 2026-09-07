@@ -80,9 +80,16 @@ function checkPersonas() {
 // ---------- 2. Masterclass tunes — 38 --------------------------------------
 
 function checkTunes() {
-  const txt = read("src/data/masterclass.ts");
-  const matches = txt.match(/\binApp:\s*(true|false)/g) || [];
-  const expected = matches.length;
+  // Walk the file, skipping JSDoc lines (start with ` *`) so that
+  // examples in comments don't get counted as data entries.
+  const rawLines = read("src/data/masterclass.ts").split("\n");
+  let count = 0;
+  for (const line of rawLines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("*") || trimmed.startsWith("//")) continue;
+    if (/\binApp:\s*(true|false)\b/.test(line)) count += 1;
+  }
+  const expected = count;
   if (expected !== 38) {
     fail(`src/data/masterclass.ts inApp: count = ${expected}, SPEC says 38`);
     return;
