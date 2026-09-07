@@ -27,6 +27,13 @@ export interface MasterclassEntry {
   mainExercise: string;
   /** Short human-readable summary (composer / era / form). */
   description: string;
+  /**
+   * Hand-curated 1-line "when you open this path, …" objective
+   * shown in the practice-loop briefing card. Only set for paths
+   * with `inApp: true`; for `inApp: false` paths the briefing
+   * falls back to the `mainExercise` field as a generic prompt.
+   */
+  objective?: string;
   /** If true, the tune is in the live path set. If false, the
    *  picker shows it as "Coming soon" — we'd add the path in a
    *  follow-up commit. */
@@ -38,6 +45,7 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
   { id: "star-eyes", title: "Star Eyes", classes: ["MC 1", "MC 2", "PJ 1", "PJ 3"],
     mainExercise: "Up the chord, 3rd & 7th twice — and up the chord, down the scale. Sing the melody before playing.",
     description: "Foundational diatonic exercise; uses higher intervals of the chord as a melodic line.",
+    objective: "Sing the melody first, then hold guide tones (3rd & 7th) while the bass walks underneath.",
     inApp: true },
   { id: "is-you-is-or-is-you-aint", title: "Is You Is or Is You Ain't My Baby", classes: ["MC 3", "MC 5"],
     mainExercise: "3-to-9 chromatic Dorian arpeggios through the changes.",
