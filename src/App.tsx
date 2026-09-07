@@ -1865,6 +1865,7 @@ export default function App() {
               activeStepIndex={activeStepIndex}
               chordName={transposeChordName(step.name, transposeShift)}
               timeSignature={timeSignature}
+              chordNotes={currentChordNotes}
               isPlaying={isPlayingAuto}
               onPlayPause={() => setIsPlayingAuto((p) => !p)}
               tempo={tempo}
