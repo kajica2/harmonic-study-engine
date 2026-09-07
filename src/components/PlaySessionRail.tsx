@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from "react";
 import { HarmonicPath } from "../lib/paths";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
+import { applyFilter, EMPTY_FILTER, type PathFilterState } from "../lib/pathFilters";
+import { PathFilterBar } from "./PathFilterBar";
 import { NOTE_NAMES } from "../lib/theory";
 import { RenderMode } from "../lib/loopWav";
 import { playbackClock } from "../lib/playbackClock";
@@ -234,11 +236,16 @@ const MasterclassStage: React.FC<{
   activePathId?: string;
   onPickInApp: (id: string) => void;
 }> = ({ activePathId, onPickInApp }) => {
-  // Group by class family so the user can scan MC 1-10, MC 11-20, etc.
+  const [filter, setFilter] = useState<PathFilterState>(EMPTY_FILTER);
+
+  // Apply the active filter, then group by class family. When no
+  // filter is active, applyFilter is a no-op and all entries pass
+  // through — preserves the existing picker behavior.
+  const filteredEntries = applyFilter(MASTERCLASS_TUNES, filter);
   const groups: { label: string; entries: MasterclassEntry[] }[] = [];
   for (let lo = 1; lo <= 40; lo += 10) {
     const hi = lo + 9;
-    const entries = MASTERCLASS_TUNES.filter((t) =>
+    const entries = filteredEntries.filter((t) =>
       t.classes.some((c) => {
         const m = c.match(/MC (\d+)/);
         if (!m) return false;
@@ -254,8 +261,28 @@ const MasterclassStage: React.FC<{
         {availableTunes().length} of {MASTERCLASS_TUNES.length} tunes are wired into the app right now;
         the rest are listed as <em>coming soon</em> — picking one from the app set opens the path immediately.
       </div>
-      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-        {groups.map((g) => (
+      <div className="mb-3 surface-2 rounded-[var(--radius-md)] border border-[color:var(--color-border)] p-2">
+        <PathFilterBar
+          filter={filter}
+          onChange={setFilter}
+          totalCount={MASTERCLASS_TUNES.length}
+          filteredCount={filteredEntries.length}
+        />
+      </div>
+      {filteredEntries.length === 0 ? (
+        <div className="text-[11px] text-neutral-400 italic px-2 py-4 text-center">
+          No tagged tunes match this filter. Try fewer tags, or{" "}
+          <button
+            onClick={() => setFilter(EMPTY_FILTER)}
+            className="text-[color:var(--color-brand-strong)] underline"
+          >
+            clear filters
+          </button>
+          .
+        </div>
+      ) : (
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          {groups.map((g) => (
           <div key={g.label}>
             <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-mono mb-1.5 sticky top-0 surface-2 py-1">
               {g.label}
@@ -303,7 +330,8 @@ const MasterclassStage: React.FC<{
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
