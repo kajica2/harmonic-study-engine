@@ -51,21 +51,28 @@ export function parseChordToMidi(
     .replace(/o/g, "dim");
 
   if (qualityStr.startsWith("m7b5")) intervals = [0, 3, 6, 10];
+  else if (qualityStr.includes("maj7") || qualityStr.includes("M7"))
+    intervals = [0, 4, 7, 11];
+  else if (qualityStr.includes("maj9")) intervals = [0, 4, 7, 11, 14];
+  // Order matters: 'm' must come AFTER 'maj7'/'M7' so that a chord
+  // like Cmaj7 (which starts with 'm') doesn't get classified as
+  // a minor chord. The previous order put the 'm' branch first, so
+  // Cmaj7 was returning [0, 3, 7, 11] (mMaj7) instead of [0, 4, 7, 11]
+  // (maj7).
   else if (qualityStr.startsWith("m") || qualityStr.startsWith("min")) {
     if (qualityStr.includes("maj7")) intervals = [0, 3, 7, 11];
     else if (qualityStr.includes("7")) intervals = [0, 3, 7, 10];
     else if (qualityStr.includes("9")) intervals = [0, 3, 7, 10, 14];
     else intervals = [0, 3, 7];
-  } else if (qualityStr.startsWith("dim")) {
+  }
+  else if (qualityStr.startsWith("dim")) {
     if (qualityStr.includes("7")) intervals = [0, 3, 6, 9];
     else intervals = [0, 3, 6];
-  } else if (qualityStr.startsWith("aug") || qualityStr.startsWith("+"))
+  }
+  else if (qualityStr.startsWith("aug") || qualityStr.startsWith("+"))
     intervals = [0, 4, 8];
   else if (qualityStr.startsWith("sus4")) intervals = [0, 5, 7];
   else if (qualityStr.startsWith("sus2")) intervals = [0, 2, 7];
-  else if (qualityStr.includes("maj7") || qualityStr.includes("M7"))
-    intervals = [0, 4, 7, 11];
-  else if (qualityStr.includes("maj9")) intervals = [0, 4, 7, 11, 14];
   else if (qualityStr.startsWith("7")) intervals = [0, 4, 7, 10];
   else if (qualityStr.startsWith("9")) intervals = [0, 4, 7, 10, 14];
   else if (qualityStr.startsWith("13")) intervals = [0, 4, 7, 10, 14, 21];

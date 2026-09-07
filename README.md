@@ -169,7 +169,7 @@ Coverage:
 - `tests/useSessionStore.test.ts` — localStorage hydration + the
   legacy `beatType` migration map
 
-178 tests passing as of this commit (149 frontend it() + 29 backend def test_).
+215 tests passing as of this commit (186 frontend it() + 29 backend def test_).
 Both counts verified by `npm test` and `npm run test:py` against the
 repo today. Run `npm test -- --coverage` for an HTML coverage report
 (defaults to `coverage/`).
