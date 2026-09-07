@@ -5,6 +5,7 @@ import {
   formatStepEyebrow,
   formatTempo,
 } from "../lib/practiceHeader";
+import { GuideToneFeedback } from "./GuideToneFeedback";
 import type { BackingStyle } from "../lib/backingEngine";
 import type { HarmonicPath } from "../lib/paths";
 import type { TimeSignature } from "../lib/rhythm";
@@ -36,6 +37,9 @@ interface PracticeHeaderProps {
   /** Display name of the chord (already transposed by caller). */
   chordName: string;
   timeSignature: TimeSignature;
+  /** Transposed chord notes (MIDI) for the active step — fed to
+   *  the GuideToneFeedback classifier. */
+  chordNotes: number[];
 
   // Transport
   isPlaying: boolean;
@@ -77,6 +81,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   activeStepIndex,
   chordName,
   timeSignature,
+  chordNotes,
   isPlaying,
   onPlayPause,
   tempo,
@@ -120,6 +125,9 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           data-testid="practice-header-readout"
         >
           {readout}
+        </div>
+        <div className="mt-1.5">
+          <GuideToneFeedback chordNotes={chordNotes} />
         </div>
       </div>
 
