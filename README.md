@@ -16,6 +16,8 @@ A practice engine for trumpet (and any instrument) that pairs curated
 harmonic etudes with iReal-Pro-style backing tracks, scale practice,
 and full export to MIDI / MusicXML / Score21 / MP4.
 
+**Live:** [harmonic-study-engine.vercel.app](https://harmonic-study-engine.vercel.app)
+
 ## What works
 
 - **17 synesthesia personas** — 12 jazz/electronic (Kandinsky,
@@ -27,10 +29,11 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   synesthesia color map. Badges in the UI distinguish
   "documented" synesthesia (Kandinsky, Scriabin) from
   "interpretive" coloring (everyone else).
-- **Curated harmonic paths** — 8 built-in + 5 classical (Paths
-  XXXIII–XXXVII) + 33-tune masterclass catalog (Star Eyes,
-  Cherokee, Solar, Out of Nowhere, I'll Remember April) with
-  composer + key filters.
+- **Curated harmonic paths** — 8 built-in + 5 classical persona
+  paths (Paths XXXIII–XXXVII) + 36-tune masterclass catalog
+  (Star Eyes, Cherokee, Solar, Out of Nowhere, I'll Remember
+  April, Blue Bossa, etc.) with composer + key + technique
+  filters in the Path Catalog tab.
 - **9 voicing modes** — Closed, Drop-2, Minimum Motion, Spread,
   Inversion, Quartal, Open Drop-3, Closed Dense, Melody-First.
   Drop-down replaces the old binary Closed/Open toggle.
@@ -38,9 +41,14 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   strip + Δ glyph for motif transformation (Brahms) and ≈ for
   frozen bass (Rachmaninov). Picks up automatically from the
   active path's note content.
+- **Per-bar harmonic function glyphs** — Tonic (○T),
+  Dominant (△D), Subdominant (□S), Predominant (◇P) next to
+  each chord name. Shape + letter pairing so colorblind users
+  still see the function (per `docs/TERMINOLOGY.md`).
 - **Per-bar behavioral rules** — sequenceStepper (Tchaikovsky's
-  path climbs by 2 semitones per bar) and keyDrift (Mahler's
-  path drifts from D minor toward C major across the bars).
+  path climbs by 2 semitones per bar), keyDrift (Mahler's path
+  drifts from D minor toward C major across the bars),
+  motifTracker (Brahms), bassIsolation (Miles).
 - **11 backing styles**: swing / bossa nova / funk / latin /
   ballad / clave 3-2 / clave 3-3 / African 4:4 / 4:3 / 3:4.
   Per-style instrument mapping — bossa uses nylon guitar +
@@ -68,6 +76,19 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   bus (WaveShaper, k=2.5, 4x oversample), per-note velocity
   scaling (bass softer, top louder; arpeggiator accents every
   4th step), FluidR3 soundfont caching across persona swaps.
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system map
+  (engine graph, file-by-file role table, wiring)
+- [docs/DEVELOPING.md](docs/DEVELOPING.md) — contributor
+  guide (how to add a persona / path / voicing)
+- [docs/AUDIO.md](docs/AUDIO.md) — engine reference (voice
+  design, ADSR curves, warmth math, MIDI semantics)
+- [docs/TERMINOLOGY.md](docs/TERMINOLOGY.md) — HSE vocabulary
+  glossary + UI glyph conventions
+- [CHANGELOG.md](CHANGELOG.md) — per-sprint changes
+- [LOOP-PROMPT.md](LOOP-PROMPT.md) — wiggum scratchpad
 
 ## What's degraded
 
@@ -109,13 +130,16 @@ manually instead, as above, if you share :3000.
 ## Testing
 
 ```bash
-npm test              # 93 unit + component tests across 5 files
-npm run lint         # tsc --noEmit
-npm run build        # vite build (no test code in bundle)
+npm test            # 212 unit + component tests across 8 files
+npm run test:e2e    # 2 Playwright e2e tests (boots dist/ + Chromium)
+npm run test:all    # unit + build + e2e (the full gate)
+npm run lint        # tsc --noEmit
+npm run build       # vite build (no test code in bundle)
 ```
 
-CI runs all three on every push and PR via
-`.github/workflows/ci.yml`.
+CI runs `lint-and-unit` on every push and PR, then a
+separate `e2e` job that installs Chromium and runs
+`npm run test:e2e`. See `.github/workflows/ci.yml`.
 
 ## Deploy to your own HF Space
 
