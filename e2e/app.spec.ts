@@ -82,3 +82,23 @@ test("Path Catalog tab is reachable", async ({ page }) => {
     page.locator('input[placeholder*="omposer" i], input[placeholder*="ilter" i], input[placeholder*="search" i]').first(),
   ).toBeVisible({ timeout: 5_000 });
 });
+
+test("Coltrane persona activates slice-and-repeat badge in live score", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("heading", { name: /Choose a mastermind/ }).waitFor({ timeout: 10_000 });
+
+  // Open the Catalog tab.
+  const catalogTab = page.getByRole("button", { name: /Catalog/i }).first();
+  await catalogTab.click();
+
+  // Open the coltrane_changes_demo path (has sliceAndRepeat=true).
+  // The path entry has a data-testid `catalog-open-<pathId>` button.
+  const openBtn = page.locator('[data-testid="catalog-open-coltrane_changes_demo"]');
+  await expect(openBtn).toBeVisible({ timeout: 5_000 });
+  await openBtn.click();
+
+  // The slice-and-repeat badge in LiveScoreDisplay should now appear.
+  const badge = page.getByTestId("slice-repeat-badge");
+  await expect(badge).toBeVisible({ timeout: 8_000 });
+  await expect(badge).toContainText("Slice & Repeat");
+});
