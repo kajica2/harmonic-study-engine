@@ -4,6 +4,12 @@ A high-level map of the Harmonic Study Engine: which files do what,
 how the engines wire together, and where to look when something is
 broken.
 
+**Related docs:**
+- `README.md` — high-level overview, local dev, deploy.
+- `CHANGELOG.md` — per-sprint record.
+- `docs/DEVELOPING.md` — recipes for adding a persona, a path, a voicing.
+- `docs/AUDIO.md` — engine design (voice recipes, warmth math, MIDI, debugging).
+
 ## Stack
 
 - **Frontend:** React 19 + Vite 6 + Tailwind 4. Single-page app.
