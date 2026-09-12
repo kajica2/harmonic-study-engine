@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { PracticeSet, PracticeSetItem } from "../lib/paths";
-import { ALL_PATHS } from "../lib/paths";
+import { PATHS, STUDIES_PATHS } from "../lib/paths";
 import { FOCUS_TAGS } from "../data/practice_sets";
 import { X, Plus, Trash2, ChevronDown } from "lucide-react";
 
@@ -85,10 +85,12 @@ export function SetEditor({ initial, onSave, onDelete, onClose }: Props) {
     onSave(set);
   }
 
-  // Path options grouped by type
+  // Path options grouped by type. Since ALL_PATHS no longer includes
+  // studies (they live in STUDIES_PATHS for the masterclass picker),
+  // we source each group directly from the appropriate array.
   const pathGroups = {
-    PATHS: ALL_PATHS.filter((p) => !p.id.startsWith("study-")),
-    STUDIES: ALL_PATHS.filter((p) => p.id.startsWith("study-")),
+    PATHS: PATHS,
+    STUDIES: STUDIES_PATHS,
   };
 
   return (

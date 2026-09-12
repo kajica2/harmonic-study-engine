@@ -37,6 +37,7 @@ import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
 import { midiIn } from "./lib/midiIn";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
+import { STUDIES_PATHS } from "./lib/paths";
 import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
 import { PianoKeyboard } from "./components/PianoKeyboard";
 import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
@@ -81,24 +82,25 @@ export default function App() {
   const [paths, setPaths] = useState<HarmonicPath[]>(() => {
     try {
       const saved = localStorage.getItem("synesthesia_paths");
-      const parsed = saved ? JSON.parse(saved) : ALL_PATHS;
+      const parsed = saved ? JSON.parse(saved) : PATHS;
       // Backfill `name` alias from `title` for LiveScoreDisplay's abcjs
       // T: header (and any other read site that expects it).
       const backfilled = parsed.map((p: HarmonicPath) => ({
         ...p,
         name: p.name ?? p.title,
       }));
-      // Bump: when v2 (study materials + new PATHS shape) ships and the
-      // user has stale localStorage from before, merge in any missing
-      // built-in paths so study materials appear without a manual reset.
+      // Merge in any curated PATHS that aren't already in the user's
+      // saved state. Songs (STUDIES_PATHS) are NOT auto-merged — they
+      // get pulled in only when the user picks one from the Masterclass
+      // picker, which prepends to paths state.
       if (saved) {
         const ids = new Set(backfilled.map((p: HarmonicPath) => p.id));
-        const missing = ALL_PATHS.filter((p) => !ids.has(p.id));
+        const missing = PATHS.filter((p) => !ids.has(p.id));
         if (missing.length) return [...backfilled, ...missing];
       }
       return backfilled;
     } catch {
-      return ALL_PATHS;
+      return PATHS;
     }
   });
 
@@ -1226,6 +1228,11 @@ export default function App() {
         {/* Play Session Rail — guided workflow */}
         <PlaySessionRail
           paths={paths}
+          prependPath={(path) => {
+            // Idempotent: don't prepend a duplicate.
+            if (paths.some((x) => x.id === path.id)) return;
+            setPaths((prev) => [path, ...prev]);
+          }}
           activePath={path}
           activePathIndex={activePathIndex}
           setActivePathIndex={setActivePathIndex}

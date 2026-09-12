@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { HarmonicPath } from "../lib/paths";
+import { HarmonicPath, STUDIES_PATHS } from "../lib/paths";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
 import { midiToName, type BehavioralMarker } from "../lib/theory";
@@ -25,6 +25,9 @@ type Stage = "choose" | "perform" | "commit" | "masterclass";
 
 interface RailProps {
   paths: HarmonicPath[];
+  /** Prepend a path to the user's paths list (used by the masterclass
+   *  picker when the user picks a study song that's not in their list). */
+  prependPath: (path: HarmonicPath) => void;
   activePath: HarmonicPath;
   activePathIndex: number;
   setActivePathIndex: (i: number) => void;
@@ -220,8 +223,19 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
         <MasterclassStage
           activePathId={p.activePath?.id}
           onPickInApp={(id) => {
-            const i = p.paths.findIndex((x) => x.id === id);
-            if (i >= 0) p.setActivePathIndex(i);
+            // Studies live in STUDIES_PATHS (not in the user's paths
+            // state). When the user picks one, prepend it to paths
+            // so setActivePathIndex(0) lands on the song, then jump
+            // to the perform stage.
+            const idx = p.paths.findIndex((x) => x.id === id);
+            if (idx >= 0) {
+              p.setActivePathIndex(idx);
+            } else {
+              const song = STUDIES_PATHS.find((s) => s.id === id);
+              if (!song) return;
+              p.prependPath(song);
+              p.setActivePathIndex(0);
+            }
             setStage("perform");
           }}
         />
