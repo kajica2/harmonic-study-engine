@@ -642,8 +642,12 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
   else if (third === 4 && hasMinor7) family = "dominant";
   else if (third === 4 && hasMajor7) family = "major";
 
-  // Roman numeral based on root pc in major scale
-  const roman = ROMAN_BY_SEMITONE[bassPc] ?? "?";
+  // Roman numeral based on the chord root (when determinable). The
+  // heuristic for finding rootPc falls back to bassPc when no 3rd
+  // exists above bass — that means inverted chords (e.g. C/G) end
+  // up with rootName=G, and the Roman reflects that ("V" not "I").
+  // Full root-recognition is out of scope for this iteration.
+  const roman = ROMAN_BY_SEMITONE[rootPc] ?? "?";
 
   // Function (very lightweight; assumes major key center)
   let fn: ChordAnalysis["function"] = "color";

@@ -164,6 +164,17 @@ describe("analyzeChord", () => {
     expect(a.tensions).toContain("9");
     expect(a.tensions).toContain("13");
   });
+
+  it("notes the inverted-chord limitation on Roman numerals (TODO)", () => {
+    // Pinned limitation: when no 3rd exists above the bass, the
+    // rootPc heuristic falls back to bassPc. So C/G (chord [67,72,76])
+    // shows rootName='G' and roman='V', even though the chord
+    // function is I. Fixing this requires proper root recognition
+    // (see theory.ts rootPc detection at ~line 600).
+    const firstInversion = analyzeChord([67, 72, 76]);
+    expect(firstInversion.rootName).toBe("G");
+    expect(firstInversion.roman).toBe("V");
+  });
 });
 
 describe("applyVoiceLeading", () => {
