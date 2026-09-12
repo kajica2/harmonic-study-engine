@@ -391,7 +391,11 @@ export interface BehavioralMarker {
   /** True if the bass note carries from the previous bar without change
    *  (Rachmaninov-style frozen bass). Derived from comparing bar bass. */
   bassFrozen: boolean;
-  /** Optional secondary hint (e.g. "Δ", "≈") for the bar UI. */
+  /** True if this bar is part of a Coltrane-style slice-and-repeat motif
+   *  (path.sliceAndRepeat === true). The bar strip surfaces a ◷ glyph
+   *  to signal the recurring shape. */
+  motifRepeat: boolean;
+  /** Optional secondary hint (e.g. "Δ", "≈", "◷") for the bar UI. */
   hint: string;
 }
 
@@ -425,10 +429,18 @@ export function deriveBehavioralMarkers(
     const hints: string[] = [];
     if (isMotifTransformation) hints.push("Δ");
     if (bassFrozen && b > 0) hints.push("≈");
+    // Coltrane-style slice-and-repeat: when the path declares it, every
+    // bar participates in the recurring motif. Surface a ◷ glyph so the
+    // bar strip visually flags the shape; LiveScoreDisplay can also read
+    // `motifRepeat` to subdivide the bar into single-beat cells.
+    const motifRepeat = !!(path as { sliceAndRepeat?: boolean })
+      .sliceAndRepeat;
+    if (motifRepeat) hints.push("◷");
     out.push({
       accentHex,
       isMotifTransformation,
       bassFrozen,
+      motifRepeat,
       hint: hints.join(" "),
     });
     prevBarBass = bass;
