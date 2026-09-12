@@ -19,6 +19,19 @@ function readHDSetting(): boolean {
   }
 }
 
+/**
+ * Soft-knee saturation curve for warmth. Used by the melody bus to
+ * add gentle harmonic richness before the master compressor. Each
+ * output sample is computed from `f(x) = sign(x) * (1 - exp(-k*|x|))
+ * / (1 - exp(-k))` — saturates toward ±1 as |x| grows, with no
+ * discontinuity at the zero crossing.
+ *
+ * Pure math lives in audioHelpers.ts (importable from node tests).
+ * Re-exported here so audio.ts stays a single import surface.
+ */
+import { buildWarmthCurve as _buildWarmthCurve } from "./audioHelpers";
+const buildWarmthCurve = _buildWarmthCurve;
+
 // Generate a simple synthetic impulse response for plush reverb
 function createReverbImpulse(
   ctx: AudioContext,
@@ -63,6 +76,7 @@ class AudioEngine {
   private masterGain: GainNode | null = null;
   private melodyBus: GainNode | null = null;
   private reverb: ConvolverNode | null = null;
+  private warmth: WaveShaperNode | null = null;
   private currentInstrument: InstrumentType = "epiano";
   private targetVolume: number = 0.5;
   /** When true, the synth melody is silenced so the user can play
@@ -173,6 +187,16 @@ class AudioEngine {
       // is silenced while the backing track keeps playing.
       this.melodyBus = this.ctx.createGain();
       this.melodyBus.gain.value = 1;
+
+      // Warmth stage — soft-knee saturation adds gentle odd-order
+      // harmonics before the master compressor catches the peaks.
+      this.warmth = this.ctx.createWaveShaper();
+      this.warmth.curve = buildWarmthCurve(1024, 2.5);
+      this.warmth.oversample = "4x";
+
+      // Parallel routing: dry path + warmth path. Dry preserves
+      // transients; warmth adds gentle harmonic body. Both feed masterGain.
+      this.melodyBus.connect(this.warmth);
       this.melodyBus.connect(this.masterGain);
 
       const compressor = this.ctx.createDynamicsCompressor();
@@ -201,7 +225,7 @@ class AudioEngine {
     }
   }
 
-  playNote(midi: number) {
+  playNote(midi: number, velocity: number = 0.85) {
     if (!this.ctx || !this.masterGain) return;
 
     if (this.ctx.state === "suspended") {
@@ -233,7 +257,15 @@ class AudioEngine {
     // entire synth-melody gain to 0 without affecting the
     // backing-track voices (which connect directly to masterGain).
     const gain = this.ctx.createGain();
-    gain.connect(this.melodyOutputBus()!);
+
+    // Velocity trim — separate gain so per-note velocity scales the
+    // voice without disturbing each instrument's ADSR envelope shape.
+    // Caller passes MIDI 0..127 (or a pre-normalized 0..1 — clamp handles it).
+    const velocityGain = this.ctx.createGain();
+    const v = Math.max(0.15, Math.min(1.0, velocity));
+    velocityGain.gain.value = v;
+    velocityGain.connect(this.melodyOutputBus()!);
+    gain.connect(velocityGain);
 
     // Lowpass Filter for warmth
     const filter = this.ctx.createBiquadFilter();
