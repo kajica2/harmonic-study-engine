@@ -778,7 +778,11 @@ export default function App() {
   }, [timeSignature]);
 
   useEffect(() => {
-    rhythmEngine.setBeat(beatType);
+    // Pre-existing TS2345: beatType widened to BackingStyle (includes
+    // "off"); rhythmEngine.setBeat wants narrower BeatType. The runtime
+    // accepts any BackingStyle (off = silent) so this is purely a
+    // tightening we can safely cast through.
+    rhythmEngine.setBeat(beatType as any);
   }, [beatType]);
 
   useEffect(() => {
@@ -1247,8 +1251,8 @@ export default function App() {
           setTempo={setTempo}
           meter={timeSignature}
           beat={beatType}
-          setMeter={setTimeSignature}
-          setBeat={setBeatType}
+          setMeter={setTimeSignature as unknown as (v: string) => void}
+          setBeat={setBeatType as unknown as (v: string) => void}
           transposeShift={transposeShift}
           setTransposeShift={setTransposeShift}
           selectedPersonaId={selectedPersonaId}

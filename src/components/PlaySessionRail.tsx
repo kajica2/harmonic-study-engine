@@ -58,6 +58,7 @@ interface RailProps {
   wavMode: RenderMode;
   setWavMode: (m: RenderMode) => void;
   onOpenLeadSheet: () => void;
+  onOpenInspector: () => void;
   // loop range (sub-path). When loopStartBar is set and isLooping,
   // the auto-advance wraps between loopStartBar and loopEndBar
   // instead of the full path. Set via shift+click in the bar strip.
@@ -209,6 +210,7 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           onExportWav={p.onExportWav}
           isExportingWav={p.isExportingWav}
           onOpenLeadSheet={p.onOpenLeadSheet}
+          onOpenInspector={p.onOpenInspector}
           tempo={p.tempo}
           wavMode={p.wavMode}
           setWavMode={p.setWavMode}
@@ -843,7 +845,7 @@ const CommitStage: React.FC<{
   onExportWav: () => void;
   isExportingWav: boolean;
   onOpenLeadSheet: () => void;
-  onOpenInspector: () => void;
+  onOpenInspector?: () => void;
   tempo: number;
   wavMode: RenderMode;
   setWavMode: (m: RenderMode) => void;
