@@ -64,15 +64,50 @@ export const StageFrame: React.FC<StageFrameProps> = ({
     ? "text-[color:var(--color-brand-strong)]"
     : "text-[color:var(--color-text-1)]";
 
-  const headerInner = (
-    <div className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3">
-      {onToggle && (
-        <ChevronRight
-          size={14}
-          className={`text-[color:var(--color-text-3)] transition-transform ${collapsed ? "rotate-0" : "rotate-90"}`}
-          aria-hidden="true"
-        />
+  // The chevron icon — only rendered when onToggle is provided.
+  // Hoisted above headerInner so the JSX below can reference it.
+  const chevron = onToggle ? (
+    <ChevronRight
+      size={14}
+      className={`text-[color:var(--color-text-3)] transition-transform ${collapsed ? "rotate-0" : "rotate-90"}`}
+      aria-hidden="true"
+    />
+  ) : null;
+
+  const headerInner = onToggle ? (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      className="w-full text-left flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 hover:bg-[color:var(--color-surface-3)]/40 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--color-brand)]"
+    >
+      {chevron}
+      <div className="flex-1 min-w-0">
+        {eyebrow && (
+          <div className="t-label text-[color:var(--color-text-3)]">{eyebrow}</div>
+        )}
+        {title && (
+          <div className={`t-h1 ${titleColor} truncate`}>{title}</div>
+        )}
+      </div>
+      {meta && (
+        <div className="t-small text-[color:var(--color-text-2)] whitespace-nowrap">
+          {meta}
+        </div>
       )}
+      {actions && (
+        // Stop click propagation so action buttons (e.g. "open" links)
+        // don't also collapse the frame.
+        <div
+          className="flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {actions}
+        </div>
+      )}
+    </button>
+  ) : (
+    <div className="flex items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3">
       <div className="flex-1 min-w-0">
         {eyebrow && (
           <div className="t-label text-[color:var(--color-text-3)]">{eyebrow}</div>
