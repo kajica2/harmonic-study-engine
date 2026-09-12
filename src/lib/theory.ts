@@ -66,6 +66,173 @@ export const getShapeForNote = (
 };
 
 /**
+ * Voicing registry — every supported voicing shape lives here.
+ *
+ * `intervals` is the stack of semitones above the bass note that
+ * makes up the voicing. The bass note itself is implicit (the lowest
+ * note of the chord). For "drop" voicings and similar, the helper
+ * `applyVoicing(chord, voicing)` does the math.
+ */
+export type VoicingId =
+  | "closed"
+  | "drop2"
+  | "minimum_motion"
+  | "spread"
+  | "inversion"
+  | "quartal"
+  | "open_drop3"
+  | "closed_dense"
+  | "melody_first";
+
+export interface Voicing {
+  id: VoicingId;
+  label: string;
+  description: string;
+  /** Semitones above bass. Root is omitted (bass IS the root). */
+  intervals: number[];
+  usedBy: string[];
+  minNotes?: number;
+  maxNotes?: number;
+  minHandSpan?: string;
+  allowMiddleGap?: boolean;
+  innerVoiceTracking?: boolean;
+  melodyOnTop?: boolean;
+}
+
+export const VOICINGS: Record<VoicingId, Voicing> = {
+  closed: {
+    id: "closed",
+    label: "Closed",
+    description: "Tight stacked triad/seventh, all notes within an octave.",
+    intervals: [3, 5, 7],
+    usedBy: ["coltrane", "bach", "debussy", "eno", "glass", "monk", "miles", "chet", "dizzy", "hubbard", "shorter", "kandinsky", "mahler"],
+  },
+  drop2: {
+    id: "drop2",
+    label: "Drop-2",
+    description: "Take the second voice from the top, drop it an octave.",
+    intervals: [3, 5, 7],
+    usedBy: [],
+  },
+  minimum_motion: {
+    id: "minimum_motion",
+    label: "Minimum Motion",
+    description: "Voice-lead every transition for minimal total semitones.",
+    intervals: [],
+    usedBy: [],
+  },
+  spread: {
+    id: "spread",
+    label: "Spread",
+    description: "Drop-2 plus alternating octaves. Open, jazz-balled.",
+    intervals: [],
+    usedBy: [],
+  },
+  inversion: {
+    id: "inversion",
+    label: "Inversion",
+    description: "Bass moves up an octave; chord stack remains.",
+    intervals: [],
+    usedBy: [],
+  },
+  quartal: {
+    id: "quartal",
+    label: "Quartal",
+    description: "Stacked fourths. Open, ambiguous, impressionist. Scriabin's mystic sound.",
+    intervals: [5, 10, 15, 20],
+    usedBy: ["scriabin"],
+    minNotes: 3,
+    maxNotes: 6,
+  },
+  open_drop3: {
+    id: "open_drop3",
+    label: "Open Drop-3",
+    description: "Wide spacing with an empty middle register. Bell-like, pianistic.",
+    intervals: [7, 16, 19],
+    usedBy: ["rachmaninov"],
+    allowMiddleGap: true,
+  },
+  closed_dense: {
+    id: "closed_dense",
+    label: "Closed Dense",
+    description: "Tight cluster in the middle register with independent inner voices. Brahms.",
+    intervals: [4, 7, 11],
+    usedBy: ["brahms"],
+    innerVoiceTracking: true,
+  },
+  melody_first: {
+    id: "melody_first",
+    label: "Melody-First",
+    description: "Top voice leads; harmony fills underneath. Simple accompaniment, lyrical line.",
+    intervals: [4, 7],
+    usedBy: ["tchaikovsky"],
+    melodyOnTop: true,
+  },
+};
+
+/**
+ * Apply a voicing to a chord's MIDI notes.
+ * - Bass is the lowest note.
+ * - Upper voices = bass + intervals[i] (intervals relative to bass).
+ * - For `intervals` that exceed available chord tones, the voicing
+ *   re-uses the chord's actual pitch classes and re-bases them
+ *   around the bass, so it still respects the chord.
+ */
+export function applyVoicing(notes: number[], voicingId: VoicingId): number[] {
+  const v = VOICINGS[voicingId];
+  if (notes.length === 0) return notes;
+  const sorted = [...new Set(notes)].sort((a, b) => a - b);
+  const bass = sorted[0];
+  const upperPcs = sorted.slice(1).map((n) => n % 12);
+  if (upperPcs.length === 0) return [bass];
+
+  if (voicingId === "minimum_motion" || voicingId === "spread" || voicingId === "inversion" || voicingId === "drop2") {
+    // Delegate to existing helpers.
+    if (voicingId === "inversion") return alternativeVoicing([], notes, "inversion");
+    if (voicingId === "drop2") return alternativeVoicing([], notes, "drop2");
+    if (voicingId === "spread") return alternativeVoicing([], notes, "spread");
+    if (voicingId === "minimum_motion") return notes; // requires prior chord; App handles
+  }
+
+  // Stack the voicing from the chord's own pitch classes, climbing from bass.
+  const stack: number[] = [bass];
+  // Use voicing intervals as the target layer positions; pick the chord's
+  // pitch class closest to each target layer.
+  for (const targetSemi of v.intervals) {
+    const targetMidi = bass + targetSemi;
+    // Find chord pc closest to targetSemi.
+    const targetPc = targetSemi % 12;
+    let bestPc: number | null = null;
+    let bestDist = Infinity;
+    for (const pc of upperPcs) {
+      const dist = Math.min(
+        Math.abs(pc - targetPc),
+        12 - Math.abs(pc - targetPc),
+      );
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPc = pc;
+      }
+    }
+    if (bestPc === null) break;
+    // Pick the octave of bestPc that puts it closest to targetMidi.
+    const candOctaves = [
+      bass + 12 * Math.floor(targetSemi / 12) + bestPc - (bass % 12),
+      bass + 12 * Math.ceil(targetSemi / 12) + bestPc - (bass % 12),
+    ].filter((c) => c > bass);
+    const cand =
+      candOctaves.length === 0
+        ? bass + bestPc + 12
+        : candOctaves.reduce((a, b) =>
+            Math.abs(a - targetMidi) < Math.abs(b - targetMidi) ? a : b,
+          );
+    stack.push(cand);
+  }
+
+  return Array.from(new Set(stack)).sort((a, b) => a - b);
+}
+
+/**
  * Total semitones traveled across all voices between two chords.
  * Lower is "smoother" voice leading.
  */

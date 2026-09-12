@@ -43,7 +43,7 @@ import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
-import { applyVoiceLeading } from "./lib/theory";
+import { applyVoiceLeading, VOICINGS, applyVoicing, type VoicingId } from "./lib/theory";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
@@ -183,10 +183,13 @@ export default function App() {
     }
   });
 
-  const [voicingType, setVoicingType] = useState<"closed" | "open">(() => {
+  const [voicingType, setVoicingType] = useState<VoicingId>(() => {
     try {
       const saved = localStorage.getItem("synesthesia_voicingType");
-      return saved === "open" ? "open" : "closed";
+      // Migrate old two-state "closed"/"open" to the new VoicingId union.
+      if (saved === "open") return "spread";
+      if (saved && (saved as VoicingId) in VOICINGS) return saved as VoicingId;
+      return "closed";
     } catch {
       return "closed";
     }
@@ -484,13 +487,14 @@ export default function App() {
       if (arpType === "none" && current.length > 0) {
         current = [current[current.length - 1]];
       }
-    } else if (voicingType === "open") {
-      const openNotes = [current[0]]; // keep bass note
-      for (let i = 1; i < current.length; i++) {
-        // Spread voicing: push every other note up an octave
-        openNotes.push(current[i] + (i % 2 !== 0 ? 12 : 0));
+    } else if (voicingType !== "closed") {
+      // Phase 5: use the VoicingId-aware applyVoicing for every non-default
+      // voicing. minimum_motion is delegated to applyVoiceLeading via the
+      // optimizeVoiceLeading flag upstream, so it falls through to "no-op"
+      // here.
+      if (voicingType !== "minimum_motion") {
+        current = applyVoicing(current, voicingType);
       }
-      current = openNotes;
     }
     return current.map((n) => n + transposeShift);
   }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType]);
@@ -1071,8 +1075,15 @@ export default function App() {
     setArpGate(p.arpGate);
     setArpOctaves(p.arpOctaves);
 
-    // Find the original path ID
-    const pathIdx = paths.findIndex((px) => px.id === p.originalSongId);
+    // Phase 5: apply persona's defaultVoicing when set (and valid).
+    if (p.defaultVoicing && p.defaultVoicing in VOICINGS) {
+      setVoicingType(p.defaultVoicing as VoicingId);
+    }
+
+    // Find the original path ID — try defaultPath first (Phase 5), then
+    // fall back to originalSongId (the original behavior).
+    const pathId = p.defaultPath ?? p.originalSongId;
+    const pathIdx = paths.findIndex((px) => px.id === pathId);
     if (pathIdx !== -1) {
       setActivePathIndex(pathIdx);
       setActiveStepIndex(0);
@@ -1385,12 +1396,13 @@ export default function App() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 gap-3 overflow-x-auto pb-1">
             {PERSONAS.map((p) => {
               const isActive = selectedPersonaId === p.id;
+              const isDocumented = p.synesthesiaStatus === "documented";
               return (
                 <button
                   key={p.id}
                   onClick={() => handleSelectPersona(p.id)}
                   aria-pressed={isActive}
-                  className={`relative text-left p-3 rounded-xl border transition-all duration-300 flex flex-col justify-between h-28 group ${
+                  className={`relative text-left p-3 rounded-xl border transition-all duration-300 flex flex-col justify-between h-36 group ${
                     isActive
                       ? `bg-gradient-to-br ${p.gradientFrom} ${p.gradientTo} shadow-[0_4px_20px_rgba(0,0,0,0.4)]`
                       : "bg-neutral-900/40 border-transparent hover:bg-neutral-900/80 hover:border-neutral-800"
@@ -1428,9 +1440,10 @@ export default function App() {
                         .join("")}
                     </div>
 
-                    {/* Non-color active indicator: a check mark + a
-                        solid ring. Color-blind safe because the shape
-                        (✓) and ring carry the meaning, not the color. */}
+                    {/* Synesthesia badge: ✅ Documented / 🎨 Interpretive
+                        OR the existing "active" indicator when selected.
+                        Color-blind safe: both badge and check use shape,
+                        not color, as the carrier. */}
                     {isActive ? (
                       <span
                         className="flex items-center gap-1 px-1.5 py-0.5 surface-1 border rounded-[var(--radius-sm)]"
@@ -1448,10 +1461,21 @@ export default function App() {
                       </span>
                     ) : (
                       <span
-                        className="w-1.5 h-1.5 rounded-full bg-neutral-700 group-hover:bg-neutral-600"
-                        title="Click to select this persona"
-                        aria-hidden="true"
-                      />
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-neutral-800 text-[8px] font-mono uppercase tracking-wider text-neutral-400"
+                        title={
+                          isDocumented
+                            ? "Documented synesthesia — color is historically sourced"
+                            : "Interpretive color — mood/texture metaphor"
+                        }
+                        aria-label={
+                          isDocumented
+                            ? "Documented synesthesia"
+                            : "Interpretive color"
+                        }
+                      >
+                        <span aria-hidden="true">{isDocumented ? "✓" : "❖"}</span>
+                        <span>{isDocumented ? "syn" : "art"}</span>
+                      </span>
                     )}
                   </div>
 
@@ -1463,6 +1487,31 @@ export default function App() {
                       {p.role}
                     </div>
                   </div>
+
+                  {/* Technique chips — first 2 visible, rest on hover via
+                      title attr. Pure visual hint of what the persona does;
+                      click cycles the active highlight elsewhere. */}
+                  {p.techniques && p.techniques.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {p.techniques.slice(0, 2).map((t) => (
+                        <span
+                          key={t}
+                          className="px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider bg-neutral-900/60 border border-neutral-800 text-neutral-500"
+                          title={`technique: ${t}`}
+                        >
+                          {t.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                      {p.techniques.length > 2 && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] font-mono text-neutral-600"
+                          title={p.techniques.slice(2).join(", ")}
+                        >
+                          +{p.techniques.length - 2}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Quote block */}
                   <div className="text-[8px] text-neutral-400 font-serif italic truncate w-full opacity-60 mt-1">
@@ -2445,21 +2494,20 @@ export default function App() {
                     </ToolChip>
                   </ToolGroup>
 
-                  <ToolGroup label={`Voicing · ${voicingType}${optimizeVoiceLeading ? " · opt" : ""}`}>
-                    <ToolChip
-                      active={voicingType === "closed"}
-                      onClick={() => setVoicingType("closed")}
-                      title="Closed voicing — notes clustered"
+                  <ToolGroup label={`Voicing · ${VOICINGS[voicingType]?.label ?? voicingType}${optimizeVoiceLeading ? " · opt" : ""}`}>
+                    <select
+                      value={voicingType}
+                      onChange={(e) => setVoicingType(e.target.value as VoicingId)}
+                      className="bg-transparent text-xs text-[color:var(--color-text-1)] outline-none cursor-pointer hover:text-[color:var(--color-brand-strong)] font-medium px-1 py-1 flex-1 min-w-0"
+                      aria-label="Voicing style"
+                      title={VOICINGS[voicingType]?.description ?? ""}
                     >
-                      Closed
-                    </ToolChip>
-                    <ToolChip
-                      active={voicingType === "open"}
-                      onClick={() => setVoicingType("open")}
-                      title="Open voicing — spread across the keyboard"
-                    >
-                      Open
-                    </ToolChip>
+                      {Object.values(VOICINGS).map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
                     <ToolChip
                       active={optimizeVoiceLeading}
                       onClick={() => setOptimizeVoiceLeading(!optimizeVoiceLeading)}

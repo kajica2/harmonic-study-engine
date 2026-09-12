@@ -12,10 +12,12 @@ export interface HarmonicPath {
   mvpReady?: boolean;
   feel?: string;
   /** Composer / writer (for standards). Optional — only present on
-   *  curated studies / standards. */
+   * curated studies / standards. */
   composer?: string;
   /** Musical key (concert pitch). Optional. Examples: "F", "Bb", "G-", "Eb". */
   key?: string;
+  /** Optional name alias used by some callers. Falls back to `title`. */
+  name?: string;
 }
 
 export const PATHS: HarmonicPath[] = [
@@ -844,6 +846,88 @@ export const PATHS: HarmonicPath[] = [
         notes: [48, 52, 55, 59, 64],
         descriptions: "Pickup to restart the cycle.",
       },
+    ],
+  },
+
+  // -------------------------------------------------------------------------
+  // Phase 5: classical-persona paths (Scriabin, Rachmaninov, Brahms,
+  // Tchaikovsky, Mahler). Each is a 4-bar, 4-step path the persona loads
+  // by default. Notes are voiced for the persona's signature technique —
+  // quartal stacks for Scriabin, open drop-3 for Rachmaninov, etc.
+  // -------------------------------------------------------------------------
+  {
+    id: "mystic_prometheus",
+    title: "Path XXXIII: The Mystic Chord",
+    description:
+      "Quartal stacks that never resolve. Color as destination, not decoration.",
+    composer: "A. Scriabin",
+    key: "C",
+    feel: "mystic / non-functional",
+    steps: [
+      { name: "C quartal", notes: [48, 53, 58, 63], descriptions: "Stacked fourths on C." },
+      { name: "Gb quartal", notes: [42, 47, 52, 57], descriptions: "Stacked fourths on Gb." },
+      { name: "B quartal", notes: [47, 52, 57, 62], descriptions: "Stacked fourths on B." },
+      { name: "E quartal", notes: [40, 45, 50, 55], descriptions: "Stacked fourths on E." },
+    ],
+  },
+  {
+    id: "bell_sonority",
+    title: "Path XXXIV: The Bell",
+    description:
+      "Low root, wide gap, high chord. The Dies irae shadow hangs over every bar.",
+    composer: "S. Rachmaninov",
+    key: "C minor",
+    feel: "mournful / pianistic",
+    steps: [
+      { name: "Cm", notes: [36, 48, 51, 55], descriptions: "Low root, wide gap, mid voicing." },
+      { name: "AbM", notes: [44, 51, 56, 63], descriptions: "Tritone step, bell sonority." },
+      { name: "Fm", notes: [41, 48, 53, 58], descriptions: "Subdominant minor, sparse." },
+      { name: "C5", notes: [36, 48, 60], descriptions: "Open fifth, frozen bass." },
+    ],
+  },
+  {
+    id: "developing_variation",
+    title: "Path XXXV: The Motif Grows",
+    description:
+      "One motif, four transformations. Track it across all four bars.",
+    composer: "J. Brahms",
+    key: "C minor",
+    feel: "developing / contrapuntal",
+    steps: [
+      { name: "Cm", notes: [48, 51, 55, 58], descriptions: "Statement — close, dense." },
+      { name: "Cm/Ab", notes: [44, 51, 55, 58], descriptions: "Inversion — bass above root." },
+      { name: "AbM", notes: [44, 51, 56, 63], descriptions: "Augmentation — wide spread." },
+      { name: "Cm", notes: [48, 51, 55, 58], descriptions: "Return, transformed." },
+    ],
+  },
+  {
+    id: "sequence_ascent",
+    title: "Path XXXVI: The Ascent",
+    description:
+      "Same shape, stepped up by a second, three times. Climax on the fourth.",
+    composer: "P. I. Tchaikovsky",
+    key: "D minor",
+    feel: "lyrical / sequential",
+    steps: [
+      { name: "Dm", notes: [50, 53, 57, 60], descriptions: "Sequence 1." },
+      { name: "Em", notes: [52, 55, 59, 62], descriptions: "Sequence 2 — up a 2nd." },
+      { name: "F#m", notes: [54, 57, 61, 64], descriptions: "Sequence 3 — up a 2nd." },
+      { name: "GM", notes: [55, 59, 62, 67], descriptions: "Climax — major resolution." },
+    ],
+  },
+  {
+    id: "progressive_tonality",
+    title: "Path XXXVII: The Journey",
+    description:
+      "Start in one key, end in another. No return. The path itself is the point.",
+    composer: "G. Mahler",
+    key: "D minor → C major",
+    feel: "orchestral / progressive",
+    steps: [
+      { name: "Dm", notes: [50, 53, 57, 62], descriptions: "Begin — D minor." },
+      { name: "BbM", notes: [46, 53, 58, 62], descriptions: "Drift — third relation." },
+      { name: "F#m", notes: [42, 49, 54, 59], descriptions: "Displacement — half-key away." },
+      { name: "CM", notes: [48, 52, 55, 60], descriptions: "End — C major, foreign key." },
     ],
   },
 ];
