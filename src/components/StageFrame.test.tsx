@@ -102,11 +102,7 @@ describe("StageFrame", () => {
     expect(container.textContent).toContain("visible body content");
   });
 
-  it.skip("toggles open/closed when onToggle is provided", () => {
-    // TODO: StageFrame's onToggle prop is declared but never wired to
-    // any click handler — the chevron rotates based on `collapsed` but
-    // can't trigger the toggle. Until that's fixed, this test stays
-    // skipped (the expected behavior is still pinned here for future work).
+  it("toggles open/closed when onToggle is provided", () => {
     let collapsed = false;
     const onToggle = vi.fn(() => {
       collapsed = !collapsed;
@@ -116,17 +112,59 @@ describe("StageFrame", () => {
         <p>toggleable body</p>
       </StageFrame>,
     );
+    // First render: not collapsed, body visible.
     expect(container.textContent).toContain("toggleable body");
-    const headerRow = container.querySelector("section > div");
-    expect(headerRow).toBeTruthy();
-    fireEvent.click(headerRow!);
+    // Click the header button. With onToggle the header is a real
+    // <button> with aria-expanded bound to !collapsed.
+    const headerBtn = container.querySelector(
+      'button[aria-expanded="true"]',
+    ) as HTMLButtonElement;
+    expect(headerBtn).toBeTruthy();
+    expect(headerBtn.textContent).toContain("T");
+    fireEvent.click(headerBtn);
     expect(onToggle).toHaveBeenCalledTimes(1);
+    // Re-render with collapsed=true; aria-expanded should flip to false.
     rerender(
       <StageFrame title="T" onToggle={onToggle} collapsed={collapsed}>
         <p>toggleable body</p>
       </StageFrame>,
     );
+    expect(
+      container.querySelector('button[aria-expanded="false"]'),
+    ).toBeTruthy();
+    // Body is now hidden.
     expect(container.textContent).not.toContain("toggleable body");
+  });
+
+  it("does not render a header button when onToggle is absent", () => {
+    const { container } = render(
+      <StageFrame title="T">
+        <span>c</span>
+      </StageFrame>,
+    );
+    // No aria-expanded button when there's no toggle.
+    expect(container.querySelector("button[aria-expanded]")).toBeNull();
+  });
+
+  it("action buttons stop propagation so they don't collapse the frame", () => {
+    const onToggle = vi.fn();
+    const onActionClick = vi.fn();
+    const { container } = render(
+      <StageFrame
+        title="T"
+        onToggle={onToggle}
+        actions={
+          <button data-testid="inner-action" onClick={onActionClick}>
+            Open
+          </button>
+        }
+      >
+        <p>body</p>
+      </StageFrame>,
+    );
+    fireEvent.click(container.querySelector('[data-testid="inner-action"]')!);
+    expect(onActionClick).toHaveBeenCalledTimes(1);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 
   it("does not show chevron when onToggle is absent", () => {
