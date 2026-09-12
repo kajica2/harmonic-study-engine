@@ -608,7 +608,11 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
     else if (s === 5 && !tensions.includes("5")) tensions.push("11");
     else if (s === 6) tensions.push("#11");
     else if (s === 8) tensions.push("b13");
-    else if (s === 9 && !tensions.includes("9")) tensions.push("13");
+    // 13th (semitone 9 above root) is independent of the 9th — both
+    // can coexist in a chord (e.g. Cmaj9 + A above = Cmaj13). Don't
+    // suppress on "9" already being present; the original bug shadowed
+    // the 13th by guarding on "9".
+    else if (s === 9) tensions.push("13");
   }
 
   // Family: based on the lowest three notes (the chord's triad plus a 7th if present)

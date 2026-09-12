@@ -152,11 +152,17 @@ describe("analyzeChord", () => {
     expect(analyzeChord([67, 71, 74]).function).toBe("dominant");
   });
   it("detects the 9th tension (semitone 2 above root)", () => {
-    // Note: code's tension ladder has a bug — semitone 9 (the 13th) is
-    // shadowed by the semitone 2 (the 9th) branch, so 13 is unreachable.
-    // This test pins the 9th detection which DOES work.
     const a = analyzeChord([60, 64, 67, 74]); // C E G D
     expect(a.tensions).toContain("9");
+  });
+
+  it("detects the 13th tension when both 9th and 13th are present", () => {
+    // The 13th (semitone 9 above root) was previously shadowed by
+    // the 9th's `!tensions.includes('9')` guard. With both D (9th)
+    // and A (13th) present, both tensions should register.
+    const a = analyzeChord([60, 64, 67, 74, 81]); // C E G D A
+    expect(a.tensions).toContain("9");
+    expect(a.tensions).toContain("13");
   });
 });
 
