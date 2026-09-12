@@ -16,12 +16,55 @@ export type VisualTheme =
   | "shorter"
   | "default";
 
+export type SynesthesiaStatus = "documented" | "interpretive";
+
+export type NoteName =
+  | "C" | "Db" | "D" | "Eb" | "E" | "F"
+  | "Gb" | "G" | "Ab" | "A" | "Bb" | "B";
+
+export interface ColorEntry {
+  hex: string;
+  label: string;
+}
+
+export interface PersonaRules {
+  minHandSpan?: string;
+  bassIsolation?: boolean;
+  allowMiddleGap?: boolean;
+  frozenBassBars?: number;
+  motifTracker?: boolean;
+  allowMajorMinorThirdTogether?: boolean;
+  phraseLengths?: number[];
+  sequenceStepper?: boolean;
+  sequenceInterval?: number;
+  sliceAndRepeat?: boolean;
+  keyDriftAcrossPath?: boolean;
+  allowTextureSwitch?: boolean;
+  reverbDistance?: boolean;
+}
+
 export interface Persona {
   id: string;
   name: string;
   role: string;
   quote: string;
-  originalSongId: string; // references PATH id
+  // New fields (Phase 1): keep old defaults so existing 12 personas keep working
+  // when these are absent in JSON.
+  synesthesiaStatus?: SynesthesiaStatus;
+  dates?: string;
+  nationality?: string;
+  tagline?: string;
+  instrumentLabel?: string;
+  colorMap?: Partial<Record<NoteName, ColorEntry>> | null;
+  colorPalette?: string[];
+  defaultVoicing?: string;
+  defaultPath?: string;
+  techniques?: string[];
+  scale?: string;
+  rhythmLayers?: string[];
+  rules?: PersonaRules;
+  // Original fields
+  originalSongId: string;
   instrument: InstrumentType;
   tempo: number;
   arpType:
@@ -37,16 +80,16 @@ export interface Persona {
   arpGate: number;
   arpOctaves: number;
   visualTheme: VisualTheme;
-  accentColor: string; // hex colour for theme matching
-  gradientFrom: string; // tailwind gradient
-  gradientTo: string; // tailwind gradient
+  accentColor: string;
+  gradientFrom: string;
+  gradientTo: string;
 }
 
 /**
  * Built-in personas. Source of truth is `src/data/personas.json`
  * — edit the JSON to add / tweak personas without touching code.
  *
- * To use the JSON directly (avoid the wrapper): import PERSONA_DATA.
+ * To use the JSON directly (avoid the wrapper): add PERSONA_DATA.
  */
 export const PERSONAS: Persona[] = PERSONA_DATA as Persona[];
 
