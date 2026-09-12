@@ -359,6 +359,40 @@ describe("deriveBehavioralMarkers", () => {
     const markers = deriveBehavioralMarkers(path, undefined);
     expect(markers[0].accentHex).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
+
+  it("sets motifRepeat=true on every bar when path.sliceAndRepeat is true", () => {
+    const path: any = {
+      steps: [
+        { name: "C", notes: [60, 64, 67] },
+        { name: "C", notes: [60, 64, 67] },
+        { name: "C", notes: [60, 64, 67] },
+        { name: "C", notes: [60, 64, 67] },
+        { name: "G", notes: [67, 71, 74] },
+        { name: "G", notes: [67, 71, 74] },
+        { name: "G", notes: [67, 71, 74] },
+        { name: "G", notes: [67, 71, 74] },
+      ],
+      sliceAndRepeat: true,
+    };
+    const markers = deriveBehavioralMarkers(path, undefined);
+    expect(markers).toHaveLength(2);
+    expect(markers[0].motifRepeat).toBe(true);
+    expect(markers[1].motifRepeat).toBe(true);
+    expect(markers[0].hint).toContain("◷");
+    expect(markers[1].hint).toContain("◷");
+  });
+
+  it("sets motifRepeat=false on every bar when path.sliceAndRepeat is unset", () => {
+    const path = makePath([
+      { name: "C", notes: [60, 64, 67] },
+      { name: "C", notes: [60, 64, 67] },
+      { name: "C", notes: [60, 64, 67] },
+      { name: "C", notes: [60, 64, 67] },
+    ]);
+    const markers = deriveBehavioralMarkers(path, undefined);
+    expect(markers[0].motifRepeat).toBe(false);
+    expect(markers[0].hint).not.toContain("◷");
+  });
 });
 
 describe("deriveBarTransposeDrift", () => {

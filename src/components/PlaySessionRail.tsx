@@ -766,7 +766,8 @@ const PerformStage: React.FC<{
                           aria-hidden="true"
                         />
                       )}
-                      {/* Phase 5: motifTracker / frozenBass hint badge (top-right). */}
+                      {/* Phase 5+: motifTracker / frozenBass / sliceAndRepeat
+                          hint badge (top-right). */}
                       {marker && marker.hint && (
                         <span
                           className="absolute top-1 right-1 text-[8px] font-mono text-neutral-400"
@@ -775,14 +776,18 @@ const PerformStage: React.FC<{
                               ? "Motif transformation — bar re-voices prior content (Brahms)"
                               : marker.bassFrozen
                                 ? "Frozen bass — bass carries from prior bar (Rachmaninov)"
-                                : ""
+                                : marker.motifRepeat
+                                  ? "Slice & repeat — Coltrane-style recurring motif"
+                                  : ""
                           }
                           aria-label={
                             marker.isMotifTransformation
                               ? "Motif transformation"
                               : marker.bassFrozen
                                 ? "Frozen bass"
-                                : ""
+                                : marker.motifRepeat
+                                  ? "Slice and repeat motif"
+                                  : ""
                           }
                         >
                           {marker.hint}
