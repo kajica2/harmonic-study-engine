@@ -27,7 +27,50 @@ export interface HarmonicPath {
   sequenceInterval?: number;
 }
 
-export const PATHS: HarmonicPath[] = [
+// ---------------------------------------------------------------------------
+// Path length policy
+// ---------------------------------------------------------------------------
+// Each HarmonicStep is one BEAT (1/4 of a bar in 4/4). So
+// `path.steps.length / 4` is the bar count. We require every path to be
+// between MIN_PATH_BARS and MAX_PATH_BARS bars long, padded/trimmed at
+// module-load by `padPath()` below.
+
+export const STEPS_PER_BAR = 4;
+export const MIN_PATH_BARS = 24;
+export const MAX_PATH_BARS = 64;
+
+/**
+ * padPath — returns a copy of `path` whose steps array sits inside
+ * `[MIN_PATH_BARS, MAX_PATH_BARS]` bars (i.e. steps in
+ * `[MIN * STEPS_PER_BAR, MAX * STEPS_PER_BAR]`).
+ *
+ *   - Short paths: cycle the existing steps until they hit MIN bars.
+ *   - Long paths: slice to MAX bars.
+ *   - Already-in-range paths: pass through unchanged.
+ *
+ * The cycling strategy for short paths is "loop the form" — the most
+ * musically sensible padding for both concept exercises (where the
+ * short phrase is meant to be repeated) and standards (where looping
+ * the 32-bar head three times is a standard practice technique).
+ */
+export function padPath(path: HarmonicPath): HarmonicPath {
+  const minSteps = MIN_PATH_BARS * STEPS_PER_BAR;
+  const maxSteps = MAX_PATH_BARS * STEPS_PER_BAR;
+  let steps = path.steps;
+  // Pad by cycling.
+  while (steps.length < minSteps) {
+    const need = Math.min(steps.length, minSteps - steps.length);
+    steps = steps.concat(steps.slice(0, need));
+  }
+  // Trim to ceiling.
+  if (steps.length > maxSteps) {
+    steps = steps.slice(0, maxSteps);
+  }
+  if (steps === path.steps) return path;
+  return { ...path, steps };
+}
+
+export const RAW_PATHS: HarmonicPath[] = [
   {
     id: "path-1",
     title: "Path I: The Resolution (II-V-I)",
@@ -955,15 +998,32 @@ export const PATHS: HarmonicPath[] = [
 // ---------------------------------------------------------------------------
 import { STUDIES_PATHS as GENERATED_STUDIES_PATHS } from "./studies";
 
-export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS;
+export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS.map(padPath);
 
-export const ALL_PATHS: HarmonicPath[] = PATHS.map((p) => ({
-  ...p,
-  // Backfill `name` alias from `title` for callers that read the
-  // older field (e.g. LiveScoreDisplay's abcjs T: header). Cheap
-  // memoization at module load time.
-  name: p.name ?? p.title,
-}));
+/**
+ * Curated PATHS exposed to consumers — already padded to the
+ * [MIN_PATH_BARS, MAX_PATH_BARS] bar range and name-backfilled.
+ */
+export const PATHS: HarmonicPath[] = RAW_PATHS.map((p) => {
+  const padded = padPath({
+    ...p,
+    name: p.name ?? p.title,
+  });
+  // Warn in dev if a raw path was over the cap and had to be trimmed.
+  // (Under-length paths get padded silently — that's the intended
+  // behavior.)
+  if (p.steps.length > MAX_PATH_BARS * STEPS_PER_BAR && padded.steps.length < p.steps.length) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[paths] '${p.id}' was ${(p.steps.length / STEPS_PER_BAR).toFixed(1)} bars — ` +
+        `trimmed to ${MAX_PATH_BARS} bars to fit policy. ` +
+        `Consider splitting into multiple paths.`,
+    );
+  }
+  return padded;
+});
+
+export const ALL_PATHS: HarmonicPath[] = PATHS;
 
 /**
  * Look up a HarmonicPath across both curated PATHS and STUDIES_PATHS.
