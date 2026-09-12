@@ -68,6 +68,11 @@ import { LeadSheet } from "./components/LeadSheet";
 import { ModalShell, useModalLabel } from "./components/ModalShell";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
+import {
+  PathCatalog,
+  type BehavioralRuleId,
+  type BehavioralRuleMap,
+} from "./components/PathCatalog";
 
 function downloadText(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -227,7 +232,7 @@ export default function App() {
   // Collapsible / Foldable states for space optimization
   const [isArpFolded, setIsArpFolded] = useState(false);
   const [isGenFolded, setIsGenFolded] = useState(true); // default folded to conserve screen height
-  const [activePanel, setActivePanel] = useState<"paths" | "practice">("paths");
+  const [activePanel, setActivePanel] = useState<"paths" | "practice" | "catalog">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
 
   const [kbRange, setKbRange] = usePersistedState<{ from: number; to: number }>({
@@ -1037,12 +1042,57 @@ export default function App() {
   // accent hue in the bar strip.
   const behavioralMarkers = useMemo(
     () =>
-        deriveBehavioralMarkers(
-          path,
-          PERSONAS.find((x) => x.id === selectedPersonaId),
-        ),
+      deriveBehavioralMarkers(
+        path,
+        PERSONAS.find((x) => x.id === selectedPersonaId),
+      ),
     [path, selectedPersonaId],
   );
+
+  /**
+   * Catalog-only: rule-id map for every path. The PathCatalog uses
+   * this so a user can filter "show me everything with key-drift or
+   * frozen-bass". The active persona shapes which rules apply — for
+   * the catalog tab we want the *current* persona's rules to be the
+   * reference: a path is "keyDrift"-y if the current persona's rules
+   * declare keyDriftAcrossPath, OR if its key field already declares
+   * a tonal drift arrow (`→`). This mirrors how the engine actually
+   * behaves when this path is loaded with the current persona.
+   *
+   *   - sequenceStepper: path.sequenceStepper === true
+   *   - keyDrift:        path.key contains "→" OR persona.keyDriftAcrossPath
+   *   - motifTracker:    persona.rules.motifTracker
+   *   - frozenBass:      any bar in deriveBehavioralMarkers carries bassFrozen
+   *   - sliceAndRepeat:  path.sliceAndRepeat === true
+   *   - bassIsolation:   persona.bassIsolation === true
+   */
+  const pathRulesByPathId: BehavioralRuleMap = useMemo(() => {
+    const persona = PERSONAS.find((x) => x.id === selectedPersonaId);
+    const rulesByPathId: BehavioralRuleMap = {};
+    for (const p of paths) {
+      const rules: BehavioralRuleId[] = [];
+      // Path-level flags
+      if ((p as HarmonicPath & { sequenceStepper?: boolean }).sequenceStepper) {
+        rules.push("sequenceStepper");
+      }
+      if ((p as HarmonicPath & { sliceAndRepeat?: boolean }).sliceAndRepeat) {
+        rules.push("sliceAndRepeat");
+      }
+      // Path declares a tonal drift explicitly
+      if (p.key && /→/.test(p.key)) rules.push("keyDrift");
+      // Persona-level flags
+      const personaRules = persona?.rules;
+      if (personaRules?.keyDriftAcrossPath) rules.push("keyDrift");
+      if (personaRules?.motifTracker) rules.push("motifTracker");
+      if (personaRules?.bassIsolation) rules.push("bassIsolation");
+      // Frozen-bass: any bar in deriveBehavioralMarkers was frozen
+      const markers = deriveBehavioralMarkers(p, persona);
+      if (markers.some((m) => m.bassFrozen)) rules.push("frozenBass");
+      // Dedupe while preserving order
+      rulesByPathId[p.id] = Array.from(new Set(rules));
+    }
+    return rulesByPathId;
+  }, [paths, selectedPersonaId]);
 
   // Stable modal-title IDs for aria-labelledby. Each ModalShell gets
   // one; the matching <h2 id=...> lives inside the modal body.
@@ -1901,7 +1951,7 @@ export default function App() {
 
               {/* Panel tab switcher */}
               <div className="flex gap-1 mb-3">
-                {(["paths", "practice"] as const).map((tab) => (
+                {(["paths", "practice", "catalog"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActivePanel(tab)}
@@ -1911,7 +1961,11 @@ export default function App() {
                         : "text-neutral-500 hover:text-neutral-300 border border-transparent"
                     }`}
                   >
-                    {tab === "paths" ? "Paths" : "Practice"}
+                    {tab === "paths"
+                      ? "Paths"
+                      : tab === "practice"
+                        ? "Practice"
+                        : "Catalog"}
                   </button>
                 ))}
               </div>
@@ -2063,6 +2117,22 @@ export default function App() {
                     />
                   )}
                 </>
+              )}
+
+              {/* Catalog tab — unified, filterable view of every path */}
+              {activePanel === "catalog" && (
+                <PathCatalog
+                  paths={paths}
+                  rulesByPathId={pathRulesByPathId}
+                  onSelect={(id) => {
+                    const idx = paths.findIndex((p) => p.id === id);
+                    if (idx >= 0) {
+                      setActivePathIndex(idx);
+                      setActiveStepIndex(0);
+                      setActivePanel("paths");
+                    }
+                  }}
+                />
               )}
             </div>
           </div>
