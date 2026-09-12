@@ -9,6 +9,7 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "strict": true,
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -16,13 +17,17 @@
     "resolveJsonModule": true,
     "allowJs": true,
     "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "midi-writer-js": [
+        "./node_modules/midi-writer-js/build/types/main.d.ts"
       ]
-    },
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    }
   },
   "exclude": ["dist"]
 }

@@ -32,7 +32,9 @@ function formatDate(iso: string): string {
 export function PracticeSetBrowser({ sets, recentSessions, onStart, onMutate }: Props) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [sessionsOpen, setSessionsOpen] = useState(false);
-  const [editingSet, setEditingSet] = useState<PracticeSet | null>(undefined);
+  const [editingSet, setEditingSet] = useState<PracticeSet | null | undefined>(
+    undefined,
+  );
   // undefined = no modal; null = new set; PracticeSet = edit existing
 
   const filtered = selectedTag
