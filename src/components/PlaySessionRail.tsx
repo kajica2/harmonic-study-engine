@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { HarmonicPath } from "../lib/paths";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
-import { NOTE_NAMES, type BehavioralMarker } from "../lib/theory";
+import { midiToName, type BehavioralMarker } from "../lib/theory";
 import { RenderMode } from "../lib/loopWav";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
@@ -786,11 +786,9 @@ const PerformStage: React.FC<{
               {isActiveBar && previewVoicing.length > 0 && (
                 <div
                   className="text-[10px] font-mono text-neutral-300 mt-0.5 truncate"
-                  title={previewVoicing.map((n) => NOTE_NAMES[(n % 12 + 12) % 12] + (Math.floor(n / 12) - 1)).join(" · ")}
+                  title={previewVoicing.map(midiToName).join(" · ")}
                 >
-                  {previewVoicing
-                    .map((n) => NOTE_NAMES[(n % 12 + 12) % 12] + (Math.floor(n / 12) - 1))
-                    .join(" ")}
+                  {previewVoicing.map(midiToName).join(" ")}
                 </div>
               )}
               {/* Tick playhead — 4 cells per bar (one per beat in 4/4).

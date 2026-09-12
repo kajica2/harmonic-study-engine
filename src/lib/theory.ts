@@ -16,6 +16,35 @@ export const NOTE_NAMES = [
   "B",
 ];
 
+/**
+ * Flat-preferred pitch-class wheel. Used by transposeChordName so that
+ * transposing "Cm" by +1 yields "Dbm" rather than "C#m" — most jazz
+ * chord names read more naturally with flats. Sharps are recognized
+ * via the ENHARMONIC_SHARP_TO_FLAT map below.
+ */
+export const NOTE_NAMES_FLAT = [
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "Gb",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
+];
+
+const ENHARMONIC_SHARP_TO_FLAT: Record<string, string> = {
+  "C#": "Db",
+  "D#": "Eb",
+  "F#": "Gb",
+  "G#": "Ab",
+  "A#": "Bb",
+};
+
 export function getMidiFromNoteName(noteName: string): number {
   const noteContent = noteName.match(/([A-G]#?)(\d)/);
   if (!noteContent) return 60;
@@ -25,10 +54,44 @@ export function getMidiFromNoteName(noteName: string): number {
   return noteIndex + (parseInt(octave) + 1) * 12;
 }
 
+/**
+ * MIDI note → "C4" style name. Handles negative MIDI values safely
+ * (JavaScript's `%` and `Math.floor` don't agree on negatives, so we
+ * normalize the pitch class explicitly).
+ */
 export function getNoteNameFromMidi(midi: number): string {
+  const pc = ((midi % 12) + 12) % 12;
   const octave = Math.floor(midi / 12) - 1;
-  const noteName = NOTE_NAMES[midi % 12];
-  return `${noteName}${octave}`;
+  return `${NOTE_NAMES[pc]}${octave}`;
+}
+
+/** Alias matching the helper that lived inline in InspectPanel.tsx. */
+export const midiToName = getNoteNameFromMidi;
+
+/**
+ * Transpose a chord symbol (e.g. "Cmaj7", "F#m7b5") by `shift` semitones.
+ * Handles slash chords ("C/E"), hyphenated names ("C-sharp"),
+ * and any modifier suffix. Returns the input unchanged when
+ * `shift % 12 === 0` so the hot path is allocation-free.
+ *
+ * Uses the flat-preferred wheel so "C" + 1 → "Db" rather than "C#",
+ * which reads better in jazz contexts.
+ */
+export function transposeChordName(name: string, shift: number): string {
+  if (shift % 12 === 0) return name;
+  const normalized = ((shift % 12) + 12) % 12;
+  return name.replace(
+    /(^|[\s/(-])([A-G][b#]?)/g,
+    (match, prefix: string, note: string) => {
+      let index = NOTE_NAMES_FLAT.indexOf(note);
+      if (index === -1 && ENHARMONIC_SHARP_TO_FLAT[note]) {
+        index = NOTE_NAMES_FLAT.indexOf(ENHARMONIC_SHARP_TO_FLAT[note]);
+      }
+      if (index === -1) return match;
+      const newIndex = (index + normalized) % 12;
+      return prefix + NOTE_NAMES_FLAT[newIndex];
+    },
+  );
 }
 
 export function midiToFreq(midi: number): number {
