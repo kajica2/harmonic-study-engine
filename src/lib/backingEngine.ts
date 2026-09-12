@@ -282,8 +282,10 @@ class BackingEngine {
     const e = q / 2; // eighth note duration
     const s = q / 4; // sixteenth note duration
 
-    // Find the chord root for bass/piano voicing
-    const rootMidi = Math.min(...step.notes);
+    // Find the chord root for bass/piano voicing. Empty `notes`
+    // would otherwise spread to `Math.min()` → Infinity and corrupt
+    // every downstream oscillator.
+    const rootMidi = step.notes.length ? Math.min(...step.notes) : 60;
 
     // ----- Drum pattern -----
     const kick = (time: number, gain = 1.0) =>

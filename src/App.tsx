@@ -207,6 +207,11 @@ export default function App() {
   // Phase 5: MIDI input state — mirrors the MIDI Out pattern.
   const [midiInputs, setMidiInputs] = useState<{ id: string; name: string }[]>([]);
   const [selectedMidiInId, setSelectedMidiInId] = useState<string>("");
+  // Phase 5: "listening" indicator — most-recent input event summary,
+  // announced via aria-live and shown briefly in the chip. Cleared by
+  // a short timer so the chip returns to its static label.
+  const [midiInStatus, setMidiInStatus] = useState<string>("");
+  const midiInStatusTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [instrument, setInstrument] = useState<InstrumentType>(() => {
     try {
@@ -545,11 +550,35 @@ export default function App() {
       setSelectedMidiInId(midiIn.getSelectedInputId() || "");
     });
 
+    // Phase 5: reflect inbound note events in the chip + aria-live
+    // region so the user knows the device is actually wired up.
+    // We don't auto-detect chords (out of scope) — just the indicator.
+    const onMidinEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        type: string;
+        note: number;
+        velocity: number;
+        inputName: string;
+      };
+      const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+      const name = noteNames[detail.note % 12];
+      const octave = Math.floor(detail.note / 12) - 1;
+      setMidiInStatus(
+        `${detail.type === "noteon" ? "♪" : "·"} ${name}${octave}` +
+          ` v${detail.velocity}`,
+      );
+      if (midiInStatusTimeout.current) clearTimeout(midiInStatusTimeout.current);
+      midiInStatusTimeout.current = setTimeout(() => setMidiInStatus(""), 1500);
+    };
+    window.addEventListener("midin", onMidinEvent);
+
     return () => {
       window.removeEventListener("keydown", handleFirstInteraction);
       window.removeEventListener("mousedown", handleFirstInteraction);
       unsubscribeMidi();
       unsubscribeMidiIn();
+      window.removeEventListener("midin", onMidinEvent);
+      if (midiInStatusTimeout.current) clearTimeout(midiInStatusTimeout.current);
     };
   }, []);
 
@@ -816,7 +845,7 @@ export default function App() {
   }, [beatType]);
 
   useEffect(() => {
-    rhythmEngine.setOnMeasureStart(() => {
+    const handler = () => {
       setActiveStepIndex((prev) => {
         // Sub-range loop wins when active and a start bar is set.
         const useLoop = isLoopingRef.current && loopStartBar !== null;
@@ -840,7 +869,13 @@ export default function App() {
         }
         return prev + 1;
       });
-    });
+    };
+    rhythmEngine.setOnMeasureStart(handler);
+    // Detach on unmount or before the next re-bind so we never leave
+    // a stale closure pointing at a different path's step count.
+    return () => {
+      rhythmEngine.setOnMeasureStart(() => {});
+    };
   }, [path.steps.length, loopStartBar, loopEndBar]);
 
   useEffect(() => {
@@ -1256,10 +1291,13 @@ export default function App() {
           {/* Phase 5: MIDI IN picker. Mirrors the OUT chip — same
               visual language, different color story (cyan vs purple).
               Lists available input devices; "no devices" or "unsupported"
-              for browsers without Web MIDI (Firefox without extension). */}
+              for browsers without Web MIDI (Firefox without extension).
+              When an event arrives, the chip briefly shows the note
+              (e.g. "♪ A4 v96") and an aria-live region announces it. */}
           <div
             className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800"
             title="MIDI input from a connected controller or instrument. Listens for note on/off and dispatches 'midin' events on window."
+            aria-label="MIDI input device"
           >
             <span
               className="w-1.5 h-1.5 rounded-full"
@@ -1276,7 +1314,14 @@ export default function App() {
             <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
               IN
             </span>
-            {midiInputs.length === 0 ? (
+            {midiInStatus ? (
+              <span
+                className="text-xs text-emerald-300 t-mono"
+                aria-hidden="true"
+              >
+                {midiInStatus}
+              </span>
+            ) : midiInputs.length === 0 ? (
               <span className="text-xs text-neutral-400 italic">
                 no inputs
               </span>
@@ -1288,6 +1333,7 @@ export default function App() {
                   setSelectedMidiInId(e.target.value);
                 }}
                 className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+                aria-label="Select MIDI input device"
               >
                 <option value="">none</option>
                 {midiInputs.map((inp) => (
@@ -1297,6 +1343,18 @@ export default function App() {
                 ))}
               </select>
             )}
+          </div>
+          {/* Screen-reader announcement of inbound MIDI note events. */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {midiInStatus
+              ? `MIDI input: ${midiInStatus.replace(/^[♪·]\s*/, "")}`
+              : midiInputs.length === 0
+                ? "MIDI input: no devices connected"
+                : selectedMidiInId
+                  ? `MIDI input: listening on ${
+                      midiInputs.find((x) => x.id === selectedMidiInId)?.name ?? ""
+                    }`
+                  : "MIDI input: devices available, none selected"}
           </div>
         </div>
       </header>
@@ -2799,7 +2857,7 @@ export default function App() {
                 width={canvasSize.width}
                 height={canvasSize.height}
                 showLabels={showTheoryLabels}
-                rootMidi={Math.min(...step.notes) + transposeShift}
+                rootMidi={(step.notes.length ? Math.min(...step.notes) : 60) + transposeShift}
                 onCanvasReady={(el) => { synesthesiaCanvasRef.current = el; }}
               />
                 </ErrorBoundary>

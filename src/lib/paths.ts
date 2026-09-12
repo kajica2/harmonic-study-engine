@@ -14,10 +14,17 @@ export interface HarmonicPath {
   /** Composer / writer (for standards). Optional — only present on
    * curated studies / standards. */
   composer?: string;
-  /** Musical key (concert pitch). Optional. Examples: "F", "Bb", "G-", "Eb". */
+  /** Musical key (concert pitch). Optional. Examples: "F", "Bb", "G-", "Eb".
+   * Can also declare a progressive tonality drift: "D minor → C major". */
   key?: string;
   /** Optional name alias used by some callers. Falls back to `title`. */
   name?: string;
+  /** Phase 5: when true, each bar steps up by `sequenceInterval` semitones
+   * (default 2). Used by Tchaikovsky persona for sequence_ascent. */
+  sequenceStepper?: boolean;
+  /** Phase 5: semitone interval per bar when sequenceStepper is true.
+   * Defaults to 2. */
+  sequenceInterval?: number;
 }
 
 export const PATHS: HarmonicPath[] = [
@@ -908,6 +915,8 @@ export const PATHS: HarmonicPath[] = [
     composer: "P. I. Tchaikovsky",
     key: "D minor",
     feel: "lyrical / sequential",
+    sequenceStepper: true,
+    sequenceInterval: 2,
     steps: [
       { name: "Dm", notes: [50, 53, 57, 60], descriptions: "Sequence 1." },
       { name: "Em", notes: [52, 55, 59, 62], descriptions: "Sequence 2 — up a 2nd." },
