@@ -321,11 +321,9 @@ export function deriveBarTransposeDrift(
 ): number[] {
   const totalBars = Math.ceil(path.steps.length / 4);
   const rules = persona?.rules ?? {};
-  const seqEnabled = (path as any).sequenceStepper === true;
+  const seqEnabled = path.sequenceStepper === true;
   const seqInterval =
-    typeof (path as any).sequenceInterval === "number"
-      ? (path as any).sequenceInterval
-      : 2;
+    typeof path.sequenceInterval === "number" ? path.sequenceInterval : 2;
   const keyDriftEnabled =
     rules.keyDriftAcrossPath === true ||
     Boolean(path.key && /\u2192/.test(path.key));

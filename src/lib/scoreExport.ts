@@ -174,7 +174,7 @@ export function toScore21(
 
   // Header
   lines.push(`# ${title}`);
-  const composer = (path as any).composer || "harmonic-study-engine";
+  const composer = path.composer || "harmonic-study-engine";
   lines.push(`> composer=${composer}  length=${path.steps.length} bars  format=score21`);
 
   // Chord-symbol row (one label per step, padded to BAR_W)
