@@ -29,5 +29,5 @@
       ]
     }
   },
-  "exclude": ["dist"]
+  "exclude": ["dist", "**/*.test.ts"]
 }
