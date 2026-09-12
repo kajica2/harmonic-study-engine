@@ -29,11 +29,11 @@ completed items `- [x]` to stop the loop.
       blocks in `App.tsx:114-139, 930-1004` with a typed hook parallel
       to `useHistory`. Cuts ~120 lines, fixes stale-path migration.
 
-- [ ] **`tsconfig.json` strict mode** — add `"strict": true`,
+- [x] **`tsconfig.json` strict mode** — add `"strict": true`,
       `"noImplicitAny": true`, `"strictNullChecks": true`. Surface ~12
       real bugs hiding behind `: any`. Fix in the same PR.
 
-- [ ] **Enable 2-3 masterclass tunes** — `masterclass.ts:36-200` has 39
+- [x] **Enable 2-3 masterclass tunes** — `masterclass.ts:36-200` has 39
       of 40 entries with `inApp: false`. Pick Solar / Cherokee /
       Stella, add 8-bar HarmonicPath entries in `paths.ts`, flip
       `inApp: true`. README boasts "33 working tunes" — only 1 works.
