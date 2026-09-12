@@ -942,7 +942,13 @@ import { STUDIES_PATHS as GENERATED_STUDIES_PATHS } from "./studies";
 
 export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS;
 
-export const ALL_PATHS: HarmonicPath[] = [...PATHS, ...STUDIES_PATHS];
+export const ALL_PATHS: HarmonicPath[] = [...PATHS, ...STUDIES_PATHS].map((p) => ({
+  ...p,
+  // Backfill `name` alias from `title` for callers that read the
+  // older field (e.g. LiveScoreDisplay's abcjs T: header). Cheap
+  // memoization at module load time.
+  name: p.name ?? p.title,
+}));
 
 // ─── Practice Sets ─────────────────────────────────────────────────────────────
 

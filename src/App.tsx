@@ -34,6 +34,7 @@ import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
+import { midiIn } from "./lib/midiIn";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
 import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
 import { PianoKeyboard } from "./components/PianoKeyboard";
@@ -43,7 +44,7 @@ import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
-import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, type VoicingId } from "./lib/theory";
+import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, type VoicingId } from "./lib/theory";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
@@ -114,15 +115,21 @@ export default function App() {
     try {
       const saved = localStorage.getItem("synesthesia_paths");
       const parsed = saved ? JSON.parse(saved) : ALL_PATHS;
+      // Backfill `name` alias from `title` for LiveScoreDisplay's abcjs
+      // T: header (and any other read site that expects it).
+      const backfilled = parsed.map((p: HarmonicPath) => ({
+        ...p,
+        name: p.name ?? p.title,
+      }));
       // Bump: when v2 (study materials + new PATHS shape) ships and the
       // user has stale localStorage from before, merge in any missing
       // built-in paths so study materials appear without a manual reset.
       if (saved) {
-        const ids = new Set(parsed.map((p: HarmonicPath) => p.id));
+        const ids = new Set(backfilled.map((p: HarmonicPath) => p.id));
         const missing = ALL_PATHS.filter((p) => !ids.has(p.id));
-        if (missing.length) return [...parsed, ...missing];
+        if (missing.length) return [...backfilled, ...missing];
       }
-      return parsed;
+      return backfilled;
     } catch {
       return ALL_PATHS;
     }
@@ -197,6 +204,9 @@ export default function App() {
 
   const [midiOutputs, setMidiOutputs] = useState<any[]>([]);
   const [selectedMidiOutId, setSelectedMidiOutId] = useState<string>("");
+  // Phase 5: MIDI input state — mirrors the MIDI Out pattern.
+  const [midiInputs, setMidiInputs] = useState<{ id: string; name: string }[]>([]);
+  const [selectedMidiInId, setSelectedMidiInId] = useState<string>("");
 
   const [instrument, setInstrument] = useState<InstrumentType>(() => {
     try {
@@ -478,6 +488,18 @@ export default function App() {
     return res;
   }, [path.steps, optimizeVoiceLeading]);
 
+  // Phase 5: per-step transpose drift (sequenceStepper / keyDrift).
+  // Added on top of the user's manual transposeShift. Declared here
+  // (before currentChordNotes) so the chord transform can reference it.
+  const barDriftShifts = useMemo(
+    () =>
+        deriveBarTransposeDrift(
+          path,
+          PERSONAS.find((x) => x.id === selectedPersonaId),
+        ),
+    [path, selectedPersonaId],
+  );
+
   const currentChordNotes = useMemo(() => {
     let current = [...optimizedStepsNotes[activeStepIndex]].sort(
       (a, b) => a - b,
@@ -496,14 +518,15 @@ export default function App() {
         current = applyVoicing(current, voicingType);
       }
     }
-    return current.map((n) => n + transposeShift);
-  }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType]);
+    return current.map((n) => n + transposeShift + (barDriftShifts[activeStepIndex] ?? 0));
+  }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType, barDriftShifts]);
 
   useEffect(() => {
     // Initialize audio engine on first interaction
     const handleFirstInteraction = () => {
       audioEngine.init();
       midiOut.init();
+      midiIn.init();
       window.removeEventListener("keydown", handleFirstInteraction);
       window.removeEventListener("mousedown", handleFirstInteraction);
     };
@@ -516,10 +539,17 @@ export default function App() {
       setSelectedMidiOutId(midiOut.getSelectedOutputId() || "");
     });
 
+    // Subscribe to MIDI inputs (Phase 5)
+    const unsubscribeMidiIn = midiIn.onInputsChange((inputs) => {
+      setMidiInputs(inputs);
+      setSelectedMidiInId(midiIn.getSelectedInputId() || "");
+    });
+
     return () => {
       window.removeEventListener("keydown", handleFirstInteraction);
       window.removeEventListener("mousedown", handleFirstInteraction);
       unsubscribeMidi();
+      unsubscribeMidiIn();
     };
   }, []);
 
@@ -975,7 +1005,7 @@ export default function App() {
 
   const handleGeneratePath = () => {
     const newPath = generateHarmonicPath(genLength, genComplexity);
-    setPaths([newPath, ...paths]);
+    setPaths([{ ...newPath, name: newPath.name ?? newPath.title }, ...paths]);
     setActivePathIndex(0);
     setActiveStepIndex(0);
     setTransposeShift(0);
@@ -1046,7 +1076,7 @@ export default function App() {
             );
           }
         }
-        setPaths([newPath, ...paths]);
+        setPaths([{ ...newPath, name: newPath.name ?? newPath.title }, ...paths]);
         setActivePathIndex(0);
         setActiveStepIndex(0);
         setTransposeShift(0);
@@ -1060,7 +1090,7 @@ export default function App() {
       }
     } else {
       const newPath = generateEtude(etudeAlgorithm, len);
-      setPaths([newPath, ...paths]);
+      setPaths([{ ...newPath, name: newPath.name ?? newPath.title }, ...paths]);
       setActivePathIndex(0);
       setActiveStepIndex(0);
       setTransposeShift(0);
@@ -1217,6 +1247,52 @@ export default function App() {
                 {midiOutputs.map((out) => (
                   <option key={out.id} value={out.id}>
                     {out.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Phase 5: MIDI IN picker. Mirrors the OUT chip — same
+              visual language, different color story (cyan vs purple).
+              Lists available input devices; "no devices" or "unsupported"
+              for browsers without Web MIDI (Firefox without extension). */}
+          <div
+            className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800"
+            title="MIDI input from a connected controller or instrument. Listens for note on/off and dispatches 'midin' events on window."
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor:
+                  midiInputs.length === 0
+                    ? "#6b7280" // gray — no inputs
+                    : selectedMidiInId
+                      ? "#22c55e" // green — listening
+                      : "#06b6d4", // cyan — devices available, none selected
+              }}
+              aria-hidden="true"
+            />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+              IN
+            </span>
+            {midiInputs.length === 0 ? (
+              <span className="text-xs text-neutral-400 italic">
+                no inputs
+              </span>
+            ) : (
+              <select
+                value={selectedMidiInId}
+                onChange={(e) => {
+                  midiIn.selectInput(e.target.value || null);
+                  setSelectedMidiInId(e.target.value);
+                }}
+                className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+              >
+                <option value="">none</option>
+                {midiInputs.map((inp) => (
+                  <option key={inp.id} value={inp.id}>
+                    {inp.name}
                   </option>
                 ))}
               </select>

@@ -236,6 +236,77 @@ export function applyVoicing(notes: number[], voicingId: VoicingId): number[] {
 }
 
 /**
+ * Phase 5: per-bar transpose drift from a path + persona.
+ *
+ * Two sources of drift:
+ *  - sequenceStepper (Tchaikovsky): when active path has
+ *    `sequenceStepper: true`, each bar after bar 0 climbs by
+ *    `sequenceInterval` semitones (default 2). sequence_ascent
+ *    declares sequenceInterval=2 → bars climb +2, +4, +6…
+ *  - keyDrift (Mahler): when active path declares a `key` like
+ *    "D minor → C major", drift from start to end across the path's bars.
+ *    Linear interpolation in semitones.
+ *
+ * Returns one semitone shift per PATH STEP (not per bar). For paths
+ * that don't declare any drift, returns 0s — no-op.
+ *
+ * Cheap to compute; caller memoizes on (path, personaId).
+ */
+export function deriveBarTransposeDrift(
+  path: HarmonicPath,
+  persona: Persona | undefined,
+): number[] {
+  const totalBars = Math.ceil(path.steps.length / 4);
+  const rules = persona?.rules ?? {};
+  const seqEnabled = (path as any).sequenceStepper === true;
+  const seqInterval =
+    typeof (path as any).sequenceInterval === "number"
+      ? (path as any).sequenceInterval
+      : 2;
+  const keyDriftEnabled =
+    rules.keyDriftAcrossPath === true ||
+    Boolean(path.key && /\u2192/.test(path.key));
+  let keyDriftTotal = 0;
+  let startKeyPc: number | null = null;
+  if (keyDriftEnabled && path.key) {
+    const noteToPc: Record<string, number> = {
+      C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
+      "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+    };
+    const parts = path.key.split(/\u2192/).map((s: string) => s.trim());
+    const startTok = parts[0]?.replace(/\s*m(in)?(aj)?\s*$/i, "").trim() ?? "";
+    const endTok = parts[1]?.replace(/\s*m(in)?(aj)?\s*$/i, "").trim() ?? "";
+    startKeyPc = noteToPc[startTok] ?? null;
+    const endPc = noteToPc[endTok] ?? null;
+    if (startKeyPc !== null && endPc !== null) {
+      // Drift relative to the start key. Convert to a linear range
+      // across the shorter of (forward, backward) intervals.
+      let delta = endPc - startKeyPc;
+      if (delta > 6) delta -= 12;
+      if (delta < -6) delta += 12;
+      keyDriftTotal = delta;
+    }
+  }
+
+  // Build per-step shifts (4 steps per bar).
+  const out: number[] = [];
+  for (let bar = 0; bar < totalBars; bar++) {
+    let shift = 0;
+    if (seqEnabled) {
+      shift += bar * seqInterval;
+    }
+    if (keyDriftEnabled && startKeyPc !== null && totalBars > 1) {
+      // Linear ramp 0 → keyDriftTotal across (totalBars - 1) bars.
+      // Round to nearest integer semitone.
+      shift += Math.round((bar / (totalBars - 1)) * keyDriftTotal);
+    }
+    for (let s = 0; s < 4; s++) out.push(shift);
+  }
+  // Trim to the actual path step count.
+  return out.slice(0, path.steps.length);
+}
+
+/**
  * Phase 5: behavioral markers — derived from a path + the active
  * persona. Returns one marker per BAR (not per step) so the bar strip
  * can render per-bar overlays: motifTracker badges for transformations,
