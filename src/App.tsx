@@ -47,6 +47,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
 import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, transposeChordName, NOTE_NAMES_FLAT, type VoicingId } from "./lib/theory";
+import { useCanvasSize } from "./lib/useCanvasSize";
 import { velocityToGain } from "./lib/audioHelpers";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
@@ -154,7 +155,12 @@ export default function App() {
   });
 
   const [activeMidis, setActiveMidis] = useState<number[]>([]);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 400 });
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Phase 5 refactor: extracted to src/lib/useCanvasSize (tested in
+  // src/lib/useCanvasSize.test.ts). Listens to window.resize AND a
+  // ResizeObserver on the container so sidebar toggles trigger
+  // re-measurement, not just viewport changes.
+  const canvasSize = useCanvasSize(canvasContainerRef, { width: 800, height: 400 });
 
   const [transposeShift, setTransposeShift] = usePersistedState<number>({
     key: "synesthesia_transposeShift",
@@ -391,7 +397,6 @@ export default function App() {
     isLoopingRef.current = isLooping;
   }, [isLooping]);
 
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const tm = useTimeoutRef();
 
   const path = paths[activePathIndex];
@@ -498,23 +503,6 @@ export default function App() {
       window.removeEventListener("midin", onMidinEvent);
       if (midiInStatusTimeout.current) clearTimeout(midiInStatusTimeout.current);
     };
-  }, []);
-
-  useEffect(() => {
-    const updateSize = () => {
-      if (canvasContainerRef.current) {
-        setCanvasSize({
-          width: canvasContainerRef.current.offsetWidth,
-          height: canvasContainerRef.current.offsetHeight,
-        });
-      }
-    };
-
-    // Initial size
-    updateSize();
-
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
   }, []);
 
   // Update audio when step changes or arp settings change
