@@ -4,6 +4,80 @@ All notable changes to Harmonic Study Engine are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Dates use the user's local timezone on commit.
 
+## [0.2.0] - 2026-09-13
+
+### Sprint 7 (this session) — classical personas, behavioral wiring, audio quality, tests, docs, e2e
+
+**Features**
+
+- 5 classical personas (Scriabin, Rachmaninov, Brahms, Tchaikovsky,
+  Mahler) with date/nationality tags, synesthesia status (documented
+  vs interpretive), taglines, signature paths, default voicings,
+  techniques, and rules.
+- 78 paths total: 8 base + 5 classical persona paths + 7 concept paths
+  in LV–LXI range + 39 curated masterclass tunes (was 19).
+- 9 voicing modes: closed, drop2, minimum_motion, quartal,
+  open_drop3, closed_dense, melody_first. Persona defaults flow into
+  the picker.
+- Per-bar behavioral markers wired into the bar strip: motifTracker
+  (Δ glyph), frozenBass (≈), keyDrift, sequenceStepper, motifRepeat
+  (◷).
+- MIDI input listener (src/lib/midiIn.ts): Web MIDI input → midin
+  CustomEvent on window. IN picker chip in the header.
+- Slice-and-repeat subdivision in LiveScoreDisplay: when a path has
+  sliceAndRepeat=true (Coltrane's Giant Steps Cycle), the score
+  renders 4 single-beat cells per bar. ◷ Slice & Repeat badge
+  surfaces the subdivision.
+- Per-bar harmonic function glyphs in the bar strip: Tonic (○T),
+  Dominant (△D), Subdominant (□S), Predominant (◇P). Shape + letter
+  pairing for colorblind safety.
+- Audio quality: warmth saturation on the melody bus (WaveShaper,
+  k=2.5, 4x oversample), per-note velocity scaling (bass softer, top
+  louder; arpeggiator accents every 4th step), FluidR3 soundfont
+  caching across persona swaps, bass bus highpass EQ.
+- Accessibility fix: StageFrame onToggle prop now wired to a
+  clickable header button with aria-expanded; action buttons stop
+  click propagation.
+
+**Tests**
+
+- 228 unit + 3 e2e (was 0 component tests, 0 e2e).
+- 8 test files: theory, paths, personas, audio helpers, concept paths,
+  audio, StageFrame (23 tests), useCanvasSize (7 tests).
+- New: Playwright e2e against built dist/ covering persona click,
+  Path Catalog tab, slice-and-repeat badge.
+- 2-job CI: lint-and-unit → e2e with Playwright Chromium.
+
+**Documentation (new docs/ directory)**
+
+- docs/ARCHITECTURE.md — engine graph, file-by-file role table,
+  troubleshooting.
+- docs/DEVELOPING.md — recipes for adding a persona / path / voicing.
+- docs/AUDIO.md — voice design, ADSR curves, warmth math.
+- docs/TERMINOLOGY.md — HSE vocabulary glossary + UI glyph
+  conventions.
+
+**Infrastructure**
+
+- 2-job CI workflow with Playwright.
+- New scripts: test:e2e, test:all, e2e:install.
+
+**Files changed**
+
+- New: docs/ (4 files), e2e/, src/lib/useCanvasSize.ts,
+  src/lib/sliceAndRepeat.ts, playwright.config.ts.
+- Modified: App.tsx (3050 lines, was 3062), LiveScoreDisplay.tsx,
+  PlaySessionRail.tsx, StageFrame.tsx, theory.ts, package.json,
+  README.md.
+
+## [0.1.0] - earlier sprints
+
+Foundational features pre-dating this session: iReal-style backing
+tracks, scale practice, MIDI/MusicXML/Score21/WAV/MP4 export, DDSP
+backend (offline-rendered via server/app.py), masterclass catalog,
+path browser, voice leading, generative practice sets, mobile-first
+bottom-sheet command bar.
+
 ## [Unreleased]
 
 ### Added
