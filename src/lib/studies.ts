@@ -9,12 +9,10 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Star Eyes — Gene de Paul",
     description: "F · 130 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
-    composer: "Gene de Paul",
-    key: "F",
     steps: [
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b1: Fmaj7",
       },
       {
@@ -24,7 +22,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b3: Fmaj7",
       },
       {
@@ -34,7 +32,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b5: Fmaj7",
       },
       {
@@ -54,7 +52,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b9: Fmaj7",
       },
       {
@@ -64,7 +62,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b11: Fmaj7",
       },
       {
@@ -74,7 +72,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b13: Fmaj7",
       },
       {
@@ -134,7 +132,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b25: Fmaj7",
       },
       {
@@ -144,7 +142,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b27: Fmaj7",
       },
       {
@@ -154,7 +152,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b29: Fmaj7",
       },
       {
@@ -179,8 +177,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Is You Is or Is You Ain't My Baby — Billy Austin",
     description: "F · 130 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
-    composer: "Billy Austin",
-    key: "F",
     steps: [
       {
         name: "F6",
@@ -349,8 +345,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Yardbird Suite — Charlie Parker",
     description: "F · 220 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
-    composer: "Charlie Parker",
-    key: "F",
     steps: [
       {
         name: "F7",
@@ -519,8 +513,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Sometimes I'm Happy — Vincent Youmans",
     description: "Bb · 120 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
-    composer: "Vincent Youmans",
-    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -579,7 +571,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b12: Ebmaj7",
       },
       {
@@ -599,7 +591,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b16: Ebmaj7",
       },
       {
@@ -619,7 +611,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b20: Ebmaj7",
       },
       {
@@ -639,7 +631,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b24: Ebmaj7",
       },
       {
@@ -659,7 +651,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b28: Ebmaj7",
       },
       {
@@ -689,8 +681,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Solar — Miles Davis",
     description: "G- · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
-    composer: "Miles Davis",
-    key: "G-",
     steps: [
       {
         name: "Gm7",
@@ -784,12 +774,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b19: Bbmaj7",
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b20: Bbmaj7",
       },
       {
@@ -859,12 +849,10 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "What Is This Thing Called Love — Cole Porter",
     description: "Ab · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
-    composer: "Cole Porter",
-    key: "Ab",
     steps: [
       {
         name: "Abmaj7",
-        notes: [68, 71, 75, 79],
+        notes: [68, 72, 75, 79],
         descriptions: "b1: Abmaj7",
       },
       {
@@ -899,7 +887,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Dbmaj7",
-        notes: [61, 64, 68, 72],
+        notes: [61, 65, 68, 72],
         descriptions: "b8: Dbmaj7",
       },
       {
@@ -919,7 +907,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Dbmaj7",
-        notes: [61, 64, 68, 72],
+        notes: [61, 65, 68, 72],
         descriptions: "b12: Dbmaj7",
       },
       {
@@ -939,12 +927,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Dbmaj7",
-        notes: [61, 64, 68, 72],
+        notes: [61, 65, 68, 72],
         descriptions: "b16: Dbmaj7",
       },
       {
         name: "Dbmaj7",
-        notes: [61, 64, 68, 72],
+        notes: [61, 65, 68, 72],
         descriptions: "b17: Dbmaj7",
       },
       {
@@ -954,7 +942,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Abmaj7",
-        notes: [68, 71, 75, 79],
+        notes: [68, 72, 75, 79],
         descriptions: "b19: Abmaj7",
       },
       {
@@ -984,7 +972,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Abmaj7",
-        notes: [68, 71, 75, 79],
+        notes: [68, 72, 75, 79],
         descriptions: "b25: Abmaj7",
       },
       {
@@ -1019,7 +1007,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Dbmaj7",
-        notes: [61, 64, 68, 72],
+        notes: [61, 65, 68, 72],
         descriptions: "b32: Dbmaj7",
       },
     ],
@@ -1029,32 +1017,30 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Lady Be Good — George Gershwin",
     description: "G · 180 BPM · Swing Up · 36 bars",
     feel: "Swing Up",
-    composer: "George Gershwin",
-    key: "F",
     steps: [
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b1: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b2: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b3: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b4: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b5: Gmaj7",
       },
       {
@@ -1064,7 +1050,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b7: Gmaj7",
       },
       {
@@ -1074,27 +1060,27 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b9: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b10: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b11: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b12: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b13: Gmaj7",
       },
       {
@@ -1104,7 +1090,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b15: Gmaj7",
       },
       {
@@ -1124,12 +1110,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b19: Fmaj7",
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b20: Fmaj7",
       },
       {
@@ -1144,7 +1130,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b23: Fmaj7",
       },
       {
@@ -1154,27 +1140,27 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b25: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b26: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b27: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b28: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b29: Gmaj7",
       },
       {
@@ -1184,7 +1170,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b31: Gmaj7",
       },
       {
@@ -1194,17 +1180,17 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b33: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b34: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b35: Gmaj7",
       },
       {
@@ -1219,8 +1205,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Cherokee — Ray Noble",
     description: "Bb · 200 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
-    composer: "Ray Noble",
-    key: "Bb",
     steps: [
       {
         name: "Bb",
@@ -1389,8 +1373,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "I Got Rhythm — George Gershwin",
     description: "Bb · 180 BPM · Swing Up · 28 bars",
     feel: "Swing Up",
-    composer: "George Gershwin",
-    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -1449,7 +1431,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b12: Ebmaj7",
       },
       {
@@ -1469,7 +1451,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b16: Ebmaj7",
       },
       {
@@ -1509,7 +1491,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b24: Ebmaj7",
       },
       {
@@ -1529,7 +1511,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b28: Ebmaj7",
       },
     ],
@@ -1539,12 +1521,10 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Stella by Starlight — Victor Young",
     description: "Bb · 120 BPM · Ballad Medium · 32 bars",
     feel: "Ballad Medium",
-    composer: "Victor Young",
-    key: "Bb",
     steps: [
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b1: Bbmaj7",
       },
       {
@@ -1564,7 +1544,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b5: Ebmaj7",
       },
       {
@@ -1594,7 +1574,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b11: Ebmaj7",
       },
       {
@@ -1639,7 +1619,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b20: Ebmaj7",
       },
       {
@@ -1659,7 +1639,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b24: Ebmaj7",
       },
       {
@@ -1679,12 +1659,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b28: Ebmaj7",
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b29: Bbmaj7",
       },
       {
@@ -1699,7 +1679,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b32: Ebmaj7",
       },
     ],
@@ -1709,8 +1689,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Bird Feathers — Charlie Parker",
     description: "F · 220 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
-    composer: "Charlie Parker",
-    key: "F",
     steps: [
       {
         name: "F7",
@@ -1879,12 +1857,10 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "There Will Never Be Another You — Harry Warren",
     description: "Eb · 120 BPM · Ballad Medium · 32 bars",
     feel: "Ballad Medium",
-    composer: "Harry Warren",
-    key: "Eb",
     steps: [
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b1: Ebmaj7",
       },
       {
@@ -1904,7 +1880,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b5: Ebmaj7",
       },
       {
@@ -1924,7 +1900,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b9: Ebmaj7",
       },
       {
@@ -1944,7 +1920,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b13: Ebmaj7",
       },
       {
@@ -1979,7 +1955,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b20: Ebmaj7",
       },
       {
@@ -1999,12 +1975,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b24: Ebmaj7",
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b25: Ebmaj7",
       },
       {
@@ -2024,7 +2000,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b29: Ebmaj7",
       },
       {
@@ -2049,12 +2025,10 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Out of Nowhere — Johnny Green",
     description: "G · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
-    composer: "Johnny Green",
-    key: "G",
     steps: [
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b1: Gmaj7",
       },
       {
@@ -2084,7 +2058,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b7: Gmaj7",
       },
       {
@@ -2094,7 +2068,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b9: Gmaj7",
       },
       {
@@ -2124,7 +2098,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b15: Gmaj7",
       },
       {
@@ -2139,7 +2113,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b18: Gmaj7",
       },
       {
@@ -2169,12 +2143,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b24: Gmaj7",
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b25: Gmaj7",
       },
       {
@@ -2204,7 +2178,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Gmaj7",
-        notes: [67, 70, 74, 78],
+        notes: [67, 71, 74, 78],
         descriptions: "b31: Gmaj7",
       },
       {
@@ -2219,17 +2193,15 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Nostalgia in October — Walter Gross",
     description: "Bb · 110 BPM · Ballad Medium · 32 bars",
     feel: "Ballad Medium",
-    composer: "Walter Gross",
-    key: "Bb",
     steps: [
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b1: Bbmaj7",
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b2: Bbmaj7",
       },
       {
@@ -2254,7 +2226,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b7: Bbmaj7",
       },
       {
@@ -2279,7 +2251,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b12: Ebmaj7",
       },
       {
@@ -2314,7 +2286,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b19: Bbmaj7",
       },
       {
@@ -2344,7 +2316,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b25: Ebmaj7",
       },
       {
@@ -2354,7 +2326,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b27: Bbmaj7",
       },
       {
@@ -2379,7 +2351,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Bbmaj7",
-        notes: [70, 73, 77, 81],
+        notes: [70, 74, 77, 81],
         descriptions: "b32: Bbmaj7",
       },
     ],
@@ -2389,12 +2361,10 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "I'll Remember April — Gene de Paul",
     description: "F · 140 BPM · Swing Medium · 32 bars",
     feel: "Swing Medium",
-    composer: "Gene de Paul",
-    key: "F",
     steps: [
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b1: Fmaj7",
       },
       {
@@ -2409,12 +2379,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b4: Fmaj7",
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b5: Fmaj7",
       },
       {
@@ -2429,12 +2399,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b8: Fmaj7",
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b9: Fmaj7",
       },
       {
@@ -2449,12 +2419,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b12: Fmaj7",
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b13: Fmaj7",
       },
       {
@@ -2469,7 +2439,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b16: Fmaj7",
       },
       {
@@ -2484,7 +2454,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b19: Fmaj7",
       },
       {
@@ -2504,17 +2474,17 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b23: Fmaj7",
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b24: Fmaj7",
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b25: Fmaj7",
       },
       {
@@ -2529,12 +2499,12 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b28: Fmaj7",
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b29: Fmaj7",
       },
       {
@@ -2549,7 +2519,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Fmaj7",
-        notes: [65, 68, 72, 76],
+        notes: [65, 69, 72, 76],
         descriptions: "b32: Fmaj7",
       },
     ],
@@ -2559,8 +2529,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Groovin' High — Dizzy Gillespie",
     description: "Bb · 220 BPM · Swing Up · 28 bars",
     feel: "Swing Up",
-    composer: "Dizzy Gillespie",
-    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -2619,7 +2587,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b12: Ebmaj7",
       },
       {
@@ -2639,7 +2607,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b16: Ebmaj7",
       },
       {
@@ -2679,7 +2647,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b24: Ebmaj7",
       },
       {
@@ -2699,7 +2667,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b28: Ebmaj7",
       },
     ],
@@ -2709,8 +2677,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Hot House — Dizzy Gillespie",
     description: "Bb · 200 BPM · Swing Up · 28 bars",
     feel: "Swing Up",
-    composer: "Dizzy Gillespie",
-    key: "Bb",
     steps: [
       {
         name: "Bb6",
@@ -2769,7 +2735,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b12: Ebmaj7",
       },
       {
@@ -2789,7 +2755,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b16: Ebmaj7",
       },
       {
@@ -2829,7 +2795,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b24: Ebmaj7",
       },
       {
@@ -2849,7 +2815,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Ebmaj7",
-        notes: [63, 66, 70, 74],
+        notes: [63, 67, 70, 74],
         descriptions: "b28: Ebmaj7",
       },
     ],
@@ -2859,8 +2825,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Confirmation — Charlie Parker",
     description: "F · 200 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
-    composer: "Charlie Parker",
-    key: "F",
     steps: [
       {
         name: "F7",
@@ -2954,7 +2918,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Abmaj7",
-        notes: [68, 71, 75, 79],
+        notes: [68, 72, 75, 79],
         descriptions: "b19: Abmaj7",
       },
       {
@@ -2974,7 +2938,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
       },
       {
         name: "Abmaj7",
-        notes: [68, 71, 75, 79],
+        notes: [68, 72, 75, 79],
         descriptions: "b23: Abmaj7",
       },
       {
@@ -3029,8 +2993,6 @@ export const STUDIES_PATHS: HarmonicPath[] = [
     title: "Confirmation Blues — Charlie Parker",
     description: "F · 140 BPM · Blues · 12 bars",
     feel: "Blues",
-    composer: "Charlie Parker",
-    key: "F",
     steps: [
       {
         name: "F7",
@@ -3091,6 +3053,2462 @@ export const STUDIES_PATHS: HarmonicPath[] = [
         name: "D7 Gm7 C7",
         notes: [62, 66, 69, 72],
         descriptions: "b12: D7 Gm7 C7",
+      },
+    ],
+  },
+  {
+    id: "study-body-and-soul",
+    title: "Body and Soul — Johnny Green",
+    description: "Db · 80 BPM · Ballad · 21 bars",
+    feel: "Ballad",
+    steps: [
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b1: Dbmaj7",
+      },
+      {
+        name: "Gbm7",
+        notes: [66, 69, 73, 76],
+        descriptions: "b2: Gbm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b3: Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b4: Bbm7",
+      },
+      {
+        name: "Ebm7 Ab7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b5: Ebm7 Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b6: Dbmaj7",
+      },
+      {
+        name: "Dbm7 Gb7",
+        notes: [61, 64, 68, 71],
+        descriptions: "b7: Dbm7 Gb7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b8: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b9: Cmaj7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b10: C7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b11: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b12: Fm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b13: Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b14: Bbm7",
+      },
+      {
+        name: "Ebm7 Ab7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b15: Ebm7 Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b16: Dbmaj7",
+      },
+      {
+        name: "Dbm7 Gb7",
+        notes: [61, 64, 68, 71],
+        descriptions: "b17: Dbm7 Gb7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b18: Cm7 F7",
+      },
+      {
+        name: "Fm7 Bb7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b19: Fm7 Bb7",
+      },
+      {
+        name: "Ebmaj7 Ab7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b20: Ebmaj7 Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b21: Dbmaj7",
+      },
+    ],
+  },
+  {
+    id: "study-all-the-things-you-are",
+    title: "All the Things You Are — Jerome Kern",
+    description: "Ab · 130 BPM · Swing Medium · 29 bars",
+    feel: "Swing Medium",
+    steps: [
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b1: Abmaj7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b2: Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b3: Bbm7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b4: Eb7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b5: Abmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b6: Dbmaj7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b7: G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b8: Cmaj7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b9: Cm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b10: Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b11: Bbm7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b12: Eb7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b13: Abmaj7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b14: D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b15: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b16: Gmaj7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b17: Abmaj7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b18: Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b19: Bbm7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b20: Eb7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b21: Abmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b22: Dbmaj7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b23: G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b24: Cmaj7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b25: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b26: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b27: Bbm7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b28: Eb7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b29: Abmaj7",
+      },
+    ],
+  },
+  {
+    id: "study-autumn-leaves",
+    title: "Autumn Leaves — Joseph Kosma",
+    description: "G- · 130 BPM · Swing Medium · 32 bars",
+    feel: "Swing Medium",
+    steps: [
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b1: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b2: D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b3: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b4: Gmaj7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b5: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b6: D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b7: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b8: Gmaj7",
+      },
+      {
+        name: "F#m7b5",
+        notes: [66, 69, 72, 76],
+        descriptions: "b9: F#m7b5",
+      },
+      {
+        name: "B7",
+        notes: [71, 75, 78, 81],
+        descriptions: "b10: B7",
+      },
+      {
+        name: "Em7",
+        notes: [64, 67, 71, 74],
+        descriptions: "b11: Em7",
+      },
+      {
+        name: "A7",
+        notes: [69, 73, 76, 79],
+        descriptions: "b12: A7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b13: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b14: D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b15: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b16: Gmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b17: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b18: Cmaj7",
+      },
+      {
+        name: "F#m7b5",
+        notes: [66, 69, 72, 76],
+        descriptions: "b19: F#m7b5",
+      },
+      {
+        name: "B7",
+        notes: [71, 75, 78, 81],
+        descriptions: "b20: B7",
+      },
+      {
+        name: "Em7",
+        notes: [64, 67, 71, 74],
+        descriptions: "b21: Em7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b22: C7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b23: Fmaj7",
+      },
+      {
+        name: "Bm7b5 E7",
+        notes: [71, 74, 77, 81],
+        descriptions: "b24: Bm7b5 E7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b25: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b26: D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b27: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b28: Gmaj7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b29: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b30: D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b31: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b32: Gmaj7",
+      },
+    ],
+  },
+  {
+    id: "study-blue-bossa",
+    title: "Blue Bossa — Kenny Dorham",
+    description: "C- · 120 BPM · Latin · 17 bars",
+    feel: "Latin",
+    steps: [
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b1: Cm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b2: Cm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b3: Fm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b4: Fm7",
+      },
+      {
+        name: "Dm7b5 G7",
+        notes: [62, 65, 68, 72],
+        descriptions: "b5: Dm7b5 G7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b6: Cm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b7: Cm7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b8: Abmaj7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b9: Abmaj7",
+      },
+      {
+        name: "Dm7b5 G7",
+        notes: [62, 65, 68, 72],
+        descriptions: "b10: Dm7b5 G7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b11: Cm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b12: Cm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b13: Fm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b14: Fm7",
+      },
+      {
+        name: "Dm7b5 G7",
+        notes: [62, 65, 68, 72],
+        descriptions: "b15: Dm7b5 G7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b16: Cm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b17: Cm7",
+      },
+    ],
+  },
+  {
+    id: "study-in-a-sentimental-mood",
+    title: "In a Sentimental Mood — Duke Ellington",
+    description: "F · 70 BPM · Ballad · 23 bars",
+    feel: "Ballad",
+    steps: [
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b1: Fmaj7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b2: Fmaj7",
+      },
+      {
+        name: "Fm7 Bbm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b3: Fm7 Bbm7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b4: Fmaj7",
+      },
+      {
+        name: "D7 Gm7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b5: D7 Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b6: C7",
+      },
+      {
+        name: "Fmaj7 Fm7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b7: Fmaj7 Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b8: Bbm7",
+      },
+      {
+        name: "Am7 D7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b9: Am7 D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b10: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b11: C7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b12: Fmaj7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b13: Fmaj7",
+      },
+      {
+        name: "Fm7 Bbm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b14: Fm7 Bbm7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b15: Fmaj7",
+      },
+      {
+        name: "D7 Gm7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b16: D7 Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b17: C7",
+      },
+      {
+        name: "Fmaj7 Fm7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b18: Fmaj7 Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b19: Bbm7",
+      },
+      {
+        name: "Am7 D7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b20: Am7 D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b21: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b22: C7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b23: Fmaj7",
+      },
+    ],
+  },
+  {
+    id: "study-take-the-a-train",
+    title: "Take the A Train — Billy Strayhorn",
+    description: "C · 140 BPM · Swing Medium · 32 bars",
+    feel: "Swing Medium",
+    steps: [
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b1: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b2: Cmaj7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b3: Dm7 G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b4: Cmaj7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b5: Dm7 G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b6: Cmaj7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b7: Dm7 G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b8: Cmaj7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b9: Dm7 G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b10: Cmaj7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b11: Fmaj7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b12: Fmaj7",
+      },
+      {
+        name: "Em7 A7",
+        notes: [64, 67, 71, 74],
+        descriptions: "b13: Em7 A7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b14: Dm7 G7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b15: Dm7 G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b16: Cmaj7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b17: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b18: D7",
+      },
+      {
+        name: "Dm7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b19: Dm7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b20: G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b21: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b22: Cmaj7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b23: C7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b24: C7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b25: Fmaj7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b26: Fmaj7",
+      },
+      {
+        name: "Em7 A7",
+        notes: [64, 67, 71, 74],
+        descriptions: "b27: Em7 A7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b28: Dm7 G7",
+      },
+      {
+        name: "Dm7 G7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b29: Dm7 G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b30: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b31: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b32: Cmaj7",
+      },
+    ],
+  },
+  {
+    id: "study-misty",
+    title: "Misty — Erroll Garner",
+    description: "Eb · 80 BPM · Ballad · 32 bars",
+    feel: "Ballad",
+    steps: [
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b1: Ebmaj7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b2: G7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b3: Cm7 F7",
+      },
+      {
+        name: "Fm7 Bb7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b4: Fm7 Bb7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b5: Ebmaj7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b6: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b7: Fm7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b8: Bb7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b9: Ebmaj7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b10: G7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b11: Cm7 F7",
+      },
+      {
+        name: "Fm7 Bb7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b12: Fm7 Bb7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b13: Ebmaj7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b14: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b15: Fm7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b16: Bb7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b17: Ebmaj7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b18: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b19: Fm7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b20: Bb7",
+      },
+      {
+        name: "Ebm7 Ab7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b21: Ebm7 Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b22: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b23: Dbmaj7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b24: Ebmaj7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b25: Ebmaj7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b26: G7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b27: Cm7 F7",
+      },
+      {
+        name: "Fm7 Bb7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b28: Fm7 Bb7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b29: Ebmaj7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b30: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b31: Fm7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b32: Bb7",
+      },
+    ],
+  },
+  {
+    id: "study-round-midnight",
+    title: "'Round Midnight — Thelonious Monk",
+    description: "Eb- · 80 BPM · Ballad · 32 bars",
+    feel: "Ballad",
+    steps: [
+      {
+        name: "Ebm7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b1: Ebm7",
+      },
+      {
+        name: "Ab7",
+        notes: [68, 72, 75, 78],
+        descriptions: "b2: Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b3: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b4: Dbmaj7",
+      },
+      {
+        name: "Ebm7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b5: Ebm7",
+      },
+      {
+        name: "Ab7",
+        notes: [68, 72, 75, 78],
+        descriptions: "b6: Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b7: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b8: Dbmaj7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b9: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b10: F7",
+      },
+      {
+        name: "Bbmaj7",
+        notes: [70, 74, 77, 81],
+        descriptions: "b11: Bbmaj7",
+      },
+      {
+        name: "G7b9",
+        notes: [67, 71, 74, 77, 80],
+        descriptions: "b12: G7b9",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b13: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b14: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b15: Bbm7",
+      },
+      {
+        name: "Ebm7 Ab7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b16: Ebm7 Ab7",
+      },
+      {
+        name: "Ebm7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b17: Ebm7",
+      },
+      {
+        name: "Ab7",
+        notes: [68, 72, 75, 78],
+        descriptions: "b18: Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b19: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b20: Dbmaj7",
+      },
+      {
+        name: "Ebm7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b21: Ebm7",
+      },
+      {
+        name: "C7b9",
+        notes: [60, 64, 67, 70, 73],
+        descriptions: "b22: C7b9",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b23: Fm7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b24: Bb7",
+      },
+      {
+        name: "Ebm7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b25: Ebm7",
+      },
+      {
+        name: "Ab7",
+        notes: [68, 72, 75, 78],
+        descriptions: "b26: Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b27: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b28: Dbmaj7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b29: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b30: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b31: Bbm7",
+      },
+      {
+        name: "Ebm7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b32: Ebm7",
+      },
+    ],
+  },
+  {
+    id: "study-satin-doll",
+    title: "Satin Doll — Duke Ellington",
+    description: "Ab · 130 BPM · Swing Medium · 32 bars",
+    feel: "Swing Medium",
+    steps: [
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b1: Abmaj7",
+      },
+      {
+        name: "Am7 D7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b2: Am7 D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b3: Gmaj7",
+      },
+      {
+        name: "F#m7 B7",
+        notes: [66, 69, 73, 76],
+        descriptions: "b4: F#m7 B7",
+      },
+      {
+        name: "Em7",
+        notes: [64, 67, 71, 74],
+        descriptions: "b5: Em7",
+      },
+      {
+        name: "A7",
+        notes: [69, 73, 76, 79],
+        descriptions: "b6: A7",
+      },
+      {
+        name: "Dm7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b7: Dm7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b8: G7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b9: Abmaj7",
+      },
+      {
+        name: "Am7 D7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b10: Am7 D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b11: Gmaj7",
+      },
+      {
+        name: "F#m7 B7",
+        notes: [66, 69, 73, 76],
+        descriptions: "b12: F#m7 B7",
+      },
+      {
+        name: "Em7",
+        notes: [64, 67, 71, 74],
+        descriptions: "b13: Em7",
+      },
+      {
+        name: "A7",
+        notes: [69, 73, 76, 79],
+        descriptions: "b14: A7",
+      },
+      {
+        name: "Dm7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b15: Dm7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b16: G7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b17: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b18: F7",
+      },
+      {
+        name: "Bbmaj7",
+        notes: [70, 74, 77, 81],
+        descriptions: "b19: Bbmaj7",
+      },
+      {
+        name: "Am7 D7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b20: Am7 D7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b21: Gmaj7",
+      },
+      {
+        name: "F#m7 B7",
+        notes: [66, 69, 73, 76],
+        descriptions: "b22: F#m7 B7",
+      },
+      {
+        name: "Em7",
+        notes: [64, 67, 71, 74],
+        descriptions: "b23: Em7",
+      },
+      {
+        name: "A7",
+        notes: [69, 73, 76, 79],
+        descriptions: "b24: A7",
+      },
+      {
+        name: "Dm7",
+        notes: [62, 65, 69, 72],
+        descriptions: "b25: Dm7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b26: G7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b27: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b28: Cmaj7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b29: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b30: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b31: Bbm7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b32: Ebmaj7",
+      },
+    ],
+  },
+  {
+    id: "study-sophisticated-lady",
+    title: "Sophisticated Lady — Duke Ellington",
+    description: "Db · 90 BPM · Ballad · 17 bars",
+    feel: "Ballad",
+    steps: [
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b1: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b2: Dbmaj7",
+      },
+      {
+        name: "Dbm7 Gb7",
+        notes: [61, 64, 68, 71],
+        descriptions: "b3: Dbm7 Gb7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b4: Cmaj7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b5: Cm7 F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b6: Bbm7",
+      },
+      {
+        name: "Ebm7 Ab7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b7: Ebm7 Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b8: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b9: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b10: Dbmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b11: Dbmaj7",
+      },
+      {
+        name: "Dbm7 Gb7",
+        notes: [61, 64, 68, 71],
+        descriptions: "b12: Dbm7 Gb7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b13: Cmaj7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b14: Cm7 F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b15: Bbm7",
+      },
+      {
+        name: "Ebm7 Ab7",
+        notes: [63, 66, 70, 73],
+        descriptions: "b16: Ebm7 Ab7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b17: Dbmaj7",
+      },
+    ],
+  },
+  {
+    id: "study-mood-indigo",
+    title: "Mood Indigo — Duke Ellington",
+    description: "F · 80 BPM · Ballad · 29 bars",
+    feel: "Ballad",
+    steps: [
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b1: Fm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b2: Fm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b3: Cm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b4: Cm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b5: Fm7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b6: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b7: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b8: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b9: Fm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b10: Cm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b11: Fm7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b12: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b13: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b14: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b15: Fm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b16: Fm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b17: Cm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b18: Cm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b19: Fm7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b20: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b21: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b22: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b23: Fm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b24: Cm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b25: Fm7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b26: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b27: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b28: C7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b29: Fm7",
+      },
+    ],
+  },
+  {
+    id: "study-donna-lee",
+    title: "Donna Lee — Charlie Parker",
+    description: "Ab · 230 BPM · Swing Up · 32 bars",
+    feel: "Swing Up",
+    steps: [
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b1: Abmaj7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b2: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b3: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b4: Bbm7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b5: Abmaj7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b6: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b7: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b8: Bbm7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b9: Abmaj7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b10: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b11: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b12: Bbm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b13: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b14: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b15: Bbm7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b16: Cm7 F7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b17: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b18: Gmaj7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b19: Fm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b20: Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b21: Bbm7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b22: Eb7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b23: Abmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b24: Dbmaj7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b25: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b26: Bbm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b27: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b28: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b29: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b30: Bbm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b31: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b32: F7",
+      },
+    ],
+  },
+  {
+    id: "study-anthropology",
+    title: "Anthropology — Charlie Parker",
+    description: "Ab · 230 BPM · Swing Up · 32 bars",
+    feel: "Swing Up",
+    steps: [
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b1: Abmaj7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b2: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b3: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b4: Bbm7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b5: Abmaj7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b6: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b7: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b8: Bbm7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b9: Abmaj7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b10: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b11: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b12: Bbm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b13: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b14: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b15: Bbm7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b16: Cm7 F7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b17: Gmaj7",
+      },
+      {
+        name: "Gmaj7",
+        notes: [67, 71, 74, 78],
+        descriptions: "b18: Gmaj7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b19: Fm7",
+      },
+      {
+        name: "Fm7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b20: Fm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b21: Bbm7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b22: Eb7",
+      },
+      {
+        name: "Abmaj7",
+        notes: [68, 72, 75, 79],
+        descriptions: "b23: Abmaj7",
+      },
+      {
+        name: "Dbmaj7",
+        notes: [61, 65, 68, 72],
+        descriptions: "b24: Dbmaj7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b25: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b26: Bbm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b27: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b28: F7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b29: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b30: Bbm7",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b31: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b32: F7",
+      },
+    ],
+  },
+  {
+    id: "study-scrapple-from-the-apple",
+    title: "Scrapple from the Apple — Charlie Parker",
+    description: "F · 220 BPM · Swing Up · 32 bars",
+    feel: "Swing Up",
+    steps: [
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b1: Fmaj7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b2: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b3: Gm7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b4: Gm7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b5: Fmaj7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b6: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b7: Gm7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b8: Gm7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b9: Fmaj7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b10: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b11: Gm7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b12: Gm7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b13: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b14: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b15: Gm7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b16: Gm7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b17: Cmaj7",
+      },
+      {
+        name: "Cmaj7",
+        notes: [60, 64, 67, 71],
+        descriptions: "b18: Cmaj7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b19: Bbm7",
+      },
+      {
+        name: "Bbm7",
+        notes: [70, 73, 77, 80],
+        descriptions: "b20: Bbm7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b21: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b22: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b23: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b24: C7",
+      },
+      {
+        name: "Fmaj7",
+        notes: [65, 69, 72, 76],
+        descriptions: "b25: Fmaj7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b26: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b27: Gm7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b28: Gm7",
+      },
+      {
+        name: "Am7",
+        notes: [69, 72, 76, 79],
+        descriptions: "b29: Am7",
+      },
+      {
+        name: "D7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b30: D7",
+      },
+      {
+        name: "Gm7",
+        notes: [67, 70, 74, 77],
+        descriptions: "b31: Gm7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b32: C7",
+      },
+    ],
+  },
+  {
+    id: "study-au-privave",
+    title: "Au Privave — Charlie Parker",
+    description: "Bb · 220 BPM · Swing Up · 24 bars",
+    feel: "Swing Up",
+    steps: [
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b1: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b2: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b3: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b4: Bb6",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b5: G7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b6: G7",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b7: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b8: Bb6",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b9: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b10: F7",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b11: Bb6",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b12: F7",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b13: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b14: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b15: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b16: Bb6",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b17: G7",
+      },
+      {
+        name: "G7",
+        notes: [67, 71, 74, 77],
+        descriptions: "b18: G7",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b19: Bb6",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b20: Bb6",
+      },
+      {
+        name: "Cm7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b21: Cm7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b22: F7",
+      },
+      {
+        name: "Bb6",
+        notes: [70, 74, 77],
+        descriptions: "b23: Bb6",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b24: F7",
+      },
+    ],
+  },
+  {
+    id: "study-nows-the-time",
+    title: "Now's the Time — Charlie Parker",
+    description: "F · 150 BPM · Blues · 24 bars",
+    feel: "Blues",
+    steps: [
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b1: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b2: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b3: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b4: F7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b5: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b6: Bb7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b7: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b8: F7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b9: C7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b10: C7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b11: F7",
+      },
+      {
+        name: "D7 Gm7 C7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b12: D7 Gm7 C7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b13: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b14: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b15: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b16: F7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b17: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b18: Bb7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b19: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b20: F7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b21: C7",
+      },
+      {
+        name: "C7",
+        notes: [60, 64, 67, 70],
+        descriptions: "b22: C7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b23: F7",
+      },
+      {
+        name: "D7 Gm7 C7",
+        notes: [62, 66, 69, 72],
+        descriptions: "b24: D7 Gm7 C7",
+      },
+    ],
+  },
+  {
+    id: "study-tenor-madness",
+    title: "Tenor Madness — Sonny Rollins",
+    description: "Bb · 140 BPM · Swing Medium · 24 bars",
+    feel: "Swing Medium",
+    steps: [
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b1: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b2: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b3: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b4: Bb7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b5: Eb7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b6: Eb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b7: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b8: Bb7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b9: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b10: F7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b11: Bb7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b12: F7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b13: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b14: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b15: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b16: Bb7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b17: Eb7",
+      },
+      {
+        name: "Eb7",
+        notes: [63, 67, 70, 73],
+        descriptions: "b18: Eb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b19: Bb7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b20: Bb7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b21: F7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b22: F7",
+      },
+      {
+        name: "Bb7",
+        notes: [70, 74, 77, 80],
+        descriptions: "b23: Bb7",
+      },
+      {
+        name: "F7",
+        notes: [65, 69, 72, 75],
+        descriptions: "b24: F7",
       },
     ],
   },

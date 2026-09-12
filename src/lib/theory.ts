@@ -627,12 +627,12 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
   const hasMajor7 = fourth === 11;
 
   let family: ChordAnalysis["family"] = "unknown";
-  if (third === 4 && (fifth === 7 || fifth === 14) && (hasMinor7 || sorted.length < 4)) {
+  if (third === 4 && (fifth === 7 || fifth === 14) && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
     if (hasMajor7) family = "major";        // M3 P5 M7
     else if (hasMinor7) family = "dominant"; // M3 P5 m7 = dominant 7th
-    else family = "major";                   // triad only
+    else family = "major";                   // M3 P5 triad only
   }
-  else if (third === 3 && (fifth === 7 || fifth === 14) && (hasMinor7 || sorted.length < 4)) {
+  else if (third === 3 && (fifth === 7 || fifth === 14) && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
     if (hasMajor7) family = "minor";         // m3 P5 M7 = mMaj7
     else family = "minor";                   // m3 P5 m7 = min 7th
   }
