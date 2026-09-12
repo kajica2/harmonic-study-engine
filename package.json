@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
+    "check:paths": "tsx scripts/check-path-bars.ts",
     "dev:ddsp": "bash dev.sh"
   },
   "dependencies": {
