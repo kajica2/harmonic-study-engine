@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { HarmonicPath } from "../lib/paths";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
-import { NOTE_NAMES } from "../lib/theory";
+import { NOTE_NAMES, type BehavioralMarker } from "../lib/theory";
 import { RenderMode } from "../lib/loopWav";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
@@ -66,6 +66,8 @@ interface RailProps {
   setLoopBar?: (from: number | null, to: number | null) => void;
   // inspect / voicing control
   optimizedStepsNotes: number[][];
+  // Phase 5: per-bar behavioral markers from active persona.
+  behavioralMarkers: BehavioralMarker[];
   onPlayChord: (notes: number[]) => void;
   onStopChord: (notes: number[]) => void;
   onCommitVoicing: (stepIndex: number, notes: number[]) => void;
@@ -193,6 +195,7 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           activeStepIndex={p.activeStepIndex}
           setActiveStepIndex={p.setActiveStepIndex}
           optimizedStepsNotes={p.optimizedStepsNotes}
+          behavioralMarkers={p.behavioralMarkers}
           onPlayChord={p.onPlayChord}
           onStopChord={p.onStopChord}
           onCommitVoicing={p.onCommitVoicing}
@@ -513,6 +516,7 @@ const PerformStage: React.FC<{
   activeStepIndex: number;
   setActiveStepIndex: (v: number) => void;
   optimizedStepsNotes: number[][];
+  behavioralMarkers: BehavioralMarker[];
   onPlayChord: (notes: number[]) => void;
   onStopChord: (notes: number[]) => void;
   onCommitVoicing: (stepIndex: number, notes: number[]) => void;
@@ -526,7 +530,7 @@ const PerformStage: React.FC<{
   transposeShift, setTransposeShift,
   persona, personas, selectedPersonaId, onPersona,
   activeStepIndex, setActiveStepIndex,
-  optimizedStepsNotes, onPlayChord, onStopChord, onCommitVoicing,
+  optimizedStepsNotes, behavioralMarkers, onPlayChord, onStopChord, onCommitVoicing,
 }) => {
   const totalBars = Math.ceil(path.steps.length / 4);
   const currentBar = Math.floor(activeStepIndex / 4) + 1;
@@ -672,66 +676,102 @@ const PerformStage: React.FC<{
       {/* Bar strip — visual progress + voicing preview (Fix #4 inline voicing) */}
       <div className="flex items-stretch gap-1 overflow-x-auto pb-2">
         {Array.from({ length: totalBars }).map((_, barIdx) => {
-          const stepIdx = barIdx * 4;
-          const chordName = path.steps[stepIdx]?.name ?? "";
-          const isActiveBar = currentBar === barIdx + 1;
-          // Build a one-line voicing preview for the active bar from the
-          // currently-optimized notes. This is the "where am I" home that
-          // Fix #4 was asking for — the eye no longer has to ping-pong
-          // between the chord card up top and the inspect panel.
-          const previewVoicing = isActiveBar
-            ? (optimizedStepsNotes[stepIdx] ?? [])
-            : [];
-          return (
-            <button
-              key={barIdx}
-              onClick={(e) => {
-                // Shift-click: set loop range. Plain click: step + audition.
-                if (e.shiftKey && setLoopBar) {
-                  if (loopStartBar === null || (loopStartBar !== null && loopEndBar !== null)) {
-                    setLoopBar(barIdx, null);
-                  } else if (barIdx >= loopStartBar) {
-                    setLoopBar(loopStartBar, barIdx);
-                  } else {
-                    setLoopBar(barIdx, loopStartBar);
-                  }
-                  // also set the cursor so the user sees the range
-                  setActiveStepIndex(stepIdx);
-                  return;
-                }
-                // Step Chord is now musical: advance the cursor AND audition.
-                setActiveStepIndex(stepIdx);
-                const stepNotes = path.steps[stepIdx]?.notes ?? [];
-                if (stepNotes.length) onPlayChord(stepNotes);
-              }}
-              title={
-                loopStartBar !== null &&
-                barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
-                barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar)
-                  ? `Bar ${barIdx + 1} — in loop range. Shift+click another bar to resize, shift+click the same bar to clear.`
-                  : `Bar ${barIdx + 1} — click to jump here, shift+click to set loop range.`
-              }
-              className={`relative flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition overflow-hidden ${
-                isActiveBar
-                  ? "border-purple-500 bg-purple-700/30 text-white shadow-[0_0_15px_rgba(147,51,234,0.35)]"
-                  : "border-white/10 bg-white/5 text-neutral-300 hover:border-purple-500/40"
-              }`}
-            >
-              {/* Loop-range background band — translucent brass when
-                  this bar is in the active loop range. */}
-              {loopStartBar !== null &&
-                barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
-                barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar) && (
-                  <div
-                    className="absolute inset-0 rounded-lg pointer-events-none"
-                    style={{
-                      background:
-                        "linear-gradient(180deg, rgba(212,168,87,0.22), rgba(212,168,87,0.10))",
-                      boxShadow: "inset 0 0 0 1px rgba(212,168,87,0.45)",
-                    }}
-                    aria-hidden="true"
-                  />
-                )}
+                  const stepIdx = barIdx * 4;
+                  const chordName = path.steps[stepIdx]?.name ?? "";
+                  const isActiveBar = currentBar === barIdx + 1;
+                  // Build a one-line voicing preview for the active bar from the
+                  // currently-optimized notes. This is the "where am I" home that
+                  // Fix #4 was asking for — the eye no longer has to ping-pong
+                  // between the chord card up top and the inspect panel.
+                  const previewVoicing = isActiveBar
+                    ? (optimizedStepsNotes[stepIdx] ?? [])
+                    : [];
+                  // Phase 5: pull the per-bar behavioral marker (motifTracker /
+                  // frozenBass hints + persona accent hue).
+                  const marker = behavioralMarkers[barIdx];
+                  return (
+                    <button
+                      key={barIdx}
+                      onClick={(e) => {
+                        // Shift-click: set loop range. Plain click: step + audition.
+                        if (e.shiftKey && setLoopBar) {
+                          if (loopStartBar === null || (loopStartBar !== null && loopEndBar !== null)) {
+                            setLoopBar(barIdx, null);
+                          } else if (barIdx >= loopStartBar) {
+                            setLoopBar(loopStartBar, barIdx);
+                          } else {
+                            setLoopBar(barIdx, loopStartBar);
+                          }
+                          // also set the cursor so the user sees the range
+                          setActiveStepIndex(stepIdx);
+                          return;
+                        }
+                        // Step Chord is now musical: advance the cursor AND audition.
+                        setActiveStepIndex(stepIdx);
+                        const stepNotes = path.steps[stepIdx]?.notes ?? [];
+                        if (stepNotes.length) onPlayChord(stepNotes);
+                      }}
+                      title={
+                        loopStartBar !== null &&
+                        barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
+                        barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar)
+                          ? `Bar ${barIdx + 1} — in loop range. Shift+click another bar to resize, shift+click the same bar to clear.`
+                          : `Bar ${barIdx + 1} — click to jump here, shift+click to set loop range.`
+                      }
+                      className={`relative flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition overflow-hidden ${
+                        isActiveBar
+                          ? "border-purple-500 bg-purple-700/30 text-white shadow-[0_0_15px_rgba(147,51,234,0.35)]"
+                          : "border-white/10 bg-white/5 text-neutral-300 hover:border-purple-500/40"
+                      }`}
+                    >
+                      {/* Loop-range background band — translucent brass when
+                          this bar is in the active loop range. */}
+                      {loopStartBar !== null &&
+                        barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
+                        barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar) && (
+                          <div
+                            className="absolute inset-0 rounded-lg pointer-events-none"
+                            style={{
+                              background:
+                                "linear-gradient(180deg, rgba(212,168,87,0.22), rgba(212,168,87,0.10))",
+                              boxShadow: "inset 0 0 0 1px rgba(212,168,87,0.45)",
+                            }}
+                            aria-hidden="true"
+                          />
+                        )}
+                      {/* Phase 5: persona-driven left-edge accent (per-bar hue from
+                          persona.colorPalette). Pure tonal flavor — not an
+                          information channel, since bar position already does
+                          that work. */}
+                      {marker && (
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg pointer-events-none"
+                          style={{ backgroundColor: marker.accentHex, opacity: 0.55 }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      {/* Phase 5: motifTracker / frozenBass hint badge (top-right). */}
+                      {marker && marker.hint && (
+                        <span
+                          className="absolute top-1 right-1 text-[8px] font-mono text-neutral-400"
+                          title={
+                            marker.isMotifTransformation
+                              ? "Motif transformation — bar re-voices prior content (Brahms)"
+                              : marker.bassFrozen
+                                ? "Frozen bass — bass carries from prior bar (Rachmaninov)"
+                                : ""
+                          }
+                          aria-label={
+                            marker.isMotifTransformation
+                              ? "Motif transformation"
+                              : marker.bassFrozen
+                                ? "Frozen bass"
+                                : ""
+                          }
+                        >
+                          {marker.hint}
+                        </span>
+                      )}
               {/* Content wrapper — relative so it sits above the loop
                   band overlay. */}
               <div className="relative">

@@ -43,7 +43,7 @@ import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
-import { applyVoiceLeading, VOICINGS, applyVoicing, type VoicingId } from "./lib/theory";
+import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, type VoicingId } from "./lib/theory";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
@@ -1096,6 +1096,18 @@ export default function App() {
     return p ? p.visualTheme : "default";
   }, [selectedPersonaId]);
 
+  // Phase 5: per-bar behavioral markers from the active path + persona.
+  // Drives motifTracker badges, frozenBass indicators, and the per-bar
+  // accent hue in the bar strip.
+  const behavioralMarkers = useMemo(
+    () =>
+        deriveBehavioralMarkers(
+          path,
+          PERSONAS.find((x) => x.id === selectedPersonaId),
+        ),
+    [path, selectedPersonaId],
+  );
+
   return (
     <div className="min-h-screen surface-0 text-[color:var(--color-text-1)] font-sans selection:bg-[color:var(--color-brand-muted)] selection:text-[color:var(--color-brand-strong)] flex flex-col">
       {/* Skip-to-main link for keyboard users */}
@@ -1361,6 +1373,7 @@ export default function App() {
           onOpenLeadSheet={() => setShowLeadSheet(true)}
           onOpenInspector={() => setShowChordInspector(true)}
           optimizedStepsNotes={optimizedStepsNotes}
+          behavioralMarkers={behavioralMarkers}
           onPlayChord={(notes) => audioEngine.playChord(notes)}
           onStopChord={(notes) => audioEngine.stopChord(notes)}
           onCommitVoicing={(stepIndex, notes) => {

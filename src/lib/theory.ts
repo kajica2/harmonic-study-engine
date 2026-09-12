@@ -1,3 +1,6 @@
+import type { HarmonicPath } from "./paths";
+import type { Persona } from "./personas";
+
 export const NOTE_NAMES = [
   "C",
   "C#",
@@ -230,6 +233,71 @@ export function applyVoicing(notes: number[], voicingId: VoicingId): number[] {
   }
 
   return Array.from(new Set(stack)).sort((a, b) => a - b);
+}
+
+/**
+ * Phase 5: behavioral markers — derived from a path + the active
+ * persona. Returns one marker per BAR (not per step) so the bar strip
+ * can render per-bar overlays: motifTracker badges for transformations,
+ * frozenBass indicators for held bass, keyDrift hues for tonal shift.
+ *
+ * Cheap to compute. Caller memoizes on (path, personaId).
+ */
+export interface BehavioralMarker {
+  /** Stable per-bar accent color (hex). Pulled from persona.colorPalette
+   *  when available; falls back to a neutral brass for non-persona paths. */
+  accentHex: string;
+  /** True if this bar represents a "transformation" of the prior bar's
+   *  pitch content (Brahms-style). Derived from note-set diff vs the
+   *  previous bar. */
+  isMotifTransformation: boolean;
+  /** True if the bass note carries from the previous bar without change
+   *  (Rachmaninov-style frozen bass). Derived from comparing bar bass. */
+  bassFrozen: boolean;
+  /** Optional secondary hint (e.g. "Δ", "≈") for the bar UI. */
+  hint: string;
+}
+
+export function deriveBehavioralMarkers(
+  path: HarmonicPath,
+  persona: Persona | undefined,
+): BehavioralMarker[] {
+  const palette = persona?.colorPalette ?? ["#D4A857", "#8B6914", "#C9A227", "#5A5A5A"];
+  const totalBars = Math.ceil(path.steps.length / 4);
+  const out: BehavioralMarker[] = [];
+  let prevBarBass: number | null = null;
+  let prevBarPcs: Set<number> | null = null;
+  for (let b = 0; b < totalBars; b++) {
+    const barSteps = path.steps.slice(b * 4, b * 4 + 4);
+    const bassNotes = barSteps
+      .map((s) => (s.notes.length ? Math.min(...s.notes) : null))
+      .filter((n): n is number => n !== null);
+    const bass = bassNotes.length ? bassNotes[0] : null;
+    const bassFrozen = bass !== null && bass === prevBarBass;
+    const pcs = new Set<number>();
+    for (const s of barSteps) for (const n of s.notes) pcs.add(n % 12);
+    let isMotifTransformation = false;
+    if (prevBarPcs !== null) {
+      // Transformation = either same root set with new voicing, or a
+      // derived inversion. Heuristic: any overlap but at least one new pc.
+      const overlap = [...pcs].filter((p) => prevBarPcs!.has(p)).length;
+      const newPcs = [...pcs].filter((p) => !prevBarPcs!.has(p)).length;
+      isMotifTransformation = overlap > 0 && newPcs > 0 && b > 0;
+    }
+    const accentHex = palette[b % palette.length];
+    const hints: string[] = [];
+    if (isMotifTransformation) hints.push("Δ");
+    if (bassFrozen && b > 0) hints.push("≈");
+    out.push({
+      accentHex,
+      isMotifTransformation,
+      bassFrozen,
+      hint: hints.join(" "),
+    });
+    prevBarBass = bass;
+    prevBarPcs = pcs;
+  }
+  return out;
 }
 
 /**
