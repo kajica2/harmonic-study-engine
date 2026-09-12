@@ -29,6 +29,7 @@ import { rhythmEngine } from "./lib/rhythm";
 import { playbackClock } from "./lib/playbackClock";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { useHistory } from "./lib/useHistory";
+import { usePersistedState } from "./lib/usePersistedState";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
@@ -147,25 +148,20 @@ export default function App() {
   const [activeMidis, setActiveMidis] = useState<number[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 400 });
 
-  const [transposeShift, setTransposeShift] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_transposeShift");
-      return saved !== null ? Number(saved) : 0;
-    } catch {
-      return 0;
-    }
+  const [transposeShift, setTransposeShift] = usePersistedState<number>({
+    key: "synesthesia_transposeShift",
+    defaultValue: 0,
+    serialize: String,
+    deserialize: (raw) => Number(raw),
   });
 
-  const [voicingType, setVoicingType] = useState<VoicingId>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_voicingType");
-      // Migrate old two-state "closed"/"open" to the new VoicingId union.
-      if (saved === "open") return "spread";
-      if (saved && (saved as VoicingId) in VOICINGS) return saved as VoicingId;
-      return "closed";
-    } catch {
-      return "closed";
-    }
+  const [voicingType, setVoicingType] = usePersistedState<VoicingId>({
+    key: "synesthesia_voicingType",
+    defaultValue: "closed",
+    serialize: (v) => v,
+    // Guard against any stale legacy / corrupt value.
+    deserialize: (raw) =>
+      raw && (raw as VoicingId) in VOICINGS ? (raw as VoicingId) : "closed",
   });
 
   const [midiOutputs, setMidiOutputs] = useState<any[]>([]);
@@ -179,13 +175,9 @@ export default function App() {
   const [midiInStatus, setMidiInStatus] = useState<string>("");
   const midiInStatusTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [instrument, setInstrument] = useState<InstrumentType>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_instrument");
-      return (saved ? JSON.parse(saved) : "epiano") as InstrumentType;
-    } catch {
-      return "epiano";
-    }
+  const [instrument, setInstrument] = usePersistedState<InstrumentType>({
+    key: "synesthesia_instrument",
+    defaultValue: "epiano",
   });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
@@ -195,13 +187,9 @@ export default function App() {
   const [isRenderingWav, setIsRenderingWav] = useState(false);
   const [wavExportError, setWavExportError] = useState<string | null>(null);
   const [wavExportStatus, setWavExportStatus] = useState<string | null>(null);
-  const [wavMode, setWavMode] = useState<RenderMode>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_wavMode");
-      return (saved ? JSON.parse(saved) : "block") as RenderMode;
-    } catch {
-      return "block";
-    }
+  const [wavMode, setWavMode] = usePersistedState<RenderMode>({
+    key: "synesthesia_wavMode",
+    defaultValue: "block",
   });
   // Whether the OpenRouter API key is configured at build time.
   // The Gemini/Cloud options are disabled in the UI when this is false.
@@ -220,23 +208,17 @@ export default function App() {
     },
   );
 
-  const [volume, setVolume] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_volume");
-      return saved !== null ? Number(saved) : 50;
-    } catch {
-      return 50;
-    }
+  const [volume, setVolume] = usePersistedState<number>({
+    key: "synesthesia_volume",
+    defaultValue: 50,
+    serialize: String,
+    deserialize: (raw) => Number(raw),
   });
 
   // Persona Sync
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_selectedPersonaId");
-      return saved ? JSON.parse(saved) : "";
-    } catch {
-      return "";
-    }
+  const [selectedPersonaId, setSelectedPersonaId] = usePersistedState<string>({
+    key: "synesthesia_selectedPersonaId",
+    defaultValue: "",
   });
 
   // Collapsible / Foldable states for space optimization
@@ -245,95 +227,75 @@ export default function App() {
   const [activePanel, setActivePanel] = useState<"paths" | "practice">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
 
-  const [kbRange, setKbRange] = useState<{ from: number; to: number }>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_kbRange");
-      return saved ? JSON.parse(saved) : { from: 36, to: 72 };
-    } catch {
-      return { from: 36, to: 72 };
-    }
+  const [kbRange, setKbRange] = usePersistedState<{ from: number; to: number }>({
+    key: "synesthesia_kbRange",
+    defaultValue: { from: 36, to: 72 },
   });
 
   useEffect(() => {
     audioEngine.setInstrument(instrument);
   }, [instrument]);
 
-  const [timeSignature, setTimeSignature] = useState<
+  const [timeSignature, setTimeSignature] = usePersistedState<
     "4/4" | "6/8" | "7/8" | "11/4" | "tintal"
-  >(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_timeSignature");
-      return (saved ? JSON.parse(saved) : "4/4") as any;
-    } catch {
-      return "4/4";
-    }
+  >({
+    key: "synesthesia_timeSignature",
+    defaultValue: "4/4",
   });
 
-  const [beatType, setBeatType] = useState<BackingStyle>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_beatType");
-      // Migrate old beat-type strings to the new BackingStyle names
-      if (saved) {
-        const legacy = JSON.parse(saved);
-        const map: Record<string, BackingStyle> = {
-          none: "off",
-          metronome: "off",
-          jazz: "swing",
-          bossa: "bossa",
-          techno: "funk",
-        };
-        return (map[legacy] ?? "off");
-      }
-      return "off";
-    } catch {
-      return "off";
-    }
+  const [beatType, setBeatType] = usePersistedState<BackingStyle>({
+    key: "synesthesia_beatType",
+    defaultValue: "off",
+    // The stored value was JSON-stringified, e.g. `"jazz"`. Migrate
+    // old beat-type strings to the new BackingStyle names.
+    deserialize: (raw) => {
+      const legacy = JSON.parse(raw) as string;
+      const map: Record<string, BackingStyle> = {
+        none: "off",
+        metronome: "off",
+        jazz: "swing",
+        bossa: "bossa",
+        techno: "funk",
+      };
+      return map[legacy] ?? "off";
+    },
   });
 
   // Per-track backing mute toggles. Default all on. Lets the user
   // practice with just drums + piano comping (mute bass for bass
   // practice) or strip everything but the bass (drums + piano muted).
-  const [drumsMuted, setDrumsMuted] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("synesthesia_drumsMuted") === "1";
-    } catch {
-      return false;
-    }
+  // Stored as "1"/"0" (NOT JSON) to match the pre-existing key format
+  // and avoid a one-time migration for every returning user.
+  const [drumsMuted, setDrumsMuted] = usePersistedState<boolean>({
+    key: "synesthesia_drumsMuted",
+    defaultValue: false,
+    serialize: (v) => (v ? "1" : "0"),
+    deserialize: (raw) => raw === "1",
   });
-  const [bassMuted, setBassMuted] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("synesthesia_bassMuted") === "1";
-    } catch {
-      return false;
-    }
+  const [bassMuted, setBassMuted] = usePersistedState<boolean>({
+    key: "synesthesia_bassMuted",
+    defaultValue: false,
+    serialize: (v) => (v ? "1" : "0"),
+    deserialize: (raw) => raw === "1",
   });
-  const [pianoMuted, setPianoMuted] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("synesthesia_pianoMuted") === "1";
-    } catch {
-      return false;
-    }
+  const [pianoMuted, setPianoMuted] = usePersistedState<boolean>({
+    key: "synesthesia_pianoMuted",
+    defaultValue: false,
+    serialize: (v) => (v ? "1" : "0"),
+    deserialize: (raw) => raw === "1",
   });
 
   const [genLength, setGenLength] = useState(1);
   const [genComplexity, setGenComplexity] = useState(1);
 
-  const [optimizeVoiceLeading, setOptimizeVoiceLeading] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_optimizeVoiceLeading");
-      return saved ? JSON.parse(saved) : false;
-    } catch {
-      return false;
-    }
+  const [optimizeVoiceLeading, setOptimizeVoiceLeading] = usePersistedState<boolean>({
+    key: "synesthesia_optimizeVoiceLeading",
+    defaultValue: false,
   });
 
-  const [showTheoryLabels, setShowTheoryLabels] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_showTheoryLabels");
-      return saved ? JSON.parse(saved) : false;
-    } catch {
-      return false;
-    }
+  const [showTheoryLabels, setShowTheoryLabels] = usePersistedState<boolean>({
+    key: "synesthesia_showTheoryLabels",
+    defaultValue: false,
   });
 
   const [showImportExport, setShowImportExport] = useState(false);
@@ -343,7 +305,7 @@ export default function App() {
   // user picks a backing style and presses Auto.
   const bassMidis = useBassNotes();
 
-  const [arpType, setArpType] = useState<
+  const [arpType, setArpType] = usePersistedState<
     | "none"
     | "up"
     | "down"
@@ -352,40 +314,30 @@ export default function App() {
     | "random"
     | "converge"
     | "diverge"
-  >(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpType");
-      return (saved ? JSON.parse(saved) : "none") as any;
-    } catch {
-      return "none";
-    }
+  >({
+    key: "synesthesia_arpType",
+    defaultValue: "none",
   });
 
-  const [arpRate, setArpRate] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpRate");
-      return saved !== null ? Number(saved) : 4;
-    } catch {
-      return 4;
-    }
+  const [arpRate, setArpRate] = usePersistedState<number>({
+    key: "synesthesia_arpRate",
+    defaultValue: 4,
+    serialize: String,
+    deserialize: (raw) => Number(raw),
   });
 
-  const [arpGate, setArpGate] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpGate");
-      return saved !== null ? Number(saved) : 80;
-    } catch {
-      return 80;
-    }
+  const [arpGate, setArpGate] = usePersistedState<number>({
+    key: "synesthesia_arpGate",
+    defaultValue: 80,
+    serialize: String,
+    deserialize: (raw) => Number(raw),
   });
 
-  const [arpOctaves, setArpOctaves] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_arpOctaves");
-      return saved !== null ? Number(saved) : 1;
-    } catch {
-      return 1;
-    }
+  const [arpOctaves, setArpOctaves] = usePersistedState<number>({
+    key: "synesthesia_arpOctaves",
+    defaultValue: 1,
+    serialize: String,
+    deserialize: (raw) => Number(raw),
   });
 
   // Diatonic-scale practice mode. "auto" picks the mode from
@@ -401,13 +353,9 @@ export default function App() {
   const [drillBusy, setDrillBusy] = useState(false);
   const [drillIter, setDrillIter] = useState<DrillSubdivision | null>(null);
 
-  const [isLooping, setIsLooping] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_isLooping");
-      return saved !== null ? JSON.parse(saved) : true;
-    } catch {
-      return true;
-    }
+  const [isLooping, setIsLooping] = usePersistedState<boolean>({
+    key: "synesthesia_isLooping",
+    defaultValue: true,
   });
   const isLoopingRef = useRef(isLooping);
 
@@ -418,21 +366,17 @@ export default function App() {
   // wraps between loopStartBar and loopEndBar instead of the full
   // path. When isLooping is false, the range is ignored (full-path
   // playback) but still visible as a hint.
-  const [loopStartBar, setLoopStartBar] = useState<number | null>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_loopStartBar");
-      return saved !== null ? Number(saved) : null;
-    } catch {
-      return null;
-    }
+  const [loopStartBar, setLoopStartBar] = usePersistedState<number | null>({
+    key: "synesthesia_loopStartBar",
+    defaultValue: null,
+    serialize: (v) => String(v ?? ""),
+    deserialize: (raw) => (raw === "" ? null : Number(raw)),
   });
-  const [loopEndBar, setLoopEndBar] = useState<number | null>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_loopEndBar");
-      return saved !== null ? Number(saved) : null;
-    } catch {
-      return null;
-    }
+  const [loopEndBar, setLoopEndBar] = usePersistedState<number | null>({
+    key: "synesthesia_loopEndBar",
+    defaultValue: null,
+    serialize: (v) => String(v ?? ""),
+    deserialize: (raw) => (raw === "" ? null : Number(raw)),
   });
 
   useEffect(() => {
@@ -927,7 +871,8 @@ export default function App() {
     return off;
   }, [isPlayingAuto, beatType, tempo, path.steps.length]);
 
-  // Sync state changes to localStorage
+  // Sync the few remaining vanilla useState values to localStorage.
+  // Everything else is persisted by usePersistedState directly.
   useEffect(() => {
     try {
       localStorage.setItem("synesthesia_paths", JSON.stringify(paths));
@@ -939,70 +884,11 @@ export default function App() {
         "synesthesia_activeStepIndex",
         String(activeStepIndex),
       );
-      localStorage.setItem(
-        "synesthesia_selectedPersonaId",
-        JSON.stringify(selectedPersonaId),
-      );
-      localStorage.setItem(
-        "synesthesia_transposeShift",
-        String(transposeShift),
-      );
-      localStorage.setItem("synesthesia_voicingType", voicingType);
-      localStorage.setItem(
-        "synesthesia_instrument",
-        JSON.stringify(instrument),
-      );
       localStorage.setItem("synesthesia_tempo", String(tempo));
-      localStorage.setItem(
-        "synesthesia_optimizeVoiceLeading",
-        JSON.stringify(optimizeVoiceLeading),
-      );
-      localStorage.setItem(
-        "synesthesia_showTheoryLabels",
-        JSON.stringify(showTheoryLabels),
-      );
-      localStorage.setItem("synesthesia_arpType", JSON.stringify(arpType));
-      localStorage.setItem("synesthesia_arpRate", String(arpRate));
-      localStorage.setItem("synesthesia_arpGate", String(arpGate));
-      localStorage.setItem("synesthesia_arpOctaves", String(arpOctaves));
-      localStorage.setItem("synesthesia_isLooping", JSON.stringify(isLooping));
-      localStorage.setItem("synesthesia_loopStartBar", String(loopStartBar ?? ""));
-      localStorage.setItem("synesthesia_loopEndBar", String(loopEndBar ?? ""));
-      localStorage.setItem("synesthesia_timeSignature", JSON.stringify(timeSignature));
-      localStorage.setItem("synesthesia_wavMode", JSON.stringify(wavMode));
-      localStorage.setItem("synesthesia_beatType", JSON.stringify(beatType));
-      localStorage.setItem("synesthesia_drumsMuted", drumsMuted ? "1" : "0");
-      localStorage.setItem("synesthesia_bassMuted", bassMuted ? "1" : "0");
-      localStorage.setItem("synesthesia_pianoMuted", pianoMuted ? "1" : "0");
-      localStorage.setItem("synesthesia_kbRange", JSON.stringify(kbRange));
-      localStorage.setItem("synesthesia_volume", String(volume));
     } catch (e) {
       console.warn("localStorage persistence error:", e);
     }
-  }, [
-    paths,
-    activePathIndex,
-    activeStepIndex,
-    selectedPersonaId,
-    transposeShift,
-    voicingType,
-    instrument,
-    tempo,
-    optimizeVoiceLeading,
-    showTheoryLabels,
-    arpType,
-    arpRate,
-    arpGate,
-    arpOctaves,
-    isLooping,
-    timeSignature,
-    beatType,
-    drumsMuted,
-    bassMuted,
-    pianoMuted,
-    kbRange,
-    volume,
-  ]);
+  }, [paths, activePathIndex, activeStepIndex, tempo]);
 
   const handleGeneratePath = () => {
     const newPath = generateHarmonicPath(genLength, genComplexity);
