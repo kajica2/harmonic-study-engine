@@ -521,9 +521,9 @@ class AudioEngine {
     );
   }
 
-  playChord(midis: number[]) {
+  playChord(midis: number[], velocity?: number) {
     for (const m of midis) {
-      this.playNote(m);
+      this.playNote(m, velocity);
     }
   }
 

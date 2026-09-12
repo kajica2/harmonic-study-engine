@@ -47,6 +47,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
 import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, transposeChordName, NOTE_NAMES_FLAT, type VoicingId } from "./lib/theory";
+import { velocityToGain } from "./lib/audioHelpers";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
@@ -570,8 +571,16 @@ export default function App() {
 
     if (arpType === "none") {
       setActiveMidis(currentChordNotes);
-      audioEngine.playChord(currentChordNotes);
-      midiOut.playChord(currentChordNotes);
+      // Velocity per note — bass softer, top louder. Bass (idx=0)
+      // maps to MIDI 60, top (idx=last) maps to 110. Single-note
+      // chords default to mid-velocity (85).
+      currentChordNotes.forEach((n, idx) => {
+        const last = currentChordNotes.length - 1;
+        const pos = last > 0 ? idx / last : 0.5;
+        const vel = 60 + pos * 50; // 60..110
+        audioEngine.playNote(n, vel);
+        midiOut.playNote(n, vel);
+      });
       currentChordNotes.forEach((n) => recorder.recordNoteOn(n));
 
       return () => {
@@ -616,9 +625,13 @@ export default function App() {
           arpIndex++;
         }
 
+        // Accent every 4th step (downbeat of the next 16th group) —
+        // velocity bumps from 75 to 105. Tighter musical groove.
+        const arpVelocity = arpIndex % 4 === 0 ? 105 : 75;
+
         lastNote = noteToPlay;
-        audioEngine.playNote(noteToPlay);
-        midiOut.playNote(noteToPlay);
+        audioEngine.playNote(noteToPlay, arpVelocity);
+        midiOut.playNote(noteToPlay, arpVelocity);
         recorder.recordNoteOn(noteToPlay);
         setActiveMidis((prev) => Array.from(new Set([...prev, noteToPlay])));
 

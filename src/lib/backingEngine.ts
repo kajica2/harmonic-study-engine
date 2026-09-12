@@ -96,6 +96,7 @@ class BackingEngine {
   private masterBus: GainNode | null = null;
   private drumBus: GainNode | null = null;
   private bassBus: GainNode | null = null;
+  private bassEq: BiquadFilterNode | null = null;
   private pianoBus: GainNode | null = null;
   private levels: BackingLevels = DEFAULT_LEVELS;
   private style: BackingStyle = "off";
@@ -122,6 +123,14 @@ class BackingEngine {
     this.drumBus = this.ctx.createGain();
     this.drumBus.gain.value = this.levels.drums;
 
+    // EQ: highpass on bass to remove DC offset and sub-bass rumble.
+    // Catches frequencies below 35 Hz that would otherwise push the
+    // speaker cone without adding musical content.
+    this.bassEq = this.ctx.createBiquadFilter();
+    this.bassEq.type = "highpass";
+    this.bassEq.frequency.value = 35;
+    this.bassEq.Q.value = 0.7;
+
     this.bassBus = this.ctx.createGain();
     this.bassBus.gain.value = this.levels.bass;
 
@@ -129,7 +138,8 @@ class BackingEngine {
     this.pianoBus.gain.value = this.levels.piano;
 
     this.drumBus.connect(this.masterBus);
-    this.bassBus.connect(this.masterBus);
+    this.bassBus.connect(this.bassEq);
+    this.bassEq.connect(this.masterBus);
     this.pianoBus.connect(this.masterBus);
 
     this.masterBus.connect(this.ctx.destination);

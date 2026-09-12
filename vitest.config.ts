@@ -5,9 +5,15 @@ export default defineConfig({
   test: {
     globals: false,
     environment: "node",
-    include: ["src/**/*.test.ts"],
-    // Skip files that aren't tests; some lib files use .ts suffix too.
+    // Match per-test environment to per-file needs:
+    //   - src/lib/**/*.test.ts  → node (pure logic)
+    //   - src/components/**/*.test.tsx → jsdom (DOM)
+    // Vitest's default `environment: "node"` is set above; per-file
+    // overrides use the @vitest-environment comment at top of file.
+    include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", "dist", "**/vite.config.ts"],
-    // Theory + persona + paths tests are pure functions — no jsdom needed.
+    environmentMatchGlobs: [
+      ["src/components/**/*.test.tsx", "jsdom"],
+    ],
   },
 });
