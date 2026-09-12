@@ -335,8 +335,13 @@ export function deriveBarTransposeDrift(
       "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
     };
     const parts = path.key.split(/\u2192/).map((s: string) => s.trim());
-    const startTok = parts[0]?.replace(/\s*m(in)?(aj)?\s*$/i, "").trim() ?? "";
-    const endTok = parts[1]?.replace(/\s*m(in)?(aj)?\s*$/i, "").trim() ?? "";
+    // Strip a mode suffix from "D minor" / "C major" / "G maj" / "Bb min" / "F#m"
+// etc. The previous regex /\s*m(in)?(aj)?\s*$/ didn't handle "minor"
+// (the trailing "or" was unaccounted for, so replace() returned the
+// string unchanged). Now matches "m" / "min" / "maj" / "minor" / "major".
+const MODE_SUFFIX_RE = /\s*(?:m(?:in(?:or)?)?|maj(?:or)?)\s*$/i;
+const startTok = parts[0]?.replace(MODE_SUFFIX_RE, "").trim() ?? "";
+const endTok = parts[1]?.replace(MODE_SUFFIX_RE, "").trim() ?? "";
     startKeyPc = noteToPc[startTok] ?? null;
     const endPc = noteToPc[endTok] ?? null;
     if (startKeyPc !== null && endPc !== null) {
