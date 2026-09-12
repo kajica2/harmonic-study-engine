@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { HarmonicPath, STUDIES_PATHS } from "../lib/paths";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
-import { midiToName, type BehavioralMarker } from "../lib/theory";
+import { midiToName, analyzeChord, type BehavioralMarker } from "../lib/theory";
 import { RenderMode } from "../lib/loopWav";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
@@ -796,7 +796,27 @@ const PerformStage: React.FC<{
                 <span className="flex-1" />
                 {isActiveBar && <span className="text-purple-300">· here</span>}
               </div>
-              <div className="font-bold truncate">{chordName}</div>
+              <div className="font-bold truncate flex items-center gap-1">
+                <span>{chordName}</span>
+                {/* HSE terminology: harmonic function glyph per your accessibility
+                    proposal — circle (Tonic), triangle (Dominant), square
+                    (Subdominant), paired with a letter so it's not color-only. */}
+                {(() => {
+                  // Use the bar's first step's notes for the function.
+                  const fn = path.steps[barIdx * 4]?.notes?.length
+                    ? analyzeChord(path.steps[barIdx * 4].notes).function
+                    : "color";
+                  if (fn === "tonic")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Tonic — I" aria-label="Tonic">○<sub>T</sub></span>;
+                  if (fn === "dominant")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Dominant — V" aria-label="Dominant">△<sub>D</sub></span>;
+                  if (fn === "subdominant")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Subdominant — IV" aria-label="Subdominant">□<sub>S</sub></span>;
+                  if (fn === "predominant")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Predominant — ii" aria-label="Predominant">◇<sub>P</sub></span>;
+                  return null;
+                })()}
+              </div>
               {isActiveBar && previewVoicing.length > 0 && (
                 <div
                   className="text-[10px] font-mono text-neutral-300 mt-0.5 truncate"
