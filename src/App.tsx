@@ -44,7 +44,7 @@ import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
-import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, type VoicingId } from "./lib/theory";
+import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, transposeChordName, NOTE_NAMES_FLAT, type VoicingId } from "./lib/theory";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
@@ -65,41 +65,6 @@ import { LeadSheet } from "./components/LeadSheet";
 import { ModalShell, useModalLabel } from "./components/ModalShell";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
-
-const NOTE_WHEEL = [
-  "C",
-  "Db",
-  "D",
-  "Eb",
-  "E",
-  "F",
-  "Gb",
-  "G",
-  "Ab",
-  "A",
-  "Bb",
-  "B",
-];
-
-function transposeChordName(name: string, shift: number): string {
-  if (shift % 12 === 0) return name;
-  return name.replace(/(^|[\s/(-])([A-G][b#]?)/g, (match, prefix, note) => {
-    let index = NOTE_WHEEL.indexOf(note);
-    if (index === -1) {
-      const enharmonics: Record<string, string> = {
-        "C#": "Db",
-        "D#": "Eb",
-        "F#": "Gb",
-        "G#": "Ab",
-        "A#": "Bb",
-      };
-      index = enharmonics[note] ? NOTE_WHEEL.indexOf(enharmonics[note]) : -1;
-    }
-    if (index === -1) return match;
-    const newIndex = (index + shift + 120) % 12; // +120 ensures positive before modulo
-    return prefix + NOTE_WHEEL[newIndex];
-  });
-}
 
 function downloadText(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -2939,7 +2904,7 @@ export default function App() {
                 <div className="flex gap-4 text-xs text-neutral-400">
                   <div className="flex items-center gap-2">
                     <span className="w-10">
-                      From: {NOTE_WHEEL[kbRange.from % 12]}
+                      From: {NOTE_NAMES_FLAT[kbRange.from % 12]}
                       {Math.floor(kbRange.from / 12) - 1}
                     </span>
                     <input
@@ -2956,7 +2921,7 @@ export default function App() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-10">
-                      To: {NOTE_WHEEL[kbRange.to % 12]}
+                      To: {NOTE_NAMES_FLAT[kbRange.to % 12]}
                       {Math.floor(kbRange.to / 12) - 1}
                     </span>
                     <input

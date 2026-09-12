@@ -19,6 +19,7 @@ import {
   AlternativeKind,
   voiceLeadingDistance,
   voiceLeadingScore,
+  midiToName,
 } from "../lib/theory";
 import { InstrumentPitch, TRANSPOSITIONS } from "../lib/scoreGenerator";
 import abcjs from "abcjs";
@@ -520,7 +521,7 @@ const ContextChord: React.FC<{ label: string; name: string; notes: number[]; act
       {notes.length === 0 && <span className="text-[9px] text-neutral-600">—</span>}
       {notes.slice(0, 5).map((n) => (
         <span key={n} className="text-[9px] font-mono px-1 py-0.5 rounded bg-black/40 text-neutral-300">
-          {((n % 12 + 12) % 12 === 0 ? "C" : (n % 12 + 12) % 12 === 1 ? "C#" : (n % 12 + 12) % 12 === 2 ? "D" : (n % 12 + 12) % 12 === 3 ? "D#" : (n % 12 + 12) % 12 === 4 ? "E" : (n % 12 + 12) % 12 === 5 ? "F" : (n % 12 + 12) % 12 === 6 ? "F#" : (n % 12 + 12) % 12 === 7 ? "G" : (n % 12 + 12) % 12 === 8 ? "G#" : (n % 12 + 12) % 12 === 9 ? "A" : (n % 12 + 12) % 12 === 10 ? "A#" : "B")}{Math.floor(n / 12) - 1}
+          {midiToName(n)}
         </span>
       ))}
       {notes.length > 5 && <span className="text-[9px] text-neutral-500">+{notes.length - 5}</span>}

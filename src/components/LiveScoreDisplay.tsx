@@ -4,41 +4,7 @@ import { HarmonicPath } from "../lib/paths";
 import { midiToABCName, transposeMidiList } from "../lib/scoreGenerator";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
-
-const NOTE_WHEEL = [
-  "C",
-  "Db",
-  "D",
-  "Eb",
-  "E",
-  "F",
-  "Gb",
-  "G",
-  "Ab",
-  "A",
-  "Bb",
-  "B",
-];
-
-function transposeChordName(name: string, shift: number): string {
-  if (shift % 12 === 0) return name;
-  return name.replace(/(^|[\s/(-])([A-G][b#]?)/g, (match, prefix, note) => {
-    let index = NOTE_WHEEL.indexOf(note);
-    if (index === -1) {
-      const enharmonics: Record<string, string> = {
-        "C#": "Db",
-        "D#": "Eb",
-        "F#": "Gb",
-        "G#": "Ab",
-        "A#": "Bb",
-      };
-      index = enharmonics[note] ? NOTE_WHEEL.indexOf(enharmonics[note]) : -1;
-    }
-    if (index === -1) return match;
-    const newIndex = (index + shift + 120) % 12;
-    return prefix + NOTE_WHEEL[newIndex];
-  });
-}
+import { transposeChordName } from "../lib/theory";
 
 interface LiveScoreDisplayProps {
   path: HarmonicPath;
