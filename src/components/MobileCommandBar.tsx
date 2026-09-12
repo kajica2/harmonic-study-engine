@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Play, Pause, MoreHorizontal, FileDown, Music, Mic, RefreshCw, Volume2 } from "lucide-react";
+import { ModalShell, useModalLabel } from "./ModalShell";
 
 interface Props {
   isPlayingAuto: boolean;
@@ -44,6 +45,7 @@ export const MobileCommandBar: React.FC<Props> = ({
   isLooping = false,
 }) => {
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreSheetTitleId = useModalLabel("mobile-more");
 
   return (
     <>
@@ -102,14 +104,24 @@ export const MobileCommandBar: React.FC<Props> = ({
       </nav>
 
       {/* Stacked bottom-sheet menu. Rendered outside the nav so it
-          can cover the screen without affecting the bar layout. */}
+          can cover the screen without affecting the bar layout.
+          Uses ModalShell for aria-modal, focus trap, Escape, and
+          body-scroll-lock — the bare `<div role="dialog">` it
+          replaced was missing all of those. Bottom-anchored via a
+          custom backdrop class so the dim wash doesn't cover the
+          command bar itself. */}
       {moreOpen && (
-        <div
-          className="md:hidden fixed inset-x-0 bottom-16 z-40 px-3 pb-2"
-          role="dialog"
-          aria-label="More playback options"
+        <ModalShell
+          labelledBy={moreSheetTitleId}
+          onDismiss={() => setMoreOpen(false)}
+          backdropClassName="md:hidden bg-black/40 backdrop-blur-sm"
+          className="md:hidden fixed inset-x-0 bottom-16 z-40 px-3 pb-2 w-full"
         >
-          <div className="surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-lg)] p-3 shadow-2xl backdrop-blur-xl">
+          <div
+            id={moreSheetTitleId}
+            className="surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-lg)] p-3 shadow-2xl backdrop-blur-xl"
+          >
+            <h2 className="sr-only">More playback options</h2>
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => { onShowInspector(); setMoreOpen(false); }}
@@ -164,7 +176,7 @@ export const MobileCommandBar: React.FC<Props> = ({
               </button>
             </div>
           </div>
-        </div>
+        </ModalShell>
       )}
     </>
   );

@@ -62,6 +62,7 @@ import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
 import { PlaySessionRail } from "./components/PlaySessionRail";
 import { MobileCommandBar } from "./components/MobileCommandBar";
 import { LeadSheet } from "./components/LeadSheet";
+import { ModalShell, useModalLabel } from "./components/ModalShell";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
 
@@ -1176,6 +1177,12 @@ export default function App() {
         ),
     [path, selectedPersonaId],
   );
+
+  // Stable modal-title IDs for aria-labelledby. Each ModalShell gets
+  // one; the matching <h2 id=...> lives inside the modal body.
+  const leadSheetTitleId = useModalLabel("lead-sheet");
+  const cheatsheetTitleId = useModalLabel("cheatsheet");
+  const moreSheetTitleId = useModalLabel("mobile-more");
 
   return (
     <div className="min-h-screen surface-0 text-[color:var(--color-text-1)] font-sans selection:bg-[color:var(--color-brand-muted)] selection:text-[color:var(--color-brand-strong)] flex flex-col">
@@ -3032,28 +3039,39 @@ export default function App() {
       )}
 
       {showLeadSheet && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur z-50 flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Lead Sheet</h2>
-              <button
-                onClick={() => setShowLeadSheet(false)}
-                className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-mono"
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <LeadSheet path={path} />
-            </div>
+        <ModalShell
+          labelledBy={leadSheetTitleId}
+          onDismiss={() => setShowLeadSheet(false)}
+          className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] p-6"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h2 id={leadSheetTitleId} className="text-xl font-bold">
+              Lead Sheet
+            </h2>
+            <button
+              onClick={() => setShowLeadSheet(false)}
+              className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-mono"
+            >
+              Close
+            </button>
           </div>
-        </div>
+          <div className="flex-1 overflow-auto">
+            <LeadSheet path={path} />
+          </div>
+        </ModalShell>
       )}
 
       {showCheatsheet && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur z-50 flex items-center justify-center p-4">
+        <ModalShell
+          labelledBy={cheatsheetTitleId}
+          onDismiss={() => setShowCheatsheet(false)}
+          className="w-full max-w-lg"
+        >
+          <div className="sr-only" id={cheatsheetTitleId}>
+            Keyboard Shortcuts
+          </div>
           <KeyboardShortcutsCheatsheet onClose={() => setShowCheatsheet(false)} />
-        </div>
+        </ModalShell>
       )}
 
       {showChordInspector && (

@@ -72,12 +72,7 @@ export const KeyboardShortcutsCheatsheet: React.FC<{ onClose: () => void }> = ({
   onClose,
 }) => {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="cheatsheet-title"
-      className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col"
-    >
+    <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col">
       <div className="flex justify-between items-center px-5 py-3 border-b border-white/10">
         <h2
           id="cheatsheet-title"
