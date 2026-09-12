@@ -56,7 +56,7 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
       const xml = toMusicXml(path, {
         transpose: instrument === "Concert" ? 0 : instrument === "Bb" ? 2 : 5,
       });
-      const ok = await renderOSMD(osmdRef.current, xml);
+      const ok = await renderOSMD(osmdRef.current!, xml);
       if (cancelled) return;
       if (ok) setOsmdReady(true);
       else {

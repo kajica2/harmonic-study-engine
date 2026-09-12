@@ -40,17 +40,6 @@ interface State {
 
 export class ErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null, info: null, resetKey: 0 };
-  // Declare props + setState explicitly so TS sees them — React 19
-  // ships no built-in type declarations, so without this `this.props`
-  // and `this.setState` resolve to `unknown` / missing and TS errors.
-  props!: Props;
-  setState!: (
-    state:
-      | Partial<State>
-      | ((prev: State, props: Props) => Partial<State> | Pick<State, never>)
-      | Pick<State, never>,
-    callback?: () => void,
-  ) => void;
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };

@@ -100,7 +100,7 @@ export async function generateMagentaSequence(
       result.notes.forEach((note) => {
         steps.push({
           name: `AI: ${note.pitch}`,
-          notes: [note.pitch],
+          notes: [note.pitch ?? 60],
           descriptions: "Neural Network Generation",
         });
       });

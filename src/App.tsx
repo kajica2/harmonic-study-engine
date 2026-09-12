@@ -392,7 +392,7 @@ export default function App() {
   const optimizedStepsNotes = useMemo(() => {
     if (!optimizeVoiceLeading) return path.steps.map((s) => s.notes);
 
-    const res = [];
+    const res: number[][] = [];
     for (let i = 0; i < path.steps.length; i++) {
       if (i === 0) {
         res.push(path.steps[i].notes);
@@ -2688,7 +2688,7 @@ export default function App() {
                         </>
                       )}
                     </button>
-                    {ddspAction.status === "error" && ddspAction.error && (
+                    {ddspAction.status === "error" && ddspAction.error != null && (
                       <div className="mt-2">
                         <InlineErrorPill onDismiss={() => ddspAction.cancel()}>
                           DDSP render failed: {String(
