@@ -73,6 +73,7 @@ import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, der
 import { useCanvasSize } from "./lib/useCanvasSize";
 import { velocityToGain } from "./lib/audioHelpers";
 import { ImportExportModal } from "./components/ImportExportModal";
+import { exportSheetMusicPDF, downloadSheetMusicPDF } from "./lib/sheetMusicExport";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
 import { generateGeminiEtude } from "./lib/geminiHelper";
@@ -283,6 +284,12 @@ export default function App() {
   // Modal / inspector visibility
   const [showImportExport, setShowImportExport] = useState(false);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
+  // Sheet-music PDF export — busy state while jsPDF/svg2pdf run
+  // (typically <1s but can spike on long paths).
+  const [isExportingSheetMusic, setIsExportingSheetMusic] = useState(false);
+  const [lastExportFilename, setLastExportFilename] = useState<string | null>(
+    null,
+  );
 
   // Bass-line tracking (live, not persisted)
   const bassMidis = useBassNotes();
@@ -968,6 +975,38 @@ export default function App() {
   const cheatsheetTitleId = useModalLabel("cheatsheet");
   const moreSheetTitleId = useModalLabel("mobile-more");
 
+  // Sheet-music PDF export: render the current path via the existing
+  // abcjs + jsPDF + svg2pdf.js stack and trigger a browser download.
+  // Uses the engine's live instrument + activeStepIndex so the PDF
+  // matches what's on screen.
+  const handleExportSheetMusic = async () => {
+    if (isExportingSheetMusic) return;
+    setIsExportingSheetMusic(true);
+    try {
+      // Map the engine's InstrumentType to the lead-sheet's
+      // InstrumentPitch (Bb trumpet/sax transposes +2, others stay at
+      // concert pitch). Falls back to "Concert" so the export never
+      // throws on an unknown instrument.
+      const pitch: "F" | "Bb" | "Concert" =
+        instrument === "trumpet" || instrument === "sax"
+          ? "Bb"
+          : "Concert";
+      const blob = await exportSheetMusicPDF({
+        path,
+        instrument: pitch,
+        composerName: path.composer,
+        activeStepIndex,
+      });
+      const filename = downloadSheetMusicPDF(blob, path.title ?? path.name ?? "sheet-music");
+      setLastExportFilename(filename);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[sheet-music export] failed:", err);
+    } finally {
+      setIsExportingSheetMusic(false);
+    }
+  };
+
   return (
     <div className="min-h-screen surface-0 text-[color:var(--color-text-1)] font-sans selection:bg-[color:var(--color-brand-muted)] selection:text-[color:var(--color-brand-strong)] flex flex-col">
       {/* Skip-to-main link for keyboard users */}
@@ -1028,6 +1067,30 @@ export default function App() {
           >
             <kbd className="t-mono text-[10px] font-bold border border-neutral-700 rounded px-1.5 py-0.5">?</kbd>
             <span className="hidden lg:inline">Shortcuts</span>
+          </button>
+          <button
+            onClick={handleExportSheetMusic}
+            disabled={isExportingSheetMusic}
+            aria-label={
+              lastExportFilename
+                ? `Export sheet music PDF — last download: ${lastExportFilename}`
+                : "Export sheet music PDF"
+            }
+            title={
+              lastExportFilename
+                ? `Last download: ${lastExportFilename}`
+                : "Export the current path as a sheet-music PDF"
+            }
+            className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 px-3 py-1.5 rounded border border-neutral-800 transition-colors text-neutral-300 hover:text-white disabled:opacity-50 disabled:cursor-wait"
+          >
+            <FileCode size={14} className="text-emerald-400" />
+            <span>
+              {isExportingSheetMusic
+                ? "Exporting…"
+                : lastExportFilename
+                  ? "Sheet music ✓"
+                  : "Sheet music"}
+            </span>
           </button>
           <button
             onClick={() => setShowImportExport(true)}

@@ -57,12 +57,36 @@ const checks = [
     name: "ComposerChartViewer",
     selector: '[data-testid^="composer-chart-"]',
   },
+  // Sheet-music PDF export button — added in the v3 "wire up output"
+  // task. Visible in the top-right toolbar alongside Import/Export.
+  {
+    name: "SheetMusicExportButton",
+    selector: 'button[aria-label*="sheet music PDF" i]',
+  },
 ];
 
 const results: Array<{ name: string; present: boolean }> = [];
 for (const c of checks) {
   const count = await page.locator(c.selector).count();
   results.push({ name: c.name, present: count > 0 });
+}
+
+// Sheet-music PDF export end-to-end check: click the button, capture
+// the download, verify the file is a non-empty PDF. This exercises the
+// full abcjs → jsPDF → svg2pdf.js pipeline under a real browser.
+console.log("\nSheet-music export:");
+try {
+  const [download] = await Promise.all([
+    page.waitForEvent("download", { timeout: 15000 }),
+    page.click('button[aria-label*="sheet music PDF" i]'),
+  ]);
+  const downloadPath = join(OUT_DIR, "sheet-music-export.pdf");
+  await download.saveAs(downloadPath);
+  const { statSync } = await import("fs");
+  const size = statSync(downloadPath).size;
+  console.log(`  ✓ Downloaded ${download.suggestedFilename()} (${size} bytes)`);
+} catch (err) {
+  console.log(`  ✗ Sheet-music export failed: ${(err as Error).message}`);
 }
 
 await page.screenshot({ path: join(OUT_DIR, "phase-3-smoke.png"), fullPage: true });
