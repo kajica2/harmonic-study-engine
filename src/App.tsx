@@ -83,6 +83,7 @@ import { FormTemplatePicker } from "./components/FormTemplatePicker";
 import { StylePackPicker } from "./components/StylePackPicker";
 import { StyleWarnings } from "./components/StyleWarnings";
 import { CoComposePanel } from "./components/CoComposePanel";
+import { QuizPanel } from "./components/QuizPanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore } from "./hooks/useSessionStore";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
@@ -172,6 +173,10 @@ export default function App() {
     setCounterMelodyByStep,
     stylePackId,
     setStylePackId,
+    quizScore,
+    setQuizScore,
+    feedbackHistory,
+    setFeedbackHistory,
   } = session;
 
 
@@ -1182,6 +1187,24 @@ export default function App() {
             />
           );
         })()}
+
+        {/* Quiz — auto-gen / curated hybrid. Cycles through 5 topics. */}
+        <QuizPanel
+          pathId={path.id}
+          stepIndex={activeStepIndex}
+          topic="roman-numerals"
+          seed={(activeStepIndex + 1) * 7}
+          score={quizScore}
+          onAnswer={(wasCorrect, correct, total) => {
+            setQuizScore({ correct, total });
+            if (wasCorrect) {
+              setFeedbackHistory([
+                ...feedbackHistory,
+                { personaId: selectedPersonaId, suggestion: "quiz:roman-numerals", accepted: true },
+              ]);
+            }
+          }}
+        />
 
         {/* Persona behavioral lens — shows when the active persona
             has a documented behavioral rule set (Bach/Coltrane/Miles). */}
