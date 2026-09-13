@@ -52,7 +52,22 @@ interface QuizPanelProps {
   onAnswer?: (wasCorrect: boolean, correct: number, total: number) => void;
   /** Optional: pass current score from session for display. */
   score?: { correct: number; total: number };
+  /**
+   * Optional: when provided, render an inline topic selector (small
+   * <select>) so the user can switch between the 6 curated topics.
+   * When omitted, the topic is fixed (default App.tsx behavior).
+   */
+  onTopicChange?: (topic: QuizTopic) => void;
 }
+
+const TOPIC_OPTIONS: { value: QuizTopic; label: string }[] = [
+  { value: "roman-numerals", label: "Roman numerals" },
+  { value: "tensions", label: "Tensions" },
+  { value: "voice-leading", label: "Voice leading" },
+  { value: "modulations", label: "Modulations" },
+  { value: "form", label: "Form" },
+  { value: "composer-reductions", label: "Composer reductions" },
+];
 
 export const QuizPanel: React.FC<QuizPanelProps> = ({
   pathId,
@@ -61,6 +76,7 @@ export const QuizPanel: React.FC<QuizPanelProps> = ({
   seed = 1,
   onAnswer,
   score,
+  onTopicChange,
 }) => {
   // Pick a curated question deterministically from the topic, OR
   // fall back to generateQuiz.
@@ -86,16 +102,35 @@ export const QuizPanel: React.FC<QuizPanelProps> = ({
       aria-label={`Quiz: ${topic}`}
       className="rounded-lg border border-neutral-800 bg-neutral-900/30 p-3 flex flex-col gap-2"
     >
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-2">
         <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 flex items-center gap-1">
           <Brain size={11} aria-hidden="true" />
           Quiz · {topic.replace(/-/g, " ")}
         </span>
-        {score && (
-          <span className="text-[10px] font-mono text-neutral-500">
-            {score.correct}/{score.total}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {onTopicChange && (
+            <select
+              data-testid="quiz-topic-selector"
+              aria-label="Quiz topic"
+              value={topic}
+              onChange={(e) =>
+                onTopicChange(e.target.value as QuizTopic)
+              }
+              className="text-[10px] font-mono uppercase tracking-wider bg-neutral-800 text-neutral-300 border border-neutral-700 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-neutral-500"
+            >
+              {TOPIC_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
+          {score && (
+            <span className="text-[10px] font-mono text-neutral-500">
+              {score.correct}/{score.total}
+            </span>
+          )}
+        </div>
       </div>
       <fieldset className="flex flex-col gap-1.5">
         <legend className="text-[12px] font-mono text-neutral-200 mb-1">

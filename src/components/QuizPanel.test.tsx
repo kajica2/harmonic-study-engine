@@ -106,4 +106,72 @@ describe("QuizPanel", () => {
       }
     });
   });
+
+  describe("topic selector", () => {
+    it("does not render a <select> when onTopicChange is omitted", () => {
+      render(
+        <QuizPanel
+          pathId="path-1"
+          stepIndex={0}
+          topic="roman-numerals"
+          score={{ correct: 0, total: 0 }}
+          onAnswer={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId("quiz-topic-selector")).toBeNull();
+    });
+
+    it("renders a <select> with all 6 topics when onTopicChange is provided", () => {
+      render(
+        <QuizPanel
+          pathId="path-1"
+          stepIndex={0}
+          topic="roman-numerals"
+          score={{ correct: 0, total: 0 }}
+          onAnswer={vi.fn()}
+          onTopicChange={vi.fn()}
+        />,
+      );
+      const selector = screen.getByTestId("quiz-topic-selector");
+      expect(selector).toBeTruthy();
+      const options = selector.querySelectorAll("option");
+      expect(options.length).toBe(6);
+      // The selected option matches the active topic
+      expect((selector as HTMLSelectElement).value).toBe("roman-numerals");
+    });
+
+    it("calls onTopicChange when a new topic is selected", () => {
+      const onTopicChange = vi.fn();
+      render(
+        <QuizPanel
+          pathId="path-1"
+          stepIndex={0}
+          topic="roman-numerals"
+          score={{ correct: 0, total: 0 }}
+          onAnswer={vi.fn()}
+          onTopicChange={onTopicChange}
+        />,
+      );
+      const selector = screen.getByTestId(
+        "quiz-topic-selector",
+      ) as HTMLSelectElement;
+      fireEvent.change(selector, { target: { value: "composer-reductions" } });
+      expect(onTopicChange).toHaveBeenCalledWith("composer-reductions");
+    });
+
+    it("shows the topic label in the human-readable form", () => {
+      render(
+        <QuizPanel
+          pathId="path-1"
+          stepIndex={0}
+          topic="voice-leading"
+          score={{ correct: 0, total: 0 }}
+          onAnswer={vi.fn()}
+          onTopicChange={vi.fn()}
+        />,
+      );
+      // Header uses replace(/-/g, " ") — dashes become spaces
+      expect(screen.getByText(/Quiz · voice leading/i)).toBeTruthy();
+    });
+  });
 });
