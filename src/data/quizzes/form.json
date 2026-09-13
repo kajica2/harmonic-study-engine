@@ -1,0 +1,107 @@
+[
+  {
+    "id": "fo-1",
+    "topic": "form",
+    "prompt": "How many bars is a typical AABA form?",
+    "options": ["16", "24", "32", "64"],
+    "correct": 2,
+    "explanation": "The standard AABA jazz form is 32 bars (8 × 4 sections)."
+  },
+  {
+    "id": "fo-2",
+    "topic": "form",
+    "prompt": "What is a 'sentence' in classical form?",
+    "options": [
+      "Two phrases: presentation + continuation",
+      "Three phrases: a-a-b",
+      "Four phrases: a-b-a-c",
+      "A single 8-bar period"
+    ],
+    "correct": 0,
+    "explanation": "Sentence form: presentation phrase (basic idea + repetition) + continuation phrase (fragmentation + cadence)."
+  },
+  {
+    "id": "fo-3",
+    "topic": "form",
+    "prompt": "A 'period' consists of how many phrases?",
+    "options": ["One", "Two", "Three", "Four"],
+    "correct": 1,
+    "explanation": "A period = antecedent + consequent = two phrases. Typically 8 bars in classical practice."
+  },
+  {
+    "id": "fo-4",
+    "topic": "form",
+    "prompt": "The 'bridge' in a jazz standard (AABA) corresponds to which section?",
+    "options": ["A", "B", "C", "Interlude"],
+    "correct": 1,
+    "explanation": "The B section of AABA is the bridge — contrasting material, usually 8 bars, often modulating."
+  },
+  {
+    "id": "fo-5",
+    "topic": "form",
+    "prompt": "Sonata form's three main sections are:",
+    "options": [
+      "Theme 1, Theme 2, Theme 3",
+      "Exposition, Development, Recapitulation",
+      "Verse, Chorus, Bridge",
+      "A, B, C"
+    ],
+    "correct": 1,
+    "explanation": "Sonata form: Exposition (present themes), Development (modulate + recombine), Recapitulation (themes in tonic)."
+  },
+  {
+    "id": "fo-6",
+    "topic": "form",
+    "prompt": "A 'theme and variations' form keeps the same _____ across variations.",
+    "options": ["Harmony", "Tempo", "Melodic shape / harmonic progression", "Instrumentation"],
+    "correct": 2,
+    "explanation": "Theme and variations: melodic/harmonic skeleton stays recognizable while surface details change."
+  },
+  {
+    "id": "fo-7",
+    "topic": "form",
+    "prompt": "Through-composed form is best described as:",
+    "options": [
+      "Repeated sections",
+      "No repeated sections; new material throughout",
+      "A single repeating riff",
+      "Strict ABA structure"
+    ],
+    "correct": 1,
+    "explanation": "Through-composed = no repeated sections; each section introduces new material (common in art songs and film cues)."
+  },
+  {
+    "id": "fo-8",
+    "topic": "form",
+    "prompt": "What typically ends a classical antecedent phrase?",
+    "options": ["Authentic cadence", "Half cadence (question)", "Plagal cadence", "Deceptive cadence"],
+    "correct": 1,
+    "explanation": "Antecedent phrases typically end on a half cadence (a question); the consequent answers with an authentic cadence."
+  },
+  {
+    "id": "fo-9",
+    "topic": "form",
+    "prompt": "What is a 'coda'?",
+    "options": [
+      "The opening section",
+      "A contrasting middle section",
+      "An optional concluding section",
+      "A modulation"
+    ],
+    "correct": 2,
+    "explanation": "A coda is an optional tail section that closes the piece, often after the final cadence."
+  },
+  {
+    "id": "fo-10",
+    "topic": "form",
+    "prompt": "What is the role of a 'transition' in sonata form?",
+    "options": [
+      "It opens the recapitulation",
+      "It modulates from tonic to the dominant (or relative major) key in the exposition",
+      "It repeats the second theme",
+      "It cadences in the tonic"
+    ],
+    "correct": 1,
+    "explanation": "The exposition transition modulates from the first-theme key (tonic) to the second-theme key (typically dominant or relative major)."
+  }
+]

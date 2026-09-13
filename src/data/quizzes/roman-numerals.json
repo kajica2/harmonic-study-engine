@@ -1,0 +1,82 @@
+[
+  {
+    "id": "rn-1",
+    "topic": "roman-numerals",
+    "prompt": "What Roman numeral labels the tonic triad in C major?",
+    "options": ["I", "ii", "iii", "IV"],
+    "correct": 0,
+    "explanation": "The tonic triad in a major key is I (uppercase)."
+  },
+  {
+    "id": "rn-2",
+    "topic": "roman-numerals",
+    "prompt": "What Roman numeral labels the supertonic triad in C major?",
+    "options": ["I", "ii", "IV", "V"],
+    "correct": 1,
+    "explanation": "The supertonic triad is the chord built on the 2nd scale degree; in major it's minor, so lowercase 'ii'."
+  },
+  {
+    "id": "rn-3",
+    "topic": "roman-numerals",
+    "prompt": "What Roman numeral labels the mediant triad in C major?",
+    "options": ["iii", "IV", "vi", "vii"],
+    "correct": 0,
+    "explanation": "The mediant is the 3rd degree; in major it's minor, so 'iii'."
+  },
+  {
+    "id": "rn-4",
+    "topic": "roman-numerals",
+    "prompt": "What Roman numeral labels the subdominant triad in C major?",
+    "options": ["II", "iii", "IV", "V"],
+    "correct": 2,
+    "explanation": "The subdominant (4th degree) triad in major is 'IV'."
+  },
+  {
+    "id": "rn-5",
+    "topic": "roman-numerals",
+    "prompt": "What Roman numeral labels the dominant triad in C major?",
+    "options": ["IV", "V", "vi", "vii"],
+    "correct": 1,
+    "explanation": "The dominant (5th degree) triad in major is 'V'."
+  },
+  {
+    "id": "rn-6",
+    "topic": "roman-numerals",
+    "prompt": "What Roman numeral labels the submediant triad in C major?",
+    "options": ["v", "vi", "VII", "ii"],
+    "correct": 1,
+    "explanation": "The submediant (6th degree) in major is minor, so 'vi'."
+  },
+  {
+    "id": "rn-7",
+    "topic": "roman-numerals",
+    "prompt": "What Roman numeral labels the leading-tone triad in C major?",
+    "options": ["vi", "vii", "VII", "iii"],
+    "correct": 1,
+    "explanation": "The leading tone (7th degree) triad in major is diminished, so 'vii°'."
+  },
+  {
+    "id": "rn-8",
+    "topic": "roman-numerals",
+    "prompt": "In C minor, what is the i chord?",
+    "options": ["C major", "C minor", "C diminished", "C dominant 7"],
+    "correct": 1,
+    "explanation": "The tonic in a minor key is a minor triad, so i = C-E♭-G."
+  },
+  {
+    "id": "rn-9",
+    "topic": "roman-numerals",
+    "prompt": "What does the ° symbol after a Roman numeral mean?",
+    "options": ["Major", "Minor", "Diminished", "Augmented"],
+    "correct": 2,
+    "explanation": "The ° symbol denotes a diminished triad (e.g. vii° in major)."
+  },
+  {
+    "id": "rn-10",
+    "topic": "roman-numerals",
+    "prompt": "In a minor key, what is the III chord typically?",
+    "options": ["III (major)", "iii (minor)", "III+ (augmented)", "ii (minor)"],
+    "correct": 0,
+    "explanation": "In natural minor, the III chord is built on the raised 7th and is major — this is the classic minor-key 'relative major' sound."
+  }
+]
