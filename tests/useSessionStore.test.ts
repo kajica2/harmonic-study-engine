@@ -184,3 +184,76 @@ describe("useSessionStore hydration", () => {
     expect(result.current.metronomeOn).toBe(false);
   });
 });
+
+describe("useSessionStore composition layer", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("hydrates melodyByStep from localStorage", () => {
+    localStorage.setItem("synesthesia_melodyByStep", JSON.stringify({
+      "path-1::4": [60, 62, 64, 65],
+    }));
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.melodyByStep["path-1::4"]).toEqual([60, 62, 64, 65]);
+  });
+
+  it("defaults melodyByStep to empty object", () => {
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.melodyByStep).toEqual({});
+  });
+
+  it("hydrates counterMelodyByStep from localStorage", () => {
+    localStorage.setItem("synesthesia_counterMelodyByStep", JSON.stringify({
+      "path-1::4": [67, 69, 71, 72],
+    }));
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.counterMelodyByStep["path-1::4"]).toEqual([67, 69, 71, 72]);
+  });
+
+  it("defaults stylePackId to null", () => {
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.stylePackId).toBeNull();
+  });
+
+  it("hydrates stylePackId from localStorage", () => {
+    localStorage.setItem("synesthesia_stylePackId", "common-practice");
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.stylePackId).toBe("common-practice");
+  });
+
+  it("defaults quizScore to {correct:0, total:0}", () => {
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.quizScore).toEqual({ correct: 0, total: 0 });
+  });
+
+  it("hydrates quizScore from localStorage", () => {
+    localStorage.setItem("synesthesia_quizScore", JSON.stringify({ correct: 7, total: 10 }));
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.quizScore).toEqual({ correct: 7, total: 10 });
+  });
+
+  it("defaults feedbackHistory to empty array", () => {
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.feedbackHistory).toEqual([]);
+  });
+
+  it("hydrates feedbackHistory from localStorage", () => {
+    const events = [
+      { personaId: "coltrane", suggestion: "modal", accepted: true },
+      { personaId: "bach", suggestion: "common-practice", accepted: false },
+    ];
+    localStorage.setItem("synesthesia_feedbackHistory", JSON.stringify(events));
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.feedbackHistory).toEqual(events);
+  });
+
+  it("setter functions exist for all composition fields", () => {
+    const { result } = renderHook(() => useSessionStore());
+    expect(typeof result.current.setMelodyByStep).toBe("function");
+    expect(typeof result.current.setCounterMelodyByStep).toBe("function");
+    expect(typeof result.current.setStylePackId).toBe("function");
+    expect(typeof result.current.setQuizScore).toBe("function");
+    expect(typeof result.current.setFeedbackHistory).toBe("function");
+  });
+});
