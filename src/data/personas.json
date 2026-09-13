@@ -20,10 +20,21 @@
     "accentColor": "#FFC107",
     "gradientFrom": "from-amber-500/25",
     "gradientTo": "to-red-500/5",
-    "colorPalette": ["#FFC107", "#E23D28", "#2980B9", "#27AE60"],
+    "colorPalette": [
+      "#FFC107",
+      "#E23D28",
+      "#2980B9",
+      "#27AE60"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-2",
-    "techniques": ["color_form", "abstraction", "non_literal_motion"]
+    "techniques": [
+      "color_form",
+      "abstraction",
+      "non_literal_motion"
+    ],
+    "contourProfile": "angular",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "scriabin",
@@ -46,25 +57,74 @@
     "accentColor": "#E60000",
     "gradientFrom": "from-red-500/30",
     "gradientTo": "to-violet-500/10",
-    "colorPalette": ["#E60000", "#FFD400", "#7B2FBE", "#0066FF"],
+    "colorPalette": [
+      "#E60000",
+      "#FFD400",
+      "#7B2FBE",
+      "#0066FF"
+    ],
     "colorMap": {
-      "C":  { "hex": "#E60000", "label": "Red" },
-      "Db": { "hex": "#7B2FBE", "label": "Violet" },
-      "D":  { "hex": "#FFD400", "label": "Yellow" },
-      "Eb": { "hex": "#8C92AC", "label": "Steel / flesh" },
-      "E":  { "hex": "#7EC8E3", "label": "Sky blue" },
-      "F":  { "hex": "#8B0000", "label": "Dark red" },
-      "Gb": { "hex": "#0066FF", "label": "Bright blue" },
-      "G":  { "hex": "#FF7A00", "label": "Orange" },
-      "Ab": { "hex": "#6A0DAD", "label": "Purple" },
-      "A":  { "hex": "#00A651", "label": "Green" },
-      "Bb": { "hex": "#A8A9AD", "label": "Steel gray" },
-      "B":  { "hex": "#4A90D9", "label": "Pearly blue" }
+      "C": {
+        "hex": "#E60000",
+        "label": "Red"
+      },
+      "Db": {
+        "hex": "#7B2FBE",
+        "label": "Violet"
+      },
+      "D": {
+        "hex": "#FFD400",
+        "label": "Yellow"
+      },
+      "Eb": {
+        "hex": "#8C92AC",
+        "label": "Steel / flesh"
+      },
+      "E": {
+        "hex": "#7EC8E3",
+        "label": "Sky blue"
+      },
+      "F": {
+        "hex": "#8B0000",
+        "label": "Dark red"
+      },
+      "Gb": {
+        "hex": "#0066FF",
+        "label": "Bright blue"
+      },
+      "G": {
+        "hex": "#FF7A00",
+        "label": "Orange"
+      },
+      "Ab": {
+        "hex": "#6A0DAD",
+        "label": "Purple"
+      },
+      "A": {
+        "hex": "#00A651",
+        "label": "Green"
+      },
+      "Bb": {
+        "hex": "#A8A9AD",
+        "label": "Steel gray"
+      },
+      "B": {
+        "hex": "#4A90D9",
+        "label": "Pearly blue"
+      }
     },
     "defaultVoicing": "quartal",
     "defaultPath": "mystic_prometheus",
     "scale": "prometheus_hexatonic",
-    "techniques": ["mystic_chord", "quartal_stacking", "altered_dominant", "polyrhythm", "synthetic_scale"]
+    "techniques": [
+      "mystic_chord",
+      "quartal_stacking",
+      "altered_dominant",
+      "polyrhythm",
+      "synthetic_scale"
+    ],
+    "contourProfile": "angular",
+    "preferredStylePackId": "post-tonal"
   },
   {
     "id": "rachmaninov",
@@ -87,10 +147,23 @@
     "accentColor": "#4A5A6A",
     "gradientFrom": "from-slate-600/25",
     "gradientTo": "to-amber-900/10",
-    "colorPalette": ["#4A5A6A", "#8B6914", "#2C3E50", "#C9A227"],
+    "colorPalette": [
+      "#4A5A6A",
+      "#8B6914",
+      "#2C3E50",
+      "#C9A227"
+    ],
     "defaultVoicing": "open_drop3",
     "defaultPath": "bell_sonority",
-    "techniques": ["wide_spaced_chords", "bell_sonority", "dies_irae_quotation", "pedal_point", "modal_mixture"]
+    "techniques": [
+      "wide_spaced_chords",
+      "bell_sonority",
+      "dies_irae_quotation",
+      "pedal_point",
+      "modal_mixture"
+    ],
+    "contourProfile": "stepwise",
+    "preferredStylePackId": "common-practice"
   },
   {
     "id": "brahms",
@@ -113,10 +186,23 @@
     "accentColor": "#8B4513",
     "gradientFrom": "from-amber-800/25",
     "gradientTo": "to-stone-700/10",
-    "colorPalette": ["#8B4513", "#5C6B3A", "#6B1F2E", "#B08D57"],
+    "colorPalette": [
+      "#8B4513",
+      "#5C6B3A",
+      "#6B1F2E",
+      "#B08D57"
+    ],
     "defaultVoicing": "closed_dense",
     "defaultPath": "developing_variation",
-    "techniques": ["developing_variation", "hemiola", "cross_relation", "inner_voice_counterpoint", "asymmetric_phrase"]
+    "techniques": [
+      "developing_variation",
+      "hemiola",
+      "cross_relation",
+      "inner_voice_counterpoint",
+      "asymmetric_phrase"
+    ],
+    "contourProfile": "leaping",
+    "preferredStylePackId": "common-practice"
   },
   {
     "id": "tchaikovsky",
@@ -139,10 +225,23 @@
     "accentColor": "#3B5998",
     "gradientFrom": "from-blue-700/25",
     "gradientTo": "to-rose-300/10",
-    "colorPalette": ["#DCE6F0", "#E8B4B8", "#C0C0C0", "#3B5998"],
+    "colorPalette": [
+      "#DCE6F0",
+      "#E8B4B8",
+      "#C0C0C0",
+      "#3B5998"
+    ],
     "defaultVoicing": "melody_first",
     "defaultPath": "sequence_ascent",
-    "techniques": ["sequential_development", "motif_fragmentation", "chromatic_sequence", "lyric_melody", "borrowed_folk_material"]
+    "techniques": [
+      "sequential_development",
+      "motif_fragmentation",
+      "chromatic_sequence",
+      "lyric_melody",
+      "borrowed_folk_material"
+    ],
+    "contourProfile": "leaping",
+    "preferredStylePackId": "common-practice"
   },
   {
     "id": "mahler",
@@ -165,10 +264,23 @@
     "accentColor": "#C8A165",
     "gradientFrom": "from-amber-700/25",
     "gradientTo": "to-stone-500/10",
-    "colorPalette": ["#C8A165", "#5A5A5A", "#FFFFFF", "#3D2B1F"],
+    "colorPalette": [
+      "#C8A165",
+      "#5A5A5A",
+      "#FFFFFF",
+      "#3D2B1F"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "progressive_tonality",
-    "techniques": ["progressive_tonality", "juxtaposition", "landler_rhythm", "ironic_quotation", "offstage_distance"]
+    "techniques": [
+      "progressive_tonality",
+      "juxtaposition",
+      "landler_rhythm",
+      "ironic_quotation",
+      "offstage_distance"
+    ],
+    "contourProfile": "leaping",
+    "preferredStylePackId": "common-practice"
   },
   {
     "id": "coltrane",
@@ -191,10 +303,22 @@
     "accentColor": "#20B2AA",
     "gradientFrom": "from-teal-500/25",
     "gradientTo": "to-cyan-500/5",
-    "colorPalette": ["#20B2AA", "#FFD400", "#E23D28", "#2980B9"],
+    "colorPalette": [
+      "#20B2AA",
+      "#FFD400",
+      "#E23D28",
+      "#2980B9"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-9",
-    "techniques": ["coltrane_changes", "sheets_of_sound", "modal_vamp", "giant_steps_cycle"]
+    "techniques": [
+      "coltrane_changes",
+      "sheets_of_sound",
+      "modal_vamp",
+      "giant_steps_cycle"
+    ],
+    "contourProfile": "leaping",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "bach",
@@ -217,10 +341,22 @@
     "accentColor": "#D4AF37",
     "gradientFrom": "from-yellow-600/25",
     "gradientTo": "to-amber-500/5",
-    "colorPalette": ["#D4AF37", "#8B4513", "#2C3E50", "#8B0000"],
+    "colorPalette": [
+      "#D4AF37",
+      "#8B4513",
+      "#2C3E50",
+      "#8B0000"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-5",
-    "techniques": ["counterpoint", "fugue", "inversion", "canon"]
+    "techniques": [
+      "counterpoint",
+      "fugue",
+      "inversion",
+      "canon"
+    ],
+    "contourProfile": "stepwise",
+    "preferredStylePackId": "common-practice"
   },
   {
     "id": "debussy",
@@ -243,10 +379,22 @@
     "accentColor": "#3498DB",
     "gradientFrom": "from-blue-500/25",
     "gradientTo": "to-purple-500/5",
-    "colorPalette": ["#3498DB", "#9B59B6", "#1ABC9C", "#E8C8A0"],
+    "colorPalette": [
+      "#3498DB",
+      "#9B59B6",
+      "#1ABC9C",
+      "#E8C8A0"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-7",
-    "techniques": ["whole_tone", "planing", "parallel_motion", "mode_mixing"]
+    "techniques": [
+      "whole_tone",
+      "planing",
+      "parallel_motion",
+      "mode_mixing"
+    ],
+    "contourProfile": "stepwise",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "eno",
@@ -269,10 +417,22 @@
     "accentColor": "#9B59B6",
     "gradientFrom": "from-purple-500/25",
     "gradientTo": "to-indigo-500/5",
-    "colorPalette": ["#9B59B6", "#3498DB", "#1ABC9C", "#E8C8A0"],
+    "colorPalette": [
+      "#9B59B6",
+      "#3498DB",
+      "#1ABC9C",
+      "#E8C8A0"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-8",
-    "techniques": ["generative", "long_decay", "phase_loop", "ambient_field"]
+    "techniques": [
+      "generative",
+      "long_decay",
+      "phase_loop",
+      "ambient_field"
+    ],
+    "contourProfile": "neutral",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "glass",
@@ -295,10 +455,22 @@
     "accentColor": "#E74C3C",
     "gradientFrom": "from-rose-600/25",
     "gradientTo": "to-violet-600/5",
-    "colorPalette": ["#E74C3C", "#9B59B6", "#F1C40F", "#2C3E50"],
+    "colorPalette": [
+      "#E74C3C",
+      "#9B59B6",
+      "#F1C40F",
+      "#2C3E50"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-10",
-    "techniques": ["arpeggiated_loop", "additive_rhythm", "ostinato", "gradual_substitution"]
+    "techniques": [
+      "arpeggiated_loop",
+      "additive_rhythm",
+      "ostinato",
+      "gradual_substitution"
+    ],
+    "contourProfile": "stepwise",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "monk",
@@ -321,10 +493,22 @@
     "accentColor": "#E67E22",
     "gradientFrom": "from-orange-500/25",
     "gradientTo": "to-amber-600/5",
-    "colorPalette": ["#E67E22", "#8B4513", "#2C3E50", "#E8C8A0"],
+    "colorPalette": [
+      "#E67E22",
+      "#8B4513",
+      "#2C3E50",
+      "#E8C8A0"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-11",
-    "techniques": ["dissonant_resolution", "wide_leaps", "stride", "silence_as_beat"]
+    "techniques": [
+      "dissonant_resolution",
+      "wide_leaps",
+      "stride",
+      "silence_as_beat"
+    ],
+    "contourProfile": "angular",
+    "preferredStylePackId": "common-practice"
   },
   {
     "id": "miles",
@@ -347,10 +531,22 @@
     "accentColor": "#5B7C99",
     "gradientFrom": "from-sky-500/25",
     "gradientTo": "to-slate-700/5",
-    "colorPalette": ["#5B7C99", "#E8C8A0", "#2C3E50", "#A8A9AD"],
+    "colorPalette": [
+      "#5B7C99",
+      "#E8C8A0",
+      "#2C3E50",
+      "#A8A9AD"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-12",
-    "techniques": ["modal_restraint", "muted_effects", "space_between_notes", "cool_inversion"]
+    "techniques": [
+      "modal_restraint",
+      "muted_effects",
+      "space_between_notes",
+      "cool_inversion"
+    ],
+    "contourProfile": "leaping",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "chet",
@@ -373,10 +569,22 @@
     "accentColor": "#E8C8A0",
     "gradientFrom": "from-amber-300/25",
     "gradientTo": "to-rose-200/5",
-    "colorPalette": ["#E8C8A0", "#9B59B6", "#5B7C99", "#2C3E50"],
+    "colorPalette": [
+      "#E8C8A0",
+      "#9B59B6",
+      "#5B7C99",
+      "#2C3E50"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-7",
-    "techniques": ["lyrical_line", "phrasing", "ballad_tone", "sparse_density"]
+    "techniques": [
+      "lyrical_line",
+      "phrasing",
+      "ballad_tone",
+      "sparse_density"
+    ],
+    "contourProfile": "stepwise",
+    "preferredStylePackId": "jazz"
   },
   {
     "id": "dizzy",
@@ -399,10 +607,22 @@
     "accentColor": "#FF3366",
     "gradientFrom": "from-rose-500/30",
     "gradientTo": "to-yellow-400/5",
-    "colorPalette": ["#FF3366", "#FFD400", "#27AE60", "#2980B9"],
+    "colorPalette": [
+      "#FF3366",
+      "#FFD400",
+      "#27AE60",
+      "#2980B9"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-9",
-    "techniques": ["bebop_chromaticism", "enclosure", "double_time", "high_register"]
+    "techniques": [
+      "bebop_chromaticism",
+      "enclosure",
+      "double_time",
+      "high_register"
+    ],
+    "contourProfile": "leaping",
+    "preferredStylePackId": "jazz"
   },
   {
     "id": "hubbard",
@@ -425,10 +645,22 @@
     "accentColor": "#2E86AB",
     "gradientFrom": "from-cyan-600/25",
     "gradientTo": "to-blue-500/5",
-    "colorPalette": ["#2E86AB", "#E74C3C", "#27AE60", "#F1C40F"],
+    "colorPalette": [
+      "#2E86AB",
+      "#E74C3C",
+      "#27AE60",
+      "#F1C40F"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-13",
-    "techniques": ["hard_bop_line", "blues_inflection", "harmonic_thinking", "double_timing"]
+    "techniques": [
+      "hard_bop_line",
+      "blues_inflection",
+      "harmonic_thinking",
+      "double_timing"
+    ],
+    "contourProfile": "leaping",
+    "preferredStylePackId": "jazz"
   },
   {
     "id": "shorter",
@@ -451,10 +683,22 @@
     "accentColor": "#9B5DE5",
     "gradientFrom": "from-violet-500/25",
     "gradientTo": "to-fuchsia-500/5",
-    "colorPalette": ["#9B5DE5", "#3498DB", "#1ABC9C", "#F1C40F"],
+    "colorPalette": [
+      "#9B5DE5",
+      "#3498DB",
+      "#1ABC9C",
+      "#F1C40F"
+    ],
     "defaultVoicing": "closed",
     "defaultPath": "path-12",
-    "techniques": ["modal_geometry", "elliptical_phrasing", "matrix_composition", "silence_as_color"]
+    "techniques": [
+      "modal_geometry",
+      "elliptical_phrasing",
+      "matrix_composition",
+      "silence_as_color"
+    ],
+    "contourProfile": "angular",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "simone",
@@ -472,7 +716,9 @@
     "visualTheme": "simone",
     "accentColor": "#7B2D8E",
     "gradientFrom": "from-purple-700/30",
-    "gradientTo": "to-rose-900/10"
+    "gradientTo": "to-rose-900/10",
+    "contourProfile": "stepwise",
+    "preferredStylePackId": "modal"
   },
   {
     "id": "novaro",
@@ -490,7 +736,9 @@
     "visualTheme": "novaro",
     "accentColor": "#C2542A",
     "gradientFrom": "from-orange-600/25",
-    "gradientTo": "to-amber-900/5"
+    "gradientTo": "to-amber-900/5",
+    "contourProfile": "angular",
+    "preferredStylePackId": "common-practice"
   },
   {
     "id": "getz",
@@ -508,7 +756,9 @@
     "visualTheme": "getz",
     "accentColor": "#3FA8B5",
     "gradientFrom": "from-teal-400/25",
-    "gradientTo": "to-cyan-700/5"
+    "gradientTo": "to-cyan-700/5",
+    "contourProfile": "stepwise",
+    "preferredStylePackId": "jazz"
   },
   {
     "id": "rollins",
@@ -526,7 +776,9 @@
     "visualTheme": "rollins",
     "accentColor": "#D98C2B",
     "gradientFrom": "from-amber-600/30",
-    "gradientTo": "to-orange-900/5"
+    "gradientTo": "to-orange-900/5",
+    "contourProfile": "leaping",
+    "preferredStylePackId": "jazz"
   },
   {
     "id": "henderson",
@@ -544,6 +796,8 @@
     "visualTheme": "henderson",
     "accentColor": "#4B2E83",
     "gradientFrom": "from-indigo-700/30",
-    "gradientTo": "to-rose-800/10"
+    "gradientTo": "to-rose-800/10",
+    "contourProfile": "angular",
+    "preferredStylePackId": "modal"
   }
 ]
