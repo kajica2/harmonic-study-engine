@@ -41,6 +41,7 @@ const TECHNIQUES = [
   "modal_mixture",
   "secondary_dominant",
   "passing_diminished",
+  "axis_modulation",
 ] as const;
 
 type Technique = (typeof TECHNIQUES)[number];
@@ -159,6 +160,21 @@ function applyTechnique(active: ChordAnalysis, technique: Technique): {
         explanation: `Passing diminished: between ${active.rootName} (I) and ii, insert ${PC_NAME[passingRoot]}dim7 to smooth the voice leading. The diminished-7th's pitches share 3 of 4 with the ii chord.`,
       };
     }
+    case "axis_modulation": {
+      // Bartók-style axis modulation: move the active tonic chord to its
+      // tritone-related key (e.g. A → Eb). This is a non-functional,
+      // symmetrical relationship — keys relate by tritone and minor third
+      // rather than by fifth. Only applies to tonic-family chords; the
+      // result is a chord of the same quality transposed up a tritone.
+      if (active.function !== "tonic") return null;
+      const axisRoot = (rootPc + 6) % 12;
+      const quality =
+        active.family === "minor" ? "min7" : active.family === "major" ? "maj7" : "dom7";
+      return {
+        notes: chordFromQuality(axisRoot, quality),
+        explanation: `Axis modulation (Bartók): ${active.rootName} (I) → ${PC_NAME[axisRoot]} (I a tritone away). The two keys are axis-related — they share no functional dominant, so the motion is symmetrical rather than tonal. Bartók's tonic axis (A–C–Eb–F#) is the canonical example.`,
+      };
+    }
   }
 }
 
@@ -208,6 +224,7 @@ function humanize(t: Technique): string {
     modal_mixture: "Modal mixture",
     secondary_dominant: "Secondary dominant",
     passing_diminished: "Passing diminished",
+    axis_modulation: "Axis modulation",
   }[t];
 }
 
