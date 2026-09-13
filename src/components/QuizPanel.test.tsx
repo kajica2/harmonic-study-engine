@@ -58,4 +58,52 @@ describe("QuizPanel", () => {
     const explanation = document.querySelector("p.text-\\[10px\\].font-mono");
     expect(explanation).toBeTruthy();
   });
+
+  describe("composer-reductions topic", () => {
+    it("renders a prompt from the composer-reductions curated pool", () => {
+      render(
+        <QuizPanel
+          pathId="path-1"
+          stepIndex={0}
+          topic="composer-reductions"
+          score={{ correct: 0, total: 0 }}
+          onAnswer={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole("region", { name: /Quiz/i })).toBeTruthy();
+      // Confirm a curated question got picked — it should reference a
+      // specific composer, work, or technique (since the curated pool is
+      // all composer-themed). Match against works AND composer names to
+      // be robust regardless of which seed the hash lands on.
+      const region = screen.getByRole("region", { name: /Quiz/i });
+      expect(region.textContent).toMatch(
+        /Beethoven|Schubert|Chopin|Wagner|Verdi|Liszt|Ellington|Armstrong|Miles|Coltrane|Beatles|Kraftwerk|Carlos|Piazzolla|Fela|Symphony|Winterreise|Tristan|Otello|Nuages|Mood Indigo|West End|So What|Giant Steps|A Day in the Life|Trans-Europe|Switched-On|Adi|WTC|Zombie/i,
+      );
+    });
+
+    it("exposes the 6th topic without breaking other topics", () => {
+      // Render all 6 topics and confirm each renders without throwing.
+      const topics = [
+        "roman-numerals",
+        "tensions",
+        "voice-leading",
+        "modulations",
+        "form",
+        "composer-reductions",
+      ] as const;
+      for (const topic of topics) {
+        const { unmount } = render(
+          <QuizPanel
+            pathId="path-1"
+            stepIndex={0}
+            topic={topic}
+            score={{ correct: 0, total: 0 }}
+            onAnswer={vi.fn()}
+          />,
+        );
+        expect(screen.getByRole("radiogroup")).toBeTruthy();
+        unmount();
+      }
+    });
+  });
 });

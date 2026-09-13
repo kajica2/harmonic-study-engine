@@ -16,9 +16,16 @@ import tensionQuizzes from "../data/quizzes/tensions.json";
 import voiceLeadingQuizzes from "../data/quizzes/voice-leading.json";
 import modulationsQuizzes from "../data/quizzes/modulations.json";
 import formQuizzes from "../data/quizzes/form.json";
+import composerReductionQuizzes from "../data/quizzes/composer-reductions.json";
 import { generateQuiz } from "../lib/quizEngine";
 
-type QuizTopic = "roman-numerals" | "tensions" | "voice-leading" | "modulations" | "form";
+type QuizTopic =
+  | "roman-numerals"
+  | "tensions"
+  | "voice-leading"
+  | "modulations"
+  | "form"
+  | "composer-reductions";
 
 const CURATED: Record<QuizTopic, Array<{
   id: string;
@@ -32,6 +39,7 @@ const CURATED: Record<QuizTopic, Array<{
   "voice-leading": voiceLeadingQuizzes as any,
   "modulations": modulationsQuizzes as any,
   "form": formQuizzes as any,
+  "composer-reductions": composerReductionQuizzes as any,
 };
 
 interface QuizPanelProps {
