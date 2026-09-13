@@ -6,12 +6,27 @@ import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { transposeChordName } from "../lib/theory";
 import { slicePathForRepeat, type BeatCell } from "../lib/sliceAndRepeat";
+import { TimeSignature } from "../lib/rhythm";
+import { stepsPerBar } from "../lib/loopWav";
+import type { ScoreDisplayMode } from "../lib/displayMode";
+
 
 interface LiveScoreDisplayProps {
   path: HarmonicPath;
   activeStepIndex: number;
   transposeShift: number;
   tempo: number;
+  /** Time signature — used to compute the steps-per-bar ratio for
+   *  the 4-bar context window. Defaults to 4/4 for backward
+   *  compat (the component is also used in places that don't pass
+   *  a signature). */
+  timeSignature?: TimeSignature;
+  /** Display mode (full / zoom). When 'zoom', the score renders
+   *  larger and the container gets a brand-colored ring so the
+   *  "this is the focus mode" treatment is visible. Per-bar dim
+   *  would require abcjs post-process — out of scope for this
+   *  PR. The zoom level itself is already wired (zoomScale state). */
+  displayMode?: ScoreDisplayMode;
 }
 
 /**
@@ -35,6 +50,8 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   activeStepIndex,
   transposeShift,
   tempo,
+  timeSignature = "4/4",
+  displayMode = "full",
 }) => {
   const svgRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,15 +85,20 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   // 4-bar window computation. The active bar gets 1 bar before +
   // 1 bar after for context (4 bars total). Computed at render so
   // the JSX can display "Bars X-Y of N".
-  const stepsPerBar = 4;
-  const activeBar = Math.floor(activeStepIndex / stepsPerBar);
-  const totalBars = Math.ceil((path?.steps.length ?? 0) / stepsPerBar);
+  //
+  // stepsPerBar used to be a hard-coded 4 — only correct for 4/4.
+  // Now derived from the active time signature via the shared
+  // helper in lib/loopWav. For 6/8 that's 6, for 7/8 it's 7, for
+  // 11/4 it's 11, for tintal it's 16.
+  const stepsPerBarValue = stepsPerBar(timeSignature);
+  const activeBar = Math.floor(activeStepIndex / stepsPerBarValue);
+  const totalBars = Math.ceil((path?.steps.length ?? 0) / stepsPerBarValue);
   const windowBarStart = Math.max(0, activeBar - 1);
   const windowBarEnd = Math.min(totalBars, windowBarStart + 4);
-  const windowStepStart = windowBarStart * stepsPerBar;
+  const windowStepStart = windowBarStart * stepsPerBarValue;
   const windowStepEnd = Math.min(
     path?.steps.length ?? 0,
-    windowBarEnd * stepsPerBar,
+    windowBarEnd * stepsPerBarValue,
   );
   const windowSteps =
     path?.steps.slice(windowStepStart, windowStepEnd) ?? [];
@@ -109,7 +131,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
     if (!svgRef.current || !path) return;
 
     let abc = `X:1\n`;
-    abc += `T:${path.name}\n`;
+    abc += `T:${path.title}\n`;
     abc += `M:4/4\n`;
     abc += `L:1/4\n`;
     abc += `Q:1/4=${tempo}\n`;
@@ -502,7 +524,12 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       {/* SVG Container in high contrast white */}
       <div
         ref={containerRef}
-        className="w-full h-[360px] overflow-x-auto overflow-y-auto bg-white rounded-2xl relative border border-white/5 shadow-inner hide-scrollbar"
+        className={`w-full h-[360px] overflow-x-auto overflow-y-auto bg-white rounded-2xl relative border shadow-inner hide-scrollbar transition-all ${
+          displayMode === "zoom"
+            ? "border-[color:var(--color-brand-strong)] ring-2 ring-[color:var(--color-brand)]/40 ring-offset-2 ring-offset-[color:var(--color-bg)]"
+            : "border-white/5"
+        }`}
+        data-display-mode={displayMode}
       >
         <div
           ref={svgRef}

@@ -1,4 +1,5 @@
 import { midiToFreq } from "./theory";
+import { newAudioContext } from "./webAudio";
 import {
   loadSoundfont,
   playSoundfontNote,
@@ -175,9 +176,7 @@ class AudioEngine {
 
   init() {
     if (!this.ctx) {
-      this.ctx = new (
-        window.AudioContext || (window as any).webkitAudioContext
-      )();
+      this.ctx = newAudioContext();
 
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.targetVolume; // Gain headroom

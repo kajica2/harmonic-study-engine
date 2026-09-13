@@ -63,24 +63,17 @@ function extractMeta(block: string): Record<string, string> {
       // Use the first segment as the value for `rawKey`, then walk
       // subsequent `<Word>: <value>` pairs into their own keys.
       // rawVal shape: "<v1> • <Word2>: <v2> • <Word3>: <v3>"
-      const tail = parts.slice(1).join(" • ");
-      // The remaining segments are `Word: value` pairs.
-      const re = /\s*([A-Z][A-Za-z ]+?):\s*(.+)$/;
-      const rest = tail.match(re);
-      if (rest) {
-        // rawKey gets only v1
-        out[rawKey] = parts[0].trim();
-        out[rest[1].trim().toLowerCase()] = rest[2].trim();
-        // Any further `• Word: value` pairs after the first?
-        const after = tail.slice(rest[0].length).trim();
-        for (const seg of after.split(/\s*[•·]\s*/)) {
-          const inner = /^\s*([A-Z][A-Za-z ]+?):\s*(.+)$/.exec(seg);
-          if (inner) {
-            out[inner[1].trim().toLowerCase()] = inner[2].trim();
-          }
+      out[rawKey] = parts[0].trim();
+      // Iterate every remaining segment as its own `Word: value` pair.
+      // The previous version joined the tail with " • " and ran a single
+      // greedy regex, which consumed the rest of the line into the first
+      // pair's value (e.g. `Form: AABA • Composers: DePaul, Ray` would
+      // set `form = "AABA • Composers: DePaul, Ray"` and drop Composers).
+      for (const seg of parts.slice(1)) {
+        const inner = /^\s*([A-Z][A-Za-z ]+?):\s*(.+)$/.exec(seg);
+        if (inner) {
+          out[inner[1].trim().toLowerCase()] = inner[2].trim();
         }
-      } else {
-        out[rawKey] = rawVal;
       }
     }
   }

@@ -64,6 +64,14 @@ import { InlineErrorPill } from "./components/InlineStatus";
 import { RecordingModal } from "./components/RecordingModal";
 import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
 import { PlaySessionRail } from "./components/PlaySessionRail";
+import { downloadText } from "./lib/download";
+import { PathBriefing } from "./components/PathBriefing";
+import { PracticeHeader } from "./components/PracticeHeader";
+import { PersonaLensBanner } from "./components/PersonaLensBanner";
+import { HumanFeelDial } from "./components/HumanFeelDial";
+import { useSessionStore } from "./hooks/useSessionStore";
+import { useDDSPProbe } from "./hooks/useDDSPProbe";
+import { usePathGenerator } from "./hooks/usePathGenerator";
 import { MobileCommandBar } from "./components/MobileCommandBar";
 import { LeadSheet } from "./components/LeadSheet";
 import { ModalShell, useModalLabel } from "./components/ModalShell";
@@ -75,15 +83,7 @@ import {
   type BehavioralRuleMap,
 } from "./components/PathCatalog";
 
-function downloadText(filename: string, content: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+// downloadText moved to src/lib/download.ts (extracted by main)
 
 export default function App() {
   const [paths, setPaths] = useState<HarmonicPath[]>(() => {
@@ -759,7 +759,7 @@ export default function App() {
     // "off"); rhythmEngine.setBeat wants narrower BeatType. The runtime
     // accepts any BackingStyle (off = silent) so this is purely a
     // tightening we can safely cast through.
-    rhythmEngine.setBeat(beatType as any);
+    (rhythmEngine as unknown as { setBeat: (b: BackingStyle) => void }).setBeat(beatType);
   }, [beatType]);
 
   useEffect(() => {
@@ -1299,10 +1299,6 @@ export default function App() {
           }}
           tempo={tempo}
           setTempo={setTempo}
-          meter={timeSignature}
-          beat={beatType}
-          setMeter={setTimeSignature as unknown as (v: string) => void}
-          setBeat={setBeatType as unknown as (v: string) => void}
           transposeShift={transposeShift}
           setTransposeShift={setTransposeShift}
           selectedPersonaId={selectedPersonaId}

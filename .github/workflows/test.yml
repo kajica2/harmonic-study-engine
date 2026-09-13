@@ -1,0 +1,86 @@
+name: test
+
+# Runs the full gate on every push to main and on every PR.
+# The gate, in order:
+#   1. assets/check-links.cjs — drift lock-in (counts & name).
+#      Asserts every cited count in README.md / src/magenta/README.md
+#      matches its source of truth (see SPEC.md). Fails before lint
+#      because drift fixes are usually the smallest possible commit
+#      and shouldn't get tangled with a tsc regression.
+#   2. tsc --noEmit — type safety.
+#   3. vitest — frontend unit tests (matrix across ubuntu + macos).
+#   4. pytest — backend contract tests against server/tests/.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs for the same ref when a new commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: drift lock-in (SPEC.md)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node assets/check-links.cjs
+
+  lint:
+    name: tsc --noEmit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+
+  frontend:
+    name: vitest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+        env:
+          # loopWav tests use a hand-rolled OfflineAudioContext mock
+          # so jsdom's missing WebAudio impl isn't an issue — but we
+          # set CI=true so vitest's reporter stays compact.
+          CI: "true"
+
+  backend:
+    name: pytest (FastAPI contract)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            server/requirements.txt
+            server/requirements-dev.txt
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server/requirements.txt
+          pip install -r server/requirements-dev.txt
+      - run: npm run test:py

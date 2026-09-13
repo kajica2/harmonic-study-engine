@@ -1,15 +1,3 @@
----
-title: Harmonic Study Engine
-emoji: 🎺
-colorFrom: yellow
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
-license: mit
-short_description: Trumpet practice engine for jazz etudes
----
-
 # Harmonic Study Engine
 
 A practice engine for trumpet (and any instrument) that pairs curated
@@ -77,6 +65,18 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   scaling (bass softer, top louder; arpeggiator accents every
   4th step), FluidR3 soundfont caching across persona swaps.
 
+## Surfaces
+
+Three user-facing surfaces, all from one repo:
+
+| URL | Purpose | Local entry |
+|---|---|---|
+| `/` (or `https://harmonic-study-engine.vercel.app`) | Main React 19 SPA — full practice engine with personas, scales, rhythm drill | `npm run dev:vite` (port 5173) |
+| `/engine` (or `https://harmonic-study-engine.vercel.app/engine`) | Audio-reactive engine v2 (sainted-word-records) | `public/sainted-word-records.html` |
+| `/rnn` (or `https://harmonic-study-engine.vercel.app/rnn`) | Magenta RNN-driven generator | `public/rnn.html` + `public/rnn-engine.bundle.js` |
+
+The `/engine` and `/rnn` rewrites are configured in `vercel.json`.
+
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system map
@@ -104,53 +104,191 @@ and full export to MIDI / MusicXML / Score21 / MP4.
 
 ## Local development
 
+The repo's `dev.sh` creates a `.venv`, installs the lean core backend
+deps (FastAPI only — no DDSP/TF), and boots both processes:
+
 ```bash
-# 1. install python deps (heavy: ddsp + tf 2.21)
-source .venv/bin/activate
-pip install -r server/requirements.txt
-
-# 2. start the backend
-python -m server.app    # -> http://127.0.0.1:8765
-
-# 3. start the frontend (port 3000 is taken by the Hermes
-# WhatsApp bridge on this machine — pick another port)
-npx vite --port=5174 --host=127.0.0.1 --strictPort
-# -> http://127.0.0.1:5174
+npm install            # first time only
+bash dev.sh            # or: npm run dev
 ```
 
-`bash dev.sh` automates all of this with one command — but
-**it kills any process bound to :3000** to free the port. On
-this machine that's the Hermes WhatsApp bridge. Run dev.sh
-manually instead, as above, if you share :3000.
+This opens `http://localhost:5173` (Vite) and `http://127.0.0.1:8765`
+(FastAPI). Both ports are gated on health checks before the browser
+opens, so you'll only see the page once everything is up. (Vite's
+default port — 5173 — is whitelisted in the backend CORS config; set
+`FRONTEND_PORT` to override if it's busy.)
 
-`npm run build` produces `dist/`; if you put `dist/` at
-`server/static/`, the FastAPI server will serve the SPA at `/`
-(no separate static host needed).
+### What works without DDSP
+
+Everything except `/synthesize` and `/fx/reverb`. `/health` returns
+`{"status":"degraded","ddsp_version":"unavailable"}`; the two
+heavy endpoints return 503 with a clear error message. All of the
+features above (personas, scales, rhythm drill, ride-along, masterclass
+catalog, backing styles, MIDI/MusicXML/Score21/MP4 export) are
+unaffected — they don't touch the DDSP stack.
+
+### Optional: enable the DDSP render + reverb path
+
+```bash
+source .venv/bin/activate
+pip install -r server/requirements-ddsp.txt
+# restart bash dev.sh — /health will now return "ok"
+```
+
+This pulls TensorFlow CPU + Magenta/DDSP (~1.5 GB). Skip it unless
+you need offline chord-progression rendering or FFT reverb on a
+recorded take.
+
+### Running backend and frontend separately
+
+```bash
+# terminal 1
+npm run dev:backend    # http://127.0.0.1:8765 (uvicorn server.app:app)
+
+# terminal 2
+npm run dev:vite       # http://localhost:5173
+```
+
+`npm run dev:backend` shells out to `python -m uvicorn server.app:app`.
+Invoking uvicorn directly (rather than `python -m server.app`) keeps
+the ddsp-import warning from printing twice during startup.
+
+`npm run build` produces `dist/`.
+
+## Live deployment
+
+Two hosts, one repo:
+
+- **Frontend** — <https://harmonic-study-engine.vercel.app> on
+  Vercel. Auto-deploys on every push to `main` via the GitHub
+  integration; the build output is a plain Vite SPA, no serverless
+  functions. Project settings in `vercel.json`-equivalent form
+  (build command, output dir) are read from `package.json` and
+  Vercel's auto-detected Vite preset.
+- **Backend** — FastAPI on Render, native Python runtime (no Docker).
+  Provisioned via `render.yaml` (Render Blueprint spec). Connect
+  the repo at <https://dashboard.render.com> → New → Blueprint →
+  point at this repo. The free tier sleeps after 15 min of
+  inactivity (cold-start latency 30–60 s on the first request).
+
+### Why the split
+
+FastAPI doesn't fit Vercel's shape:
+
+- `/recordings/upload` runs `ffmpeg` and can take 1–2 minutes per
+  recording — far over Vercel's 10 s Hobby / 60 s Pro serverless
+  timeout
+- `/synthesize` and `/fx/reverb` use TensorFlow + Magenta/DDSP
+  weights (~1.5 GB) — the cold-start cost would dominate every
+  request
+- Both endpoints need a persistent host (ffmpeg installed, scratch
+  disk, a real process model)
+
+Render's native Python runtime gives all three.
+
+### Wiring them together
+
+After Render gives the backend a `*.onrender.com` URL, point the
+deployed Vercel frontend at it:
+
+1. Vercel dashboard → Project → Settings → Environment Variables
+2. Add `VITE_DDSP_API` = `https://harmonic-study-engine-api.onrender.com`
+3. Trigger a redeploy (Vercel picks the new value at build time)
+
+Locally, the default `VITE_DDSP_API=http://127.0.0.1:8765` is
+correct — start the backend with `bash dev.sh` (or
+`npm run dev:backend`) and load the deployed tab in the same
+browser session. The toolbar's **API** status pill reflects the
+state:
+
+- ● live — backend reachable, DDSP installed
+- ● degraded — backend reachable, DDSP not installed (`/synthesize`
+  and `/fx/reverb` will 503). Default on Render — uncomment the
+  `requirements-ddsp.txt` line in `render.yaml` to opt in
+- ● offline — backend unreachable (the default state on the deployed
+  tab until Render is set up)
+
+### CORS
+
+Render's `DDSP_CORS_ORIGINS` env var whitelists the Vercel
+canonical domain plus `localhost:5173` for local dev. If you add
+a custom domain to the Vercel project, add it to that env var on
+the Render side and redeploy.
 
 ## Testing
 
+Two test suites, run from the project root with `npm test` and
+`npm run test:py`:
+
+### Frontend (Vitest)
+
 ```bash
-npm test            # 212 unit + component tests across 8 files
-npm run test:e2e    # 2 Playwright e2e tests (boots dist/ + Chromium)
-npm run test:all    # unit + build + e2e (the full gate)
-npm run lint        # tsc --noEmit
-npm run build       # vite build (no test code in bundle)
+npm test             # run once
+npm run test:watch   # watch mode
 ```
 
-CI runs `lint-and-unit` on every push and PR, then a
-separate `e2e` job that installs Chromium and runs
-`npm run test:e2e`. See `.github/workflows/ci.yml`.
+Coverage:
 
-## Deploy to your own HF Space
+- `tests/smoke.test.ts` — vitest infrastructure + src import paths
+- `tests/theory.test.ts` — note names, MIDI conversion, voice-leading
+- `tests/paths.test.ts` — catalog invariants (every path has notes, unique ids)
+- `tests/scoreExport.test.ts` — MusicXML 4.0 + Score21 output shapes
+- `tests/midiExport.test.ts` — SMF header bytes + format
+- `tests/useSessionStore.test.ts` — localStorage hydration + the
+  legacy `beatType` migration map
 
-1. Create a new Space (Docker, port 7860).
-2. Push this repo. The `Dockerfile` at the repo root is the
-   build entry point. The multi-stage build compiles the Vite
-   frontend, installs the Python deps (minus ddsp), copies
-   `dist/` into `/app/server/static/`, and runs uvicorn on
-   port 7860 — which is exactly what HF Spaces expects.
-3. Wait ~6 min for the build. The Space will be live at
-   `https://huggingface.co/spaces/<you>/harmonic-study-engine`.
+307 tests passing as of this commit (278 frontend it() + 29 backend def test_).
+Both counts verified by `npm test` and `npm run test:py` against the
+repo today. New tests added for previously-untested lib files
+(useBassNotes, importRealBook, ireal — the ones the older "What to
+add next" section listed). Run `npm test -- --coverage` for an HTML
+coverage report (defaults to `coverage/`).
+
+**Not covered** (intentionally): React components in `src/components/`
+beyond the few that use `@testing-library/react` (useBassNotes is
+covered). The audio/score/visualization engines in `src/components/`
+are tightly coupled to audio-engine singleton instances
+(rhythmEngine, audioEngine, backingEngine), and the test ROI for
+mocking all that is low. UI bugs surface in browser-browser tests;
+the unit tests cover the deterministic, importable logic that the
+UI composes.
+
+### Backend (pytest)
+
+```bash
+npm run test:py      # wrapper that prefers .venv/bin/python
+```
+
+Requires `server/requirements-dev.txt` installed in the venv
+(`pip install -r server/requirements-dev.txt`). The wrapper
+falls back to `python3 -m pytest` if no venv exists, but
+pytest-asyncio must be installed in that Python for tests to run.
+
+Coverage (29 tests):
+
+- `server/tests/test_app.py` — every API route registered
+- `server/tests/test_health.py` — `/health` shape + status contract
+- `server/tests/test_synthesize.py` — 503/400/422 contract paths
+- `server/tests/test_fx_reverb.py` — multipart upload + 503/400
+- `server/tests/test_recordings_upload.py` — ffmpeg fallback path
+  + Content-Disposition + X-Transcoded headers
+- `server/tests/test_cors.py` — DDSP_CORS_ORIGINS env var + defaults
+
+**Not covered**: `server/synthesizer.py` and `server/fx.py` — these
+require Magenta/DDSP installed to even import. The `/synthesize`
+and `/fx/reverb` 503 paths are tested instead, which is what
+production deploys actually hit without the DDSP stack.
+
+### What to add next
+
+If you tackle more coverage, the highest-leverage targets are:
+
+- `src/lib/recorder.ts` — needs the MediaRecorder mock; complex
+- `src/lib/scoreGenerator.ts` — the MusicXML/abcjs renderer; medium
+  effort, high regression value
+- `src/lib/backingEngine.ts` — the rhythm-section synth singleton;
+  AudioContext-coupled, but pattern tables could be extracted into
+  pure helpers and tested
 
 ## License
 
