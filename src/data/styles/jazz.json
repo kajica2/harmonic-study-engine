@@ -1,0 +1,10 @@
+{
+  "id": "jazz",
+  "name": "Jazz (bebop and beyond)",
+  "description": "Functional harmony with chromatic voice-leading. Parallel 5ths/octaves allowed; voice-leading is about guide-tone resolution and smooth voice-leading rather than classical rules.",
+  "constraints": {
+    "forbiddenIntervals": [],
+    "allowedNCTs": ["passingTone", "neighborTone", "anticipation", "escapeTone", "suspension", "pedal", "chromaticApproach", "modalMixture"],
+    "requiredResolutions": ["guideToneResolves"]
+  }
+}
