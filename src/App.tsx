@@ -86,6 +86,7 @@ import { CoComposePanel } from "./components/CoComposePanel";
 import { QuizPanel } from "./components/QuizPanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore } from "./hooks/useSessionStore";
+import { usePersistedState } from "./lib/usePersistedState";
 import { useFeedback } from "./hooks/useFeedback";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
 import { usePathGenerator } from "./hooks/usePathGenerator";
@@ -191,6 +192,14 @@ export default function App() {
   const [selectedMidiOutId, setSelectedMidiOutId] = useState<string>("");
   // Phase 5: MIDI input state — mirrors the MIDI Out pattern.
   const [midiInputs, setMidiInputs] = useState<{ id: string; name: string }[]>([]);
+  // Composer-catalog v2: Quiz topic selector — persisted across reloads
+  // so the user's last-selected topic survives.
+  const [quizTopic, setQuizTopic] = usePersistedState<
+    "roman-numerals" | "tensions" | "voice-leading" | "modulations" | "form" | "composer-reductions"
+  >({
+    key: "quizTopic",
+    defaultValue: "roman-numerals",
+  });
   const [selectedMidiInId, setSelectedMidiInId] = useState<string>("");
   // Phase 5: "listening" indicator — most-recent input event summary,
   // announced via aria-live and shown briefly in the chip. Cleared by
@@ -1198,19 +1207,27 @@ export default function App() {
           );
         })()}
 
-        {/* Quiz — auto-gen / curated hybrid. Cycles through 5 topics. */}
+        {/* Quiz — auto-gen / curated hybrid. Topic is selectable
+            (persisted via usePersistedState). 6 topics total: roman-
+            numerals, tensions, voice-leading, modulations, form,
+            composer-reductions. */}
         <QuizPanel
           pathId={path.id}
           stepIndex={activeStepIndex}
-          topic="roman-numerals"
+          topic={quizTopic}
           seed={(activeStepIndex + 1) * 7}
           score={quizScore}
+          onTopicChange={setQuizTopic}
           onAnswer={(wasCorrect, correct, total) => {
             setQuizScore({ correct, total });
             if (wasCorrect) {
               setFeedbackHistory([
                 ...feedbackHistory,
-                { personaId: selectedPersonaId, suggestion: "quiz:roman-numerals", accepted: true },
+                {
+                  personaId: selectedPersonaId,
+                  suggestion: `quiz:${quizTopic}`,
+                  accepted: true,
+                },
               ]);
             }
           }}
