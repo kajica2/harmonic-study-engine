@@ -473,17 +473,49 @@ export function voiceLeadingDistance(
 }
 
 /**
- * Quick voice-leading score: "minimized top-voice motion: N semitones"
+ * Quick voice-leading score: "minimized top-voice motion: N semitones".
+ *
+ * Optional `personaId` enables persona-aware strictness:
+ *   - "bach" — penalize parallel motion (parallel 5ths / 8ves between
+ *     the top voice of two adjacent chords). Returns a "STRICT:" prefix
+ *     when the motion would create parallel motion against the previous
+ *     chord's top-voice interval, so the user sees a louder signal
+ *     that the voicing needs work.
+ *
+ * The persona-aware branch is opt-in. Most callers don't pass it; the
+ * default behavior is identical to the original implementation.
  */
 export function voiceLeadingScore(
   prevNotes: number[],
   currNotes: number[],
+  personaId?: string,
 ): string {
   if (prevNotes.length === 0) return "no prior chord";
   const top = Math.max(...currNotes);
   const prevTop = Math.max(...prevNotes);
   const semitones = Math.abs(top - prevTop);
   if (semitones === 0) return "common tone on top — held";
+
+  // Bach lens — flag parallel motion between top-voice intervals
+  // when both chords have an inner voice we can compare. Heuristic:
+  // if the second voice of both chords moves in the same direction
+  // by the same interval as the top voice, that's parallel motion
+  // (3rd, 5th, 6th, octave — any of these are warnings in classical
+  // voice-leading). Sufficient signal to surface, not enough to
+  // re-rank the voicing — the user makes the call.
+  if (personaId === "bach" && prevNotes.length >= 2 && currNotes.length >= 2) {
+    const inner = currNotes[currNotes.length - 2];
+    const prevInner = prevNotes[prevNotes.length - 2];
+    const intervalTop = top - prevTop;
+    const intervalInner = inner - prevInner;
+    if (
+      intervalTop !== 0 &&
+      intervalInner === intervalTop
+    ) {
+      return `STRICT: parallel motion (${semitones} st) — revoice to break`;
+    }
+  }
+
   return `top-voice motion: ${semitones} st`;
 }
 

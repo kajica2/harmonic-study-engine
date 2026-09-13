@@ -174,12 +174,53 @@ export function beatsPerBar(meter: string): number {
 }
 
 /**
- * Render shapes for the loop WAV export.
- *  - block:        every chord as one block (sustained).
- *  - arp:          every chord broken into a sweeping arpeggio.
- *  - block_then_arp: alternate block / arp per bar — useful as a study pattern.
+ * Steps per bar — the number of `HarmonicStep` entries that fill
+ * one bar in the given time signature. One step = one chord, and
+ * one step = one beat (the bottom number of the meter = the
+ * beat unit: 4 = quarter, 8 = eighth, etc.).
+ *
+ * Examples:
+ *   "4/4"   -> 4   (4 quarter notes)
+ *   "6/8"   -> 6   (6 eighth notes)
+ *   "7/8"   -> 7   (7 eighth notes)
+ *   "11/4"  -> 11  (11 quarter notes)
+ *   "tintal"-> 16  (16-beat Hindustani cycle; notated 4/4 but
+ *                    with 4 grouped beats per count = 16 steps)
+ *
+ * This is the single source of truth for the bar-strip and
+ * loop-range math in App.tsx. Replaces the hard-coded `/ 4` and
+ * `* 4` constants that were only correct for 4/4. Mirrors the
+ * existing `beatsPerBar` parser but adds explicit support for
+ * "tintal" and any future meter the catalog may add.
  */
-export type RenderMode = "block" | "arp" | "block_then_arp";
+export function stepsPerBar(timeSignature: string): number {
+  switch (timeSignature) {
+    case "4/4":
+      return 4;
+    case "6/8":
+      return 6;
+    case "7/8":
+      return 7;
+    case "11/4":
+      return 11;
+    case "tintal":
+      return 16;
+    default:
+      // Fall back to the regex parser for any future meter.
+      return beatsPerBar(timeSignature);
+  }
+}
+
+/**
+ * Render shapes for the loop WAV export.
+ *  - block:           every chord as one block (sustained for the full bar).
+ *  - arp:             every chord broken into a sweeping arpeggio.
+ *  - block_then_arp:  alternate block / arp per bar — useful as a study pattern.
+ *  - mono:            each chord collapses to its top voice, played as a
+ *                     single sustained note for the full bar. Useful for
+ *                     melodic practice over a backing track.
+ */
+export type RenderMode = "block" | "arp" | "block_then_arp" | "mono";
 
 /**
  * Arpeggio version of `scheduleChord`: rather than ringing the chord as
@@ -255,6 +296,55 @@ function scheduleSingleNote(
 }
 
 /**
+ * Monophonic version: each chord collapses to its highest note, played
+ * as a single sustained tone that fills the full bar. Lets a player
+ * practice a melody on top of a single-note backing track that
+ * outlines the chord changes. The note sustains to the end of the
+ * bar with a short release tail (~25% of the bar) so the next bar
+ * starts cleanly without overlap.
+ */
+function scheduleTopVoice(
+  ctx: OfflineAudioContext,
+  out: AudioNode,
+  midis: number[],
+  startSec: number,
+  durSec: number,
+  instrument: InstrumentType,
+) {
+  if (!midis.length) return;
+  const top = Math.min(84, Math.max(36, Math.max(...midis)));
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 1.2;
+  filter.frequency.setValueAtTime(
+    Math.min(8000, midiToFreq(top) * 4),
+    startSec,
+  );
+  filter.connect(out);
+
+  const env = ctx.createGain();
+  // Full sustain across the bar, then release in the last 25%.
+  // The release completes right at the bar boundary so the next
+  // chord's attack lands on a clean signal — no overlapping tails.
+  const release = Math.min(0.3, durSec * 0.25);
+  const sustainDur = durSec - release;
+  env.gain.setValueAtTime(0.001, startSec);
+  env.gain.exponentialRampToValueAtTime(0.5, startSec + 0.04);
+  env.gain.setValueAtTime(0.5, startSec + sustainDur);
+  env.gain.exponentialRampToValueAtTime(0.001, startSec + durSec);
+  env.connect(filter);
+
+  const osc = ctx.createOscillator();
+  osc.type =
+    instrument === "pad" ? "sawtooth" : instrument === "sine" ? "sine" : "triangle";
+  osc.frequency.value = midiToFreq(top);
+  osc.connect(env);
+  osc.start(startSec);
+  osc.stop(startSec + durSec + 0.05);
+}
+
+/**
  * Render the entire path to a single mono WAV Blob.
  * Tempo → seconds-per-beat. Meter → beats-per-bar. Each chord occupies
  * exactly one bar. A 1-second tail is appended so the reverb release
@@ -297,9 +387,25 @@ export async function renderPathToWav(
   master.release.value = 0.2;
   master.connect(ctx.destination);
 
-  // Render every step as a one-bar chord at the bar boundary
+  // Render every step as a one-bar event at the bar boundary.
+  // Block + arp paths run the chord for the FULL bar; the envelope
+  // inside scheduleChord includes its own release tail that may
+  // bleed slightly into the next bar — that's the "ring out"
+  // effect, not silence. The previous version passed secPerBar * 0.9
+  // which left a literal gap of silence in the last 10% of each bar.
   path.steps.forEach((step, i) => {
     const startSec = i * secPerBar;
+    if (mode === "mono") {
+      scheduleTopVoice(
+        ctx,
+        master as unknown as AudioNode,
+        step.notes,
+        startSec,
+        secPerBar,
+        instrument,
+      );
+      return;
+    }
     const useArp =
       mode === "arp" ||
       (mode === "block_then_arp" && i % 2 === 1);
@@ -318,7 +424,7 @@ export async function renderPathToWav(
         master as unknown as AudioNode,
         step.notes,
         startSec,
-        secPerBar * 0.9,
+        secPerBar,
         instrument,
       );
     }

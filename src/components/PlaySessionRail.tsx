@@ -3,11 +3,15 @@ import { HarmonicPath, STUDIES_PATHS } from "../lib/paths";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
 import { midiToName, analyzeChord, type BehavioralMarker } from "../lib/theory";
+import { applyFilter, EMPTY_FILTER, type PathFilterState } from "../lib/pathFilters";
+import { PathFilterBar } from "./PathFilterBar";
+import { NOTE_NAMES } from "../lib/theory";
 import { RenderMode } from "../lib/loopWav";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { InspectPanel } from "./InspectPanel";
 import { InlineErrorPill } from "./InlineStatus";
+import { ToolChip } from "./StageFrame";
 import {
   Music,
   Play,
@@ -38,10 +42,6 @@ interface RailProps {
   setIsLooping: (v: boolean) => void;
   tempo: number;
   setTempo: (v: number) => void;
-  meter: string; // "4/4" | "3/4" | ...
-  beat: string;  // "metronome" | "jazz" | ...
-  setMeter: (v: string) => void;
-  setBeat: (v: string) => void;
   transposeShift: number;
   setTransposeShift: (v: number) => void;
   selectedPersonaId: string;
@@ -186,10 +186,6 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           setLoopBar={p.setLoopBar}
           tempo={p.tempo}
           setTempo={p.setTempo}
-          meter={p.meter}
-          beat={p.beat}
-          setMeter={p.setMeter}
-          setBeat={p.setBeat}
           transposeShift={p.transposeShift}
           setTransposeShift={p.setTransposeShift}
           persona={persona}
@@ -252,11 +248,16 @@ const MasterclassStage: React.FC<{
   activePathId?: string;
   onPickInApp: (id: string) => void;
 }> = ({ activePathId, onPickInApp }) => {
-  // Group by class family so the user can scan MC 1-10, MC 11-20, etc.
+  const [filter, setFilter] = useState<PathFilterState>(EMPTY_FILTER);
+
+  // Apply the active filter, then group by class family. When no
+  // filter is active, applyFilter is a no-op and all entries pass
+  // through — preserves the existing picker behavior.
+  const filteredEntries = applyFilter(MASTERCLASS_TUNES, filter);
   const groups: { label: string; entries: MasterclassEntry[] }[] = [];
   for (let lo = 1; lo <= 40; lo += 10) {
     const hi = lo + 9;
-    const entries = MASTERCLASS_TUNES.filter((t) =>
+    const entries = filteredEntries.filter((t) =>
       t.classes.some((c) => {
         const m = c.match(/MC (\d+)/);
         if (!m) return false;
@@ -272,8 +273,28 @@ const MasterclassStage: React.FC<{
         {availableTunes().length} of {MASTERCLASS_TUNES.length} tunes are wired into the app right now;
         the rest are listed as <em>coming soon</em> — picking one from the app set opens the path immediately.
       </div>
-      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-        {groups.map((g) => (
+      <div className="mb-3 surface-2 rounded-[var(--radius-md)] border border-[color:var(--color-border)] p-2">
+        <PathFilterBar
+          filter={filter}
+          onChange={setFilter}
+          totalCount={MASTERCLASS_TUNES.length}
+          filteredCount={filteredEntries.length}
+        />
+      </div>
+      {filteredEntries.length === 0 ? (
+        <div className="text-[11px] text-neutral-400 italic px-2 py-4 text-center">
+          No tagged tunes match this filter. Try fewer tags, or{" "}
+          <button
+            onClick={() => setFilter(EMPTY_FILTER)}
+            className="text-[color:var(--color-brand-strong)] underline"
+          >
+            clear filters
+          </button>
+          .
+        </div>
+      ) : (
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          {groups.map((g) => (
           <div key={g.label}>
             <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-mono mb-1.5 sticky top-0 surface-2 py-1">
               {g.label}
@@ -321,7 +342,8 @@ const MasterclassStage: React.FC<{
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -519,12 +541,10 @@ const PerformStage: React.FC<{
   setLoopBar?: (from: number | null, to: number | null) => void;
   tempo: number;
   setTempo: (v: number) => void;
-  meter: string;
-  beat: string;
-  setMeter: (v: string) => void;
-  setBeat: (v: string) => void;
   transposeShift: number;
   setTransposeShift: (v: number) => void;
+  metronomeOn?: boolean;
+  setMetronomeOn?: (v: boolean) => void;
   persona: Persona;
   personas: Persona[];
   selectedPersonaId: string;
@@ -542,8 +562,8 @@ const PerformStage: React.FC<{
   isLooping, setIsLooping,
   loopStartBar = null, loopEndBar = null, setLoopBar,
   tempo, setTempo,
-  meter, beat, setMeter, setBeat,
   transposeShift, setTransposeShift,
+  metronomeOn, setMetronomeOn,
   persona, personas, selectedPersonaId, onPersona,
   activeStepIndex, setActiveStepIndex,
   optimizedStepsNotes, behavioralMarkers, onPlayChord, onStopChord, onCommitVoicing,
@@ -597,13 +617,13 @@ const PerformStage: React.FC<{
           onClick={() => setAdvancedOpen(!advancedOpen)}
           className="px-2.5 py-2 rounded-xl text-xs font-mono text-neutral-500 hover:text-white"
         >
-          {advancedOpen ? "Hide" : "Show"} rhythm & meter
+          {advancedOpen ? "Hide" : "Show"} tempo
         </button>
       </div>
 
       {/* Advanced controls — collapsed by default, lives inline with transport */}
       {advancedOpen && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 p-3 rounded-xl bg-black/30 border border-white/5">
+        <div className="grid grid-cols-1 gap-3 mb-3 p-3 rounded-xl bg-black/30 border border-white/5">
           <div className="flex flex-col gap-1">
             <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Tempo</label>
             <div className="flex items-center gap-2 text-xs font-mono text-neutral-300">
@@ -619,30 +639,21 @@ const PerformStage: React.FC<{
             </div>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Meter</label>
-            <select
-              value={meter}
-              onChange={(e) => setMeter(e.target.value)}
-              className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
-            >
-              <option value="4/4">4/4</option>
-              <option value="3/4">3/4</option>
-              <option value="6/8">6/8</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Backing</label>
-            <select
-              value={beat}
-              onChange={(e) => setBeat(e.target.value)}
-              className="bg-neutral-800 text-xs text-neutral-300 rounded-lg px-2 py-1.5 outline-none"
-            >
-              <option value="none">No beat</option>
-              <option value="metronome">Metronome</option>
-              <option value="jazz">Jazz Ride</option>
-              <option value="bossa">Bossa</option>
-              <option value="techno">Techno</option>
-            </select>
+            <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Metronome</label>
+            <div className="flex items-center gap-2">
+              <ToolChip
+                active={!!metronomeOn}
+                onClick={() => setMetronomeOn?.(!metronomeOn)}
+                title={metronomeOn ? "Mute the metronome click" : "Unmute the metronome click"}
+              >
+                {metronomeOn ? "● On" : "○ Off"}
+              </ToolChip>
+              <span className="text-[10px] font-mono text-neutral-500">
+                {metronomeOn
+                  ? "Click track plays during playback"
+                  : "Silent — backing track keeps running"}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -929,6 +940,7 @@ const CommitStage: React.FC<{
             <option value="block">Full chords</option>
             <option value="arp">Arpeggio</option>
             <option value="block_then_arp">Block + Arp</option>
+            <option value="mono">Top-voice (mono)</option>
           </select>
         </div>
         <button
@@ -938,7 +950,7 @@ const CommitStage: React.FC<{
         >
           {isExportingWav
             ? "Rendering…"
-            : `↓ Download ${wavMode === "block" ? "chord" : wavMode === "arp" ? "arpeggio" : "block+arp"} WAV`}
+            : `↓ Download ${wavMode === "block" ? "chord" : wavMode === "arp" ? "arpeggio" : wavMode === "mono" ? "top-voice" : "block+arp"} WAV`}
         </button>
 
         {/* Inline status — replaces old alert() popups. Sits inside the

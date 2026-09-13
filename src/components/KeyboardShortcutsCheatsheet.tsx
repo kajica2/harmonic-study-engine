@@ -15,7 +15,9 @@ interface Shortcut {
   group: "Navigation" | "Playback" | "Modals" | "Mixer";
 }
 
-const SHORTCUTS: Shortcut[] = [
+// Exported so tests can verify handler/cheatsheet consistency. Don't
+// re-export from the index — the data shape is internal.
+export const SHORTCUTS: Shortcut[] = [
   // Navigation
   {
     keys: ["←", "→"],

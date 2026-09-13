@@ -98,7 +98,16 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+/* [role="button"] catches divs / spans styled as buttons (PlaySessionRail
+ * uses this pattern in a few places — the bar strip, the voicing
+ * chips). Without this rule, tabbing to them shows no ring.
+ *
+ * [tabindex]:not([tabindex="-1"]) covers any element made focusable
+ * via the tabindex attribute (excluding the focus-trap sentinel
+ * which ModalShell uses at tabindex=-1). */
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
   outline: 2px solid var(--color-brand-strong);
   outline-offset: 2px;
 }
@@ -151,4 +160,29 @@ textarea:focus-visible {
 .brass-strip {
   background: linear-gradient(90deg, transparent, var(--color-brand) 30%, var(--color-brand-strong) 50%, var(--color-brand) 70%, transparent);
   height: 2px;
+}
+
+/* Recording bar — peripheral "REC" indicator at the very top of the
+ * viewport. 4px tall, full-width, pulses red. Pinned at z-50 so it
+ * sits above the sticky header (z-30) and the recording pill
+ * (z-default). The pill carries the elapsed-time detail; the bar
+ * is for peripheral vision while the user watches the score.
+ * @keyframes recording-pulse is defined here so the animation is
+ * scoped to the .recording-bar class only (the global reduced-motion
+ * rule above shortens it to 0.01ms for users who prefer that). */
+.recording-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 50;
+  background: var(--color-err);
+  box-shadow: 0 0 8px var(--color-err);
+  animation: recording-pulse 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }

@@ -29,5 +29,5 @@
       ]
     }
   },
-  "exclude": ["dist", "**/*.test.ts"]
+  "exclude": ["dist", "**/*.test.ts", "**/*.test.tsx", "public/rnn-engine.bundle.js"]
 }

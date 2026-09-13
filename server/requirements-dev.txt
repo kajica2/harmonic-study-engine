@@ -1,0 +1,19 @@
+# Test-only deps for the FastAPI backend. NOT installed in production.
+#
+# Install alongside requirements.txt for local dev / CI:
+#   source .venv/bin/activate
+#   pip install -r server/requirements.txt -r server/requirements-dev.txt
+#
+# Or just:
+#   pip install -r server/requirements-dev.txt
+# (it transitively pulls the core requirements via pip's resolver
+# only if you put them in the same `pip install` invocation. The
+# script below assumes both files are installed.)
+#
+# Why pytest-asyncio in `auto` mode: FastAPI's `async def` handlers
+# are easier to exercise through `httpx.AsyncClient` against the
+# ASGI app than spinning up uvicorn in a subprocess.
+
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1

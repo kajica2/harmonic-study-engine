@@ -16,3 +16,19 @@ __pycache__/
 playwright-report/
 test-results/
 playwright/.cache/
+.pytest_cache/
+
+# Vitest coverage HTML report (default `coverage/` dir from --coverage)
+/coverage/
+
+# Lockfile drift between system Python and the venv (if a dev runs
+# `pip freeze` on either side, the result differs).
+/server/requirements-dev.lock
+.vercel
+
+# RNN engine bundle — build artifact. Re-emitted by `npm run build`
+# (which calls vite build --config vite.rnn.config.ts) into public/,
+# then copied to dist/ by the main vite build. Vercel serves it
+# from dist/rnn-engine.bundle.js after the build step in vercel.json
+# runs in CI. Source-of-truth is src/rnn-engine.ts.
+/public/rnn-engine.bundle.js

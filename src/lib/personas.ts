@@ -14,6 +14,11 @@ export type VisualTheme =
   | "dizzy"
   | "hubbard"
   | "shorter"
+  | "simone"
+  | "novaro"
+  | "getz"
+  | "rollins"
+  | "henderson"
   | "default";
 
 export type SynesthesiaStatus = "documented" | "interpretive";
@@ -64,7 +69,7 @@ export interface Persona {
   rhythmLayers?: string[];
   rules?: PersonaRules;
   // Original fields
-  originalSongId: string;
+  originalSongId: string; // references PATH id
   instrument: InstrumentType;
   tempo: number;
   arpType:
