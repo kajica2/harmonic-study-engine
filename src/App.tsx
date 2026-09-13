@@ -1,3 +1,28 @@
+// Composer-catalog v3: tiny helpers used by CoComposePanel.onAccept
+// to rebuild MIDI notes from a ChordAnalysis. ChordAnalysis loses
+// the raw input notes (analyzeChord discards them), so we rebuild
+// a root-position triad from the analyzed rootName + family.
+function rootNameToPc(name: string): number {
+  const NOTE_TO_PC: Record<string, number> = {
+    C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
+    "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+  };
+  return NOTE_TO_PC[name] ?? 0;
+}
+
+function triadFromRoot(
+  rootPc: number,
+  quality: "maj" | "min" | "dim" | "dom",
+): number[] {
+  const base = 60 + rootPc;
+  const third =
+    quality === "min" || quality === "dim" ? base + 3 : base + 4;
+  const fifth = quality === "dim" ? base + 6 : base + 7;
+  const notes = [base, third, fifth];
+  if (quality === "dom") notes.push(base + 10); // dominant 7th
+  return notes;
+}
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Play,
@@ -181,6 +206,7 @@ export default function App() {
     setQuizScore,
     feedbackHistory,
     setFeedbackHistory,
+    setHarmonicStep,
   } = session;
 
 
@@ -1197,7 +1223,9 @@ export default function App() {
 
         {/* CoComposePanel — "what if?" reharmonization suggestion.
             personaId biases the technique picker (Coltrane → major-third
-            modulations, Scriabin → Bartók axis modulations, etc.). */}
+            modulations, Scriabin → Bartók axis modulations, etc.).
+            onAccept applies the proposed substitution to the active
+            step in the active path via setHarmonicStep. */}
         {(() => {
           const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
           const seed = (path.id.charCodeAt(0) || 0) ^ ((activeBar + 1) * 0x9e3779b9);
@@ -1207,6 +1235,32 @@ export default function App() {
               barIndex={activeBar}
               seed={seed >>> 0}
               personaId={selectedPersonaId}
+              onAccept={(alt) => {
+                if (!alt.alternative) return;
+                // Apply the proposed substitution to the active bar
+                // (4 steps/bar). Builds a root-position triad from the
+                // analyzed alternative's rootName + family — same
+                // shape as proposeAlternative's `applyTechnique` output.
+                const rootName = alt.alternative.rootName;
+                const rootPc = rootNameToPc(rootName);
+                const family = alt.alternative.family;
+                const quality: "maj" | "min" | "dim" | "dom" =
+                  family === "minor" || family === "half-diminished"
+                    ? "min"
+                    : family === "dominant"
+                      ? "dom"
+                      : family === "diminished"
+                        ? "dim"
+                        : "maj";
+                const newStep = {
+                  name: rootName + (quality === "min" ? "m" : quality === "dom" ? "7" : ""),
+                  notes: triadFromRoot(rootPc, quality),
+                  descriptions: alt.alternative.roman,
+                };
+                for (let s = 0; s < STEPS_PER_BAR; s++) {
+                  setHarmonicStep(activeBar * STEPS_PER_BAR + s, newStep);
+                }
+              }}
             />
           );
         })()}
