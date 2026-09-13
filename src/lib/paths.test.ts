@@ -125,10 +125,10 @@ describe("ALL_PATHS backfill", () => {
   });
 
   it("ALL_PATHS includes PATHS + STUDIES_PATHS with no duplicate IDs", () => {
-    // PATHS is the post-padPath derived array. ALL_PATHS is currently
-    // aliased to PATHS (STUDIES_PATHS are surfaced separately through
-    // the Masterclass picker, see src/lib/paths.ts comments).
-    expect(ALL_PATHS.length).toBe(PATHS.length);
+    // PATHS is the curated set + concept paths; STUDIES_PATHS is the
+    // masterclass deep-dive block (Solar, Cherokee, …). ALL_PATHS is the
+    // union — the practice-session player uses it for the full catalog.
+    expect(ALL_PATHS.length).toBe(PATHS.length + STUDIES_PATHS.length);
     const ids = ALL_PATHS.map((p) => p.id);
     const set = new Set(ids);
     expect(set.size).toBe(ids.length);

@@ -20,8 +20,8 @@ import {
 import { VOICINGS } from "./theory";
 
 describe("PERSONAS array shape", () => {
-  it("has 17 entries (12 jazz/electronic + 5 classical from Phase 5)", () => {
-    expect(PERSONAS.length).toBe(17);
+  it("has 22 entries (12 jazz/electronic + 5 classical from Phase 5 + 5 new from main merge)", () => {
+    expect(PERSONAS.length).toBe(22);
   });
 
   it("every persona has id, name, role, quote, originalSongId", () => {

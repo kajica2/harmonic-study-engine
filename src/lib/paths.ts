@@ -1284,7 +1284,16 @@ export const RAW_PATHS: HarmonicPath[] = [
 import { CONCEPT_PATHS } from "./conceptPaths";
 import { STUDIES_PATHS as GENERATED_STUDIES_PATHS } from "./studies";
 
-export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS.map(padPath);
+export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS.map((p) => {
+  const padded = padPath(p);
+  // Backfill `name` from `title` so LiveScoreDisplay's abcjs header
+  // (which reads `name`) doesn't print "undefined" when the source
+  // entry only set `title`.
+  if (padded.name == null) {
+    return { ...padded, name: padded.title };
+  }
+  return padded;
+});
 
 /**
  * Curated PATHS exposed to consumers — already padded to the
@@ -1313,7 +1322,7 @@ export const PATHS: HarmonicPath[] = [...RAW_PATHS, ...CONCEPT_PATHS].map((p) =>
   return padded;
 });
 
-export const ALL_PATHS: HarmonicPath[] = PATHS;
+export const ALL_PATHS: HarmonicPath[] = [...PATHS, ...STUDIES_PATHS];
 
 /**
  * Look up a HarmonicPath across both curated PATHS and STUDIES_PATHS.
