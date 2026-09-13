@@ -64,6 +64,17 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   bus (WaveShaper, k=2.5, 4x oversample), per-note velocity
   scaling (bass softer, top louder; arpeggiator accents every
   4th step), FluidR3 soundfont caching across persona swaps.
+- **Composition layer (v0.3.0-composition-mvp)** — 9 layers of
+  compositional helpers behind the existing 22-persona, 78-path
+  shell. Pure-function pipeline: order-2 Markov melody (genre-
+  neutral core + persona-conditioned surface), species-1 voice-
+  leading rules (parallel 5ths/octaves flagged, 100% recall on a
+  100-case corpus), form planner (24-64 bar invariant), 4 style
+  packs (common-practice / jazz / modal / post-tonal), reharmoni-
+  zation proposer (4 substitution techniques), 50 curated quiz
+  questions + auto-gen fallback. See `docs/COMPOSITION-ENGINE-PLAN.md`
+  for the design, `docs/COMPOSITION-MVP-PLAN.md` for the implementation,
+  `docs/COMPOSITION.md` for the user tour.
 
 ## Surfaces
 
