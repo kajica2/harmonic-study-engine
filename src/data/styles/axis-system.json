@@ -1,0 +1,19 @@
+{
+  "id": "axis-system",
+  "name": "Axis system (Bartók-style)",
+  "description": "Symmetrical non-functional harmony. Keys relate by tritone and minor third rather than by fifth. Quartal voicings, folk-mode melodies, axis-based modulations. Used for modernist works where functional V–I is replaced by symmetrical key relationships.",
+  "constraints": {
+    "forbiddenIntervals": [],
+    "allowedNCTs": [
+      "passingTone",
+      "neighborTone",
+      "anticipation",
+      "escapeTone",
+      "suspension",
+      "pedal",
+      "modalMixture",
+      "chromaticApproach"
+    ],
+    "requiredResolutions": []
+  }
+}
