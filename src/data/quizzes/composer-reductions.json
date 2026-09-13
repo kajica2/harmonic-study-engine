@@ -1,0 +1,242 @@
+[
+  {
+    "id": "cr-beethoven-1",
+    "topic": "composer-reductions",
+    "prompt": "In the exposition opening of Beethoven's Symphony No. 5 (C minor), bar 10 has which chord?",
+    "options": ["Cm (i)", "Db (bII — Neapolitan)", "Eb (III)", "G7 (V7)"],
+    "correct": 1,
+    "explanation": "Bar 10 is the Neapolitan (Db major), approached from iv in bar 9. Beethoven delays the dominant until bar 18 — a hallmark of his dramatic pacing."
+  },
+  {
+    "id": "cr-beethoven-2",
+    "topic": "composer-reductions",
+    "prompt": "What does the Eb (III) chord in bars 5–8 of Beethoven's Symphony No. 5 represent?",
+    "options": ["Subdominant", "Mediant relationship replacing dominant preparation", "Picardy third", "Tritone substitution"],
+    "correct": 1,
+    "explanation": "The motion from i (Cm) to III (Eb) and VI (Ab) is a mediant relationship — Beethoven uses it to defer the dominant arrival, building dramatic tension."
+  },
+  {
+    "id": "cr-schubert-1",
+    "topic": "composer-reductions",
+    "prompt": "In 'Gute Nacht' from Winterreise, what key does the verse modulate to before returning to D major?",
+    "options": ["F major (bIII)", "Bb major (bVI)", "G major (IV of D)", "A major (V)"],
+    "correct": 0,
+    "explanation": "Schubert reaches bIII (F major, bars 17-24) without preparing it as a dominant. This mediant motion, not V–I, drives the form."
+  },
+  {
+    "id": "cr-schubert-2",
+    "topic": "composer-reductions",
+    "prompt": "What happens to the tonic at bar 25 of 'Gute Nacht'?",
+    "options": ["Returns to D minor", "Shifts to D major (parallel major)", "Modulates to G major", "Drops to D flat major"],
+    "correct": 1,
+    "explanation": "Bar 25 shifts to D major (parallel major) for the same melodic material. Modal mixture becomes the emotional punchline of the song."
+  },
+  {
+    "id": "cr-chopin-1",
+    "topic": "composer-reductions",
+    "prompt": "In Chopin's Prelude op. 28 no. 4 (E minor), the bass descends chromatically while the harmony moves through which sequence?",
+    "options": ["ii – V – I – vi", "bVI – iv – vii°7 – V7 – i", "I – IV – V – I", "i – III – VII – i"],
+    "correct": 1,
+    "explanation": "Chopin moves through bVI (C), iv (Am/C), vii°7 (C#dim7), and V7 (B7) — non-functional chords that delay the dominant and create suspension rather than closure."
+  },
+  {
+    "id": "cr-chopin-2",
+    "topic": "composer-reductions",
+    "prompt": "What does the C#dim7 chord (bar 15) in Chopin's E-minor Prelude represent?",
+    "options": ["Dominant", "vii°7 (leading-tone diminished seventh)", "Tritone substitution", "Augmented sixth"],
+    "correct": 1,
+    "explanation": "The C#dim7 is vii°7 — the leading-tone diminished seventh, pulling toward i (Em). Chopin repeats it to delay the dominant resolution."
+  },
+  {
+    "id": "cr-wagner-1",
+    "topic": "composer-reductions",
+    "prompt": "The Tristan chord is spelled which way in the Prelude to Tristan und Isolde?",
+    "options": ["F – A – C – Eb", "F – B – D# – G#", "C – E – G – Bb", "D – F# – A – C"],
+    "correct": 1,
+    "explanation": "The Tristan chord (F – B – D# – G#) stacks an augmented fourth, major third, and perfect fifth. Wagner never lets it settle — every resolution is immediately re-dissonated."
+  },
+  {
+    "id": "cr-wagner-2",
+    "topic": "composer-reductions",
+    "prompt": "What Roman-numeral function does Wagner usually assign the Tristan chord?",
+    "options": ["V7", "bVI7 (altered)", "iv (Neapolitan)", "ii°7"],
+    "correct": 1,
+    "explanation": "The Tristan chord is most commonly analyzed as an altered bVI7. Its resolution is ambiguous and constantly deferred — the practical end of functional tonality in the 19th century."
+  },
+  {
+    "id": "cr-verdi-1",
+    "topic": "composer-reductions",
+    "prompt": "In Verdi's Otello reduction, what marks the dramatic 'mode collapse'?",
+    "options": ["A tritone substitution", "The shift from C major to C minor (bar 15)", "An augmented sixth", "A Picardy third"],
+    "correct": 1,
+    "explanation": "Bar 15 is Cm — the modal collapse from C major to C minor. Verdi's late harmony tracks dramatic pacing: stable I–IV–V for lyric passages, borrowed iv and bVI for betrayal, mode collapse for climax."
+  },
+  {
+    "id": "cr-verdi-2",
+    "topic": "composer-reductions",
+    "prompt": "What does the Fm (iv) chord in bar 4 of the Otello reduction represent?",
+    "options": ["Subdominant minor (modal mixture)", "Neapolitan", "Tritone substitution", "Passing chord"],
+    "correct": 0,
+    "explanation": "The Fm (iv) against F (IV) is modal mixture — borrowing from the parallel minor. It's the dramatic pivot in bar 4."
+  },
+  {
+    "id": "cr-liszt-1",
+    "topic": "composer-reductions",
+    "prompt": "What harmony dominates Liszt's Nuages gris, and why does it resist functional resolution?",
+    "options": ["Diminished sevenths", "Augmented triads (symmetrical — no stable root)", "Augmented sixths", "Whole-tone collections only"],
+    "correct": 1,
+    "explanation": "Nuages gris uses parallel augmented triads (Caug, Eaug, etc.). Augmented triads are symmetrical — they have no stable root and no functional resolution. Liszt ends without a cadence, a direct precursor to Debussy and to atonality."
+  },
+  {
+    "id": "cr-liszt-2",
+    "topic": "composer-reductions",
+    "prompt": "In Nuages gris, the tonic G#m is suspended between which two colors?",
+    "options": ["Bb (bII) and C (bIII)", "F# (V) and A (bVI)", "C# (ii) and D (III)", "Eb (VI) and D# (vii)"],
+    "correct": 0,
+    "explanation": "G#m sits between Bb (bII) and C/Caug (bIII). The piece moves through bIII+ augmented colors and bII (with enharmonic shift) — both flat-side, both non-functional."
+  },
+  {
+    "id": "cr-ellington-1",
+    "topic": "composer-reductions",
+    "prompt": "In Mood Indigo, what is unique about the opening four bars?",
+    "options": ["The bass descends chromatically (Bb–Ab–Gb–F) while the top voice holds Bb", "The harmony moves entirely by V–I", "The chords are all parallel triads", "It's a 12-bar blues"],
+    "correct": 0,
+    "explanation": "The opening four bars hold Bb in the top voice while the bass descends chromatically (Bb–Ab–Gb–F). This creates extended, altered sonorities over a static tonic — Ellington writes harmony as color and voicing rather than as chord function alone."
+  },
+  {
+    "id": "cr-ellington-2",
+    "topic": "composer-reductions",
+    "prompt": "In Mood Indigo, the Ebm (iv) in bar 7 is an example of what technique?",
+    "options": ["Tritone substitution", "Modal mixture", "Neapolitan", "Passing diminished"],
+    "correct": 1,
+    "explanation": "The Ebm (iv) is modal mixture — borrowing the minor mode against the Bb major tonic. It darkens the color and signals the harmonic-as-palette approach."
+  },
+  {
+    "id": "cr-armstrong-1",
+    "topic": "composer-reductions",
+    "prompt": "What is the form of West End Blues' harmony?",
+    "options": ["32-bar AABA", "12-bar blues", "16-bar song form", "Through-composed"],
+    "correct": 1,
+    "explanation": "West End Blues uses a standard 12-bar blues progression. Armstrong's innovation is rhythmic and melodic — making the soloist the main voice, implying blues harmony through phrasing."
+  },
+  {
+    "id": "cr-armstrong-2",
+    "topic": "composer-reductions",
+    "prompt": "What role does the F7 (V7) chord play in West End Blues bar 12?",
+    "options": ["Resolution to tonic", "Turnaround (back to the top of the form)", "Tritone substitution", "Secondary dominant"],
+    "correct": 1,
+    "explanation": "The F7 (V7) at bar 12 is the turnaround — re-establishing dominant tension to return to bar 1. Armstrong's phrasing implies the harmony through rhythmic invention more than chord substitution."
+  },
+  {
+    "id": "cr-miles-1",
+    "topic": "composer-reductions",
+    "prompt": "In So What, what are the two modal centers and how are they related?",
+    "options": ["D Dorian and Eb Dorian, a half-step apart", "C major and A minor, a third apart", "F Dorian and G Dorian, a whole step apart", "Bb major and Eb major, a fourth apart"],
+    "correct": 0,
+    "explanation": "So What uses only D Dorian and Eb Dorian, a half-step apart. There is no functional V–I — the harmony is a static field for improvisation, with quartal voicings (E–A–D–G–B) that avoid thirds."
+  },
+  {
+    "id": "cr-miles-2",
+    "topic": "composer-reductions",
+    "prompt": "What voicing technique does Miles Davis's So What use to make the mode ambiguous?",
+    "options": ["Parallel major triads", "Quartal stacks (built in fourths)", "Drop-2 voicings", "Shell voicings only"],
+    "correct": 1,
+    "explanation": "So What uses quartal stacks: E–A–D–G–B, built in fourths. Avoiding thirds keeps the mode ambiguous — neither major nor minor is implied."
+  },
+  {
+    "id": "cr-coltrane-1",
+    "topic": "composer-reductions",
+    "prompt": "What is the major-third cycle in Giant Steps?",
+    "options": ["B – G – Eb – B (tonics a major third apart)", "C – F – Bb – Eb (fourths)", "D – G – C – F (fifths)", "Bb – Eb – Ab – Db (tritones)"],
+    "correct": 0,
+    "explanation": "Giant Steps compresses three tonal centers a major third apart into a 16-bar form: B – G – Eb – B. Each tonic is approached by its own V7, creating rapid modulation by major thirds."
+  },
+  {
+    "id": "cr-coltrane-2",
+    "topic": "composer-reductions",
+    "prompt": "What does the F#7 chord in bar 10 of Giant Steps function as?",
+    "options": ["V7/ii (tritone sub for the ii–V of B)", "Dominant of B", "Backdoor dominant", "Tonicization of G"],
+    "correct": 0,
+    "explanation": "F#7 is V7/ii — a tritone substitute resolving to Bmaj7. Coltrane changes use tritone subs liberally to compress modulation."
+  },
+  {
+    "id": "cr-beatles-1",
+    "topic": "composer-reductions",
+    "prompt": "In A Day in the Life, what is unusual about the verse's bass line?",
+    "options": ["It descends chromatically (Am/G – Am/F# – F)", "It alternates tonic and dominant", "It stays on root position", "It moves by whole steps only"],
+    "correct": 0,
+    "explanation": "The Am – Am/G – Am/F# – F descent is a chromatic bass line that creates modal mixture. The verse itself is diatonic above, but the bass introduces the borrowed colors."
+  },
+  {
+    "id": "cr-beatles-2",
+    "topic": "composer-reductions",
+    "prompt": "What is the relationship between the verse (G major) and the middle section of A Day in the Life?",
+    "options": ["Same key, different voicing", "Modulates to E major (V of G)", "Subdominant modulation to C major", "Tritone modulation to Db major"],
+    "correct": 1,
+    "explanation": "The middle section modulates away from G major into E major (commonly read as such), then returns to G. The orchestral crescendo is a non-harmonic structural device."
+  },
+  {
+    "id": "cr-kraftwerk-1",
+    "topic": "composer-reductions",
+    "prompt": "What is the harmonic structure of Trans-Europe Express?",
+    "options": ["A 12-bar blues", "A static D-minor modal loop with bVI / bVII colors", "AABA jazz form", "Through-composed modulation"],
+    "correct": 1,
+    "explanation": "Trans-Europe Express reduces to a static D-minor modal loop with bVI (Bb) and bVII (C) colors. Kraftwerk reduces harmony to short, repetitive modal loops — the interest is rhythm, timbre, and sequencing."
+  },
+  {
+    "id": "cr-kraftwerk-2",
+    "topic": "composer-reductions",
+    "prompt": "What role does harmony play in Kraftwerk's Trans-Europe Express?",
+    "options": ["Narrative progression", "Repeating grid", "Modal mixture only", "Whole-tone field"],
+    "correct": 1,
+    "explanation": "Harmony functions as a repeating grid rather than a narrative. Kraftwerk's template is the foundation for synth-pop, hip-hop, and techno — repetitive, modal, machine-driven."
+  },
+  {
+    "id": "cr-piazzolla-1",
+    "topic": "composer-reductions",
+    "prompt": "What makes Piazzolla's Adiós Nonino harmonic language 'nuevo tango'?",
+    "options": ["Pure functional V–I", "Jazz harmony (bII, bVI) + chromatic bass motion + classical counterpoint", "Whole-tone scales", "Serial twelve-tone rows"],
+    "correct": 1,
+    "explanation": "Piazzolla combines tango rhythm with jazz harmony, chromatic bass motion, and classical counterpoint. The bII (Bb) and bVI (F) create a dark, non-functional color typical of nuevo tango."
+  },
+  {
+    "id": "cr-piazzolla-2",
+    "topic": "composer-reductions",
+    "prompt": "What device unifies the two halves of Adiós Nonino's reduction (bars 1-8 vs 9-16)?",
+    "options": ["Each half has its own key area (Am + bVI colors, then Dm + bIII)", "Both use the same chord progression", "Both stay on tonic", "Both cycle through all 12 keys"],
+    "correct": 0,
+    "explanation": "The first half (bars 1-8) uses Am with bVI (F) and bVII (E7). The second half (bars 9-16) introduces Dm (iv) and C (bIII) and Bb (bII), adding darker jazz colors before returning to Am."
+  },
+  {
+    "id": "cr-fela-1",
+    "topic": "composer-reductions",
+    "prompt": "What is the harmonic structure of Fela Kuti's Zombie?",
+    "options": ["12-bar blues", "Static modal vamp (Em / D bVII)", "AABA jazz form", "Through-composed"],
+    "correct": 1,
+    "explanation": "Zombie uses a static modal vamp alternating between Em (i) and D (bVII). Harmony is a static modal vamp; development happens through rhythm, horn arrangement, call-and-response, and groove length rather than through chord progression."
+  },
+  {
+    "id": "cr-fela-2",
+    "topic": "composer-reductions",
+    "prompt": "How does Fela add harmonic color over the Em / D vamp?",
+    "options": ["Through two-tenor and baritone horn lines in parallel thirds, fourths, and sixths", "Through complex chord substitutions", "Through whole-tone scales", "Through twelve-tone rows"],
+    "correct": 0,
+    "explanation": "Two-tenor and baritone horn lines often move in parallel thirds, fourths, and sixths, adding jazz-style harmonic color over the modal vamp — Afrobeat's signature harmonic texture."
+  },
+  {
+    "id": "cr-carlos-1",
+    "topic": "composer-reductions",
+    "prompt": "What is Wendy Carlos's harmonic innovation beyond the original Bach score?",
+    "options": ["Modal mixture", "Just intonation and alternate temperaments", "Serial rows", "Whole-tone scales"],
+    "correct": 1,
+    "explanation": "The harmony is Bach's functional tonality; the innovation is timbre and tuning. A Moog synthesizer realizes the progression with electronic sound, and Carlos explored just intonation, where thirds and fifths are tuned pure rather than equal-tempered."
+  },
+  {
+    "id": "cr-carlos-2",
+    "topic": "composer-reductions",
+    "prompt": "In Carlos's reduction of WTC I Prelude No. 1 (C major), what is unusual about the bass motion?",
+    "options": ["The bass holds C throughout", "Most chords have C in the bass (pedal-point-style figures)", "The bass descends chromatically", "The bass moves by tritone"],
+    "correct": 1,
+    "explanation": "Almost every chord in Carlos's reduction has C in the bass — Dm7/C, Am7/C, D7/C, F/C — emphasizing the tonic pedal Bach's prelude builds on. The inversions create the smooth voice-leading characteristic of the piece."
+  }
+]
