@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import type { PracticeSet, PracticeSession } from "../lib/paths";
+import type { HarmonicPath, PracticeSet, PracticeSession } from "../lib/paths";
 import { playbackClock } from "../lib/playbackClock";
 import { saveSession } from "../lib/practiceStore";
-import { ALL_PATHS } from "../lib/paths";
+import { ALL_PATHS, STUDIES_PATHS, findPathById } from "../lib/paths";
 import {
   Play,
   Pause,
@@ -49,10 +49,13 @@ export function PracticeSessionPlayer({
 }: Props) {
   const { tempo, reps, transposeSemitones } = options;
 
-  // Resolve path items to full HarmonicPath objects from ALL_PATHS
+  // Resolve path items to full HarmonicPath objects from across
+  // PATHS + STUDIES_PATHS — practice sets can reference either
+  // curated educational paths or masterclass songs (which now live
+  // only in STUDIES_PATHS, not in ALL_PATHS).
   const resolvedItems = set.items
     .map((item) => {
-      const path = ALL_PATHS.find((p) => p.id === item.pathId);
+      const path = findPathById(item.pathId);
       if (!path) return null;
       // Slice bars if startBar/endBar provided
       if (item.startBar != null || item.endBar != null) {
@@ -67,7 +70,7 @@ export function PracticeSessionPlayer({
       }
       return path;
     })
-    .filter(Boolean) as typeof ALL_PATHS;
+    .filter(Boolean) as HarmonicPath[];
 
   if (resolvedItems.length === 0) {
     return (
@@ -291,7 +294,12 @@ export function PracticeSessionPlayer({
   const currentPath = resolvedItems[state.currentItemIndex];
   const currentStepIndex = prevStepRef.current;
   const currentStep = currentPath?.steps[currentStepIndex];
-  const currentPathIndex = ALL_PATHS.findIndex((p) => p.id === resolvedItems[state.currentItemIndex].id);
+  // Look up across PATHS + STUDIES_PATHS since resolved items can
+  // include masterclass songs now. -1 if the path isn't found anywhere
+  // (caller must guard).
+  const currentPathIndex = [...ALL_PATHS, ...STUDIES_PATHS].findIndex(
+    (p) => p.id === resolvedItems[state.currentItemIndex]?.id,
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -398,7 +406,7 @@ export function PracticeSessionPlayer({
       {/* Step dots */}
       <div className="flex flex-wrap gap-1 justify-center">
         {resolvedItems.map((p, pi) =>
-          p.steps.map((_, si) => (
+          p.steps.map((_step: unknown, si: number) => (
             <div
               key={`${pi}-${si}`}
               className={`w-1.5 h-1.5 rounded-full transition-colors ${

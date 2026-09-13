@@ -18,7 +18,7 @@ import re
 import subprocess
 from pathlib import Path
 
-REPO = Path("/Users/kajicadjuric/harmonic-study-engine")
+REPO = Path("/Users/kaidejuricmasscmbook/Documents/github-recovery/harmonic-study-engine")
 
 # The same SONGS dict as the iReal encoder. Kept inline so this
 # script is self-contained — one source of truth per artifact family.
@@ -175,6 +175,142 @@ SONGS = [
         "style": "Blues",
         "chords": "T44 |F7 |F7 |F7 |F7 |Bb7 |Bb7 |F7 |F7 |C7 |C7 |F7 |D7 Gm7 C7",
     },
+    {
+        "title": "Body and Soul",
+        "composer": "Johnny Green",
+        "key": "Db",
+        "tempo": 80,
+        "style": "Ballad",
+        "chords": "T44 |Dbmaj7 |Gbm7 |Fm7 |Bbm7 |Ebm7 Ab7 |Dbmaj7 |Dbm7 Gb7 |Cmaj7 |Cmaj7 |C7 |C7 |Fm7 |Fm7 |Bbm7 |Ebm7 Ab7 |Dbmaj7 |Dbm7 Gb7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 Ab7 |Dbmaj7",
+    },
+    {
+        "title": "All the Things You Are",
+        "composer": "Jerome Kern",
+        "key": "Ab",
+        "tempo": 130,
+        "style": "Swing Medium",
+        "chords": "T44 |Abmaj7 |Fm7 |Bbm7 |Eb7 |Abmaj7 |Dbmaj7 |G7 |Cmaj7 |Cm7 |Fm7 |Bbm7 |Eb7 |Abmaj7 |D7 |Gmaj7 |Gmaj7 |Abmaj7 |Fm7 |Bbm7 |Eb7 |Abmaj7 |Dbmaj7 |G7 |Cmaj7 |Cm7 |F7 |Bbm7 |Eb7 |Abmaj7",
+    },
+    {
+        "title": "Autumn Leaves",
+        "composer": "Joseph Kosma",
+        "key": "G-",
+        "tempo": 130,
+        "style": "Swing Medium",
+        "chords": "T44 |Am7 |D7 |Gmaj7 |Gmaj7 |Am7 |D7 |Gmaj7 |Gmaj7 |F#m7b5 |B7 |Em7 |A7 |Am7 |D7 |Gmaj7 |Gmaj7 |Cmaj7 |Cmaj7 |F#m7b5 |B7 |Em7 |C7 |Fmaj7 |Bm7b5 E7 |Am7 |D7 |Gmaj7 |Gmaj7 |Am7 |D7 |Gmaj7 |Gmaj7",
+    },
+    {
+        "title": "Blue Bossa",
+        "composer": "Kenny Dorham",
+        "key": "C-",
+        "tempo": 120,
+        "style": "Latin",
+        "chords": "T44 |Cm7 |Cm7 |Fm7 |Fm7 |Dm7b5 G7 |Cm7 |Cm7 |Abmaj7 |Abmaj7 |Dm7b5 G7 |Cm7 |Cm7 |Fm7 |Fm7 |Dm7b5 G7 |Cm7 |Cm7",
+    },
+    {
+        "title": "In a Sentimental Mood",
+        "composer": "Duke Ellington",
+        "key": "F",
+        "tempo": 70,
+        "style": "Ballad",
+        "chords": "T44 |Fmaj7 |Fmaj7 |Fm7 Bbm7 |Fmaj7 |D7 Gm7 |C7 |Fmaj7 Fm7 |Bbm7 |Am7 D7 |Gm7 |C7 |Fmaj7 |Fmaj7 |Fm7 Bbm7 |Fmaj7 |D7 Gm7 |C7 |Fmaj7 Fm7 |Bbm7 |Am7 D7 |Gm7 |C7 |Fmaj7",
+    },
+    {
+        "title": "Take the A Train",
+        "composer": "Billy Strayhorn",
+        "key": "C",
+        "tempo": 140,
+        "style": "Swing Medium",
+        "chords": "T44 |Cmaj7 |Cmaj7 |Dm7 G7 |Cmaj7 |Dm7 G7 |Cmaj7 |Dm7 G7 |Cmaj7 |Dm7 G7 |Cmaj7 |Fmaj7 |Fmaj7 |Em7 A7 |Dm7 G7 |Dm7 G7 |Cmaj7 |Am7 |D7 |Dm7 |G7 |Cmaj7 |Cmaj7 |C7 |C7 |Fmaj7 |Fmaj7 |Em7 A7 |Dm7 G7 |Dm7 G7 |Cmaj7 |Cmaj7 |Cmaj7",
+    },
+    {
+        "title": "Misty",
+        "composer": "Erroll Garner",
+        "key": "Eb",
+        "tempo": 80,
+        "style": "Ballad",
+        "chords": "T44 |Ebmaj7 |G7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |C7 |Fm7 |Bb7 |Ebmaj7 |G7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |C7 |Fm7 |Bb7 |Ebmaj7 |C7 |Fm7 |Bb7 |Ebm7 Ab7 |Dbmaj7 |Dbmaj7 |Ebmaj7 |Ebmaj7 |G7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |C7 |Fm7 |Bb7",
+    },
+    {
+        "title": "'Round Midnight",
+        "composer": "Thelonious Monk",
+        "key": "Eb-",
+        "tempo": 80,
+        "style": "Ballad",
+        "chords": "T44 |Ebm7 |Ab7 |Dbmaj7 |Dbmaj7 |Ebm7 |Ab7 |Dbmaj7 |Dbmaj7 |Cm7 |F7 |Bbmaj7 |G7b9 |Cm7 |F7 |Bbm7 |Ebm7 Ab7 |Ebm7 |Ab7 |Dbmaj7 |Dbmaj7 |Ebm7 |C7b9 |Fm7 |Bb7 |Ebm7 |Ab7 |Dbmaj7 |Dbmaj7 |Cm7 |F7 |Bbm7 |Ebm7",
+    },
+    {
+        "title": "Satin Doll",
+        "composer": "Duke Ellington",
+        "key": "Ab",
+        "tempo": 130,
+        "style": "Swing Medium",
+        "chords": "T44 |Abmaj7 |Am7 D7 |Gmaj7 |F#m7 B7 |Em7 |A7 |Dm7 |G7 |Abmaj7 |Am7 D7 |Gmaj7 |F#m7 B7 |Em7 |A7 |Dm7 |G7 |Cm7 |F7 |Bbmaj7 |Am7 D7 |Gmaj7 |F#m7 B7 |Em7 |A7 |Dm7 |G7 |Cmaj7 |Cmaj7 |F7 |F7 |Bbm7 |Ebmaj7",
+    },
+    {
+        "title": "Sophisticated Lady",
+        "composer": "Duke Ellington",
+        "key": "Db",
+        "tempo": 90,
+        "style": "Ballad",
+        "chords": "T44 |Dbmaj7 |Dbmaj7 |Dbm7 Gb7 |Cmaj7 |Cm7 F7 |Bbm7 |Ebm7 Ab7 |Dbmaj7 |Dbmaj7 |Dbmaj7 |Dbmaj7 |Dbm7 Gb7 |Cmaj7 |Cm7 F7 |Bbm7 |Ebm7 Ab7 |Dbmaj7",
+    },
+    {
+        "title": "Mood Indigo",
+        "composer": "Duke Ellington",
+        "key": "F",
+        "tempo": 80,
+        "style": "Ballad",
+        "chords": "T44 |Fm7 |Fm7 |Cm7 |Cm7 |Fm7 |D7 |Gm7 |C7 |Fm7 |Cm7 |Fm7 |D7 |Gm7 |C7 |Fm7 |Fm7 |Cm7 |Cm7 |Fm7 |D7 |Gm7 |C7 |Fm7 |Cm7 |Fm7 |D7 |Gm7 |C7 |Fm7",
+    },
+    {
+        "title": "Donna Lee",
+        "composer": "Charlie Parker",
+        "key": "Ab",
+        "tempo": 230,
+        "style": "Swing Up",
+        "chords": "T44 |Abmaj7 |F7 |Bbm7 |Bbm7 |Abmaj7 |F7 |Bbm7 |Bbm7 |Abmaj7 |F7 |Bbm7 |Bbm7 |Cm7 |F7 |Bbm7 |Cm7 F7 |Gmaj7 |Gmaj7 |Fm7 |Fm7 |Bbm7 |Eb7 |Abmaj7 |Dbmaj7 |Bbm7 |Bbm7 |Cm7 |F7 |Bbm7 |Bbm7 |Cm7 |F7",
+    },
+    {
+        "title": "Anthropology",
+        "composer": "Charlie Parker",
+        "key": "Ab",
+        "tempo": 230,
+        "style": "Swing Up",
+        "chords": "T44 |Abmaj7 |F7 |Bbm7 |Bbm7 |Abmaj7 |F7 |Bbm7 |Bbm7 |Abmaj7 |F7 |Bbm7 |Bbm7 |Cm7 |F7 |Bbm7 |Cm7 F7 |Gmaj7 |Gmaj7 |Fm7 |Fm7 |Bbm7 |Eb7 |Abmaj7 |Dbmaj7 |Bbm7 |Bbm7 |Cm7 |F7 |Bbm7 |Bbm7 |Cm7 |F7",
+    },
+    {
+        "title": "Scrapple from the Apple",
+        "composer": "Charlie Parker",
+        "key": "F",
+        "tempo": 220,
+        "style": "Swing Up",
+        "chords": "T44 |Fmaj7 |D7 |Gm7 |Gm7 |Fmaj7 |D7 |Gm7 |Gm7 |Fmaj7 |D7 |Gm7 |Gm7 |Am7 |D7 |Gm7 |Gm7 |Cmaj7 |Cmaj7 |Bbm7 |Bbm7 |Am7 |D7 |Gm7 |C7 |Fmaj7 |D7 |Gm7 |Gm7 |Am7 |D7 |Gm7 |C7",
+    },
+    {
+        "title": "Au Privave",
+        "composer": "Charlie Parker",
+        "key": "Bb",
+        "tempo": 220,
+        "style": "Swing Up",
+        "chords": "T44 |Bb6 |Bb6 |Bb6 |Bb6 |G7 |G7 |Bb6 |Bb6 |Cm7 |F7 |Bb6 |F7 |Bb6 |Bb6 |Bb6 |Bb6 |G7 |G7 |Bb6 |Bb6 |Cm7 |F7 |Bb6 |F7",
+    },
+    {
+        "title": "Now's the Time",
+        "composer": "Charlie Parker",
+        "key": "F",
+        "tempo": 150,
+        "style": "Blues",
+        "chords": "T44 |F7 |F7 |F7 |F7 |Bb7 |Bb7 |F7 |F7 |C7 |C7 |F7 |D7 Gm7 C7 |F7 |F7 |F7 |F7 |Bb7 |Bb7 |F7 |F7 |C7 |C7 |F7 |D7 Gm7 C7",
+    },
+    {
+        "title": "Tenor Madness",
+        "composer": "Sonny Rollins",
+        "key": "Bb",
+        "tempo": 140,
+        "style": "Swing Medium",
+        "chords": "T44 |Bb7 |Bb7 |Bb7 |Bb7 |Eb7 |Eb7 |Bb7 |Bb7 |F7 |F7 |Bb7 |F7 |Bb7 |Bb7 |Bb7 |Bb7 |Eb7 |Eb7 |Bb7 |Bb7 |F7 |F7 |Bb7 |F7",
+    },
 ]
 
 
@@ -200,7 +336,18 @@ def intervals_for_quality(quality: str):
     quality = quality.replace("^", "maj").replace("-", "m").replace("ø", "m7b5").replace("o", "dim").replace("h", "m7b5")
     if quality.startswith("m7b5"):
         ints = [0, 3, 6, 10]
-    elif quality.startswith("min") or quality.startswith("m"):
+    # IMPORTANT: order matters. "Cmaj7" has quality="maj7" which starts
+    # with "m", so the bare `quality.startswith("m")` below would
+    # mis-classify it as a mMaj7 ([0, 3, 7, 11]). Guard with
+    # `not quality.startswith("maj")` so "Cmaj7" / "FM7" / "BbM7" all
+    # fall through to the explicit "maj7"/"M7" branch lower down that
+    # returns the correct Maj7 ([0, 4, 7, 11]). The inner
+    # `if "maj7" in quality` below still handles true mMaj7 notation
+    # like "CmMaj7" / "m(maj7)" / "minMaj7".
+    elif (
+        (quality.startswith("min") or quality.startswith("m"))
+        and not quality.startswith("maj")
+    ):
         if "maj7" in quality: ints = [0, 3, 7, 11]
         elif "7" in quality: ints = [0, 3, 7, 10]
         elif "9" in quality: ints = [0, 3, 7, 10, 14]

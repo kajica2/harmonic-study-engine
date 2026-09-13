@@ -97,6 +97,7 @@ class BackingEngine {
   private masterBus: GainNode | null = null;
   private drumBus: GainNode | null = null;
   private bassBus: GainNode | null = null;
+  private bassEq: BiquadFilterNode | null = null;
   private pianoBus: GainNode | null = null;
   private levels: BackingLevels = DEFAULT_LEVELS;
   private style: BackingStyle = "off";
@@ -142,6 +143,14 @@ class BackingEngine {
     this.drumBus = this.ctx.createGain();
     this.drumBus.gain.value = this.levels.drums;
 
+    // EQ: highpass on bass to remove DC offset and sub-bass rumble.
+    // Catches frequencies below 35 Hz that would otherwise push the
+    // speaker cone without adding musical content.
+    this.bassEq = this.ctx.createBiquadFilter();
+    this.bassEq.type = "highpass";
+    this.bassEq.frequency.value = 35;
+    this.bassEq.Q.value = 0.7;
+
     this.bassBus = this.ctx.createGain();
     this.bassBus.gain.value = this.levels.bass;
 
@@ -149,7 +158,8 @@ class BackingEngine {
     this.pianoBus.gain.value = this.levels.piano;
 
     this.drumBus.connect(this.masterBus);
-    this.bassBus.connect(this.masterBus);
+    this.bassBus.connect(this.bassEq);
+    this.bassEq.connect(this.masterBus);
     this.pianoBus.connect(this.masterBus);
 
     this.masterBus.connect(this.ctx.destination);
@@ -311,8 +321,10 @@ class BackingEngine {
     const e = q / 2; // eighth note duration
     const s = q / 4; // sixteenth note duration
 
-    // Find the chord root for bass/piano voicing
-    const rootMidi = Math.min(...step.notes);
+    // Find the chord root for bass/piano voicing. Empty `notes`
+    // would otherwise spread to `Math.min()` → Infinity and corrupt
+    // every downstream oscillator.
+    const rootMidi = step.notes.length ? Math.min(...step.notes) : 60;
 
     // Humanizer wrapper — no-op if `humanizer` is null (default).
     // Every backing-track play-arg goes through this so the dial

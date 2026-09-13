@@ -1,3 +1,6 @@
+import type { HarmonicPath } from "./paths";
+import type { Persona } from "./personas";
+
 export const NOTE_NAMES = [
   "C",
   "C#",
@@ -13,6 +16,35 @@ export const NOTE_NAMES = [
   "B",
 ];
 
+/**
+ * Flat-preferred pitch-class wheel. Used by transposeChordName so that
+ * transposing "Cm" by +1 yields "Dbm" rather than "C#m" — most jazz
+ * chord names read more naturally with flats. Sharps are recognized
+ * via the ENHARMONIC_SHARP_TO_FLAT map below.
+ */
+export const NOTE_NAMES_FLAT = [
+  "C",
+  "Db",
+  "D",
+  "Eb",
+  "E",
+  "F",
+  "Gb",
+  "G",
+  "Ab",
+  "A",
+  "Bb",
+  "B",
+];
+
+const ENHARMONIC_SHARP_TO_FLAT: Record<string, string> = {
+  "C#": "Db",
+  "D#": "Eb",
+  "F#": "Gb",
+  "G#": "Ab",
+  "A#": "Bb",
+};
+
 export function getMidiFromNoteName(noteName: string): number {
   const noteContent = noteName.match(/([A-G]#?)(\d)/);
   if (!noteContent) return 60;
@@ -22,10 +54,44 @@ export function getMidiFromNoteName(noteName: string): number {
   return noteIndex + (parseInt(octave) + 1) * 12;
 }
 
+/**
+ * MIDI note → "C4" style name. Handles negative MIDI values safely
+ * (JavaScript's `%` and `Math.floor` don't agree on negatives, so we
+ * normalize the pitch class explicitly).
+ */
 export function getNoteNameFromMidi(midi: number): string {
+  const pc = ((midi % 12) + 12) % 12;
   const octave = Math.floor(midi / 12) - 1;
-  const noteName = NOTE_NAMES[midi % 12];
-  return `${noteName}${octave}`;
+  return `${NOTE_NAMES[pc]}${octave}`;
+}
+
+/** Alias matching the helper that lived inline in InspectPanel.tsx. */
+export const midiToName = getNoteNameFromMidi;
+
+/**
+ * Transpose a chord symbol (e.g. "Cmaj7", "F#m7b5") by `shift` semitones.
+ * Handles slash chords ("C/E"), hyphenated names ("C-sharp"),
+ * and any modifier suffix. Returns the input unchanged when
+ * `shift % 12 === 0` so the hot path is allocation-free.
+ *
+ * Uses the flat-preferred wheel so "C" + 1 → "Db" rather than "C#",
+ * which reads better in jazz contexts.
+ */
+export function transposeChordName(name: string, shift: number): string {
+  if (shift % 12 === 0) return name;
+  const normalized = ((shift % 12) + 12) % 12;
+  return name.replace(
+    /(^|[\s/(-])([A-G][b#]?)/g,
+    (match, prefix: string, note: string) => {
+      let index = NOTE_NAMES_FLAT.indexOf(note);
+      if (index === -1 && ENHARMONIC_SHARP_TO_FLAT[note]) {
+        index = NOTE_NAMES_FLAT.indexOf(ENHARMONIC_SHARP_TO_FLAT[note]);
+      }
+      if (index === -1) return match;
+      const newIndex = (index + normalized) % 12;
+      return prefix + NOTE_NAMES_FLAT[newIndex];
+    },
+  );
 }
 
 export function midiToFreq(midi: number): number {
@@ -64,6 +130,324 @@ export const getShapeForNote = (
   if ([1, 6, 11].includes(pitchClass)) return "triangle"; // dissonant (m2, Tritone, M7)
   return "line";
 };
+
+/**
+ * Voicing registry — every supported voicing shape lives here.
+ *
+ * `intervals` is the stack of semitones above the bass note that
+ * makes up the voicing. The bass note itself is implicit (the lowest
+ * note of the chord). For "drop" voicings and similar, the helper
+ * `applyVoicing(chord, voicing)` does the math.
+ */
+export type VoicingId =
+  | "closed"
+  | "drop2"
+  | "minimum_motion"
+  | "spread"
+  | "inversion"
+  | "quartal"
+  | "open_drop3"
+  | "closed_dense"
+  | "melody_first";
+
+export interface Voicing {
+  id: VoicingId;
+  label: string;
+  description: string;
+  /** Semitones above bass. Root is omitted (bass IS the root). */
+  intervals: number[];
+  usedBy: string[];
+  minNotes?: number;
+  maxNotes?: number;
+  minHandSpan?: string;
+  allowMiddleGap?: boolean;
+  innerVoiceTracking?: boolean;
+  melodyOnTop?: boolean;
+}
+
+export const VOICINGS: Record<VoicingId, Voicing> = {
+  closed: {
+    id: "closed",
+    label: "Closed",
+    description: "Tight stacked triad/seventh, all notes within an octave.",
+    intervals: [3, 5, 7],
+    usedBy: ["coltrane", "bach", "debussy", "eno", "glass", "monk", "miles", "chet", "dizzy", "hubbard", "shorter", "kandinsky", "mahler"],
+  },
+  drop2: {
+    id: "drop2",
+    label: "Drop-2",
+    description: "Take the second voice from the top, drop it an octave.",
+    intervals: [3, 5, 7],
+    usedBy: [],
+  },
+  minimum_motion: {
+    id: "minimum_motion",
+    label: "Minimum Motion",
+    description: "Voice-lead every transition for minimal total semitones.",
+    intervals: [],
+    usedBy: [],
+  },
+  spread: {
+    id: "spread",
+    label: "Spread",
+    description: "Drop-2 plus alternating octaves. Open, jazz-balled.",
+    intervals: [],
+    usedBy: [],
+  },
+  inversion: {
+    id: "inversion",
+    label: "Inversion",
+    description: "Bass moves up an octave; chord stack remains.",
+    intervals: [],
+    usedBy: [],
+  },
+  quartal: {
+    id: "quartal",
+    label: "Quartal",
+    description: "Stacked fourths. Open, ambiguous, impressionist. Scriabin's mystic sound.",
+    intervals: [5, 10, 15, 20],
+    usedBy: ["scriabin"],
+    minNotes: 3,
+    maxNotes: 6,
+  },
+  open_drop3: {
+    id: "open_drop3",
+    label: "Open Drop-3",
+    description: "Wide spacing with an empty middle register. Bell-like, pianistic.",
+    intervals: [7, 16, 19],
+    usedBy: ["rachmaninov"],
+    allowMiddleGap: true,
+  },
+  closed_dense: {
+    id: "closed_dense",
+    label: "Closed Dense",
+    description: "Tight cluster in the middle register with independent inner voices. Brahms.",
+    intervals: [4, 7, 11],
+    usedBy: ["brahms"],
+    innerVoiceTracking: true,
+  },
+  melody_first: {
+    id: "melody_first",
+    label: "Melody-First",
+    description: "Top voice leads; harmony fills underneath. Simple accompaniment, lyrical line.",
+    intervals: [4, 7],
+    usedBy: ["tchaikovsky"],
+    melodyOnTop: true,
+  },
+};
+
+/**
+ * Apply a voicing to a chord's MIDI notes.
+ * - Bass is the lowest note.
+ * - Upper voices = bass + intervals[i] (intervals relative to bass).
+ * - For `intervals` that exceed available chord tones, the voicing
+ *   re-uses the chord's actual pitch classes and re-bases them
+ *   around the bass, so it still respects the chord.
+ */
+export function applyVoicing(notes: number[], voicingId: VoicingId): number[] {
+  const v = VOICINGS[voicingId];
+  if (notes.length === 0) return notes;
+  const sorted = [...new Set(notes)].sort((a, b) => a - b);
+  const bass = sorted[0];
+  const upperPcs = sorted.slice(1).map((n) => n % 12);
+  if (upperPcs.length === 0) return [bass];
+
+  if (voicingId === "minimum_motion" || voicingId === "spread" || voicingId === "inversion" || voicingId === "drop2") {
+    // Delegate to existing helpers.
+    if (voicingId === "inversion") return alternativeVoicing([], notes, "inversion");
+    if (voicingId === "drop2") return alternativeVoicing([], notes, "drop2");
+    if (voicingId === "spread") return alternativeVoicing([], notes, "spread");
+    if (voicingId === "minimum_motion") return notes; // requires prior chord; App handles
+  }
+
+  // Stack the voicing from the chord's own pitch classes, climbing from bass.
+  const stack: number[] = [bass];
+  // Use voicing intervals as the target layer positions; pick the chord's
+  // pitch class closest to each target layer.
+  for (const targetSemi of v.intervals) {
+    const targetMidi = bass + targetSemi;
+    // Find chord pc closest to targetSemi.
+    const targetPc = targetSemi % 12;
+    let bestPc: number | null = null;
+    let bestDist = Infinity;
+    for (const pc of upperPcs) {
+      const dist = Math.min(
+        Math.abs(pc - targetPc),
+        12 - Math.abs(pc - targetPc),
+      );
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPc = pc;
+      }
+    }
+    if (bestPc === null) break;
+    // Pick the octave of bestPc that puts it closest to targetMidi.
+    const candOctaves = [
+      bass + 12 * Math.floor(targetSemi / 12) + bestPc - (bass % 12),
+      bass + 12 * Math.ceil(targetSemi / 12) + bestPc - (bass % 12),
+    ].filter((c) => c > bass);
+    const cand =
+      candOctaves.length === 0
+        ? bass + bestPc + 12
+        : candOctaves.reduce((a, b) =>
+            Math.abs(a - targetMidi) < Math.abs(b - targetMidi) ? a : b,
+          );
+    stack.push(cand);
+  }
+
+  return Array.from(new Set(stack)).sort((a, b) => a - b);
+}
+
+/**
+ * Phase 5: per-bar transpose drift from a path + persona.
+ *
+ * Two sources of drift:
+ *  - sequenceStepper (Tchaikovsky): when active path has
+ *    `sequenceStepper: true`, each bar after bar 0 climbs by
+ *    `sequenceInterval` semitones (default 2). sequence_ascent
+ *    declares sequenceInterval=2 → bars climb +2, +4, +6…
+ *  - keyDrift (Mahler): when active path declares a `key` like
+ *    "D minor → C major", drift from start to end across the path's bars.
+ *    Linear interpolation in semitones.
+ *
+ * Returns one semitone shift per PATH STEP (not per bar). For paths
+ * that don't declare any drift, returns 0s — no-op.
+ *
+ * Cheap to compute; caller memoizes on (path, personaId).
+ */
+export function deriveBarTransposeDrift(
+  path: HarmonicPath,
+  persona: Persona | undefined,
+): number[] {
+  const totalBars = Math.ceil(path.steps.length / 4);
+  const rules = persona?.rules ?? {};
+  const seqEnabled = path.sequenceStepper === true;
+  const seqInterval =
+    typeof path.sequenceInterval === "number" ? path.sequenceInterval : 2;
+  const keyDriftEnabled =
+    rules.keyDriftAcrossPath === true ||
+    Boolean(path.key && /\u2192/.test(path.key));
+  let keyDriftTotal = 0;
+  let startKeyPc: number | null = null;
+  if (keyDriftEnabled && path.key) {
+    const noteToPc: Record<string, number> = {
+      C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
+      "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+    };
+    const parts = path.key.split(/\u2192/).map((s: string) => s.trim());
+    // Strip a mode suffix from "D minor" / "C major" / "G maj" / "Bb min" / "F#m"
+// etc. The previous regex /\s*m(in)?(aj)?\s*$/ didn't handle "minor"
+// (the trailing "or" was unaccounted for, so replace() returned the
+// string unchanged). Now matches "m" / "min" / "maj" / "minor" / "major".
+const MODE_SUFFIX_RE = /\s*(?:m(?:in(?:or)?)?|maj(?:or)?)\s*$/i;
+const startTok = parts[0]?.replace(MODE_SUFFIX_RE, "").trim() ?? "";
+const endTok = parts[1]?.replace(MODE_SUFFIX_RE, "").trim() ?? "";
+    startKeyPc = noteToPc[startTok] ?? null;
+    const endPc = noteToPc[endTok] ?? null;
+    if (startKeyPc !== null && endPc !== null) {
+      // Drift relative to the start key. Convert to a linear range
+      // across the shorter of (forward, backward) intervals.
+      let delta = endPc - startKeyPc;
+      if (delta > 6) delta -= 12;
+      if (delta < -6) delta += 12;
+      keyDriftTotal = delta;
+    }
+  }
+
+  // Build per-step shifts (4 steps per bar).
+  const out: number[] = [];
+  for (let bar = 0; bar < totalBars; bar++) {
+    let shift = 0;
+    if (seqEnabled) {
+      shift += bar * seqInterval;
+    }
+    if (keyDriftEnabled && startKeyPc !== null && totalBars > 1) {
+      // Linear ramp 0 → keyDriftTotal across (totalBars - 1) bars.
+      // Round to nearest integer semitone.
+      shift += Math.round((bar / (totalBars - 1)) * keyDriftTotal);
+    }
+    for (let s = 0; s < 4; s++) out.push(shift);
+  }
+  // Trim to the actual path step count.
+  return out.slice(0, path.steps.length);
+}
+
+/**
+ * Phase 5: behavioral markers — derived from a path + the active
+ * persona. Returns one marker per BAR (not per step) so the bar strip
+ * can render per-bar overlays: motifTracker badges for transformations,
+ * frozenBass indicators for held bass, keyDrift hues for tonal shift.
+ *
+ * Cheap to compute. Caller memoizes on (path, personaId).
+ */
+export interface BehavioralMarker {
+  /** Stable per-bar accent color (hex). Pulled from persona.colorPalette
+   *  when available; falls back to a neutral brass for non-persona paths. */
+  accentHex: string;
+  /** True if this bar represents a "transformation" of the prior bar's
+   *  pitch content (Brahms-style). Derived from note-set diff vs the
+   *  previous bar. */
+  isMotifTransformation: boolean;
+  /** True if the bass note carries from the previous bar without change
+   *  (Rachmaninov-style frozen bass). Derived from comparing bar bass. */
+  bassFrozen: boolean;
+  /** True if this bar is part of a Coltrane-style slice-and-repeat motif
+   *  (path.sliceAndRepeat === true). The bar strip surfaces a ◷ glyph
+   *  to signal the recurring shape. */
+  motifRepeat: boolean;
+  /** Optional secondary hint (e.g. "Δ", "≈", "◷") for the bar UI. */
+  hint: string;
+}
+
+export function deriveBehavioralMarkers(
+  path: HarmonicPath,
+  persona: Persona | undefined,
+): BehavioralMarker[] {
+  const palette = persona?.colorPalette ?? ["#D4A857", "#8B6914", "#C9A227", "#5A5A5A"];
+  const totalBars = Math.ceil(path.steps.length / 4);
+  const out: BehavioralMarker[] = [];
+  let prevBarBass: number | null = null;
+  let prevBarPcs: Set<number> | null = null;
+  for (let b = 0; b < totalBars; b++) {
+    const barSteps = path.steps.slice(b * 4, b * 4 + 4);
+    const bassNotes = barSteps
+      .map((s) => (s.notes.length ? Math.min(...s.notes) : null))
+      .filter((n): n is number => n !== null);
+    const bass = bassNotes.length ? bassNotes[0] : null;
+    const bassFrozen = bass !== null && bass === prevBarBass;
+    const pcs = new Set<number>();
+    for (const s of barSteps) for (const n of s.notes) pcs.add(n % 12);
+    let isMotifTransformation = false;
+    if (prevBarPcs !== null) {
+      // Transformation = either same root set with new voicing, or a
+      // derived inversion. Heuristic: any overlap but at least one new pc.
+      const overlap = [...pcs].filter((p) => prevBarPcs!.has(p)).length;
+      const newPcs = [...pcs].filter((p) => !prevBarPcs!.has(p)).length;
+      isMotifTransformation = overlap > 0 && newPcs > 0 && b > 0;
+    }
+    const accentHex = palette[b % palette.length];
+    const hints: string[] = [];
+    if (isMotifTransformation) hints.push("Δ");
+    if (bassFrozen && b > 0) hints.push("≈");
+    // Coltrane-style slice-and-repeat: when the path declares it, every
+    // bar participates in the recurring motif. Surface a ◷ glyph so the
+    // bar strip visually flags the shape; LiveScoreDisplay can also read
+    // `motifRepeat` to subdivide the bar into single-beat cells.
+    const motifRepeat = !!(path as { sliceAndRepeat?: boolean })
+      .sliceAndRepeat;
+    if (motifRepeat) hints.push("◷");
+    out.push({
+      accentHex,
+      isMotifTransformation,
+      bassFrozen,
+      motifRepeat,
+      hint: hints.join(" "),
+    });
+    prevBarBass = bass;
+    prevBarPcs = pcs;
+  }
+  return out;
+}
 
 /**
  * Total semitones traveled across all voices between two chords.
@@ -268,7 +652,11 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
     else if (s === 5 && !tensions.includes("5")) tensions.push("11");
     else if (s === 6) tensions.push("#11");
     else if (s === 8) tensions.push("b13");
-    else if (s === 9 && !tensions.includes("9")) tensions.push("13");
+    // 13th (semitone 9 above root) is independent of the 9th — both
+    // can coexist in a chord (e.g. Cmaj9 + A above = Cmaj13). Don't
+    // suppress on "9" already being present; the original bug shadowed
+    // the 13th by guarding on "9".
+    else if (s === 9) tensions.push("13");
   }
 
   // Family: based on the lowest three notes (the chord's triad plus a 7th if present)
@@ -283,12 +671,12 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
   const hasMajor7 = fourth === 11;
 
   let family: ChordAnalysis["family"] = "unknown";
-  if (third === 4 && (fifth === 7 || fifth === 14) && (hasMinor7 || sorted.length < 4)) {
+  if (third === 4 && (fifth === 7 || fifth === 14) && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
     if (hasMajor7) family = "major";        // M3 P5 M7
     else if (hasMinor7) family = "dominant"; // M3 P5 m7 = dominant 7th
-    else family = "major";                   // triad only
+    else family = "major";                   // M3 P5 triad only
   }
-  else if (third === 3 && (fifth === 7 || fifth === 14) && (hasMinor7 || sorted.length < 4)) {
+  else if (third === 3 && (fifth === 7 || fifth === 14) && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
     if (hasMajor7) family = "minor";         // m3 P5 M7 = mMaj7
     else family = "minor";                   // m3 P5 m7 = min 7th
   }
@@ -298,8 +686,12 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
   else if (third === 4 && hasMinor7) family = "dominant";
   else if (third === 4 && hasMajor7) family = "major";
 
-  // Roman numeral based on root pc in major scale
-  const roman = ROMAN_BY_SEMITONE[bassPc] ?? "?";
+  // Roman numeral based on the chord root (when determinable). The
+  // heuristic for finding rootPc falls back to bassPc when no 3rd
+  // exists above bass — that means inverted chords (e.g. C/G) end
+  // up with rootName=G, and the Roman reflects that ("V" not "I").
+  // Full root-recognition is out of scope for this iteration.
+  const roman = ROMAN_BY_SEMITONE[rootPc] ?? "?";
 
   // Function (very lightweight; assumes major key center)
   let fn: ChordAnalysis["function"] = "color";

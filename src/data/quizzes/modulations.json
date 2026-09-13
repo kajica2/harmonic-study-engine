@@ -1,0 +1,97 @@
+[
+  {
+    "id": "mo-1",
+    "topic": "modulations",
+    "prompt": "What is a pivot chord modulation?",
+    "options": [
+      "A modulation that uses a chord common to both keys",
+      "A modulation that changes key abruptly",
+      "A modulation that uses parallel modes",
+      "A modulation that requires a rest"
+    ],
+    "correct": 0,
+    "explanation": "Pivot chord modulation: a chord shared by the old key and the new key serves as a hinge between them."
+  },
+  {
+    "id": "mo-2",
+    "topic": "modulations",
+    "prompt": "In a pivot modulation from C major to G major, which chord is most likely to be the pivot?",
+    "options": ["I in C (CMaj7)", "IV in C (FMaj7)", "V in G (D7)", "vi in C (Am7)"],
+    "correct": 1,
+    "explanation": "FMaj7 = IV in C, but also II in G — it's the pivot between the two keys."
+  },
+  {
+    "id": "mo-3",
+    "topic": "modulations",
+    "prompt": "What does direct modulation (aka phrase modulation) mean?",
+    "options": [
+      "Modulation by common chord",
+      "Modulation without pivot — abrupt",
+      "Modulation by chromatic voice leading",
+      "Modulation to the relative minor"
+    ],
+    "correct": 1,
+    "explanation": "Direct modulation jumps to the new key without a pivot chord — abrupt, often used for dramatic effect."
+  },
+  {
+    "id": "mo-4",
+    "topic": "modulations",
+    "prompt": "Modulating from C major up a fifth lands in which key?",
+    "options": ["F major", "G major", "D major", "A minor"],
+    "correct": 1,
+    "explanation": "Up a fifth from C → G. The dominant relationship makes this the most common modulation."
+  },
+  {
+    "id": "mo-5",
+    "topic": "modulations",
+    "prompt": "Modulating from C major to its relative minor lands in which key?",
+    "options": ["G minor", "A minor", "E minor", "C minor"],
+    "correct": 1,
+    "explanation": "The relative minor of C major is A minor (same key signature, tonic down a minor third)."
+  },
+  {
+    "id": "mo-6",
+    "topic": "modulations",
+    "prompt": "Modulating from C major to its parallel minor lands in which key?",
+    "options": ["A minor", "C minor", "E minor", "G minor"],
+    "correct": 1,
+    "explanation": "Parallel minor = same tonic, different mode. C major → C minor (3 flats added)."
+  },
+  {
+    "id": "mo-7",
+    "topic": "modulations",
+    "prompt": "An enharmonic modulation typically pivots on which chord type?",
+    "options": ["I", "V7", "Diminished 7th / Augmented 6th", "vi"],
+    "correct": 2,
+    "explanation": "Diminished 7th and augmented 6th chords are symmetric (enharmonically respellable), so they pivot smoothly between distant keys."
+  },
+  {
+    "id": "mo-8",
+    "topic": "modulations",
+    "prompt": "Modulating by a half-step up from C major lands in which key?",
+    "options": ["D♭ major", "C# major", "B major", "F major"],
+    "correct": 1,
+    "explanation": "C# major (7 sharps) is a half-step up from C. Enharmonic equivalent to D♭ but spelled with sharps."
+  },
+  {
+    "id": "mo-9",
+    "topic": "modulations",
+    "prompt": "When modulating, the new key is typically confirmed by which chord?",
+    "options": ["ii of new key", "V of new key", "I of new key", "♭VII of new key"],
+    "correct": 1,
+    "explanation": "The V of the new key signals the impending tonic. The I then confirms the arrival."
+  },
+  {
+    "id": "mo-10",
+    "topic": "modulations",
+    "prompt": "Tonicization is best described as:",
+    "options": [
+      "A full key change",
+      "A brief emphasis on a non-tonic key area within a phrase",
+      "A return to the tonic",
+      "A modulation to the parallel minor"
+    ],
+    "correct": 1,
+    "explanation": "Tonicization is a temporary emphasis on a non-tonic key area (often via secondary dominant), not a full modulation."
+  }
+]

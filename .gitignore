@@ -11,6 +11,11 @@ coverage/
 .venv/
 __pycache__/
 *.pyc
+
+# Playwright e2e
+playwright-report/
+test-results/
+playwright/.cache/
 .pytest_cache/
 
 # Vitest coverage HTML report (default `coverage/` dir from --coverage)
@@ -27,4 +32,3 @@ __pycache__/
 # from dist/rnn-engine.bundle.js after the build step in vercel.json
 # runs in CI. Source-of-truth is src/rnn-engine.ts.
 /public/rnn-engine.bundle.js
-

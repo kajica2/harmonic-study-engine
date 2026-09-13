@@ -1,0 +1,82 @@
+[
+  {
+    "id": "tn-1",
+    "topic": "tensions",
+    "prompt": "What is the 9th of Cmaj7?",
+    "options": ["C", "D", "E", "G"],
+    "correct": 1,
+    "explanation": "The 9th is two scale steps above the root (C → D)."
+  },
+  {
+    "id": "tn-2",
+    "topic": "tensions",
+    "prompt": "What is the 13th of Cmaj7?",
+    "options": ["E", "G", "A", "B"],
+    "correct": 2,
+    "explanation": "The 13th is the 6th scale degree (C major: A)."
+  },
+  {
+    "id": "tn-3",
+    "topic": "tensions",
+    "prompt": "What is the #11 of D7?",
+    "options": ["F", "F#", "G", "G#"],
+    "correct": 2,
+    "explanation": "The #11 is the raised 4th scale degree (D major: G#)."
+  },
+  {
+    "id": "tn-4",
+    "topic": "tensions",
+    "prompt": "The ♭13 of a dominant chord typically resolves to which scale degree?",
+    "options": ["5 (dominant)", "1 (tonic)", "3 (mediant)", "6 (submediant)"],
+    "correct": 0,
+    "explanation": "The ♭13 of V typically resolves down to the 5th scale degree of the key — the dominant itself."
+  },
+  {
+    "id": "tn-5",
+    "topic": "tensions",
+    "prompt": "Which tension is most characteristic of an altered dominant chord?",
+    "options": ["9", "♭13", "11", "#9"],
+    "correct": 3,
+    "explanation": "The #9 is the signature tension of altered dominants (e.g. C7#9 = 'the Hendrix chord')."
+  },
+  {
+    "id": "tn-6",
+    "topic": "tensions",
+    "prompt": "What is the natural 9th of F7?",
+    "options": ["E", "F", "G", "A"],
+    "correct": 2,
+    "explanation": "The natural 9th of F7 is G (F major: G)."
+  },
+  {
+    "id": "tn-7",
+    "topic": "tensions",
+    "prompt": "What is the ♭9 of G7?",
+    "options": ["A♭", "A", "B♭", "C"],
+    "correct": 0,
+    "explanation": "The ♭9 of G7 is A♭ — a half-step above the dominant root."
+  },
+  {
+    "id": "tn-8",
+    "topic": "tensions",
+    "prompt": "The 11th tension typically sounds dissonant on which chord type?",
+    "options": ["Major 7", "Dominant 7", "Minor 7", "Half-diminished"],
+    "correct": 0,
+    "explanation": "The natural 11th clashes with the major 3rd of a maj7 chord — usually avoided or used as #11."
+  },
+  {
+    "id": "tn-9",
+    "topic": "tensions",
+    "prompt": "Which chord typically has a natural 9th by default?",
+    "options": ["Diminished 7", "Dominant 7", "Half-diminished", "Minor 7 ♭5"],
+    "correct": 1,
+    "explanation": "Dominant 7 chords have a natural 9th; maj7/min7 use it too but the dominant 9 is the signature sound."
+  },
+  {
+    "id": "tn-10",
+    "topic": "tensions",
+    "prompt": "The #11 of a minor chord resolves to which scale degree?",
+    "options": ["5", "1", "3", "♭7"],
+    "correct": 0,
+    "explanation": "The #11 has strong dominant function; it typically resolves down to the 5th."
+  }
+]

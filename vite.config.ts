@@ -7,7 +7,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 export default defineConfig(() => {
   return {
     plugins: [
-      react(), 
+      react(),
       tailwindcss(),
       nodePolyfills({
         exclude: ['fs', 'net'],
@@ -16,6 +16,14 @@ export default defineConfig(() => {
     define: {
       global: 'globalThis',
       'global.process': 'undefined',
+    },
+    build: {
+      // Keep test files out of the production bundle. vitest picks
+      // them up directly; vite/esbuild would otherwise pull them
+      // in via dynamic import chains.
+      rollupOptions: {
+        external: (id) => /\.test\.(ts|tsx)$/.test(id),
+      },
     },
     resolve: {
       alias: {

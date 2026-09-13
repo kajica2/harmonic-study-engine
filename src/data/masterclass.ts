@@ -1,16 +1,23 @@
 /**
- * Masterclass catalog — 33 working tunes + concept files from
- * the WCJA (Woody / Charlie / Jazz masterclass) curriculum,
- * MC 1–40 + PJ 1–4. Each entry has:
+ * Masterclass catalog — tunes + concept files from the WCJA
+ * (Woody / Charlie / Jazz masterclass) curriculum, MC 1–40 + PJ 1–4.
+ * Each entry has:
  *
- *   - id              matches the existing HarmonicPath id where
- *                     one exists; otherwise a new id we'll add to
- *                     paths.ts in a follow-up.
+ *   - id              matches the path id in ALL_PATHS. Mixed
+ *                     identifiers (curated PATHS use bare ids like
+ *                     "path-1"; ingested standards use the
+ *                     `study-` prefix from scripts/ingest_standards.py).
+ *                     The catalog uses whichever id matches a real
+ *                     path so the picker can do a direct findIndex()
+ *                     lookup against ALL_PATHS.
  *   - title           display name (the song, or "Solar diatonic solo" etc.)
  *   - classes         list of masterclass class refs (e.g. ["MC 1", "MC 2"])
  *   - mainExercise    one-sentence "what to do with this tune"
  *                     drawn from the class's main exercise
- *   - description     short human-readable summary
+ *   - description     short human-readable summary (composer / era / form)
+ *   - inApp           true when a playable path exists in ALL_PATHS;
+ *                     false means "coming soon" and the picker shows
+ *                     the tune as disabled.
  *
  * The data here is reference + content. The picker UI lives in
  * `src/components/MasterclassPicker.tsx`. Picking a tune from the
@@ -81,7 +88,11 @@ export type PathTag =
 
 export const MASTERCLASS_TUNES: MasterclassEntry[] = [
   // ----- PJ 1-4 (introductory mini-series) -----
-  { id: "star-eyes", title: "Star Eyes", classes: ["MC 1", "MC 2", "PJ 1", "PJ 3"],
+  // Note: ids are path ids, not display ids. The masterclass catalog
+  // and the path set share the same id space so the picker can do a
+  // direct findIndex() lookup. STUDIES_PATHS uses a `study-` prefix
+  // (set by scripts/ingest_standards.py), so the catalog must match.
+  { id: "study-star-eyes", title: "Star Eyes", classes: ["MC 1", "MC 2", "PJ 1", "PJ 3"],
     mainExercise: "Up the chord, 3rd & 7th twice — and up the chord, down the scale. Sing the melody before playing.",
     description: "Foundational diatonic exercise; uses higher intervals of the chord as a melodic line.",
     objective: "Sing the melody first, then hold guide tones (3rd & 7th) while the bass walks underneath.",
@@ -103,11 +114,11 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
     inApp: false },
 
   // ----- Solar studies -----
-  { id: "solar", title: "Solar", classes: ["MC 6", "MC 7", "MC 8", "MC 11", "MC 14-P1", "MC 21"],
+  { id: "study-solar", title: "Solar", classes: ["MC 6", "MC 7", "MC 8", "MC 11", "MC 14-P1", "MC 21"],
     mainExercise: "Diatonic Solar solo (and harmonic-minor / melodic-minor variations). Motif = Bach sequences.",
     description: "The flagship harmonic-minor study. Most heavy-rotated tune in the series.",
     tags: ["advanced", "transposition", "improv"],
-    inApp: false },
+    inApp: true },
 
   // ----- Cherokee / What Is This Thing Called Love (the deep-dive block) -----
   { id: "what-is-this-thing-called-love", title: "What Is This Thing Called Love", classes: ["MC 7", "MC 9", "MC 10", "MC 11", "MC 14-P2"],
@@ -115,11 +126,11 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
     description: "Rhythmic concept study; 2-5-1 voice-leading line.",
     tags: ["intermediate", "ii-v-i", "voice-leading"],
     inApp: false },
-  { id: "cherokee", title: "Cherokee", classes: ["MC 13", "MC 15", "MC 16", "MC 20", "MC 21", "MC 34"],
+  { id: "study-cherokee", title: "Cherokee", classes: ["MC 13", "MC 15", "MC 16", "MC 20", "MC 21", "MC 34"],
     mainExercise: "Three diminished chords, one key per day; sing the changes including II–V–I through the bridge keys.",
     description: "Diminished-trail study. House-of-Harmony anchor (two keys a flatted-fifth apart).",
     tags: ["advanced", "transposition", "coltrane-cycle"],
-    inApp: false },
+    inApp: true },
   { id: "i-got-rhythm", title: "I Got Rhythm", classes: ["MC 3", "MC 8", "MC 17", "MC 18"],
     mainExercise: "Twin-key syncopation; back door #1 (1 → 1m → 2-5 → 2-5 → 1) and #2 (half-diminished before the IV minor).",
     description: "Back-cycling study; the bridge is 3 minor-3rd related keys.",

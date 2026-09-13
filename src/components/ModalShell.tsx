@@ -54,9 +54,8 @@ export const ModalShell: React.FC<ModalShellProps> = ({
   // Focus management + Escape + body scroll lock
   useEffect(() => {
     const prev =
-      (document.activeElement && (document.activeElement as HTMLElement)) ||
-      null;
-    previouslyFocused.current = prev && prev.focus ? prev : null;
+      (document.activeElement as HTMLElement | null) ?? null;
+    previouslyFocused.current = prev;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 

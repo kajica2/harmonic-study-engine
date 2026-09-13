@@ -38,7 +38,7 @@ export function loadSavedVoicings(): SavedVoicing[] {
         typeof v.id === "string" &&
         typeof v.name === "string" &&
         Array.isArray(v.notes) &&
-        v.notes.every((n) => typeof n === "number"),
+        v.notes.every((n: unknown) => typeof n === "number"),
     );
   } catch {
     return [];

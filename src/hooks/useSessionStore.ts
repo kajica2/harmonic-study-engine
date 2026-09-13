@@ -20,6 +20,8 @@ import { InstrumentType } from "../lib/audio";
 import { BackingStyle } from "../lib/backingEngine";
 import { TimeSignature } from "../lib/rhythm";
 import { RenderMode } from "../lib/loopWav";
+import { VoicingId } from "../lib/theory";
+import { ScoreDisplayMode } from "../lib/displayMode";
 import { useHistory } from "../lib/useHistory";
 
 // ---------- setter type aliases ------------------------------------------
@@ -78,7 +80,7 @@ function loadBool(key: string, fallback: boolean): boolean {
 
 // ---------- store type ---------------------------------------------------
 
-export type VoicingType = "closed" | "open";
+export type VoicingType = VoicingId;
 export type ArpType =
   | "none"
   | "up"
@@ -180,6 +182,26 @@ export interface SessionStore {
   /** Persona id driving the humanizer's placement / timing σ. */
   humanizePersonaId: string;
   setHumanizePersonaId: Setter<string>;
+  /** Live score display mode — full vs active-bar zoom. */
+  scoreDisplayMode: ScoreDisplayMode;
+  setScoreDisplayMode: Setter<ScoreDisplayMode>;
+
+  // Composition layer (added 2026-09-13)
+  /** Per-step melody (MIDI pitches, length = STEPS_PER_BAR). Key = `${pathId}::${barIndex}`. */
+  melodyByStep: Record<string, number[]>;
+  setMelodyByStep: Setter<Record<string, number[]>>;
+  /** Per-step counter-line (separate voice; layer-by-default per user decision). */
+  counterMelodyByStep: Record<string, number[]>;
+  setCounterMelodyByStep: Setter<Record<string, number[]>>;
+  /** Currently-active style pack id (suggestion from persona, user-overridable). */
+  stylePackId: string | null;
+  setStylePackId: Setter<string | null>;
+  /** Quiz score: correct / total answered. */
+  quizScore: { correct: number; total: number };
+  setQuizScore: Setter<{ correct: number; total: number }>;
+  /** Per-suggestion accept/reject log. Drives the L9 learning loop. */
+  feedbackHistory: Array<{ personaId: string; suggestion: string; accepted: boolean }>;
+  setFeedbackHistory: Setter<Array<{ personaId: string; suggestion: string; accepted: boolean }>>;
 }
 
 // ---------- the hook itself ----------------------------------------------
@@ -290,7 +312,19 @@ export function useSessionStore(): SessionStore {
   // voicing
   const [voicingType, setVoicingType] = useState<VoicingType>(() => {
     const saved = loadString("synesthesia_voicingType", "closed");
-    return saved === "open" ? "open" : "closed";
+    // VoicingId has 9 valid values; coerce anything else to the default.
+    const valid: VoicingType[] = [
+      "closed",
+      "drop2",
+      "minimum_motion",
+      "spread",
+      "inversion",
+      "quartal",
+      "open_drop3",
+      "closed_dense",
+      "melody_first",
+    ];
+    return (valid.includes(saved as VoicingType) ? saved : "closed") as VoicingType;
   });
   const [optimizeVoiceLeading, setOptimizeVoiceLeading] = useState(() =>
     loadBool("synesthesia_optimizeVoiceLeading", false),
@@ -378,6 +412,37 @@ export function useSessionStore(): SessionStore {
     loadString("synesthesia_humanizePersonaId", ""),
   );
 
+  // Live-score display mode (full vs zoom) — persisted so the user's
+  // preference survives reload. Picker lives in <PracticeHeader>;
+  // the actual dim treatment is applied inside <LiveScoreDisplay>.
+  const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>(
+    () => {
+      const saved = loadString("synesthesia_scoreDisplayMode", "full");
+      return saved === "zoom" ? "zoom" : "full";
+    },
+  );
+
+  // Composition layer state — all persisted via localStorage with
+  // backwards-compatible defaults so users on older sessions don't crash.
+  const [melodyByStep, setMelodyByStep] = useState<Record<string, number[]>>(
+    () => loadJSON("synesthesia_melodyByStep", {}),
+  );
+  const [counterMelodyByStep, setCounterMelodyByStep] = useState<Record<string, number[]>>(
+    () => loadJSON("synesthesia_counterMelodyByStep", {}),
+  );
+  const [stylePackId, setStylePackId] = useState<string | null>(
+    () => {
+      const saved = loadString("synesthesia_stylePackId", "");
+      return saved || null;
+    },
+  );
+  const [quizScore, setQuizScore] = useState<{ correct: number; total: number }>(
+    () => loadJSON("synesthesia_quizScore", { correct: 0, total: 0 }),
+  );
+  const [feedbackHistory, setFeedbackHistory] = useState<
+    Array<{ personaId: string; suggestion: string; accepted: boolean }>
+  >(() => loadJSON("synesthesia_feedbackHistory", []));
+
   // Persist on change. useState's setter identity is stable, so this
   // effect runs only when the value actually changes.
   useEffect(() => {
@@ -386,6 +451,21 @@ export function useSessionStore(): SessionStore {
   useEffect(() => {
     try { localStorage.setItem("synesthesia_humanizePersonaId", humanizePersonaId); } catch {}
   }, [humanizePersonaId]);
+  useEffect(() => {
+    try { localStorage.setItem("synesthesia_melodyByStep", JSON.stringify(melodyByStep)); } catch {}
+  }, [melodyByStep]);
+  useEffect(() => {
+    try { localStorage.setItem("synesthesia_counterMelodyByStep", JSON.stringify(counterMelodyByStep)); } catch {}
+  }, [counterMelodyByStep]);
+  useEffect(() => {
+    try { localStorage.setItem("synesthesia_stylePackId", stylePackId ?? ""); } catch {}
+  }, [stylePackId]);
+  useEffect(() => {
+    try { localStorage.setItem("synesthesia_quizScore", JSON.stringify(quizScore)); } catch {}
+  }, [quizScore]);
+  useEffect(() => {
+    try { localStorage.setItem("synesthesia_feedbackHistory", JSON.stringify(feedbackHistory)); } catch {}
+  }, [feedbackHistory]);
 
   return {
     paths,
@@ -445,5 +525,17 @@ export function useSessionStore(): SessionStore {
     setHumanizeAmount,
     humanizePersonaId,
     setHumanizePersonaId,
+    scoreDisplayMode,
+    setScoreDisplayMode,
+    melodyByStep,
+    setMelodyByStep,
+    counterMelodyByStep,
+    setCounterMelodyByStep,
+    stylePackId,
+    setStylePackId,
+    quizScore,
+    setQuizScore,
+    feedbackHistory,
+    setFeedbackHistory,
   };
 }

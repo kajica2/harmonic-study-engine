@@ -4,6 +4,78 @@ A practice engine for trumpet (and any instrument) that pairs curated
 harmonic etudes with iReal-Pro-style backing tracks, scale practice,
 and full export to MIDI / MusicXML / Score21 / MP4.
 
+**Live:** [harmonic-study-engine.vercel.app](https://harmonic-study-engine.vercel.app)
+
+## What works
+
+- **17 synesthesia personas** — 12 jazz/electronic (Kandinsky,
+  Coltrane, Bach, Debussy, Eno, Glass, Monk, Miles, Chet Baker,
+  Dizzy, Freddie Hubbard, Wayne Shorter) + 5 classical
+  (Scriabin, Rachmaninov, Brahms, Tchaikovsky, Mahler). Each
+  persona sets the visual theme, instrument voicing, tempo,
+  default path, and (where historically documented) the
+  synesthesia color map. Badges in the UI distinguish
+  "documented" synesthesia (Kandinsky, Scriabin) from
+  "interpretive" coloring (everyone else).
+- **Curated harmonic paths** — 8 built-in + 5 classical persona
+  paths (Paths XXXIII–XXXVII) + 36-tune masterclass catalog
+  (Star Eyes, Cherokee, Solar, Out of Nowhere, I'll Remember
+  April, Blue Bossa, etc.) with composer + key + technique
+  filters in the Path Catalog tab.
+- **9 voicing modes** — Closed, Drop-2, Minimum Motion, Spread,
+  Inversion, Quartal, Open Drop-3, Closed Dense, Melody-First.
+  Drop-down replaces the old binary Closed/Open toggle.
+- **Behavioral markers in the bar strip** — per-bar accent
+  strip + Δ glyph for motif transformation (Brahms) and ≈ for
+  frozen bass (Rachmaninov). Picks up automatically from the
+  active path's note content.
+- **Per-bar harmonic function glyphs** — Tonic (○T),
+  Dominant (△D), Subdominant (□S), Predominant (◇P) next to
+  each chord name. Shape + letter pairing so colorblind users
+  still see the function (per `docs/TERMINOLOGY.md`).
+- **Per-bar behavioral rules** — sequenceStepper (Tchaikovsky's
+  path climbs by 2 semitones per bar), keyDrift (Mahler's path
+  drifts from D minor toward C major across the bars),
+  motifTracker (Brahms), bassIsolation (Miles).
+- **11 backing styles**: swing / bossa nova / funk / latin /
+  ballad / clave 3-2 / clave 3-3 / African 4:4 / 4:3 / 3:4.
+  Per-style instrument mapping — bossa uses nylon guitar +
+  fingered electric bass; funk uses slap bass + Rhodes
+  (FluidR3 GM bank via the gleitz/midi-js-soundfonts CDN).
+- **Per-track mute toggles** + highpass EQ on bass bus to
+  remove DC offset.
+- **Diatonic scale practice** (auto mode picks from chord
+  quality; manual mode lets you pin Ionian / Dorian /
+  Mixolydian / etc.).
+- **3-iteration rhythm drill** (the masterclass "three
+  subdivisions" exercise).
+- **Sub-range loop** (shift+click two bars in the bar strip).
+- **Live score** windowed to 4 bars with auto-scroll — abcjs
+  T: header now carries the path title (was previously
+  empty).
+- **MediaRecorder + WebM → MP4 transcode** (via ffmpeg in the
+  image).
+- **MIDI input listener** — `src/lib/midiIn.ts` wraps Web MIDI
+  access, dispatches `midin` CustomEvent on `window`. New
+  IN picker chip in the header next to the OUT chip.
+- **Mobile-first**: fixed bottom-sheet command bar,
+  safe-area padding.
+- **Audio quality**: warm soft-knee saturation on the melody
+  bus (WaveShaper, k=2.5, 4x oversample), per-note velocity
+  scaling (bass softer, top louder; arpeggiator accents every
+  4th step), FluidR3 soundfont caching across persona swaps.
+- **Composition layer (v0.3.0-composition-mvp)** — 9 layers of
+  compositional helpers behind the existing 22-persona, 78-path
+  shell. Pure-function pipeline: order-2 Markov melody (genre-
+  neutral core + persona-conditioned surface), species-1 voice-
+  leading rules (parallel 5ths/octaves flagged, 100% recall on a
+  100-case corpus), form planner (24-64 bar invariant), 4 style
+  packs (common-practice / jazz / modal / post-tonal), reharmoni-
+  zation proposer (4 substitution techniques), 50 curated quiz
+  questions + auto-gen fallback. See `docs/COMPOSITION-ENGINE-PLAN.md`
+  for the design, `docs/COMPOSITION-MVP-PLAN.md` for the implementation,
+  `docs/COMPOSITION.md` for the user tour.
+
 ## Surfaces
 
 Three user-facing surfaces, all from one repo:
@@ -16,26 +88,30 @@ Three user-facing surfaces, all from one repo:
 
 The `/engine` and `/rnn` rewrites are configured in `vercel.json`.
 
-## Features
+## Documentation
 
-- 17 masterclass personas (Wynton Marsalis, Coltrane, Bach, Eno,
-  Miles, Monk, Kandinsky, …) with persona-driven visual themes
-  in the canvas
-- 38-tune working catalog (Star Eyes, Cherokee, Solar, Out of
-  Nowhere, I'll Remember April, …) with composer + key filters
-  (37 entries marked "Coming soon" — full paths land in follow-up commits)
-- 11 backing styles: swing / bossa nova / funk / latin / ballad /
-  clave 3-2 / clave 3-3 / African 4:4 / 4:3 / 3:4
-- Per-style instrument mapping — bossa uses nylon guitar + fingered
-  electric bass; funk uses slap bass + Rhodes (FluidR3 GM bank
-  via the gleitz/midi-js-soundfonts CDN)
-- Diatonic scale practice (auto mode picks from chord quality;
-  manual mode lets you pin Ionian / Dorian / Mixolydian / etc.)
-- 3-iteration rhythm drill (the masterclass "three subdivisions" exercise)
-- Sub-range loop (shift+click two bars in the bar strip)
-- Live score windowed to 4 bars with auto-scroll
-- MediaRecorder → WebM (and → MP4 if ffmpeg is installed locally)
-- Mobile-first: fixed bottom-sheet command bar, safe-area padding
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system map
+  (engine graph, file-by-file role table, wiring)
+- [docs/DEVELOPING.md](docs/DEVELOPING.md) — contributor
+  guide (how to add a persona / path / voicing)
+- [docs/AUDIO.md](docs/AUDIO.md) — engine reference (voice
+  design, ADSR curves, warmth math, MIDI semantics)
+- [docs/TERMINOLOGY.md](docs/TERMINOLOGY.md) — HSE vocabulary
+  glossary + UI glyph conventions
+- [CHANGELOG.md](CHANGELOG.md) — per-sprint changes
+- [LOOP-PROMPT.md](LOOP-PROMPT.md) — wiggum scratchpad
+
+## What's degraded
+
+- **DDSP offline render on HF Spaces**: the HF free tier
+  can't host the ~1.5 GB `ddsp` package. The Dockerfile omits
+  it; `/synthesize` returns 503 on the Space. Everything else
+  works without DDSP.
+- **To enable DDSP locally** (it does work — verified ddsp
+  3.5.1 imports cleanly with `python -m server.app`): fork
+  `magenta/ddsp` or use `ddsp-install-macos-arm64`, then
+  `pip install -r server/requirements.txt` in your local
+  venv. The backend at `:8765` will report `status: ok`.
 
 ## Local development
 
