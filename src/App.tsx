@@ -147,6 +147,8 @@ export default function App() {
     setLoopEndBar,
     metronomeOn,
     setMetronomeOn,
+    scoreDisplayMode,
+    setScoreDisplayMode,
   } = session;
 
 
@@ -1085,11 +1087,38 @@ export default function App() {
         </div>
       </header>
 
+      <PracticeHeader
+        path={path}
+        activeStepIndex={activeStepIndex}
+        chordName={transposeChordName(step.name ?? "", transposeShift)}
+        timeSignature={timeSignature}
+        chordNotes={currentChordNotes}
+        isPlaying={isPlayingAuto}
+        onPlayPause={() => setIsPlayingAuto(!isPlayingAuto)}
+        tempo={tempo}
+        onTempoChange={setTempo}
+        isLooping={isLooping}
+        onLoopToggle={() => setIsLooping(!isLooping)}
+        backingStyle={beatType}
+        onBackingStyleChange={setBeatType}
+        volume={volume}
+        onVolumeChange={setVolume}
+        scoreDisplayMode={scoreDisplayMode}
+        onScoreDisplayModeChange={setScoreDisplayMode}
+      />
+
       <main
         id="main"
         className="flex-1 flex flex-col w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 gap-4 sm:gap-6 max-w-screen-2xl pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-6"
       >
         <div id="adv-live" role="status" aria-live="polite" className="sr-only" />
+
+        {/* Per-path briefing — explains the practice loop for the active path. */}
+        <PathBriefing pathId={path.id} />
+
+        {/* Persona behavioral lens — shows when the active persona
+            has a documented behavioral rule set (Bach/Coltrane/Miles). */}
+        <PersonaLensBanner personaId={selectedPersonaId} />
 
         {/* Play Session Rail — guided workflow */}
         <PlaySessionRail
@@ -1538,6 +1567,16 @@ export default function App() {
 
                 {!isGenFolded && (
                   <div className="mt-4 pt-1 flex flex-col gap-4">
+                    {/* Humanizer — Magenta-driven persona-aware timing
+                        jitter. 0 = grid-locked, 1 = full persona profile.
+                        Live during backing-track playback. */}
+                    <HumanFeelDial
+                      amount={humanizeAmount}
+                      setAmount={setHumanizeAmount}
+                      personaId={humanizePersonaId || selectedPersonaId}
+                      setPersonaId={setHumanizePersonaId}
+                    />
+
                     <div className="flex flex-col gap-3">
                       <div className="text-xs font-semibold text-neutral-400 mb-1 flex items-center gap-1">
                         <Music size={12} className="text-purple-400" /> Path

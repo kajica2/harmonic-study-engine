@@ -21,6 +21,7 @@ import { BackingStyle } from "../lib/backingEngine";
 import { TimeSignature } from "../lib/rhythm";
 import { RenderMode } from "../lib/loopWav";
 import { VoicingId } from "../lib/theory";
+import { ScoreDisplayMode } from "../lib/displayMode";
 import { useHistory } from "../lib/useHistory";
 
 // ---------- setter type aliases ------------------------------------------
@@ -181,6 +182,9 @@ export interface SessionStore {
   /** Persona id driving the humanizer's placement / timing σ. */
   humanizePersonaId: string;
   setHumanizePersonaId: Setter<string>;
+  /** Live score display mode — full vs active-bar zoom. */
+  scoreDisplayMode: ScoreDisplayMode;
+  setScoreDisplayMode: Setter<ScoreDisplayMode>;
 }
 
 // ---------- the hook itself ----------------------------------------------
@@ -391,6 +395,16 @@ export function useSessionStore(): SessionStore {
     loadString("synesthesia_humanizePersonaId", ""),
   );
 
+  // Live-score display mode (full vs zoom) — persisted so the user's
+  // preference survives reload. Picker lives in <PracticeHeader>;
+  // the actual dim treatment is applied inside <LiveScoreDisplay>.
+  const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>(
+    () => {
+      const saved = loadString("synesthesia_scoreDisplayMode", "full");
+      return saved === "zoom" ? "zoom" : "full";
+    },
+  );
+
   // Persist on change. useState's setter identity is stable, so this
   // effect runs only when the value actually changes.
   useEffect(() => {
@@ -458,5 +472,7 @@ export function useSessionStore(): SessionStore {
     setHumanizeAmount,
     humanizePersonaId,
     setHumanizePersonaId,
+    scoreDisplayMode,
+    setScoreDisplayMode,
   };
 }
