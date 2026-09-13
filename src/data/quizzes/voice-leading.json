@@ -1,0 +1,82 @@
+[
+  {
+    "id": "vl-1",
+    "topic": "voice-leading",
+    "prompt": "Which motion type is forbidden between two perfect consonances?",
+    "options": ["Contrary", "Oblique", "Parallel", "All are allowed"],
+    "correct": 2,
+    "explanation": "Parallel motion between two perfect consonances (P5, P8) is forbidden by species-1 rules."
+  },
+  {
+    "id": "vl-2",
+    "topic": "voice-leading",
+    "prompt": "What is contrary motion?",
+    "options": ["Both voices move in the same direction", "Both voices move in opposite directions", "One voice holds, the other moves", "Both voices leap by the same interval"],
+    "correct": 1,
+    "explanation": "Contrary motion: both voices move, in opposite directions (one up, one down)."
+  },
+  {
+    "id": "vl-3",
+    "topic": "voice-leading",
+    "prompt": "What is oblique motion?",
+    "options": ["Voices move in opposite directions", "Voices move in the same direction", "One voice holds, the other moves", "Voices leap by a third"],
+    "correct": 2,
+    "explanation": "Oblique motion: one voice holds while the other moves."
+  },
+  {
+    "id": "vl-4",
+    "topic": "voice-leading",
+    "prompt": "Parallel fifths between two consecutive chords are…",
+    "options": ["Allowed in all species", "Forbidden in species 1", "Forbidden only in modal counterpoint", "Always encouraged"],
+    "correct": 1,
+    "explanation": "Parallel P5 is forbidden in species-1 strict counterpoint; parallel P8 likewise."
+  },
+  {
+    "id": "vl-5",
+    "topic": "voice-leading",
+    "prompt": "Contrary motion into a perfect consonance is…",
+    "options": ["Forbidden", "Allowed", "Always required", "Forbidden only on strong beats"],
+    "correct": 1,
+    "explanation": "Contrary motion into a perfect consonance is allowed — it's the one direction that 'softens' the parallel problem."
+  },
+  {
+    "id": "vl-6",
+    "topic": "voice-leading",
+    "prompt": "A voice crossing occurs when…",
+    "options": ["A voice moves more than an octave", "An upper voice drops below a lower voice", "Two voices play the same pitch", "A chord is in inversion"],
+    "correct": 1,
+    "explanation": "Voice crossing: an upper voice's pitch falls below a lower voice's pitch."
+  },
+  {
+    "id": "vl-7",
+    "topic": "voice-leading",
+    "prompt": "The leading tone in V7 typically resolves…",
+    "options": ["Down to the 5th", "Up to the tonic", "Down to the mediant", "Stays the same"],
+    "correct": 1,
+    "explanation": "The leading tone (3rd of V7) resolves up by half-step to the tonic."
+  },
+  {
+    "id": "vl-8",
+    "topic": "voice-leading",
+    "prompt": "The 7th of V7 typically resolves…",
+    "options": ["Up to the tonic", "Down to the 3rd of the I chord", "Stays the same", "Down to the 5th"],
+    "correct": 1,
+    "explanation": "The 7th of V7 resolves down by step to the 3rd of the I chord (a guide tone)."
+  },
+  {
+    "id": "vl-9",
+    "topic": "voice-leading",
+    "prompt": "Voice crossing is…",
+    "options": ["Encouraged in 4-part writing", "Forbidden in strict species counterpoint", "Only an issue in jazz", "Required in inversion"],
+    "correct": 1,
+    "explanation": "Voice crossing is forbidden in strict species counterpoint."
+  },
+  {
+    "id": "vl-10",
+    "topic": "voice-leading",
+    "prompt": "What is the standard doubling rule for a I chord in 4-part writing?",
+    "options": ["Double the 3rd", "Double the root", "Double the 7th", "Double the 5th"],
+    "correct": 1,
+    "explanation": "On the tonic (I), double the root. This stabilizes the chord's function."
+  }
+]
