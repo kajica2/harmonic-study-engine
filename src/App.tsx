@@ -86,6 +86,7 @@ import { CoComposePanel } from "./components/CoComposePanel";
 import { QuizPanel } from "./components/QuizPanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore } from "./hooks/useSessionStore";
+import { useFeedback } from "./hooks/useFeedback";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
 import { usePathGenerator } from "./hooks/usePathGenerator";
 import { MobileCommandBar } from "./components/MobileCommandBar";
@@ -107,6 +108,7 @@ export default function App() {
   // from localStorage by the hook (same `synesthesia_*` keys HEAD's
   // useSessionStore used, so existing user prefs survive reload).
   const session = useSessionStore();
+  const feedback = useFeedback();
   const {
     paths,
     setPaths,
@@ -1162,11 +1164,19 @@ export default function App() {
 
         {/* Style pack picker — auto-selects persona's preferred pack.
             The picker is mounted alongside StyleWarnings which appears
-            only when the active pack has violations. */}
+            only when the active pack has violations. Accept/reject
+            events feed useFeedback for the L9 learning loop. */}
         <StylePackPicker
           activeId={stylePackId as StylePackId | null}
           activePersonaId={selectedPersonaId}
-          onPick={(id) => setStylePackId(id)}
+          onPick={(id) => {
+            setStylePackId(id);
+            feedback.record({
+              personaId: selectedPersonaId,
+              suggestion: `style:${id}`,
+              accepted: true,
+            });
+          }}
         />
         {stylePackId && (
           <StyleWarnings

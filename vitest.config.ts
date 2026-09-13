@@ -27,6 +27,8 @@ export default defineConfig({
       ["tests/useSessionStore.test.ts", "jsdom"],
       ["tests/useDDSPProbe.test.ts", "jsdom"],
       ["tests/useBassNotes.test.ts", "jsdom"],
+      ["src/hooks/useFeedback.test.ts", "jsdom"],
+      ["tests/useFeedback.test.ts", "jsdom"],
       // webAudio shim is read off window.AudioContext
       ["tests/webAudio.test.ts", "jsdom"],
     ],
