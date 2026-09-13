@@ -68,6 +68,10 @@ interface RailProps {
   loopStartBar?: number | null;
   loopEndBar?: number | null;
   setLoopBar?: (from: number | null, to: number | null) => void;
+  // metronome click toggle — when false, the rhythmEngine skips
+  // playMetronomeClick on every step. Backing track is unaffected.
+  metronomeOn: boolean;
+  setMetronomeOn: (v: boolean) => void;
   // inspect / voicing control
   optimizedStepsNotes: number[][];
   // Phase 5: per-bar behavioral markers from active persona.
@@ -188,6 +192,8 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           setTempo={p.setTempo}
           transposeShift={p.transposeShift}
           setTransposeShift={p.setTransposeShift}
+          metronomeOn={p.metronomeOn}
+          setMetronomeOn={p.setMetronomeOn}
           persona={persona}
           personas={p.personas}
           selectedPersonaId={p.selectedPersonaId}
@@ -543,8 +549,8 @@ const PerformStage: React.FC<{
   setTempo: (v: number) => void;
   transposeShift: number;
   setTransposeShift: (v: number) => void;
-  metronomeOn?: boolean;
-  setMetronomeOn?: (v: boolean) => void;
+  metronomeOn: boolean;
+  setMetronomeOn: (v: boolean) => void;
   persona: Persona;
   personas: Persona[];
   selectedPersonaId: string;
@@ -642,8 +648,8 @@ const PerformStage: React.FC<{
             <label className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">Metronome</label>
             <div className="flex items-center gap-2">
               <ToolChip
-                active={!!metronomeOn}
-                onClick={() => setMetronomeOn?.(!metronomeOn)}
+                active={metronomeOn}
+                onClick={() => setMetronomeOn(!metronomeOn)}
                 title={metronomeOn ? "Mute the metronome click" : "Unmute the metronome click"}
               >
                 {metronomeOn ? "● On" : "○ Off"}
