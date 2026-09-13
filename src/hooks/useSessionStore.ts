@@ -398,11 +398,12 @@ export function useSessionStore(): SessionStore {
     }
   });
 
-  // metronome click — user-toggleable, default ON (matches the
-  // historical "always click while playing" behavior). Persisted so
-  // the preference survives reloads.
+  // metronome click — user-toggleable, default OFF (so first-time
+  // users don't get an unprompted audio click when they hit play).
+  // Persisted so the preference survives reloads; users who had it
+  // on before this default flip keep their setting until they toggle.
   const [metronomeOn, setMetronomeOn] = useState(() =>
-    loadBool("synesthesia_metronomeOn", true),
+    loadBool("synesthesia_metronomeOn", false),
   );
 
   // WAV export mode
