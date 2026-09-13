@@ -75,6 +75,12 @@ export interface Persona {
    * the field get "neutral" (no bias).
    */
   contourProfile?: ContourProfile;
+  /**
+   * Style-pack id the StylePackPicker auto-selects on persona change.
+   * Optional — UI falls back to most-recently-used. Per user decision
+   * 2026-09-13 this is a SUGGESTION not a lock; user can pick any pack.
+   */
+  preferredStylePackId?: string;
   rules?: PersonaRules;
   // Original fields
   originalSongId: string; // references PATH id

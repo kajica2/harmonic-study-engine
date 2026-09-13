@@ -64,6 +64,7 @@ import {
   MAX_PATH_BARS,
   type FormTemplateId,
 } from "./lib/formPlanner";
+import { loadStylePack, type StylePackId } from "./lib/stylePack";
 import { suggestMelody, pcSet } from "./lib/melodyMarkov";
 import { useAsyncAction } from "./lib/useAsyncAction";
 import { InlineErrorPill } from "./components/InlineStatus";
@@ -79,6 +80,8 @@ import { PersonaLensBanner } from "./components/PersonaLensBanner";
 import { TexturePanel } from "./components/TexturePanel";
 import { FormPlanner } from "./components/FormPlanner";
 import { FormTemplatePicker } from "./components/FormTemplatePicker";
+import { StylePackPicker } from "./components/StylePackPicker";
+import { StyleWarnings } from "./components/StyleWarnings";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore } from "./hooks/useSessionStore";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
@@ -166,6 +169,8 @@ export default function App() {
     setMelodyByStep,
     counterMelodyByStep,
     setCounterMelodyByStep,
+    stylePackId,
+    setStylePackId,
   } = session;
 
 
@@ -1148,6 +1153,21 @@ export default function App() {
             </>
           );
         })()}
+
+        {/* Style pack picker — auto-selects persona's preferred pack.
+            The picker is mounted alongside StyleWarnings which appears
+            only when the active pack has violations. */}
+        <StylePackPicker
+          activeId={stylePackId as StylePackId | null}
+          activePersonaId={selectedPersonaId}
+          onPick={(id) => setStylePackId(id)}
+        />
+        {stylePackId && (
+          <StyleWarnings
+            styleName={loadStylePack(stylePackId as StylePackId).name}
+            violations={[]}
+          />
+        )}
 
         {/* Persona behavioral lens — shows when the active persona
             has a documented behavioral rule set (Bach/Coltrane/Miles). */}
