@@ -1283,6 +1283,8 @@ export const RAW_PATHS: HarmonicPath[] = [
 // ---------------------------------------------------------------------------
 import { CONCEPT_PATHS } from "./conceptPaths";
 import { STUDIES_PATHS as GENERATED_STUDIES_PATHS } from "./studies";
+import { seedPathFromComposer } from "./composerPathSeed";
+import { seedSectionPathFromComposer } from "./composerSectionSeed";
 
 export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS.map((p) => {
   const padded = padPath(p);
@@ -1333,7 +1335,6 @@ export const PATHS: HarmonicPath[] = [...RAW_PATHS, ...CONCEPT_PATHS].map((p) =>
 // break the static circular dependency. We import the seed function
 // directly here at the bottom of the file so all other exports
 // (PATHS, STUDIES_PATHS, ALL_PATHS) are in place when we call it.
-import { seedPathFromComposer } from "./composerPathSeed";
 
 export const COMPOSER_PATHS: HarmonicPath[] = [
   "beethoven",
@@ -1348,10 +1349,25 @@ export const COMPOSER_PATHS: HarmonicPath[] = [
   return path ? [path] : [];
 });
 
+// Composer-catalog v3: 10 section composers, seeded via per-kind
+// synthesizers in composerSectionSeed.ts (bitonal, row, axis, duration,
+// layer, generic). Each path is 24 bars; the synthesis is structural
+// — Cage's path is intentional silence, Schoenberg's walks the row,
+// Bartók's rotates the tonic axis, etc.
+export const SECTION_PATHS: HarmonicPath[] = [
+  "debussy", "stravinsky", "schoenberg", "bartok", "cage",
+  "stockhausen", "minimalists", "ornette-coleman", "brian-eno",
+  "ravi-shankar",
+].flatMap((id) => {
+  const path = seedSectionPathFromComposer(id as Parameters<typeof seedSectionPathFromComposer>[0]);
+  return path ? [path] : [];
+});
+
 export const ALL_PATHS: HarmonicPath[] = [
   ...PATHS,
   ...STUDIES_PATHS,
   ...COMPOSER_PATHS,
+  ...SECTION_PATHS,
 ];
 
 /**
@@ -1364,7 +1380,8 @@ export function findPathById(id: string): HarmonicPath | undefined {
   return (
     ALL_PATHS.find((p) => p.id === id) ??
     STUDIES_PATHS.find((p) => p.id === id) ??
-    COMPOSER_PATHS.find((p) => p.id === id)
+    COMPOSER_PATHS.find((p) => p.id === id) ??
+    SECTION_PATHS.find((p) => p.id === id)
   );
 }
 
