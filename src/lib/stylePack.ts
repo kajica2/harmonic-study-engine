@@ -11,12 +11,14 @@ import aabaPack from "../data/styles/common-practice.json";
 import jazzPack from "../data/styles/jazz.json";
 import modalPack from "../data/styles/modal.json";
 import postTonalPack from "../data/styles/post-tonal.json";
+import axisSystemPack from "../data/styles/axis-system.json";
 
 export type StylePackId =
   | "common-practice"
   | "jazz"
   | "modal"
-  | "post-tonal";
+  | "post-tonal"
+  | "axis-system";
 
 export interface StyleConstraints {
   /** Interval progressions the enforcer flags as violations. */
@@ -44,6 +46,7 @@ const PACKS: ReadonlyMap<StylePackId, StylePack> = new Map([
   ["jazz", jazzPack as StylePack],
   ["modal", modalPack as StylePack],
   ["post-tonal", postTonalPack as StylePack],
+  ["axis-system", axisSystemPack as StylePack],
 ]);
 
 /**

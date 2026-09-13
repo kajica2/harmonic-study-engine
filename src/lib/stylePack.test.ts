@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { loadStylePack, validateStylePack, allStylePacks } from "./stylePack";
+import { loadStylePack, validateStylePack, allStylePacks, allStylePackIds } from "./stylePack";
 
 describe("stylePack", () => {
-  it("loads all 4 packs at module init", () => {
-    expect(allStylePacks().length).toBe(4);
+  it("loads all 5 packs at module init", () => {
+    expect(allStylePacks().length).toBe(5);
   });
 
   it("common-practice bans parallel 5ths", () => {
@@ -47,5 +47,21 @@ describe("stylePack", () => {
 
   it("throws on unknown pack id", () => {
     expect(() => loadStylePack("does-not-exist" as any)).toThrow(/Unknown style pack/);
+  });
+
+  it("axis-system pack loads with empty forbiddenIntervals and a descriptive name", () => {
+    const pack = loadStylePack("axis-system");
+    expect(pack.id).toBe("axis-system");
+    expect(pack.name).toMatch(/Axis system/i);
+    expect(pack.constraints.forbiddenIntervals.length).toBe(0);
+    // Modal mixture is the key device — axis modulation borrows from
+    // parallel modes freely.
+    expect(pack.constraints.allowedNCTs).toContain("modalMixture");
+    // No required resolutions — axis modulations don't resolve to V.
+    expect(pack.constraints.requiredResolutions.length).toBe(0);
+  });
+
+  it("allStylePackIds includes axis-system", () => {
+    expect(allStylePackIds()).toContain("axis-system");
   });
 });
