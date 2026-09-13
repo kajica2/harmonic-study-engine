@@ -14,8 +14,8 @@
  * effect dependency arrays in the rest of App.tsx.
  */
 
-import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { HarmonicPath, ALL_PATHS } from "../lib/paths";
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
+import { HarmonicPath, HarmonicStep, ALL_PATHS } from "../lib/paths";
 import { InstrumentType } from "../lib/audio";
 import { BackingStyle } from "../lib/backingEngine";
 import { TimeSignature } from "../lib/rhythm";
@@ -104,6 +104,14 @@ export interface SessionStore {
   setActivePathIndex: Setter<number>;
   activeStepIndex: number;
   setActiveStepIndex: Setter<number>;
+
+  /**
+   * Composer-catalog v3: mutate a single step in the active path.
+   * Used by CoComposePanel's "Accept" button to apply a reharmonization
+   * suggestion. No undo — fire-and-forget mutation. (TODO: integrate
+   * with useHistory if/when a general-purpose undo is added.)
+   */
+  setHarmonicStep: (stepIndex: number, step: HarmonicStep) => void;
 
   // transport
   tempo: number;
@@ -474,6 +482,24 @@ export function useSessionStore(): SessionStore {
     setActivePathIndex,
     activeStepIndex,
     setActiveStepIndex,
+    // Composer-catalog v3: Accept-button mutation target.
+    setHarmonicStep: useCallback(
+      (stepIndex: number, step: HarmonicStep) => {
+        setPaths((prev) => {
+          if (activePathIndex < 0 || activePathIndex >= prev.length) return prev;
+          const path = prev[activePathIndex];
+          if (stepIndex < 0 || stepIndex >= path.steps.length) return prev;
+          // Replace the step at stepIndex; preserve everything else.
+          const newSteps = path.steps.slice();
+          newSteps[stepIndex] = step;
+          const newPath = { ...path, steps: newSteps };
+          const newPaths = prev.slice();
+          newPaths[activePathIndex] = newPath;
+          return newPaths;
+        });
+      },
+      [activePathIndex, setPaths],
+    ),
     tempo,
     setTempo,
     tempoHistory,
