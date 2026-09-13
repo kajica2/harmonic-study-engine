@@ -51,18 +51,115 @@ export interface BarChart {
   bars: ChartBar[];
 }
 
-/** A non-bar chart — section / row / axis / duration — kept structured for v2. */
-export interface SectionChart {
-  kind: "section" | "row" | "axis" | "duration" | "layer";
+/** Stravinsky bitonal block — two triads a tritone apart. */
+export interface BitonalBlock {
+  kind: "bitonal";
   composerId: ComposerId;
   composerName: string;
-  /** Free-form description of what the chart represents. */
   description: string;
-  /** Raw lines preserved for now — v2 will parse these. */
+  /** Pair of root pitch classes (0-11) for the two triads. */
+  pairs: { root1: number; root2: number }[];
+  /** Free-form chord descriptions per pair (preserved for display). */
   raw: string[];
 }
 
+/** Schoenberg twelve-tone row matrix. */
+export interface RowMatrix {
+  kind: "row";
+  composerId: ComposerId;
+  composerName: string;
+  description: string;
+  /** The four canonical row forms as pitch-class arrays (0-11). */
+  forms: {
+    P0: number[];
+    I0: number[];
+    R0: number[];
+    RI0: number[];
+  };
+  /** Hexachordal segmentation of P0. */
+  hexachords: { first: number[]; second: number[] };
+  /** Raw lines preserved for display. */
+  raw: string[];
+}
+
+/** Bartók axis system — three axes of related keys. */
+export interface AxisSystem {
+  kind: "axis";
+  composerId: ComposerId;
+  composerName: string;
+  description: string;
+  /** Three axes, each as an array of pitch classes (0-11). */
+  tonicAxis: number[];
+  dominantAxis: number[];
+  subdominantAxis: number[];
+  /** Raw lines preserved for display. */
+  raw: string[];
+}
+
+/** Cage 4'33"-style duration structure. */
+export interface DurationStructure {
+  kind: "duration";
+  composerId: ComposerId;
+  composerName: string;
+  description: string;
+  movements: { label: string; description: string; seconds: number }[];
+  raw: string[];
+}
+
+/** Eno-style ambient layer stack. */
+export interface LayerStack {
+  kind: "layer";
+  composerId: ComposerId;
+  composerName: string;
+  description: string;
+  layers: { index: number; description: string }[];
+  raw: string[];
+}
+
+/** Generic section chart for composers without a specialized parser. */
+export interface GenericSectionChart {
+  kind: "section";
+  composerId: ComposerId;
+  composerName: string;
+  description: string;
+  raw: string[];
+}
+
+/** A non-bar chart — discriminated union of per-kind shapes. */
+export type SectionChart =
+  | BitonalBlock
+  | RowMatrix
+  | AxisSystem
+  | DurationStructure
+  | LayerStack
+  | GenericSectionChart;
+
 export type ComposerChart = BarChart | SectionChart;
+
+// --- Pitch-class helper for parsing structured section charts ---
+const NOTE_TO_PC: Record<string, number> = {
+  C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
+  "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+};
+
+/** Parse a single note name like "E", "Db", "C#" into a pitch class (0-11). */
+export function pcFromNoteName(name: string | null | undefined): number | undefined {
+  if (typeof name !== "string") return undefined;
+  const trimmed = name.trim();
+  if (!trimmed) return undefined;
+  return NOTE_TO_PC[trimmed];
+}
+
+/** Parse a sequence of note names from a delimiter-separated string. */
+export function pcsFromNoteNames(raw: string): number[] {
+  const notes = raw.split(/[–—\-\s,]+/).filter(Boolean);
+  const out: number[] = [];
+  for (const n of notes) {
+    const pc = pcFromNoteName(n);
+    if (pc !== undefined) out.push(pc);
+  }
+  return out;
+}
 
 // --- Built-in chart data (parsed from the catalog) ---
 // v1: hand-curated bar-by-bar data for the 19 composers with literal
@@ -532,10 +629,14 @@ const SECTION_CHARTS: SectionChart[] = [
     ],
   },
   {
-    kind: "section",
+    kind: "bitonal",
     composerId: "stravinsky",
     composerName: "Stravinsky",
-    description: "Petrushka chord and Rite of Spring chord blocks (bitonal / ostinato).",
+    description: "Petrushka chord and Rite of Spring chord blocks (bitonal / ostinato). The Petrushka chord (C major + F# major) is the canonical bitonal sonority — two major triads a tritone apart.",
+    pairs: [
+      // Petrushka chord: C (pc 0) + F# (pc 6) — a tritone apart.
+      { root1: 0, root2: 6 },
+    ],
     raw: [
       "1-4: C major / F# major — two triads a tritone apart",
       "5-8: C major / F# major — bitonal oscillation",
@@ -551,7 +652,19 @@ const SECTION_CHARTS: SectionChart[] = [
     kind: "row",
     composerId: "schoenberg",
     composerName: "Schoenberg",
-    description: "Suite for Piano op. 25 row forms (P0/I0/R0/RI0). v2 will expose the full row matrix and structural plan.",
+    description: "Suite for Piano op. 25 row forms (P0/I0/R0/RI0). Each form is 12 distinct pitch classes covering the chromatic aggregate. P0 splits into two combinatorially-related hexachords.",
+    forms: {
+      // Pitch classes encoded as numbers 0-11. Sharp/flat notation chosen
+      // for canonical spelling — see raw for the original enharmonics.
+      P0: [4, 5, 7, 1, 6, 3, 8, 2, 11, 0, 9, 10], // E F G Db Gb Eb Ab D B C A Bb
+      I0: [4, 3, 1, 7, 2, 5, 0, 8, 10, 9, 1, 11], // E Eb Db G D F C Ab Bb A C# B (C#=1)
+      R0: [10, 9, 0, 11, 2, 8, 3, 6, 1, 7, 5, 4], // Bb A C B D Ab Eb Gb Db G F E
+      RI0: [11, 1, 9, 10, 8, 0, 5, 2, 7, 1, 3, 4], // B C# A Bb Ab C F D G Db Eb E (Db=1)
+    },
+    hexachords: {
+      first: [4, 5, 7, 1, 6, 3],   // E F G Db Gb Eb
+      second: [8, 2, 11, 0, 9, 10], // Ab D B C A Bb
+    },
     raw: [
       "P0: E – F – G – Db – Gb – Eb – Ab – D – B – C – A – Bb",
       "I0: E – Eb – Db – G – D – F – C – Ab – Bb – A – C# – B",
@@ -565,7 +678,10 @@ const SECTION_CHARTS: SectionChart[] = [
     kind: "axis",
     composerId: "bartok",
     composerName: "Bartók",
-    description: "Fugue from Music for Strings, Percussion and Celesta — tritone axis system (A – Eb). v2 will model the axis as a graph of related keys.",
+    description: "Fugue from Music for Strings, Percussion and Celesta — tritone axis system (A – Eb). Each axis contains four keys related by tritone and minor third rather than by fifth.",
+    tonicAxis: [9, 0, 3, 6],       // A – C – Eb – F#
+    dominantAxis: [4, 7, 10, 1],  // E – G – Bb – C#
+    subdominantAxis: [2, 5, 8, 11], // D – F – Ab – B
     raw: [
       "Tonic axis: A – C – Eb – F#",
       "Dominant axis: E – G – Bb – C#",
@@ -578,6 +694,11 @@ const SECTION_CHARTS: SectionChart[] = [
     composerId: "cage",
     composerName: "Cage",
     description: "4'33\" — three silent movements of 30s / 2m23s / 1m40s. Sonatas and Interludes prepared-piano timbre catalog is a separate study.",
+    movements: [
+      { label: "I", description: "Silence", seconds: 30 },
+      { label: "II", description: "Silence", seconds: 143 }, // 2*60 + 23
+      { label: "III", description: "Silence", seconds: 100 }, // 1*60 + 40
+    ],
     raw: [
       "Movement I: Silence — 30 seconds",
       "Movement II: Silence — 2 minutes 23 seconds",
@@ -628,7 +749,13 @@ const SECTION_CHARTS: SectionChart[] = [
     kind: "layer",
     composerId: "brian-eno",
     composerName: "Brian Eno",
-    description: "Music for Airports 1/1 — four looping layers of different lengths. No functional progression.",
+    description: "Music for Airports 1/1 — four looping layers of different lengths. No functional progression. The polyrhythm of differently-paced loops is the compositional idea.",
+    layers: [
+      { index: 1, description: "Piano loop in C diatonic field" },
+      { index: 2, description: "Piano loop at different length" },
+      { index: 3, description: "Vocal loop on sustained pitches" },
+      { index: 4, description: "Synthesizer pad drone" },
+    ],
     raw: [
       "Layer 1: Piano loop in C diatonic field",
       "Layer 2: Piano loop at different length",
