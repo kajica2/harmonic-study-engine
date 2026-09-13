@@ -1,0 +1,11 @@
+{
+  "id": "through-composed",
+  "name": "Through-composed (32-bar)",
+  "description": "No repeated sections; each 8-bar block introduces new material. Common in art songs and film cues.",
+  "sections": [
+    { "id": "A", "length": 8, "cadence": "ii-V-I" },
+    { "id": "B", "length": 8, "cadence": "half-cadence" },
+    { "id": "C", "length": 8, "cadence": "deceptive" },
+    { "id": "D", "length": 8, "cadence": "ii-V-I" }
+  ]
+}

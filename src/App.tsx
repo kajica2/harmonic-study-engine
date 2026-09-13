@@ -24,20 +24,18 @@ import {
   Video,
   StopCircle,
 } from "lucide-react";
-import { audioEngine } from "./lib/audio";
-import { rhythmEngine, TimeSignature } from "./lib/rhythm";
+import { audioEngine, InstrumentType } from "./lib/audio";
+import { rhythmEngine } from "./lib/rhythm";
 import { playbackClock } from "./lib/playbackClock";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
-import { useSessionStore } from "./hooks/useSessionStore";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
-import { createHumanizeBacking } from "./magenta/humanizeBacking";
-import { createMixHumanizer } from "./magenta/mixHumanizer";
-import { HumanFeelDial } from "./components/HumanFeelDial";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
+import { midiIn } from "./lib/midiIn";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
+import { STUDIES_PATHS } from "./lib/paths";
 import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
 import { PianoKeyboard } from "./components/PianoKeyboard";
 import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
@@ -46,7 +44,9 @@ import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
 import { generateHarmonicPath } from "./lib/generator";
-import { applyVoiceLeading } from "./lib/theory";
+import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, transposeChordName, NOTE_NAMES_FLAT, type VoicingId } from "./lib/theory";
+import { useCanvasSize } from "./lib/useCanvasSize";
+import { velocityToGain } from "./lib/audioHelpers";
 import { ImportExportModal } from "./components/ImportExportModal";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
@@ -56,31 +56,59 @@ import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
 import { exportToMidiFile } from "./lib/midiExport";
-import { renderPathToWav, downloadWavFromBlob, RenderMode, stepsPerBar } from "./lib/loopWav";
+import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
+import { STEPS_PER_BAR } from "./lib/paths";
+import {
+  planForm,
+  MIN_PATH_BARS,
+  MAX_PATH_BARS,
+  type FormTemplateId,
+} from "./lib/formPlanner";
+import { loadStylePack, type StylePackId } from "./lib/stylePack";
+import { suggestMelody, pcSet } from "./lib/melodyMarkov";
 import { useAsyncAction } from "./lib/useAsyncAction";
 import { InlineErrorPill } from "./components/InlineStatus";
 import { RecordingModal } from "./components/RecordingModal";
 import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
+import { MelodyLane } from "./components/MelodyLane";
+import { MelodyToolbar } from "./components/MelodyToolbar";
 import { PlaySessionRail } from "./components/PlaySessionRail";
-import { MobileCommandBar } from "./components/MobileCommandBar";
-import { LeadSheet } from "./components/LeadSheet";
-import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
+import { downloadText } from "./lib/download";
 import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
 import { PersonaLensBanner } from "./components/PersonaLensBanner";
-import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
-
-import { transposeChordName, PITCH_CLASSES } from "./lib/chordTranspose";
-import { downloadText } from "./lib/download";
+import { TexturePanel } from "./components/TexturePanel";
+import { FormPlanner } from "./components/FormPlanner";
+import { FormTemplatePicker } from "./components/FormTemplatePicker";
+import { StylePackPicker } from "./components/StylePackPicker";
+import { StyleWarnings } from "./components/StyleWarnings";
+import { CoComposePanel } from "./components/CoComposePanel";
+import { QuizPanel } from "./components/QuizPanel";
+import { HumanFeelDial } from "./components/HumanFeelDial";
+import { useSessionStore } from "./hooks/useSessionStore";
+import { useFeedback } from "./hooks/useFeedback";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
 import { usePathGenerator } from "./hooks/usePathGenerator";
-import type { ScoreDisplayMode } from "./lib/displayMode";
+import { MobileCommandBar } from "./components/MobileCommandBar";
+import { LeadSheet } from "./components/LeadSheet";
+import { ModalShell, useModalLabel } from "./components/ModalShell";
+import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
+import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
+import {
+  PathCatalog,
+  type BehavioralRuleId,
+  type BehavioralRuleMap,
+} from "./components/PathCatalog";
+
+// downloadText moved to src/lib/download.ts (extracted by main)
 
 export default function App() {
   // Persistent session state — paths, transport, voicing, mutes,
-  // arpeggiator, persona, loop range. Hydrated from localStorage
-  // by the hook; this is the only place these defaults live.
+  // arpeggiator, persona, loop range, metronome, humanizer. Hydrated
+  // from localStorage by the hook (same `synesthesia_*` keys HEAD's
+  // useSessionStore used, so existing user prefs survive reload).
   const session = useSessionStore();
+  const feedback = useFeedback();
   const {
     paths,
     setPaths,
@@ -88,12 +116,6 @@ export default function App() {
     setActivePathIndex,
     activeStepIndex,
     setActiveStepIndex,
-    transposeShift,
-    setTransposeShift,
-    voicingType,
-    setVoicingType,
-    instrument,
-    setInstrument,
     tempo,
     setTempo,
     tempoHistory,
@@ -107,6 +129,12 @@ export default function App() {
     setTimeSignature,
     beatType,
     setBeatType,
+    transposeShift,
+    setTransposeShift,
+    voicingType,
+    setVoicingType,
+    instrument,
+    setInstrument,
     drumsMuted,
     setDrumsMuted,
     bassMuted,
@@ -139,21 +167,45 @@ export default function App() {
     setLoopEndBar,
     metronomeOn,
     setMetronomeOn,
+    scoreDisplayMode,
+    setScoreDisplayMode,
+    melodyByStep,
+    setMelodyByStep,
+    counterMelodyByStep,
+    setCounterMelodyByStep,
+    stylePackId,
+    setStylePackId,
+    quizScore,
+    setQuizScore,
+    feedbackHistory,
+    setFeedbackHistory,
   } = session;
 
-  // Practice sets (separate storage system; loaded once at mount)
-  const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
-  const [recentSessions] = useState(() => getRecentSessions(5));
-  const [activePracticeSet, setActivePracticeSet] = useState<{
-    set: Parameters<typeof PracticeSessionPlayer>[0]["set"];
-    options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
-  } | null>(null);
 
-  const [activeMidis, setActiveMidis] = useState<number[]>([]);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 400 });
+  const isLoopingRef = useRef(isLooping);
 
+  // Ephemeral transport state — MIDI device lists, recorder status,
+  // UI flags. These don't need to survive reload; the session
+  // hook owns everything that's user preference.
   const [midiOutputs, setMidiOutputs] = useState<any[]>([]);
   const [selectedMidiOutId, setSelectedMidiOutId] = useState<string>("");
+  // Phase 5: MIDI input state — mirrors the MIDI Out pattern.
+  const [midiInputs, setMidiInputs] = useState<{ id: string; name: string }[]>([]);
+  const [selectedMidiInId, setSelectedMidiInId] = useState<string>("");
+  // Phase 5: "listening" indicator — most-recent input event summary,
+  // announced via aria-live and shown briefly in the chip. Cleared by
+  // a short timer so the chip returns to its static label.
+  const [midiInStatus, setMidiInStatus] = useState<string>("");
+  const midiInStatusTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+
+  // MIDI / recording ephemeral state
+  // MIDI / recording ephemeral state
+  const [activeMidis, setActiveMidis] = useState<number[]>([]);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Phase 5 refactor: extracted to src/lib/useCanvasSize. Listens to
+  // window.resize AND a ResizeObserver so sidebar toggles re-measure.
+  const canvasSize = useCanvasSize(canvasContainerRef, { width: 800, height: 400 });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
   const [isDDSPLoading, setIsDDSPLoading] = useState(false);
@@ -163,51 +215,64 @@ export default function App() {
   const [wavExportError, setWavExportError] = useState<string | null>(null);
   const [wavExportStatus, setWavExportStatus] = useState<string | null>(null);
   // Whether the OpenRouter API key is configured at build time.
-  // The Gemini/Cloud options are disabled in the UI when this is false.
   const hasOpenRouterKey = Boolean(
     (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined)?.trim(),
   );
 
-  // Collapsible / Foldable states for space optimization
+  // UI panel / folding
   const [isArpFolded, setIsArpFolded] = useState(false);
-  const [isGenFolded, setIsGenFolded] = useState(true); // default folded to conserve screen height
-  const [activePanel, setActivePanel] = useState<"paths" | "practice">("paths");
+  const [isGenFolded, setIsGenFolded] = useState(true);
+  const [activePanel, setActivePanel] = useState<"paths" | "practice" | "catalog">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
 
-  useEffect(() => {
-    audioEngine.setInstrument(instrument);
-  }, [instrument]);
+  // Practice sets + recent sessions
+  const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
+  const [recentSessions] = useState(() => getRecentSessions(5));
+  const [activePracticeSet, setActivePracticeSet] = useState<{
+    set: Parameters<typeof PracticeSessionPlayer>[0]["set"];
+    options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
+  } | null>(null);
 
+  // Generator knobs
   const [genLength, setGenLength] = useState(1);
   const [genComplexity, setGenComplexity] = useState(1);
 
-  const [showImportExport, setShowImportExport] = useState(false);
-  const [showCheatsheet, setShowCheatsheet] = useState(false);
-
-  // Live bass notes from the backing engine. Empty until the
-  // user picks a backing style and presses Auto.
-  const bassMidis = useBassNotes();
-
-  // Diatonic-scale practice mode. "auto" picks the mode from
-  // the chord's quality (maj / min / mix / locrian), or the user
-  // can pin a specific mode. "scaleMode" controls which.
+  // Scale + drill ephemeral
   const [scaleMode, setScaleMode] = useState<string>("auto");
   const [scaleBusy, setScaleBusy] = useState(false);
   const [scaleModeOpen, setScaleModeOpen] = useState(false);
-
-  // Rhythm drill state — same pattern as scaleBusy. We keep it
-  // tiny because the drill is mostly self-scheduling on the audio
-  // clock; only the button label needs to flip.
   const [drillBusy, setDrillBusy] = useState(false);
   const [drillIter, setDrillIter] = useState<DrillSubdivision | null>(null);
 
-  const isLoopingRef = useRef(isLooping);
+  // Modal / inspector visibility
+  const [showImportExport, setShowImportExport] = useState(false);
+  const [showCheatsheet, setShowCheatsheet] = useState(false);
 
-  useEffect(() => {
-    isLoopingRef.current = isLooping;
-  }, [isLooping]);
+  // Bass-line tracking (live, not persisted)
+  const bassMidis = useBassNotes();
 
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Etude state
+  const [etudeAlgorithm, setEtudeAlgorithm] = useState<EtudeAlgorithm>("magenta_rnn");
+  const [isGeneratingML, setIsGeneratingML] = useState(false);
+  const [etudeStatus, setEtudeStatus] = useState<string | null>(null);
+  const [hdStatus, setHdStatus] = useState<string | null>(null);
+  const [, setHDSoundsTick] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showRecordingModal, setShowRecordingModal] = useState(false);
+  const [isMediaRecording, setIsMediaRecording] = useState(false);
+  const [mediaRecordingStatus, setMediaRecordingStatus] = useState<string | null>(null);
+  const [mediaRecordingError, setMediaRecordingError] = useState<string | null>(null);
+  const [mediaRecordingElapsed, setMediaRecordingElapsed] = useState(0);
+  const [mp4BlobUrl, setMp4BlobUrl] = useState<string | null>(null);
+  const ddspApiUrl = (import.meta.env.VITE_DDSP_API as string | undefined) ||
+    "http://127.0.0.1:8765";
+  const backend = useDDSPProbe(ddspApiUrl);
+  const synesthesiaCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [showLeadSheet, setShowLeadSheet] = useState(false);
+  const [showChordInspector, setShowChordInspector] = useState(false);
+  const inspectorHistory = useMemo(() => makeInspectorHistory(), []);
+  const [showLiveScore, setShowLiveScore] = useState(true);
+
   const tm = useTimeoutRef();
 
   const path = paths[activePathIndex];
@@ -216,7 +281,7 @@ export default function App() {
   const optimizedStepsNotes = useMemo(() => {
     if (!optimizeVoiceLeading) return path.steps.map((s) => s.notes);
 
-    const res = [];
+    const res: number[][] = [];
     for (let i = 0; i < path.steps.length; i++) {
       if (i === 0) {
         res.push(path.steps[i].notes);
@@ -227,6 +292,18 @@ export default function App() {
     return res;
   }, [path.steps, optimizeVoiceLeading]);
 
+  // Phase 5: per-step transpose drift (sequenceStepper / keyDrift).
+  // Added on top of the user's manual transposeShift. Declared here
+  // (before currentChordNotes) so the chord transform can reference it.
+  const barDriftShifts = useMemo(
+    () =>
+        deriveBarTransposeDrift(
+          path,
+          PERSONAS.find((x) => x.id === selectedPersonaId),
+        ),
+    [path, selectedPersonaId],
+  );
+
   const currentChordNotes = useMemo(() => {
     let current = [...optimizedStepsNotes[activeStepIndex]].sort(
       (a, b) => a - b,
@@ -236,22 +313,24 @@ export default function App() {
       if (arpType === "none" && current.length > 0) {
         current = [current[current.length - 1]];
       }
-    } else if (voicingType === "open") {
-      const openNotes = [current[0]]; // keep bass note
-      for (let i = 1; i < current.length; i++) {
-        // Spread voicing: push every other note up an octave
-        openNotes.push(current[i] + (i % 2 !== 0 ? 12 : 0));
+    } else if (voicingType !== "closed") {
+      // Phase 5: use the VoicingId-aware applyVoicing for every non-default
+      // voicing. minimum_motion is delegated to applyVoiceLeading via the
+      // optimizeVoiceLeading flag upstream, so it falls through to "no-op"
+      // here.
+      if (voicingType !== "minimum_motion") {
+        current = applyVoicing(current, voicingType);
       }
-      current = openNotes;
     }
-    return current.map((n) => n + transposeShift);
-  }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType]);
+    return current.map((n) => n + transposeShift + (barDriftShifts[activeStepIndex] ?? 0));
+  }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType, barDriftShifts]);
 
   useEffect(() => {
     // Initialize audio engine on first interaction
     const handleFirstInteraction = () => {
       audioEngine.init();
       midiOut.init();
+      midiIn.init();
       window.removeEventListener("keydown", handleFirstInteraction);
       window.removeEventListener("mousedown", handleFirstInteraction);
     };
@@ -264,28 +343,42 @@ export default function App() {
       setSelectedMidiOutId(midiOut.getSelectedOutputId() || "");
     });
 
+    // Subscribe to MIDI inputs (Phase 5)
+    const unsubscribeMidiIn = midiIn.onInputsChange((inputs) => {
+      setMidiInputs(inputs);
+      setSelectedMidiInId(midiIn.getSelectedInputId() || "");
+    });
+
+    // Phase 5: reflect inbound note events in the chip + aria-live
+    // region so the user knows the device is actually wired up.
+    // We don't auto-detect chords (out of scope) — just the indicator.
+    const onMidinEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        type: string;
+        note: number;
+        velocity: number;
+        inputName: string;
+      };
+      const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+      const name = noteNames[detail.note % 12];
+      const octave = Math.floor(detail.note / 12) - 1;
+      setMidiInStatus(
+        `${detail.type === "noteon" ? "♪" : "·"} ${name}${octave}` +
+          ` v${detail.velocity}`,
+      );
+      if (midiInStatusTimeout.current) clearTimeout(midiInStatusTimeout.current);
+      midiInStatusTimeout.current = setTimeout(() => setMidiInStatus(""), 1500);
+    };
+    window.addEventListener("midin", onMidinEvent);
+
     return () => {
       window.removeEventListener("keydown", handleFirstInteraction);
       window.removeEventListener("mousedown", handleFirstInteraction);
       unsubscribeMidi();
+      unsubscribeMidiIn();
+      window.removeEventListener("midin", onMidinEvent);
+      if (midiInStatusTimeout.current) clearTimeout(midiInStatusTimeout.current);
     };
-  }, []);
-
-  useEffect(() => {
-    const updateSize = () => {
-      if (canvasContainerRef.current) {
-        setCanvasSize({
-          width: canvasContainerRef.current.offsetWidth,
-          height: canvasContainerRef.current.offsetHeight,
-        });
-      }
-    };
-
-    // Initial size
-    updateSize();
-
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
   }, []);
 
   // Update audio when step changes or arp settings change
@@ -347,8 +440,16 @@ export default function App() {
 
     if (arpType === "none") {
       setActiveMidis(currentChordNotes);
-      audioEngine.playChord(currentChordNotes);
-      midiOut.playChord(currentChordNotes);
+      // Velocity per note — bass softer, top louder. Bass (idx=0)
+      // maps to MIDI 60, top (idx=last) maps to 110. Single-note
+      // chords default to mid-velocity (85).
+      currentChordNotes.forEach((n, idx) => {
+        const last = currentChordNotes.length - 1;
+        const pos = last > 0 ? idx / last : 0.5;
+        const vel = 60 + pos * 50; // 60..110
+        audioEngine.playNote(n, vel);
+        midiOut.playNote(n, vel);
+      });
       currentChordNotes.forEach((n) => recorder.recordNoteOn(n));
 
       return () => {
@@ -393,9 +494,13 @@ export default function App() {
           arpIndex++;
         }
 
+        // Accent every 4th step (downbeat of the next 16th group) —
+        // velocity bumps from 75 to 105. Tighter musical groove.
+        const arpVelocity = arpIndex % 4 === 0 ? 105 : 75;
+
         lastNote = noteToPlay;
-        audioEngine.playNote(noteToPlay);
-        midiOut.playNote(noteToPlay);
+        audioEngine.playNote(noteToPlay, arpVelocity);
+        midiOut.playNote(noteToPlay, arpVelocity);
         recorder.recordNoteOn(noteToPlay);
         setActiveMidis((prev) => Array.from(new Set([...prev, noteToPlay])));
 
@@ -525,27 +630,23 @@ export default function App() {
     rhythmEngine.setTimeSignature(timeSignature);
   }, [timeSignature]);
 
-  useEffect(() => {
-    rhythmEngine.setMetronomeEnabled(metronomeOn);
-  }, [metronomeOn]);
+  // beatType is owned by backingEngine — see the useEffect below that
+  // calls backingEngine.setStyle(beatType) when playback starts. The
+  // rhythm engine only owns transport (tempo, time signature, metronome
+  // click, measure-start callback); it doesn't synthesize the beat.
 
   useEffect(() => {
-    rhythmEngine.setOnMeasureStart(() => {
+    const handler = () => {
       setActiveStepIndex((prev) => {
         // Sub-range loop wins when active and a start bar is set.
         const useLoop = isLoopingRef.current && loopStartBar !== null;
         if (useLoop) {
-          // Bar <-> step conversion uses the active time signature's
-          // stepsPerBar (4 for 4/4, 6 for 6/8, 7 for 7/8, 11 for 11/4,
-          // 16 for tintal). The previous code hard-coded / 4 which
-          // was only correct for 4/4 — see commit fixing this.
-          const stepsPerBarNow = stepsPerBar(timeSignature);
-          const totalBars = Math.ceil(path.steps.length / stepsPerBarNow);
-          const fromStep = loopStartBar! * stepsPerBarNow;
+          const totalBars = Math.ceil(path.steps.length / 4);
+          const fromStep = loopStartBar! * 4;
           // Inclusive end bar; +1 because we want the wrap to land on
           // the start of (loopEndBar + 1).
           const toStep =
-            (Math.min(loopEndBar ?? totalBars - 1, totalBars - 1) + 1) * stepsPerBarNow;
+            (Math.min(loopEndBar ?? totalBars - 1, totalBars - 1) + 1) * 4;
           if (prev + 1 >= toStep) return fromStep;
           if (prev < fromStep) return fromStep;
           return prev + 1;
@@ -559,7 +660,13 @@ export default function App() {
         }
         return prev + 1;
       });
-    });
+    };
+    rhythmEngine.setOnMeasureStart(handler);
+    // Detach on unmount or before the next re-bind so we never leave
+    // a stale closure pointing at a different path's step count.
+    return () => {
+      rhythmEngine.setOnMeasureStart(() => {});
+    };
   }, [path.steps.length, loopStartBar, loopEndBar]);
 
   useEffect(() => {
@@ -617,61 +724,6 @@ export default function App() {
     });
   }, [drumsMuted, bassMuted, pianoMuted]);
 
-  // Magenta humanizer — when `humanizeAmount` is non-zero, route
-  // every backing note's absolute time through createHumanizeBacking.
-  // The humanizer is recreated when amount/persona/style change so
-  // the RNG seed refreshes; rebuilding on every note would be
-  // cheaper but lose the per-call determinism we test for.
-  useEffect(() => {
-    if (humanizeAmount <= 0.001) {
-      backingEngine.humanizer = null;
-      return;
-    }
-    const ctx = backingEngine as unknown as { ctx?: AudioContext | null };
-    const ctxNow = ctx.ctx?.currentTime ?? 0;
-    const handle = createHumanizeBacking({
-      amount: humanizeAmount,
-      personaId: humanizePersonaId || "kandinsky",
-      style: beatType,
-      ctxNow,
-    });
-    backingEngine.humanizer = (time, track) => handle.adjust(time, track);
-    // No teardown — the engine reads the closure each call. Rebuilding
-    // on dep change replaces the function reference with a fresh one.
-  }, [humanizeAmount, humanizePersonaId, beatType, isPlayingAuto]);
-
-  // Mix humanizer (plan §6 item 4). When the Human feel dial is
-  // active, every backing-track setLevels call pulls a fresh ±1 dB
-  // wobble from a shared seeded RNG and multiplies it into each bus
-  // gain. The result: the record never "loops" exactly — each
-  // pass sounds like a slightly different take. Reseed on persona
-  // change so a different player gets a different wobble pattern.
-  useEffect(() => {
-    if (humanizeAmount <= 0.001) {
-      backingEngine.mixHumanizer = null;
-      // Re-apply static levels so the bus gains snap back to the
-      // user's chosen values rather than staying at the last wobble.
-      backingEngine.setLevels({});
-      return;
-    }
-    // Hash persona id into a 32-bit seed so each persona produces a
-    // distinct wobble signature without us hand-tuning 17 seeds.
-    const seedStr = `mix-humanizer-${humanizePersonaId || "kandinsky"}`;
-    let h = 2166136261 >>> 0;
-    for (let i = 0; i < seedStr.length; i++) {
-      h ^= seedStr.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    const handle = createMixHumanizer({ seed: h >>> 0 });
-    backingEngine.mixHumanizer = handle;
-    // Re-apply levels once so the first wobble is heard immediately
-    // rather than waiting for the next setLevels call.
-    backingEngine.setLevels({});
-    return () => {
-      backingEngine.mixHumanizer = null;
-    };
-  }, [humanizeAmount, humanizePersonaId]);
-
   // Each tick: schedule a window of backing-track beats ahead so
   // the rhythm section stays in phase with the melody playback
   // clock. Uses the playbackClock's `tick` event so we share one
@@ -700,7 +752,8 @@ export default function App() {
     return off;
   }, [isPlayingAuto, beatType, tempo, path.steps.length]);
 
-  // Sync state changes to localStorage
+  // Sync the few remaining vanilla useState values to localStorage.
+  // Everything else is persisted by useSessionStore.
   useEffect(() => {
     try {
       localStorage.setItem("synesthesia_paths", JSON.stringify(paths));
@@ -712,135 +765,19 @@ export default function App() {
         "synesthesia_activeStepIndex",
         String(activeStepIndex),
       );
-      localStorage.setItem(
-        "synesthesia_selectedPersonaId",
-        JSON.stringify(selectedPersonaId),
-      );
-      localStorage.setItem(
-        "synesthesia_transposeShift",
-        String(transposeShift),
-      );
-      localStorage.setItem("synesthesia_voicingType", voicingType);
-      localStorage.setItem(
-        "synesthesia_instrument",
-        JSON.stringify(instrument),
-      );
       localStorage.setItem("synesthesia_tempo", String(tempo));
-      localStorage.setItem(
-        "synesthesia_optimizeVoiceLeading",
-        JSON.stringify(optimizeVoiceLeading),
-      );
-      localStorage.setItem(
-        "synesthesia_showTheoryLabels",
-        JSON.stringify(showTheoryLabels),
-      );
-      localStorage.setItem("synesthesia_arpType", JSON.stringify(arpType));
-      localStorage.setItem("synesthesia_arpRate", String(arpRate));
-      localStorage.setItem("synesthesia_arpGate", String(arpGate));
-      localStorage.setItem("synesthesia_arpOctaves", String(arpOctaves));
-      localStorage.setItem("synesthesia_isLooping", JSON.stringify(isLooping));
-      localStorage.setItem("synesthesia_loopStartBar", String(loopStartBar ?? ""));
-      localStorage.setItem("synesthesia_loopEndBar", String(loopEndBar ?? ""));
-      localStorage.setItem("synesthesia_timeSignature", JSON.stringify(timeSignature));
-      localStorage.setItem("synesthesia_wavMode", JSON.stringify(wavMode));
-      localStorage.setItem("synesthesia_beatType", JSON.stringify(beatType));
-      localStorage.setItem("synesthesia_drumsMuted", drumsMuted ? "1" : "0");
-      localStorage.setItem("synesthesia_bassMuted", bassMuted ? "1" : "0");
-      localStorage.setItem("synesthesia_pianoMuted", pianoMuted ? "1" : "0");
-      localStorage.setItem("synesthesia_kbRange", JSON.stringify(kbRange));
-      localStorage.setItem("synesthesia_volume", String(volume));
     } catch (e) {
       console.warn("localStorage persistence error:", e);
     }
-  }, [
-    paths,
-    activePathIndex,
-    activeStepIndex,
-    selectedPersonaId,
-    transposeShift,
-    voicingType,
-    instrument,
-    tempo,
-    optimizeVoiceLeading,
-    showTheoryLabels,
-    arpType,
-    arpRate,
-    arpGate,
-    arpOctaves,
-    isLooping,
-    timeSignature,
-    beatType,
-    drumsMuted,
-    bassMuted,
-    pianoMuted,
-    kbRange,
-    volume,
-  ]);
+  }, [paths, activePathIndex, activeStepIndex, tempo]);
 
-  const handleGeneratePath = usePathGenerator({
-    currentPaths: paths,
-    setPaths,
-    setActivePathIndex,
-    setActiveStepIndex,
-    setTransposeShift,
-    length: [8, 16, 32][genLength - 1] ?? 8,
-    complexity: genComplexity,
-  });
-
-  const [etudeAlgorithm, setEtudeAlgorithm] =
-    useState<EtudeAlgorithm>("magenta_rnn");
-  const [isGeneratingML, setIsGeneratingML] = useState(false);
-  const [etudeStatus, setEtudeStatus] = useState<string | null>(null);
-  const [hdStatus, setHdStatus] = useState<string | null>(null);
-  const [, setHDSoundsTick] = useState(0); // force re-render when HD toggles
-
-  const [isRecording, setIsRecording] = useState(false);
-  const [showRecordingModal, setShowRecordingModal] = useState(false);
-
-  // Media recording (audio + canvas video → MP4 via server transcode)
-  const [isMediaRecording, setIsMediaRecording] = useState(false);
-  const [mediaRecordingStatus, setMediaRecordingStatus] = useState<
-    string | null
-  >(null);
-  const [mediaRecordingError, setMediaRecordingError] = useState<string | null>(
-    null,
-  );
-  const [mediaRecordingElapsed, setMediaRecordingElapsed] = useState(0);
-  const [mp4BlobUrl, setMp4BlobUrl] = useState<string | null>(null);
-  const ddspApiUrl =
-    (import.meta.env.VITE_DDSP_API as string | undefined) ||
-    "http://127.0.0.1:8765";
-  // Health-probe state for the DDSP backend — extracted to
-  // src/hooks/useDDSPProbe.ts. The hook handles the focus-reprobe
-  // lifecycle; the discriminated-union shape renders directly
-  // in the toolbar's status pill.
-  const backend = useDDSPProbe(ddspApiUrl);
-  const synesthesiaCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [showLeadSheet, setShowLeadSheet] = useState(false);
-  const [showChordInspector, setShowChordInspector] = useState(false);
-  const inspectorHistory = useMemo(() => makeInspectorHistory(), []);
-  const [showLiveScore, setShowLiveScore] = useState(true);
-  // Display mode for the live score — full vs active-bar zoom.
-  // Persisted to localStorage so the user's preference survives
-  // reload. Picker lives in <PracticeHeader>; the actual dim
-  // treatment is applied inside <LiveScoreDisplay>.
-  const [scoreDisplayMode, setScoreDisplayMode] =
-    useState<ScoreDisplayMode>(() => {
-      try {
-        const saved = localStorage.getItem("hse.scoreDisplayMode");
-        if (saved === "full" || saved === "zoom") return saved;
-      } catch {
-        /* localStorage unavailable; fall through */
-      }
-      return "full";
-    });
-  useEffect(() => {
-    try {
-      localStorage.setItem("hse.scoreDisplayMode", scoreDisplayMode);
-    } catch {
-      /* ignore */
-    }
-  }, [scoreDisplayMode]);
+  const handleGeneratePath = () => {
+    const newPath = generateHarmonicPath(genLength, genComplexity);
+    setPaths([{ ...newPath, name: newPath.name ?? newPath.title }, ...paths]);
+    setActivePathIndex(0);
+    setActiveStepIndex(0);
+    setTransposeShift(0);
+  };
 
   const handleGenerateEtude = async () => {
     const lengthMap = [8, 16, 32];
@@ -878,7 +815,7 @@ export default function App() {
             );
           }
         }
-        setPaths([newPath, ...paths]);
+        setPaths([{ ...newPath, name: newPath.name ?? newPath.title }, ...paths]);
         setActivePathIndex(0);
         setActiveStepIndex(0);
         setTransposeShift(0);
@@ -892,7 +829,7 @@ export default function App() {
       }
     } else {
       const newPath = generateEtude(etudeAlgorithm, len);
-      setPaths([newPath, ...paths]);
+      setPaths([{ ...newPath, name: newPath.name ?? newPath.title }, ...paths]);
       setActivePathIndex(0);
       setActiveStepIndex(0);
       setTransposeShift(0);
@@ -911,8 +848,15 @@ export default function App() {
     setArpGate(p.arpGate);
     setArpOctaves(p.arpOctaves);
 
-    // Find the original path ID
-    const pathIdx = paths.findIndex((px) => px.id === p.originalSongId);
+    // Phase 5: apply persona's defaultVoicing when set (and valid).
+    if (p.defaultVoicing && p.defaultVoicing in VOICINGS) {
+      setVoicingType(p.defaultVoicing as VoicingId);
+    }
+
+    // Find the original path ID — try defaultPath first (Phase 5), then
+    // fall back to originalSongId (the original behavior).
+    const pathId = p.defaultPath ?? p.originalSongId;
+    const pathIdx = paths.findIndex((px) => px.id === pathId);
     if (pathIdx !== -1) {
       setActivePathIndex(pathIdx);
       setActiveStepIndex(0);
@@ -924,6 +868,69 @@ export default function App() {
     const p = PERSONAS.find((x) => x.id === selectedPersonaId);
     return p ? p.visualTheme : "default";
   }, [selectedPersonaId]);
+
+  // Phase 5: per-bar behavioral markers from the active path + persona.
+  // Drives motifTracker badges, frozenBass indicators, and the per-bar
+  // accent hue in the bar strip.
+  const behavioralMarkers = useMemo(
+    () =>
+      deriveBehavioralMarkers(
+        path,
+        PERSONAS.find((x) => x.id === selectedPersonaId),
+      ),
+    [path, selectedPersonaId],
+  );
+
+  /**
+   * Catalog-only: rule-id map for every path. The PathCatalog uses
+   * this so a user can filter "show me everything with key-drift or
+   * frozen-bass". The active persona shapes which rules apply — for
+   * the catalog tab we want the *current* persona's rules to be the
+   * reference: a path is "keyDrift"-y if the current persona's rules
+   * declare keyDriftAcrossPath, OR if its key field already declares
+   * a tonal drift arrow (`→`). This mirrors how the engine actually
+   * behaves when this path is loaded with the current persona.
+   *
+   *   - sequenceStepper: path.sequenceStepper === true
+   *   - keyDrift:        path.key contains "→" OR persona.keyDriftAcrossPath
+   *   - motifTracker:    persona.rules.motifTracker
+   *   - frozenBass:      any bar in deriveBehavioralMarkers carries bassFrozen
+   *   - sliceAndRepeat:  path.sliceAndRepeat === true
+   *   - bassIsolation:   persona.bassIsolation === true
+   */
+  const pathRulesByPathId: BehavioralRuleMap = useMemo(() => {
+    const persona = PERSONAS.find((x) => x.id === selectedPersonaId);
+    const rulesByPathId: BehavioralRuleMap = {};
+    for (const p of paths) {
+      const rules: BehavioralRuleId[] = [];
+      // Path-level flags
+      if ((p as HarmonicPath & { sequenceStepper?: boolean }).sequenceStepper) {
+        rules.push("sequenceStepper");
+      }
+      if ((p as HarmonicPath & { sliceAndRepeat?: boolean }).sliceAndRepeat) {
+        rules.push("sliceAndRepeat");
+      }
+      // Path declares a tonal drift explicitly
+      if (p.key && /→/.test(p.key)) rules.push("keyDrift");
+      // Persona-level flags
+      const personaRules = persona?.rules;
+      if (personaRules?.keyDriftAcrossPath) rules.push("keyDrift");
+      if (personaRules?.motifTracker) rules.push("motifTracker");
+      if (personaRules?.bassIsolation) rules.push("bassIsolation");
+      // Frozen-bass: any bar in deriveBehavioralMarkers was frozen
+      const markers = deriveBehavioralMarkers(p, persona);
+      if (markers.some((m) => m.bassFrozen)) rules.push("frozenBass");
+      // Dedupe while preserving order
+      rulesByPathId[p.id] = Array.from(new Set(rules));
+    }
+    return rulesByPathId;
+  }, [paths, selectedPersonaId]);
+
+  // Stable modal-title IDs for aria-labelledby. Each ModalShell gets
+  // one; the matching <h2 id=...> lives inside the modal body.
+  const leadSheetTitleId = useModalLabel("lead-sheet");
+  const cheatsheetTitleId = useModalLabel("cheatsheet");
+  const moreSheetTitleId = useModalLabel("mobile-more");
 
   return (
     <div className="min-h-screen surface-0 text-[color:var(--color-text-1)] font-sans selection:bg-[color:var(--color-brand-muted)] selection:text-[color:var(--color-brand-strong)] flex flex-col">
@@ -964,19 +971,6 @@ export default function App() {
           setIsPlayingAuto(true);
         }}
       />
-
-      {/* Recording bar — peripheral "REC" indicator at the very top
-          of the viewport. The corner pill (below) carries the
-          elapsed-time detail; this bar is for peripheral vision
-          while the user is looking at the score. aria-hidden because
-          the pill already has aria-live=polite for screen readers. */}
-      {isMediaRecording && (
-        <div
-          className="recording-bar"
-          aria-hidden="true"
-          data-testid="recording-bar"
-        />
-      )}
 
       <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[color:var(--color-border)] surface-1 flex flex-wrap gap-3 sm:gap-4 justify-between items-center backdrop-blur-xl sticky top-0 z-30">
         <div className="min-w-0">
@@ -1048,8 +1042,97 @@ export default function App() {
               </select>
             )}
           </div>
+
+          {/* Phase 5: MIDI IN picker. Mirrors the OUT chip — same
+              visual language, different color story (cyan vs purple).
+              Lists available input devices; "no devices" or "unsupported"
+              for browsers without Web MIDI (Firefox without extension).
+              When an event arrives, the chip briefly shows the note
+              (e.g. "♪ A4 v96") and an aria-live region announces it. */}
+          <div
+            className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800"
+            title="MIDI input from a connected controller or instrument. Listens for note on/off and dispatches 'midin' events on window."
+            aria-label="MIDI input device"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor:
+                  midiInputs.length === 0
+                    ? "#6b7280" // gray — no inputs
+                    : selectedMidiInId
+                      ? "#22c55e" // green — listening
+                      : "#06b6d4", // cyan — devices available, none selected
+              }}
+              aria-hidden="true"
+            />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+              IN
+            </span>
+            {midiInStatus ? (
+              <span
+                className="text-xs text-emerald-300 t-mono"
+                aria-hidden="true"
+              >
+                {midiInStatus}
+              </span>
+            ) : midiInputs.length === 0 ? (
+              <span className="text-xs text-neutral-400 italic">
+                no inputs
+              </span>
+            ) : (
+              <select
+                value={selectedMidiInId}
+                onChange={(e) => {
+                  midiIn.selectInput(e.target.value || null);
+                  setSelectedMidiInId(e.target.value);
+                }}
+                className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+                aria-label="Select MIDI input device"
+              >
+                <option value="">none</option>
+                {midiInputs.map((inp) => (
+                  <option key={inp.id} value={inp.id}>
+                    {inp.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          {/* Screen-reader announcement of inbound MIDI note events. */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {midiInStatus
+              ? `MIDI input: ${midiInStatus.replace(/^[♪·]\s*/, "")}`
+              : midiInputs.length === 0
+                ? "MIDI input: no devices connected"
+                : selectedMidiInId
+                  ? `MIDI input: listening on ${
+                      midiInputs.find((x) => x.id === selectedMidiInId)?.name ?? ""
+                    }`
+                  : "MIDI input: devices available, none selected"}
+          </div>
         </div>
       </header>
+
+      <PracticeHeader
+        path={path}
+        activeStepIndex={activeStepIndex}
+        chordName={transposeChordName(step.name ?? "", transposeShift)}
+        timeSignature={timeSignature}
+        chordNotes={currentChordNotes}
+        isPlaying={isPlayingAuto}
+        onPlayPause={() => setIsPlayingAuto(!isPlayingAuto)}
+        tempo={tempo}
+        onTempoChange={setTempo}
+        isLooping={isLooping}
+        onLoopToggle={() => setIsLooping(!isLooping)}
+        backingStyle={beatType}
+        onBackingStyleChange={setBeatType}
+        volume={volume}
+        onVolumeChange={setVolume}
+        scoreDisplayMode={scoreDisplayMode}
+        onScoreDisplayModeChange={setScoreDisplayMode}
+      />
 
       <main
         id="main"
@@ -1057,9 +1140,105 @@ export default function App() {
       >
         <div id="adv-live" role="status" aria-live="polite" className="sr-only" />
 
+        {/* Per-path briefing — explains the practice loop for the active path. */}
+        <PathBriefing pathId={path.id} />
+
+        {/* Form planner — MVP shows a default AABA plan; v1 will let the
+            user pick + reorder. The picker lets the user see all 4 templates. */}
+        {(() => {
+          const barCount = Math.max(MIN_PATH_BARS, Math.min(MAX_PATH_BARS, Math.floor(path.steps.length / 4)));
+          const result = planForm({ bars: barCount, template: "aaba" });
+          const plan = result.ok ? result.plan : null;
+          return (
+            <>
+              <FormTemplatePicker
+                activeId={null}
+                onPick={() => {
+                  /* MVP: no-op; v1 will call setPlan(planForm({...})) */
+                }}
+              />
+              <FormPlanner plan={plan} />
+            </>
+          );
+        })()}
+
+        {/* Style pack picker — auto-selects persona's preferred pack.
+            The picker is mounted alongside StyleWarnings which appears
+            only when the active pack has violations. Accept/reject
+            events feed useFeedback for the L9 learning loop. */}
+        <StylePackPicker
+          activeId={stylePackId as StylePackId | null}
+          activePersonaId={selectedPersonaId}
+          onPick={(id) => {
+            setStylePackId(id);
+            feedback.record({
+              personaId: selectedPersonaId,
+              suggestion: `style:${id}`,
+              accepted: true,
+            });
+          }}
+        />
+        {stylePackId && (
+          <StyleWarnings
+            styleName={loadStylePack(stylePackId as StylePackId).name}
+            violations={[]}
+          />
+        )}
+
+        {/* CoComposePanel — "what if?" reharmonization suggestion. */}
+        {(() => {
+          const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
+          const seed = (path.id.charCodeAt(0) || 0) ^ ((activeBar + 1) * 0x9e3779b9);
+          return (
+            <CoComposePanel
+              pathId={path.id}
+              barIndex={activeBar}
+              seed={seed >>> 0}
+            />
+          );
+        })()}
+
+        {/* Quiz — auto-gen / curated hybrid. Cycles through 5 topics. */}
+        <QuizPanel
+          pathId={path.id}
+          stepIndex={activeStepIndex}
+          topic="roman-numerals"
+          seed={(activeStepIndex + 1) * 7}
+          score={quizScore}
+          onAnswer={(wasCorrect, correct, total) => {
+            setQuizScore({ correct, total });
+            if (wasCorrect) {
+              setFeedbackHistory([
+                ...feedbackHistory,
+                { personaId: selectedPersonaId, suggestion: "quiz:roman-numerals", accepted: true },
+              ]);
+            }
+          }}
+        />
+
+        {/* Persona behavioral lens — shows when the active persona
+            has a documented behavioral rule set (Bach/Coltrane/Miles). */}
+        <PersonaLensBanner personaId={selectedPersonaId} />
+
+        {/* Texture — per-track mute toggles + counter-line layer toggle. */}
+        <TexturePanel
+          drumsMuted={drumsMuted}
+          bassMuted={bassMuted}
+          pianoMuted={pianoMuted}
+          setDrumsMuted={setDrumsMuted}
+          setBassMuted={setBassMuted}
+          setPianoMuted={setPianoMuted}
+          counterLineActive={false}
+        />
+
         {/* Play Session Rail — guided workflow */}
         <PlaySessionRail
           paths={paths}
+          prependPath={(path) => {
+            // Idempotent: don't prepend a duplicate.
+            if (paths.some((x) => x.id === path.id)) return;
+            setPaths((prev) => [path, ...prev]);
+          }}
           activePath={path}
           activePathIndex={activePathIndex}
           setActivePathIndex={setActivePathIndex}
@@ -1201,6 +1380,7 @@ export default function App() {
           onOpenLeadSheet={() => setShowLeadSheet(true)}
           onOpenInspector={() => setShowChordInspector(true)}
           optimizedStepsNotes={optimizedStepsNotes}
+          behavioralMarkers={behavioralMarkers}
           onPlayChord={(notes) => audioEngine.playChord(notes)}
           onStopChord={(notes) => audioEngine.stopChord(notes)}
           onCommitVoicing={(stepIndex, notes) => {
@@ -1236,14 +1416,13 @@ export default function App() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 gap-3 overflow-x-auto pb-1">
             {PERSONAS.map((p) => {
               const isActive = selectedPersonaId === p.id;
+              const isDocumented = p.synesthesiaStatus === "documented";
               return (
                 <button
                   key={p.id}
                   onClick={() => handleSelectPersona(p.id)}
                   aria-pressed={isActive}
-                  title={`${p.name} — ${p.role}`}
-                  aria-label={`${p.name} — ${p.role}`}
-                  className={`relative text-left p-3 rounded-xl border transition-all duration-300 flex flex-col justify-between h-28 group ${
+                  className={`relative text-left p-3 rounded-xl border transition-all duration-300 flex flex-col justify-between h-36 group ${
                     isActive
                       ? `bg-gradient-to-br ${p.gradientFrom} ${p.gradientTo} shadow-[0_4px_20px_rgba(0,0,0,0.4)]`
                       : "bg-neutral-900/40 border-transparent hover:bg-neutral-900/80 hover:border-neutral-800"
@@ -1281,9 +1460,10 @@ export default function App() {
                         .join("")}
                     </div>
 
-                    {/* Non-color active indicator: a check mark + a
-                        solid ring. Color-blind safe because the shape
-                        (✓) and ring carry the meaning, not the color. */}
+                    {/* Synesthesia badge: ✅ Documented / 🎨 Interpretive
+                        OR the existing "active" indicator when selected.
+                        Color-blind safe: both badge and check use shape,
+                        not color, as the carrier. */}
                     {isActive ? (
                       <span
                         className="flex items-center gap-1 px-1.5 py-0.5 surface-1 border rounded-[var(--radius-sm)]"
@@ -1301,10 +1481,21 @@ export default function App() {
                       </span>
                     ) : (
                       <span
-                        className="w-1.5 h-1.5 rounded-full bg-neutral-700 group-hover:bg-neutral-600"
-                        title="Click to select this persona"
-                        aria-hidden="true"
-                      />
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-neutral-800 text-[8px] font-mono uppercase tracking-wider text-neutral-400"
+                        title={
+                          isDocumented
+                            ? "Documented synesthesia — color is historically sourced"
+                            : "Interpretive color — mood/texture metaphor"
+                        }
+                        aria-label={
+                          isDocumented
+                            ? "Documented synesthesia"
+                            : "Interpretive color"
+                        }
+                      >
+                        <span aria-hidden="true">{isDocumented ? "✓" : "❖"}</span>
+                        <span>{isDocumented ? "syn" : "art"}</span>
+                      </span>
                     )}
                   </div>
 
@@ -1316,6 +1507,31 @@ export default function App() {
                       {p.role}
                     </div>
                   </div>
+
+                  {/* Technique chips — first 2 visible, rest on hover via
+                      title attr. Pure visual hint of what the persona does;
+                      click cycles the active highlight elsewhere. */}
+                  {p.techniques && p.techniques.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {p.techniques.slice(0, 2).map((t) => (
+                        <span
+                          key={t}
+                          className="px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-wider bg-neutral-900/60 border border-neutral-800 text-neutral-500"
+                          title={`technique: ${t}`}
+                        >
+                          {t.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                      {p.techniques.length > 2 && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[8px] font-mono text-neutral-600"
+                          title={p.techniques.slice(2).join(", ")}
+                        >
+                          +{p.techniques.length - 2}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Quote block */}
                   <div className="text-[8px] text-neutral-400 font-serif italic truncate w-full opacity-60 mt-1">
@@ -1462,6 +1678,16 @@ export default function App() {
 
                 {!isGenFolded && (
                   <div className="mt-4 pt-1 flex flex-col gap-4">
+                    {/* Humanizer — Magenta-driven persona-aware timing
+                        jitter. 0 = grid-locked, 1 = full persona profile.
+                        Live during backing-track playback. */}
+                    <HumanFeelDial
+                      amount={humanizeAmount}
+                      setAmount={setHumanizeAmount}
+                      personaId={humanizePersonaId || selectedPersonaId}
+                      setPersonaId={setHumanizePersonaId}
+                    />
+
                     <div className="flex flex-col gap-3">
                       <div className="text-xs font-semibold text-neutral-400 mb-1 flex items-center gap-1">
                         <Music size={12} className="text-purple-400" /> Path
@@ -1676,7 +1902,7 @@ export default function App() {
 
               {/* Panel tab switcher */}
               <div className="flex gap-1 mb-3">
-                {(["paths", "practice"] as const).map((tab) => (
+                {(["paths", "practice", "catalog"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActivePanel(tab)}
@@ -1686,7 +1912,11 @@ export default function App() {
                         : "text-neutral-500 hover:text-neutral-300 border border-transparent"
                     }`}
                   >
-                    {tab === "paths" ? "Paths" : "Practice"}
+                    {tab === "paths"
+                      ? "Paths"
+                      : tab === "practice"
+                        ? "Practice"
+                        : "Catalog"}
                   </button>
                 ))}
               </div>
@@ -1839,32 +2069,27 @@ export default function App() {
                   )}
                 </>
               )}
+
+              {/* Catalog tab — unified, filterable view of every path */}
+              {activePanel === "catalog" && (
+                <PathCatalog
+                  paths={paths}
+                  rulesByPathId={pathRulesByPathId}
+                  onSelect={(id) => {
+                    const idx = paths.findIndex((p) => p.id === id);
+                    if (idx >= 0) {
+                      setActivePathIndex(idx);
+                      setActiveStepIndex(0);
+                      setActivePanel("paths");
+                    }
+                  }}
+                />
+              )}
             </div>
           </div>
 
           {/* Right Content: Visualization & Keyboard */}
           <div className="flex-1 flex flex-col gap-4 sm:gap-6 min-w-0">
-            {/* Practice loop header — the dominant start flow */}
-            <PracticeHeader
-              path={path}
-              activeStepIndex={activeStepIndex}
-              chordName={transposeChordName(step.name, transposeShift)}
-              timeSignature={timeSignature}
-              chordNotes={currentChordNotes}
-              isPlaying={isPlayingAuto}
-              onPlayPause={() => setIsPlayingAuto((p) => !p)}
-              tempo={tempo}
-              onTempoChange={setTempo}
-              isLooping={isLooping}
-              onLoopToggle={() => setIsLooping((p) => !p)}
-              backingStyle={beatType}
-              onBackingStyleChange={setBeatType}
-              volume={volume}
-              onVolumeChange={setVolume}
-              scoreDisplayMode={scoreDisplayMode}
-              onScoreDisplayModeChange={setScoreDisplayMode}
-            />
-
             {/* Active Step Info / Stage */}
             <StageFrame
               accent
@@ -2214,7 +2439,7 @@ export default function App() {
                       title={
                         isLooping
                           ? loopStartBar !== null
-                            ? `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / stepsPerBar(timeSignature)) - 1) + 1} — click to stop`
+                            ? `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / 4) - 1) + 1} — click to stop`
                             : "Looping whole path — click to stop"
                           : "Loop playback"
                       }
@@ -2222,7 +2447,7 @@ export default function App() {
                     >
                       {isLooping
                         ? loopStartBar !== null
-                          ? `↻ Bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / stepsPerBar(timeSignature)) - 1) + 1}`
+                          ? `↻ Bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / 4) - 1) + 1}`
                           : "↻ Loop"
                         : "○ Loop"}
                     </ToolChip>
@@ -2232,38 +2457,7 @@ export default function App() {
                 {/* Backing band — second row, only what's essential for
                     a real session. Tracks, HD, and Generator live in
                     the Advanced disclosure below. */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <ToolGroup label="API">
-                      {backend.state === "checking" ? (
-                        <span
-                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono text-[color:var(--color-text-3)]"
-                          title={`Probing ${ddspApiUrl}/health…`}
-                        >
-                          ⏳ checking
-                        </span>
-                      ) : backend.state === "ok" ? (
-                        <span
-                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono bg-emerald-700/30 text-emerald-200"
-                          title={`Backend at ${ddspApiUrl} — DDSP ${backend.ddspVersion}`}
-                        >
-                          ● live · DDSP {backend.ddspVersion}
-                        </span>
-                      ) : backend.state === "degraded" ? (
-                        <span
-                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono bg-amber-600/30 text-amber-100"
-                          title={`Backend at ${ddspApiUrl} reachable; DDSP not installed. /synthesize and /fx/reverb will 503.`}
-                        >
-                          ● degraded
-                        </span>
-                      ) : (
-                        <span
-                          className="px-2.5 py-1 rounded-[var(--radius-sm)] text-xs font-mono bg-rose-600/30 text-rose-100"
-                          title={`Backend at ${ddspApiUrl} unreachable (${backend.reason}). Run \`bash dev.sh\` locally and reload, or set VITE_DDSP_API in .env.`}
-                        >
-                          ● offline
-                        </span>
-                      )}
-                    </ToolGroup>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <ToolGroup label={`Backing${beatType !== "off" ? ` · ${beatType}` : ""}`}>
                     <select
                       value={beatType}
@@ -2350,38 +2544,26 @@ export default function App() {
                     </ToolChip>
                   </ToolGroup>
 
-                  {/* Magenta humanizer dial — drives BackingEngine.humanizer
-                      via the useEffect above. amount=0 leaves the backing
-                      grid-perfect (the default); >0 routes every backing
-                      note's absolute time through createHumanizeBacking. */}
-                  <HumanFeelDial
-                    amount={humanizeAmount}
-                    setAmount={setHumanizeAmount}
-                    personaId={humanizePersonaId}
-                    setPersonaId={setHumanizePersonaId}
-                  />
-
-                  <ToolGroup label={`Voicing · ${voicingType === "closed" ? "Closed" : "Open"}${optimizeVoiceLeading ? " · Optimize on" : ""}`}>
-                    <ToolChip
-                      active={voicingType === "closed"}
-                      onClick={() => setVoicingType("closed")}
-                      title="Closed voicing — chord tones clustered within an octave"
+                  <ToolGroup label={`Voicing · ${VOICINGS[voicingType]?.label ?? voicingType}${optimizeVoiceLeading ? " · opt" : ""}`}>
+                    <select
+                      value={voicingType}
+                      onChange={(e) => setVoicingType(e.target.value as VoicingId)}
+                      className="bg-transparent text-xs text-[color:var(--color-text-1)] outline-none cursor-pointer hover:text-[color:var(--color-brand-strong)] font-medium px-1 py-1 flex-1 min-w-0"
+                      aria-label="Voicing style"
+                      title={VOICINGS[voicingType]?.description ?? ""}
                     >
-                      Closed voicing
-                    </ToolChip>
-                    <ToolChip
-                      active={voicingType === "open"}
-                      onClick={() => setVoicingType("open")}
-                      title="Open voicing — chord tones spread across two or more octaves"
-                    >
-                      Open voicing
-                    </ToolChip>
+                      {Object.values(VOICINGS).map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
                     <ToolChip
                       active={optimizeVoiceLeading}
                       onClick={() => setOptimizeVoiceLeading(!optimizeVoiceLeading)}
-                      title="Optimize voicing — choose each chord's notes to minimize motion from the previous chord"
+                      title="Voice-lead from the previous chord"
                     >
-                      {optimizeVoiceLeading ? "● Optimize voicing" : "○ Optimize voicing"}
+                      {optimizeVoiceLeading ? "● Optimize" : "○ Optimize"}
                     </ToolChip>
                   </ToolGroup>
                 </div>
@@ -2547,7 +2729,7 @@ export default function App() {
                         </>
                       )}
                     </button>
-                    {ddspAction.status === "error" && ddspAction.error && (
+                    {ddspAction.status === "error" && ddspAction.error != null && (
                       <div className="mt-2">
                         <InlineErrorPill onDismiss={() => ddspAction.cancel()}>
                           DDSP render failed: {String(
@@ -2574,7 +2756,7 @@ export default function App() {
                 width={canvasSize.width}
                 height={canvasSize.height}
                 showLabels={showTheoryLabels}
-                rootMidi={Math.min(...step.notes) + transposeShift}
+                rootMidi={(step.notes.length ? Math.min(...step.notes) : 60) + transposeShift}
                 onCanvasReady={(el) => { synesthesiaCanvasRef.current = el; }}
               />
                 </ErrorBoundary>
@@ -2631,22 +2813,72 @@ export default function App() {
 
             {showLiveScore && (
               <div className="w-full mt-2">
-                <PathBriefing pathId={path?.id} />
-                <PersonaLensBanner personaId={selectedPersonaId} />
+                {/* Melody layer — suggested Markov output for the active bar.
+                    Edits write back to useSessionStore.melodyByStep under
+                    the key `${pathId}::${barIndex}`. */}
+                {(() => {
+                  const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
+                  const stepKey = `${path.id}::${activeBar}`;
+                  const stored = melodyByStep[stepKey] ?? [];
+                  const chordNotes = step?.notes ?? [];
+                  const handleSuggest = () => {
+                    const seed =
+                      (path.id.charCodeAt(0) || 0) ^
+                      ((activeBar + 1) * 0x9e3779b9) ^
+                      ((Date.now() & 0xffff) >>> 0);
+                    const raw = suggestMelody({
+                      notes: chordNotes,
+                      stepsPerBar: STEPS_PER_BAR,
+                      seed,
+                    });
+                    setMelodyByStep({ ...melodyByStep, [stepKey]: raw });
+                  };
+                  const handleRegenerate = () => {
+                    const seed =
+                      (path.id.charCodeAt(0) || 0) ^
+                      ((activeBar + 1) * 0x9e3779b9) ^
+                      (((Date.now() + 1) & 0xffff) >>> 0);
+                    const raw = suggestMelody({
+                      notes: chordNotes,
+                      stepsPerBar: STEPS_PER_BAR,
+                      seed,
+                    });
+                    setMelodyByStep({ ...melodyByStep, [stepKey]: raw });
+                  };
+                  const handleMelodyChange = (next: number[]) => {
+                    setMelodyByStep({ ...melodyByStep, [stepKey]: next });
+                  };
+                  return (
+                    <div className="mb-2 flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+                          Melody
+                        </span>
+                        <MelodyToolbar
+                          onSuggest={handleSuggest}
+                          onRegenerate={handleRegenerate}
+                          disabled={chordNotes.length === 0}
+                        />
+                      </div>
+                      <MelodyLane
+                        pathId={path.id}
+                        barIndex={activeBar}
+                        stepsPerBar={STEPS_PER_BAR}
+                        melody={stored.length === STEPS_PER_BAR ? stored : Array(STEPS_PER_BAR).fill(0)}
+                        counterMelody={counterMelodyByStep[stepKey]}
+                        onChange={handleMelodyChange}
+                        disabled={chordNotes.length === 0}
+                      />
+                    </div>
+                  );
+                })()}
+
                 <LiveScoreDisplay
                   path={path}
                   activeStepIndex={activeStepIndex}
                   transposeShift={transposeShift}
                   tempo={tempo}
-                  timeSignature={timeSignature}
-                  displayMode={scoreDisplayMode}
                 />
-              </div>
-            )}
-            {!showLiveScore && (
-              <div className="w-full mt-2">
-                <PathBriefing pathId={path?.id} />
-                <PersonaLensBanner personaId={selectedPersonaId} />
               </div>
             )}
 
@@ -2659,7 +2891,7 @@ export default function App() {
                 <div className="flex gap-4 text-xs text-neutral-400">
                   <div className="flex items-center gap-2">
                     <span className="w-10">
-                      From: {PITCH_CLASSES[kbRange.from % 12]}
+                      From: {NOTE_NAMES_FLAT[kbRange.from % 12]}
                       {Math.floor(kbRange.from / 12) - 1}
                     </span>
                     <input
@@ -2676,7 +2908,7 @@ export default function App() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-10">
-                      To: {PITCH_CLASSES[kbRange.to % 12]}
+                      To: {NOTE_NAMES_FLAT[kbRange.to % 12]}
                       {Math.floor(kbRange.to / 12) - 1}
                     </span>
                     <input
@@ -2759,28 +2991,39 @@ export default function App() {
       )}
 
       {showLeadSheet && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur z-50 flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Lead Sheet</h2>
-              <button
-                onClick={() => setShowLeadSheet(false)}
-                className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-mono"
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <LeadSheet path={path} />
-            </div>
+        <ModalShell
+          labelledBy={leadSheetTitleId}
+          onDismiss={() => setShowLeadSheet(false)}
+          className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] p-6"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h2 id={leadSheetTitleId} className="text-xl font-bold">
+              Lead Sheet
+            </h2>
+            <button
+              onClick={() => setShowLeadSheet(false)}
+              className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-mono"
+            >
+              Close
+            </button>
           </div>
-        </div>
+          <div className="flex-1 overflow-auto">
+            <LeadSheet path={path} />
+          </div>
+        </ModalShell>
       )}
 
       {showCheatsheet && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur z-50 flex items-center justify-center p-4">
+        <ModalShell
+          labelledBy={cheatsheetTitleId}
+          onDismiss={() => setShowCheatsheet(false)}
+          className="w-full max-w-lg"
+        >
+          <div className="sr-only" id={cheatsheetTitleId}>
+            Keyboard Shortcuts
+          </div>
           <KeyboardShortcutsCheatsheet onClose={() => setShowCheatsheet(false)} />
-        </div>
+        </ModalShell>
       )}
 
       {showChordInspector && (

@@ -1,0 +1,25 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+python-multipart==0.0.12
+
+# DDSP and TF (ARM64 / Apple Silicon local-dev override of server/requirements.txt).
+# Render/Dockerfile keeps tensorflow-cpu==2.15.0 for x86_64; on Apple Silicon the
+# stable working combo is tensorflow==2.15.1 + tensorflow-metal==1.2.0.
+# Marked: LOCAL-ARM64-OVERRIDE — do NOT ship this file; revert by deleting.
+tensorflow==2.15.1
+tensorflow-metal==1.2.0
+
+ddsp @ git+https://github.com/magenta/ddsp.git@v3.5.1
+# setuptools<81 needed: crepe still imports pkg_resources at build time
+setuptools<81
+crepe<=0.0.16
+tensorflow-hub
+gin-config>=0.3.0
+librosa<=0.10.1
+protobuf>=3.20.3,<5
+numpy<1.24
+scipy<=1.10.1
+
+# Install crepe with --no-build-isolation because pip's isolated build env
+# strips pkg_resources; everything else uses the standard resolver.

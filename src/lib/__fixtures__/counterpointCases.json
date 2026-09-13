@@ -1,0 +1,1402 @@
+[
+  {
+    "id": "parallel_fifth_0",
+    "category": "parallel_fifth",
+    "melody": [
+      64,
+      65
+    ],
+    "counterline": [
+      71,
+      72
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 1: top 64→65, bottom 71→72"
+  },
+  {
+    "id": "parallel_fifth_1",
+    "category": "parallel_fifth",
+    "melody": [
+      64,
+      66
+    ],
+    "counterline": [
+      71,
+      73
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 2: top 64→66, bottom 71→73"
+  },
+  {
+    "id": "parallel_fifth_2",
+    "category": "parallel_fifth",
+    "melody": [
+      64,
+      67
+    ],
+    "counterline": [
+      71,
+      74
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 3: top 64→67, bottom 71→74"
+  },
+  {
+    "id": "parallel_fifth_3",
+    "category": "parallel_fifth",
+    "melody": [
+      64,
+      68
+    ],
+    "counterline": [
+      71,
+      75
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 4: top 64→68, bottom 71→75"
+  },
+  {
+    "id": "parallel_fifth_4",
+    "category": "parallel_fifth",
+    "melody": [
+      66,
+      67
+    ],
+    "counterline": [
+      73,
+      74
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 1: top 66→67, bottom 73→74"
+  },
+  {
+    "id": "parallel_fifth_5",
+    "category": "parallel_fifth",
+    "melody": [
+      66,
+      68
+    ],
+    "counterline": [
+      73,
+      75
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 2: top 66→68, bottom 73→75"
+  },
+  {
+    "id": "parallel_fifth_6",
+    "category": "parallel_fifth",
+    "melody": [
+      66,
+      69
+    ],
+    "counterline": [
+      73,
+      76
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 3: top 66→69, bottom 73→76"
+  },
+  {
+    "id": "parallel_fifth_7",
+    "category": "parallel_fifth",
+    "melody": [
+      66,
+      70
+    ],
+    "counterline": [
+      73,
+      77
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 4: top 66→70, bottom 73→77"
+  },
+  {
+    "id": "parallel_fifth_8",
+    "category": "parallel_fifth",
+    "melody": [
+      68,
+      69
+    ],
+    "counterline": [
+      75,
+      76
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 1: top 68→69, bottom 75→76"
+  },
+  {
+    "id": "parallel_fifth_9",
+    "category": "parallel_fifth",
+    "melody": [
+      68,
+      70
+    ],
+    "counterline": [
+      75,
+      77
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 2: top 68→70, bottom 75→77"
+  },
+  {
+    "id": "parallel_fifth_10",
+    "category": "parallel_fifth",
+    "melody": [
+      68,
+      71
+    ],
+    "counterline": [
+      75,
+      78
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 3: top 68→71, bottom 75→78"
+  },
+  {
+    "id": "parallel_fifth_11",
+    "category": "parallel_fifth",
+    "melody": [
+      68,
+      72
+    ],
+    "counterline": [
+      75,
+      79
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 4: top 68→72, bottom 75→79"
+  },
+  {
+    "id": "parallel_fifth_12",
+    "category": "parallel_fifth",
+    "melody": [
+      69,
+      70
+    ],
+    "counterline": [
+      76,
+      77
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 1: top 69→70, bottom 76→77"
+  },
+  {
+    "id": "parallel_fifth_13",
+    "category": "parallel_fifth",
+    "melody": [
+      69,
+      71
+    ],
+    "counterline": [
+      76,
+      78
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 2: top 69→71, bottom 76→78"
+  },
+  {
+    "id": "parallel_fifth_14",
+    "category": "parallel_fifth",
+    "melody": [
+      69,
+      72
+    ],
+    "counterline": [
+      76,
+      79
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 3: top 69→72, bottom 76→79"
+  },
+  {
+    "id": "parallel_fifth_15",
+    "category": "parallel_fifth",
+    "melody": [
+      69,
+      73
+    ],
+    "counterline": [
+      76,
+      80
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 4: top 69→73, bottom 76→80"
+  },
+  {
+    "id": "parallel_fifth_16",
+    "category": "parallel_fifth",
+    "melody": [
+      71,
+      72
+    ],
+    "counterline": [
+      78,
+      79
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 1: top 71→72, bottom 78→79"
+  },
+  {
+    "id": "parallel_fifth_17",
+    "category": "parallel_fifth",
+    "melody": [
+      71,
+      73
+    ],
+    "counterline": [
+      78,
+      80
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 2: top 71→73, bottom 78→80"
+  },
+  {
+    "id": "parallel_fifth_18",
+    "category": "parallel_fifth",
+    "melody": [
+      71,
+      74
+    ],
+    "counterline": [
+      78,
+      81
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 3: top 71→74, bottom 78→81"
+  },
+  {
+    "id": "parallel_fifth_19",
+    "category": "parallel_fifth",
+    "melody": [
+      71,
+      75
+    ],
+    "counterline": [
+      78,
+      82
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 4: top 71→75, bottom 78→82"
+  },
+  {
+    "id": "parallel_fifth_20",
+    "category": "parallel_fifth",
+    "melody": [
+      73,
+      74
+    ],
+    "counterline": [
+      80,
+      81
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 1: top 73→74, bottom 80→81"
+  },
+  {
+    "id": "parallel_fifth_21",
+    "category": "parallel_fifth",
+    "melody": [
+      73,
+      75
+    ],
+    "counterline": [
+      80,
+      82
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 2: top 73→75, bottom 80→82"
+  },
+  {
+    "id": "parallel_fifth_22",
+    "category": "parallel_fifth",
+    "melody": [
+      73,
+      76
+    ],
+    "counterline": [
+      80,
+      83
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 3: top 73→76, bottom 80→83"
+  },
+  {
+    "id": "parallel_fifth_23",
+    "category": "parallel_fifth",
+    "melody": [
+      73,
+      77
+    ],
+    "counterline": [
+      80,
+      84
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 4: top 73→77, bottom 80→84"
+  },
+  {
+    "id": "parallel_fifth_24",
+    "category": "parallel_fifth",
+    "melody": [
+      75,
+      76
+    ],
+    "counterline": [
+      82,
+      83
+    ],
+    "expectViolation": true,
+    "description": "parallel P5 with motion 1: top 75→76, bottom 82→83"
+  },
+  {
+    "id": "parallel_octave_0",
+    "category": "parallel_octave",
+    "melody": [
+      72,
+      73
+    ],
+    "counterline": [
+      60,
+      61
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 1: top 72→73, bottom 60→61"
+  },
+  {
+    "id": "parallel_octave_1",
+    "category": "parallel_octave",
+    "melody": [
+      72,
+      74
+    ],
+    "counterline": [
+      60,
+      62
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 2: top 72→74, bottom 60→62"
+  },
+  {
+    "id": "parallel_octave_2",
+    "category": "parallel_octave",
+    "melody": [
+      72,
+      75
+    ],
+    "counterline": [
+      60,
+      63
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 3: top 72→75, bottom 60→63"
+  },
+  {
+    "id": "parallel_octave_3",
+    "category": "parallel_octave",
+    "melody": [
+      72,
+      76
+    ],
+    "counterline": [
+      60,
+      64
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 4: top 72→76, bottom 60→64"
+  },
+  {
+    "id": "parallel_octave_4",
+    "category": "parallel_octave",
+    "melody": [
+      74,
+      75
+    ],
+    "counterline": [
+      62,
+      63
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 1: top 74→75, bottom 62→63"
+  },
+  {
+    "id": "parallel_octave_5",
+    "category": "parallel_octave",
+    "melody": [
+      74,
+      76
+    ],
+    "counterline": [
+      62,
+      64
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 2: top 74→76, bottom 62→64"
+  },
+  {
+    "id": "parallel_octave_6",
+    "category": "parallel_octave",
+    "melody": [
+      74,
+      77
+    ],
+    "counterline": [
+      62,
+      65
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 3: top 74→77, bottom 62→65"
+  },
+  {
+    "id": "parallel_octave_7",
+    "category": "parallel_octave",
+    "melody": [
+      74,
+      78
+    ],
+    "counterline": [
+      62,
+      66
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 4: top 74→78, bottom 62→66"
+  },
+  {
+    "id": "parallel_octave_8",
+    "category": "parallel_octave",
+    "melody": [
+      76,
+      77
+    ],
+    "counterline": [
+      64,
+      65
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 1: top 76→77, bottom 64→65"
+  },
+  {
+    "id": "parallel_octave_9",
+    "category": "parallel_octave",
+    "melody": [
+      76,
+      78
+    ],
+    "counterline": [
+      64,
+      66
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 2: top 76→78, bottom 64→66"
+  },
+  {
+    "id": "parallel_octave_10",
+    "category": "parallel_octave",
+    "melody": [
+      76,
+      79
+    ],
+    "counterline": [
+      64,
+      67
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 3: top 76→79, bottom 64→67"
+  },
+  {
+    "id": "parallel_octave_11",
+    "category": "parallel_octave",
+    "melody": [
+      76,
+      80
+    ],
+    "counterline": [
+      64,
+      68
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 4: top 76→80, bottom 64→68"
+  },
+  {
+    "id": "parallel_octave_12",
+    "category": "parallel_octave",
+    "melody": [
+      77,
+      78
+    ],
+    "counterline": [
+      65,
+      66
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 1: top 77→78, bottom 65→66"
+  },
+  {
+    "id": "parallel_octave_13",
+    "category": "parallel_octave",
+    "melody": [
+      77,
+      79
+    ],
+    "counterline": [
+      65,
+      67
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 2: top 77→79, bottom 65→67"
+  },
+  {
+    "id": "parallel_octave_14",
+    "category": "parallel_octave",
+    "melody": [
+      77,
+      80
+    ],
+    "counterline": [
+      65,
+      68
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 3: top 77→80, bottom 65→68"
+  },
+  {
+    "id": "parallel_octave_15",
+    "category": "parallel_octave",
+    "melody": [
+      77,
+      81
+    ],
+    "counterline": [
+      65,
+      69
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 4: top 77→81, bottom 65→69"
+  },
+  {
+    "id": "parallel_octave_16",
+    "category": "parallel_octave",
+    "melody": [
+      79,
+      80
+    ],
+    "counterline": [
+      67,
+      68
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 1: top 79→80, bottom 67→68"
+  },
+  {
+    "id": "parallel_octave_17",
+    "category": "parallel_octave",
+    "melody": [
+      79,
+      81
+    ],
+    "counterline": [
+      67,
+      69
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 2: top 79→81, bottom 67→69"
+  },
+  {
+    "id": "parallel_octave_18",
+    "category": "parallel_octave",
+    "melody": [
+      79,
+      82
+    ],
+    "counterline": [
+      67,
+      70
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 3: top 79→82, bottom 67→70"
+  },
+  {
+    "id": "parallel_octave_19",
+    "category": "parallel_octave",
+    "melody": [
+      79,
+      83
+    ],
+    "counterline": [
+      67,
+      71
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 4: top 79→83, bottom 67→71"
+  },
+  {
+    "id": "parallel_octave_20",
+    "category": "parallel_octave",
+    "melody": [
+      81,
+      82
+    ],
+    "counterline": [
+      69,
+      70
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 1: top 81→82, bottom 69→70"
+  },
+  {
+    "id": "parallel_octave_21",
+    "category": "parallel_octave",
+    "melody": [
+      81,
+      83
+    ],
+    "counterline": [
+      69,
+      71
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 2: top 81→83, bottom 69→71"
+  },
+  {
+    "id": "parallel_octave_22",
+    "category": "parallel_octave",
+    "melody": [
+      81,
+      84
+    ],
+    "counterline": [
+      69,
+      72
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 3: top 81→84, bottom 69→72"
+  },
+  {
+    "id": "parallel_octave_23",
+    "category": "parallel_octave",
+    "melody": [
+      81,
+      85
+    ],
+    "counterline": [
+      69,
+      73
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 4: top 81→85, bottom 69→73"
+  },
+  {
+    "id": "parallel_octave_24",
+    "category": "parallel_octave",
+    "melody": [
+      83,
+      84
+    ],
+    "counterline": [
+      71,
+      72
+    ],
+    "expectViolation": true,
+    "description": "parallel P8 with motion 1: top 83→84, bottom 71→72"
+  },
+  {
+    "id": "contrary_ok_0",
+    "category": "contrary_ok",
+    "melody": [
+      64,
+      65
+    ],
+    "counterline": [
+      71,
+      58
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 64→65 up, bottom 71→58 down"
+  },
+  {
+    "id": "contrary_ok_1",
+    "category": "contrary_ok",
+    "melody": [
+      64,
+      66
+    ],
+    "counterline": [
+      71,
+      59
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 64→66 up, bottom 71→59 down"
+  },
+  {
+    "id": "contrary_ok_2",
+    "category": "contrary_ok",
+    "melody": [
+      64,
+      67
+    ],
+    "counterline": [
+      71,
+      60
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 64→67 up, bottom 71→60 down"
+  },
+  {
+    "id": "contrary_ok_3",
+    "category": "contrary_ok",
+    "melody": [
+      64,
+      68
+    ],
+    "counterline": [
+      71,
+      61
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 64→68 up, bottom 71→61 down"
+  },
+  {
+    "id": "contrary_ok_4",
+    "category": "contrary_ok",
+    "melody": [
+      66,
+      67
+    ],
+    "counterline": [
+      73,
+      60
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 66→67 up, bottom 73→60 down"
+  },
+  {
+    "id": "contrary_ok_5",
+    "category": "contrary_ok",
+    "melody": [
+      66,
+      68
+    ],
+    "counterline": [
+      73,
+      61
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 66→68 up, bottom 73→61 down"
+  },
+  {
+    "id": "contrary_ok_6",
+    "category": "contrary_ok",
+    "melody": [
+      66,
+      69
+    ],
+    "counterline": [
+      73,
+      62
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 66→69 up, bottom 73→62 down"
+  },
+  {
+    "id": "contrary_ok_7",
+    "category": "contrary_ok",
+    "melody": [
+      66,
+      70
+    ],
+    "counterline": [
+      73,
+      63
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 66→70 up, bottom 73→63 down"
+  },
+  {
+    "id": "contrary_ok_8",
+    "category": "contrary_ok",
+    "melody": [
+      68,
+      69
+    ],
+    "counterline": [
+      75,
+      62
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 68→69 up, bottom 75→62 down"
+  },
+  {
+    "id": "contrary_ok_9",
+    "category": "contrary_ok",
+    "melody": [
+      68,
+      70
+    ],
+    "counterline": [
+      75,
+      63
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 68→70 up, bottom 75→63 down"
+  },
+  {
+    "id": "contrary_ok_10",
+    "category": "contrary_ok",
+    "melody": [
+      68,
+      71
+    ],
+    "counterline": [
+      75,
+      64
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 68→71 up, bottom 75→64 down"
+  },
+  {
+    "id": "contrary_ok_11",
+    "category": "contrary_ok",
+    "melody": [
+      68,
+      72
+    ],
+    "counterline": [
+      75,
+      65
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 68→72 up, bottom 75→65 down"
+  },
+  {
+    "id": "contrary_ok_12",
+    "category": "contrary_ok",
+    "melody": [
+      69,
+      70
+    ],
+    "counterline": [
+      76,
+      63
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 69→70 up, bottom 76→63 down"
+  },
+  {
+    "id": "contrary_ok_13",
+    "category": "contrary_ok",
+    "melody": [
+      69,
+      71
+    ],
+    "counterline": [
+      76,
+      64
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 69→71 up, bottom 76→64 down"
+  },
+  {
+    "id": "contrary_ok_14",
+    "category": "contrary_ok",
+    "melody": [
+      69,
+      72
+    ],
+    "counterline": [
+      76,
+      65
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 69→72 up, bottom 76→65 down"
+  },
+  {
+    "id": "contrary_ok_15",
+    "category": "contrary_ok",
+    "melody": [
+      69,
+      73
+    ],
+    "counterline": [
+      76,
+      66
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 69→73 up, bottom 76→66 down"
+  },
+  {
+    "id": "contrary_ok_16",
+    "category": "contrary_ok",
+    "melody": [
+      71,
+      72
+    ],
+    "counterline": [
+      78,
+      65
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 71→72 up, bottom 78→65 down"
+  },
+  {
+    "id": "contrary_ok_17",
+    "category": "contrary_ok",
+    "melody": [
+      71,
+      73
+    ],
+    "counterline": [
+      78,
+      66
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 71→73 up, bottom 78→66 down"
+  },
+  {
+    "id": "contrary_ok_18",
+    "category": "contrary_ok",
+    "melody": [
+      71,
+      74
+    ],
+    "counterline": [
+      78,
+      67
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 71→74 up, bottom 78→67 down"
+  },
+  {
+    "id": "contrary_ok_19",
+    "category": "contrary_ok",
+    "melody": [
+      71,
+      75
+    ],
+    "counterline": [
+      78,
+      68
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 71→75 up, bottom 78→68 down"
+  },
+  {
+    "id": "contrary_ok_20",
+    "category": "contrary_ok",
+    "melody": [
+      73,
+      74
+    ],
+    "counterline": [
+      80,
+      67
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 73→74 up, bottom 80→67 down"
+  },
+  {
+    "id": "contrary_ok_21",
+    "category": "contrary_ok",
+    "melody": [
+      73,
+      75
+    ],
+    "counterline": [
+      80,
+      68
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 73→75 up, bottom 80→68 down"
+  },
+  {
+    "id": "contrary_ok_22",
+    "category": "contrary_ok",
+    "melody": [
+      73,
+      76
+    ],
+    "counterline": [
+      80,
+      69
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 73→76 up, bottom 80→69 down"
+  },
+  {
+    "id": "contrary_ok_23",
+    "category": "contrary_ok",
+    "melody": [
+      73,
+      77
+    ],
+    "counterline": [
+      80,
+      70
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 73→77 up, bottom 80→70 down"
+  },
+  {
+    "id": "contrary_ok_24",
+    "category": "contrary_ok",
+    "melody": [
+      75,
+      76
+    ],
+    "counterline": [
+      82,
+      69
+    ],
+    "expectViolation": false,
+    "description": "contrary motion into P5: top 75→76 up, bottom 82→69 down"
+  },
+  {
+    "id": "oblique_ok_0",
+    "category": "oblique_ok",
+    "melody": [
+      64,
+      64
+    ],
+    "counterline": [
+      52,
+      57
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 52→57"
+  },
+  {
+    "id": "oblique_ok_1",
+    "category": "oblique_ok",
+    "melody": [
+      66,
+      66
+    ],
+    "counterline": [
+      54,
+      59
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 54→59"
+  },
+  {
+    "id": "oblique_ok_2",
+    "category": "oblique_ok",
+    "melody": [
+      68,
+      68
+    ],
+    "counterline": [
+      56,
+      61
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 56→61"
+  },
+  {
+    "id": "oblique_ok_3",
+    "category": "oblique_ok",
+    "melody": [
+      69,
+      69
+    ],
+    "counterline": [
+      57,
+      62
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 57→62"
+  },
+  {
+    "id": "oblique_ok_4",
+    "category": "oblique_ok",
+    "melody": [
+      71,
+      71
+    ],
+    "counterline": [
+      59,
+      64
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 59→64"
+  },
+  {
+    "id": "oblique_ok_5",
+    "category": "oblique_ok",
+    "melody": [
+      73,
+      73
+    ],
+    "counterline": [
+      61,
+      66
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 61→66"
+  },
+  {
+    "id": "oblique_ok_6",
+    "category": "oblique_ok",
+    "melody": [
+      75,
+      75
+    ],
+    "counterline": [
+      63,
+      68
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 63→68"
+  },
+  {
+    "id": "oblique_ok_7",
+    "category": "oblique_ok",
+    "melody": [
+      65,
+      65
+    ],
+    "counterline": [
+      53,
+      58
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 53→58"
+  },
+  {
+    "id": "oblique_ok_8",
+    "category": "oblique_ok",
+    "melody": [
+      67,
+      67
+    ],
+    "counterline": [
+      55,
+      60
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 55→60"
+  },
+  {
+    "id": "oblique_ok_9",
+    "category": "oblique_ok",
+    "melody": [
+      69,
+      69
+    ],
+    "counterline": [
+      57,
+      62
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 57→62"
+  },
+  {
+    "id": "oblique_ok_10",
+    "category": "oblique_ok",
+    "melody": [
+      70,
+      70
+    ],
+    "counterline": [
+      58,
+      63
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 58→63"
+  },
+  {
+    "id": "oblique_ok_11",
+    "category": "oblique_ok",
+    "melody": [
+      72,
+      72
+    ],
+    "counterline": [
+      60,
+      65
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 60→65"
+  },
+  {
+    "id": "oblique_ok_12",
+    "category": "oblique_ok",
+    "melody": [
+      74,
+      74
+    ],
+    "counterline": [
+      62,
+      67
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 62→67"
+  },
+  {
+    "id": "oblique_ok_13",
+    "category": "oblique_ok",
+    "melody": [
+      76,
+      76
+    ],
+    "counterline": [
+      64,
+      69
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 64→69"
+  },
+  {
+    "id": "oblique_ok_14",
+    "category": "oblique_ok",
+    "melody": [
+      66,
+      66
+    ],
+    "counterline": [
+      54,
+      59
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 54→59"
+  },
+  {
+    "id": "oblique_ok_15",
+    "category": "oblique_ok",
+    "melody": [
+      68,
+      68
+    ],
+    "counterline": [
+      56,
+      61
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 56→61"
+  },
+  {
+    "id": "oblique_ok_16",
+    "category": "oblique_ok",
+    "melody": [
+      70,
+      70
+    ],
+    "counterline": [
+      58,
+      63
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 58→63"
+  },
+  {
+    "id": "oblique_ok_17",
+    "category": "oblique_ok",
+    "melody": [
+      71,
+      71
+    ],
+    "counterline": [
+      59,
+      64
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 59→64"
+  },
+  {
+    "id": "oblique_ok_18",
+    "category": "oblique_ok",
+    "melody": [
+      73,
+      73
+    ],
+    "counterline": [
+      61,
+      66
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 61→66"
+  },
+  {
+    "id": "oblique_ok_19",
+    "category": "oblique_ok",
+    "melody": [
+      75,
+      75
+    ],
+    "counterline": [
+      63,
+      68
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 63→68"
+  },
+  {
+    "id": "oblique_ok_20",
+    "category": "oblique_ok",
+    "melody": [
+      77,
+      77
+    ],
+    "counterline": [
+      65,
+      70
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 65→70"
+  },
+  {
+    "id": "oblique_ok_21",
+    "category": "oblique_ok",
+    "melody": [
+      67,
+      67
+    ],
+    "counterline": [
+      55,
+      60
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 55→60"
+  },
+  {
+    "id": "oblique_ok_22",
+    "category": "oblique_ok",
+    "melody": [
+      69,
+      69
+    ],
+    "counterline": [
+      57,
+      62
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 57→62"
+  },
+  {
+    "id": "oblique_ok_23",
+    "category": "oblique_ok",
+    "melody": [
+      71,
+      71
+    ],
+    "counterline": [
+      59,
+      64
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 59→64"
+  },
+  {
+    "id": "oblique_ok_24",
+    "category": "oblique_ok",
+    "melody": [
+      72,
+      72
+    ],
+    "counterline": [
+      60,
+      65
+    ],
+    "expectViolation": false,
+    "description": "oblique motion into P5: top holds, bottom 60→65"
+  }
+]

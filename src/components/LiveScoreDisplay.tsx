@@ -4,44 +4,12 @@ import { HarmonicPath } from "../lib/paths";
 import { midiToABCName, transposeMidiList } from "../lib/scoreGenerator";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
+import { transposeChordName } from "../lib/theory";
+import { slicePathForRepeat, type BeatCell } from "../lib/sliceAndRepeat";
 import { TimeSignature } from "../lib/rhythm";
 import { stepsPerBar } from "../lib/loopWav";
 import type { ScoreDisplayMode } from "../lib/displayMode";
 
-const NOTE_WHEEL = [
-  "C",
-  "Db",
-  "D",
-  "Eb",
-  "E",
-  "F",
-  "Gb",
-  "G",
-  "Ab",
-  "A",
-  "Bb",
-  "B",
-];
-
-function transposeChordName(name: string, shift: number): string {
-  if (shift % 12 === 0) return name;
-  return name.replace(/(^|[\s/(-])([A-G][b#]?)/g, (match, prefix, note) => {
-    let index = NOTE_WHEEL.indexOf(note);
-    if (index === -1) {
-      const enharmonics: Record<string, string> = {
-        "C#": "Db",
-        "D#": "Eb",
-        "F#": "Gb",
-        "G#": "Ab",
-        "A#": "Bb",
-      };
-      index = enharmonics[note] ? NOTE_WHEEL.indexOf(enharmonics[note]) : -1;
-    }
-    if (index === -1) return match;
-    const newIndex = (index + shift + 120) % 12;
-    return prefix + NOTE_WHEEL[newIndex];
-  });
-}
 
 interface LiveScoreDisplayProps {
   path: HarmonicPath;
@@ -135,6 +103,30 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   const windowSteps =
     path?.steps.slice(windowStepStart, windowStepEnd) ?? [];
 
+  // Coltrane-style slice-and-repeat: when path.sliceAndRepeat is on,
+  // render each bar as 4 individual beat-cells (one per beat) instead
+  // of one chord stretched across 4 beats. The visual effect: the
+  // recurring motif becomes legible — same chord four times per bar
+  // when the source data repeats, or per-beat variation when it
+  // doesn't. The helper pads short bars with the last step.
+  const isSliced = !!(path as { sliceAndRepeat?: boolean })?.sliceAndRepeat;
+  // Per-beat cells for the visible window, flattened. Index = beat
+  // offset within the window (0..windowCells.length-1).
+  const windowCells: BeatCell[] = isSliced
+    ? slicePathForRepeat(path?.steps ?? [])
+        .slice(windowBarStart, windowBarEnd)
+        .flat()
+    : [];
+
+  // In sliced mode each cell IS one beat, so the window is `totalBars`
+  // × 4 cells long. The active-step highlight needs a different
+  // mapping: activeStepIndex / 4 = active bar; active beat = position
+  // within the bar (already encoded in cell.beat).
+  const activeCellIndex = isSliced
+    ? (activeBar - windowBarStart) * 4 +
+      Math.max(0, activeStepIndex - activeBar * 4)
+    : activeStepIndex - windowStepStart;
+
   useEffect(() => {
     if (!svgRef.current || !path) return;
 
@@ -145,6 +137,22 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
     abc += `Q:1/4=${tempo}\n`;
     abc += `K:C\n`;
 
+    // In sliced mode, iterate the beat cells (4 per bar); otherwise
+    // iterate the source steps (one per beat already). Same field
+    // shape (`notes` + `name`) so the rest of the rendering logic
+    // is identical.
+    const events: Array<{ notes: number[]; name: string; index: number }> = isSliced
+      ? windowCells.map((c, i) => ({
+          notes: c.notes,
+          name: c.chordName,
+          index: windowBarStart * 4 + i, // global beat index for the | separator
+        }))
+      : windowSteps.map((s, i) => ({
+          notes: s.notes,
+          name: s.name,
+          index: windowStepStart + i,
+        }));
+
     if (clefLayout === "grand") {
       abc += `%%score { (T B) }\n`;
       abc += `V:T clef=treble\n`;
@@ -153,22 +161,21 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       let lineT = "";
       let lineB = "";
 
-      windowSteps.forEach((step, localIdx) => {
-        const index = windowStepStart + localIdx;
-        if (index > 0 && index % 4 === 0) {
+      events.forEach((evt) => {
+        if (evt.index > 0 && evt.index % 4 === 0) {
           lineT += "| ";
           lineB += "| ";
         }
 
         const shiftedNotes = transposeMidiList(
-          step.notes,
+          evt.notes,
           transposeShift + visualTranspose,
         );
         const treblePitches = shiftedNotes.filter((p) => p >= 60);
         const bassPitches = shiftedNotes.filter((p) => p < 60);
 
-        let chordLabel = step.name
-          ? step.name.replace(/m/g, "m").replace(/#/g, "#")
+        let chordLabel = evt.name
+          ? evt.name.replace(/m/g, "m").replace(/#/g, "#")
           : "";
 
         if (visualTranspose !== 0 && chordLabel) {
@@ -198,23 +205,22 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       abc += `V:T clef=treble\n`;
       let lineT = "";
 
-      windowSteps.forEach((step, localIdx) => {
-        const index = windowStepStart + localIdx;
-        if (index > 0 && index % 4 === 0) {
+      events.forEach((evt) => {
+        if (evt.index > 0 && evt.index % 4 === 0) {
           lineT += "| ";
         }
 
         // Take ALL chord notes, transpose, and arpeggiate as a
         // quarter-note sequence (or 8ths if the chord has > 4 notes).
         const shiftedNotes = transposeMidiList(
-          step.notes,
+          evt.notes,
           transposeShift + visualTranspose,
         );
         const quarterNotes = shiftedNotes.slice(0, 4);
         const overflow = shiftedNotes.slice(4);
 
-        let chordLabel = step.name
-          ? step.name.replace(/m/g, "m").replace(/#/g, "#")
+        let chordLabel = evt.name
+          ? evt.name.replace(/m/g, "m").replace(/#/g, "#")
           : "";
 
         if (visualTranspose !== 0 && chordLabel) {
@@ -246,21 +252,20 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       abc += `V:B clef=bass\n`;
       let lineB = "";
 
-      windowSteps.forEach((step, localIdx) => {
-        const index = windowStepStart + localIdx;
-        if (index > 0 && index % 4 === 0) {
+      events.forEach((evt) => {
+        if (evt.index > 0 && evt.index % 4 === 0) {
           lineB += "| ";
         }
 
         const shiftedNotes = transposeMidiList(
-          step.notes,
+          evt.notes,
           transposeShift + visualTranspose,
         );
         const quarterNotes = shiftedNotes.slice(0, 4);
         const overflow = shiftedNotes.slice(4);
 
-        let chordLabel = step.name
-          ? step.name.replace(/m/g, "m").replace(/#/g, "#")
+        let chordLabel = evt.name
+          ? evt.name.replace(/m/g, "m").replace(/#/g, "#")
           : "";
 
         if (visualTranspose !== 0 && chordLabel) {
@@ -299,13 +304,15 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       paddingleft: 20,
       paddingright: 20,
     });
-  }, [path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex]);
+  }, [path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex, isSliced, windowCells.length]);
 
   useEffect(() => {
     if (!svgRef.current) return;
 
-    // Map global activeStepIndex to local 4-bar-window index.
-    const localStepIndex = activeStepIndex - windowStepStart;
+    // Map global activeStepIndex to local 4-bar-window index. In sliced
+    // mode each cell IS one beat, so the offset is the cell index in
+    // the windowCells array; otherwise it's the step offset.
+    const localStepIndex = isSliced ? activeCellIndex : activeStepIndex - windowStepStart;
 
     // Reset previous highlights.
     const coloredElements = svgRef.current.querySelectorAll('[data-highlighted="true"]');
@@ -446,6 +453,20 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
           >
             {showChords ? "Hide Chord Names" : "Show Chord Names"}
           </button>
+
+          {/* Slice & repeat badge — surfaces the Coltrane-style subdivision
+              visually so the user knows the score is rendering per-beat
+              cells instead of one chord per beat. */}
+          {isSliced && (
+            <span
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-mono rounded-lg bg-amber-900/30 text-amber-200 border border-amber-700/50"
+              title="Path has sliceAndRepeat=true — each bar rendered as 4 single-beat cells (Coltrane-style)"
+              aria-label="Slice and repeat active"
+              data-testid="slice-repeat-badge"
+            >
+              ◷ Slice & Repeat
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

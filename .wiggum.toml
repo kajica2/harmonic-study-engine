@@ -1,0 +1,29 @@
+[security]
+yolo = true
+allow_paths = ""
+
+[loop]
+max_iterations = 20
+agent = "claude"
+model = "sonnet"
+keep_running = false
+tasks_file = "TODO.md"
+prompt_file = "LOOP-PROMPT.md"
+timeout = 1800
+
+[git]
+enabled = false
+branch_prefix = "wiggum"
+auto_pr = false
+
+[output]
+verbose = true
+log_file = ""
+
+[session]
+continue_session = false
+
+[learning]
+enabled = true
+keep_diary = false
+auto_consolidate = true

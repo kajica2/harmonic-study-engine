@@ -21,12 +21,68 @@ export type VisualTheme =
   | "henderson"
   | "default";
 
+export type SynesthesiaStatus = "documented" | "interpretive";
+
+export type NoteName =
+  | "C" | "Db" | "D" | "Eb" | "E" | "F"
+  | "Gb" | "G" | "Ab" | "A" | "Bb" | "B";
+
+export interface ColorEntry {
+  hex: string;
+  label: string;
+}
+
+export interface PersonaRules {
+  minHandSpan?: string;
+  bassIsolation?: boolean;
+  allowMiddleGap?: boolean;
+  frozenBassBars?: number;
+  motifTracker?: boolean;
+  allowMajorMinorThirdTogether?: boolean;
+  phraseLengths?: number[];
+  sequenceStepper?: boolean;
+  sequenceInterval?: number;
+  sliceAndRepeat?: boolean;
+  keyDriftAcrossPath?: boolean;
+  allowTextureSwitch?: boolean;
+  reverbDistance?: boolean;
+}
+
+export type ContourProfile = "leaping" | "stepwise" | "angular" | "neutral";
+
 export interface Persona {
   id: string;
   name: string;
   role: string;
   quote: string;
-  tagline?: string; // optional short descriptor rendered in the masterclass rail
+  // New fields (Phase 1): keep old defaults so existing 12 personas keep working
+  // when these are absent in JSON.
+  synesthesiaStatus?: SynesthesiaStatus;
+  dates?: string;
+  nationality?: string;
+  tagline?: string;
+  instrumentLabel?: string;
+  colorMap?: Partial<Record<NoteName, ColorEntry>> | null;
+  colorPalette?: string[];
+  defaultVoicing?: string;
+  defaultPath?: string;
+  techniques?: string[];
+  scale?: string;
+  rhythmLayers?: string[];
+  /**
+   * Melodic contour preference. Drives `personaMelodyFilter.ts` to
+   * bias the genre-neutral Markov output. Optional — personas without
+   * the field get "neutral" (no bias).
+   */
+  contourProfile?: ContourProfile;
+  /**
+   * Style-pack id the StylePackPicker auto-selects on persona change.
+   * Optional — UI falls back to most-recently-used. Per user decision
+   * 2026-09-13 this is a SUGGESTION not a lock; user can pick any pack.
+   */
+  preferredStylePackId?: string;
+  rules?: PersonaRules;
+  // Original fields
   originalSongId: string; // references PATH id
   instrument: InstrumentType;
   tempo: number;
@@ -43,16 +99,16 @@ export interface Persona {
   arpGate: number;
   arpOctaves: number;
   visualTheme: VisualTheme;
-  accentColor: string; // hex colour for theme matching
-  gradientFrom: string; // tailwind gradient
-  gradientTo: string; // tailwind gradient
+  accentColor: string;
+  gradientFrom: string;
+  gradientTo: string;
 }
 
 /**
  * Built-in personas. Source of truth is `src/data/personas.json`
  * — edit the JSON to add / tweak personas without touching code.
  *
- * To use the JSON directly (avoid the wrapper): import PERSONA_DATA.
+ * To use the JSON directly (avoid the wrapper): add PERSONA_DATA.
  */
 export const PERSONAS: Persona[] = PERSONA_DATA as Persona[];
 

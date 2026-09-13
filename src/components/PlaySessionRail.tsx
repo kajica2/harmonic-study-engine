@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import { HarmonicPath } from "../lib/paths";
+import { HarmonicPath, STUDIES_PATHS } from "../lib/paths";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
+import { midiToName, analyzeChord, type BehavioralMarker } from "../lib/theory";
 import { applyFilter, EMPTY_FILTER, type PathFilterState } from "../lib/pathFilters";
 import { PathFilterBar } from "./PathFilterBar";
 import { NOTE_NAMES } from "../lib/theory";
@@ -28,6 +29,9 @@ type Stage = "choose" | "perform" | "commit" | "masterclass";
 
 interface RailProps {
   paths: HarmonicPath[];
+  /** Prepend a path to the user's paths list (used by the masterclass
+   *  picker when the user picks a study song that's not in their list). */
+  prependPath: (path: HarmonicPath) => void;
   activePath: HarmonicPath;
   activePathIndex: number;
   setActivePathIndex: (i: number) => void;
@@ -57,19 +61,21 @@ interface RailProps {
   wavMode: RenderMode;
   setWavMode: (m: RenderMode) => void;
   onOpenLeadSheet: () => void;
-  // metronome click toggle — when false, the rhythmEngine skips
-  // playMetronomeClick on every step. Backing track is unaffected.
-  metronomeOn: boolean;
-  setMetronomeOn: (v: boolean) => void;
+  onOpenInspector: () => void;
   // loop range (sub-path). When loopStartBar is set and isLooping,
   // the auto-advance wraps between loopStartBar and loopEndBar
   // instead of the full path. Set via shift+click in the bar strip.
   loopStartBar?: number | null;
   loopEndBar?: number | null;
   setLoopBar?: (from: number | null, to: number | null) => void;
-  onOpenInspector: () => void;
+  // metronome click toggle — when false, the rhythmEngine skips
+  // playMetronomeClick on every step. Backing track is unaffected.
+  metronomeOn: boolean;
+  setMetronomeOn: (v: boolean) => void;
   // inspect / voicing control
   optimizedStepsNotes: number[][];
+  // Phase 5: per-bar behavioral markers from active persona.
+  behavioralMarkers: BehavioralMarker[];
   onPlayChord: (notes: number[]) => void;
   onStopChord: (notes: number[]) => void;
   onCommitVoicing: (stepIndex: number, notes: number[]) => void;
@@ -195,6 +201,7 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           activeStepIndex={p.activeStepIndex}
           setActiveStepIndex={p.setActiveStepIndex}
           optimizedStepsNotes={p.optimizedStepsNotes}
+          behavioralMarkers={p.behavioralMarkers}
           onPlayChord={p.onPlayChord}
           onStopChord={p.onStopChord}
           onCommitVoicing={p.onCommitVoicing}
@@ -218,8 +225,19 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
         <MasterclassStage
           activePathId={p.activePath?.id}
           onPickInApp={(id) => {
-            const i = p.paths.findIndex((x) => x.id === id);
-            if (i >= 0) p.setActivePathIndex(i);
+            // Studies live in STUDIES_PATHS (not in the user's paths
+            // state). When the user picks one, prepend it to paths
+            // so setActivePathIndex(0) lands on the song, then jump
+            // to the perform stage.
+            const idx = p.paths.findIndex((x) => x.id === id);
+            if (idx >= 0) {
+              p.setActivePathIndex(idx);
+            } else {
+              const song = STUDIES_PATHS.find((s) => s.id === id);
+              if (!song) return;
+              p.prependPath(song);
+              p.setActivePathIndex(0);
+            }
             setStage("perform");
           }}
         />
@@ -540,6 +558,7 @@ const PerformStage: React.FC<{
   activeStepIndex: number;
   setActiveStepIndex: (v: number) => void;
   optimizedStepsNotes: number[][];
+  behavioralMarkers: BehavioralMarker[];
   onPlayChord: (notes: number[]) => void;
   onStopChord: (notes: number[]) => void;
   onCommitVoicing: (stepIndex: number, notes: number[]) => void;
@@ -553,7 +572,7 @@ const PerformStage: React.FC<{
   metronomeOn, setMetronomeOn,
   persona, personas, selectedPersonaId, onPersona,
   activeStepIndex, setActiveStepIndex,
-  optimizedStepsNotes, onPlayChord, onStopChord, onCommitVoicing,
+  optimizedStepsNotes, behavioralMarkers, onPlayChord, onStopChord, onCommitVoicing,
 }) => {
   const totalBars = Math.ceil(path.steps.length / 4);
   const currentBar = Math.floor(activeStepIndex / 4) + 1;
@@ -690,66 +709,107 @@ const PerformStage: React.FC<{
       {/* Bar strip — visual progress + voicing preview (Fix #4 inline voicing) */}
       <div className="flex items-stretch gap-1 overflow-x-auto pb-2">
         {Array.from({ length: totalBars }).map((_, barIdx) => {
-          const stepIdx = barIdx * 4;
-          const chordName = path.steps[stepIdx]?.name ?? "";
-          const isActiveBar = currentBar === barIdx + 1;
-          // Build a one-line voicing preview for the active bar from the
-          // currently-optimized notes. This is the "where am I" home that
-          // Fix #4 was asking for — the eye no longer has to ping-pong
-          // between the chord card up top and the inspect panel.
-          const previewVoicing = isActiveBar
-            ? (optimizedStepsNotes[stepIdx] ?? [])
-            : [];
-          return (
-            <button
-              key={barIdx}
-              onClick={(e) => {
-                // Shift-click: set loop range. Plain click: step + audition.
-                if (e.shiftKey && setLoopBar) {
-                  if (loopStartBar === null || (loopStartBar !== null && loopEndBar !== null)) {
-                    setLoopBar(barIdx, null);
-                  } else if (barIdx >= loopStartBar) {
-                    setLoopBar(loopStartBar, barIdx);
-                  } else {
-                    setLoopBar(barIdx, loopStartBar);
-                  }
-                  // also set the cursor so the user sees the range
-                  setActiveStepIndex(stepIdx);
-                  return;
-                }
-                // Step Chord is now musical: advance the cursor AND audition.
-                setActiveStepIndex(stepIdx);
-                const stepNotes = path.steps[stepIdx]?.notes ?? [];
-                if (stepNotes.length) onPlayChord(stepNotes);
-              }}
-              title={
-                loopStartBar !== null &&
-                barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
-                barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar)
-                  ? `Bar ${barIdx + 1} — in loop range. Shift+click another bar to resize, shift+click the same bar to clear.`
-                  : `Bar ${barIdx + 1} — click to jump here, shift+click to set loop range.`
-              }
-              className={`relative flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition overflow-hidden ${
-                isActiveBar
-                  ? "border-purple-500 bg-purple-700/30 text-white shadow-[0_0_15px_rgba(147,51,234,0.35)]"
-                  : "border-white/10 bg-white/5 text-neutral-300 hover:border-purple-500/40"
-              }`}
-            >
-              {/* Loop-range background band — translucent brass when
-                  this bar is in the active loop range. */}
-              {loopStartBar !== null &&
-                barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
-                barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar) && (
-                  <div
-                    className="absolute inset-0 rounded-lg pointer-events-none"
-                    style={{
-                      background:
-                        "linear-gradient(180deg, rgba(212,168,87,0.22), rgba(212,168,87,0.10))",
-                      boxShadow: "inset 0 0 0 1px rgba(212,168,87,0.45)",
-                    }}
-                    aria-hidden="true"
-                  />
-                )}
+                  const stepIdx = barIdx * 4;
+                  const chordName = path.steps[stepIdx]?.name ?? "";
+                  const isActiveBar = currentBar === barIdx + 1;
+                  // Build a one-line voicing preview for the active bar from the
+                  // currently-optimized notes. This is the "where am I" home that
+                  // Fix #4 was asking for — the eye no longer has to ping-pong
+                  // between the chord card up top and the inspect panel.
+                  const previewVoicing = isActiveBar
+                    ? (optimizedStepsNotes[stepIdx] ?? [])
+                    : [];
+                  // Phase 5: pull the per-bar behavioral marker (motifTracker /
+                  // frozenBass hints + persona accent hue).
+                  const marker = behavioralMarkers[barIdx];
+                  return (
+                    <button
+                      key={barIdx}
+                      onClick={(e) => {
+                        // Shift-click: set loop range. Plain click: step + audition.
+                        if (e.shiftKey && setLoopBar) {
+                          if (loopStartBar === null || (loopStartBar !== null && loopEndBar !== null)) {
+                            setLoopBar(barIdx, null);
+                          } else if (barIdx >= loopStartBar) {
+                            setLoopBar(loopStartBar, barIdx);
+                          } else {
+                            setLoopBar(barIdx, loopStartBar);
+                          }
+                          // also set the cursor so the user sees the range
+                          setActiveStepIndex(stepIdx);
+                          return;
+                        }
+                        // Step Chord is now musical: advance the cursor AND audition.
+                        setActiveStepIndex(stepIdx);
+                        const stepNotes = path.steps[stepIdx]?.notes ?? [];
+                        if (stepNotes.length) onPlayChord(stepNotes);
+                      }}
+                      title={
+                        loopStartBar !== null &&
+                        barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
+                        barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar)
+                          ? `Bar ${barIdx + 1} — in loop range. Shift+click another bar to resize, shift+click the same bar to clear.`
+                          : `Bar ${barIdx + 1} — click to jump here, shift+click to set loop range.`
+                      }
+                      className={`relative flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition overflow-hidden ${
+                        isActiveBar
+                          ? "border-purple-500 bg-purple-700/30 text-white shadow-[0_0_15px_rgba(147,51,234,0.35)]"
+                          : "border-white/10 bg-white/5 text-neutral-300 hover:border-purple-500/40"
+                      }`}
+                    >
+                      {/* Loop-range background band — translucent brass when
+                          this bar is in the active loop range. */}
+                      {loopStartBar !== null &&
+                        barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
+                        barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar) && (
+                          <div
+                            className="absolute inset-0 rounded-lg pointer-events-none"
+                            style={{
+                              background:
+                                "linear-gradient(180deg, rgba(212,168,87,0.22), rgba(212,168,87,0.10))",
+                              boxShadow: "inset 0 0 0 1px rgba(212,168,87,0.45)",
+                            }}
+                            aria-hidden="true"
+                          />
+                        )}
+                      {/* Phase 5: persona-driven left-edge accent (per-bar hue from
+                          persona.colorPalette). Pure tonal flavor — not an
+                          information channel, since bar position already does
+                          that work. */}
+                      {marker && (
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg pointer-events-none"
+                          style={{ backgroundColor: marker.accentHex, opacity: 0.55 }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      {/* Phase 5+: motifTracker / frozenBass / sliceAndRepeat
+                          hint badge (top-right). */}
+                      {marker && marker.hint && (
+                        <span
+                          className="absolute top-1 right-1 text-[8px] font-mono text-neutral-400"
+                          title={
+                            marker.isMotifTransformation
+                              ? "Motif transformation — bar re-voices prior content (Brahms)"
+                              : marker.bassFrozen
+                                ? "Frozen bass — bass carries from prior bar (Rachmaninov)"
+                                : marker.motifRepeat
+                                  ? "Slice & repeat — Coltrane-style recurring motif"
+                                  : ""
+                          }
+                          aria-label={
+                            marker.isMotifTransformation
+                              ? "Motif transformation"
+                              : marker.bassFrozen
+                                ? "Frozen bass"
+                                : marker.motifRepeat
+                                  ? "Slice and repeat motif"
+                                  : ""
+                          }
+                        >
+                          {marker.hint}
+                        </span>
+                      )}
               {/* Content wrapper — relative so it sits above the loop
                   band overlay. */}
               <div className="relative">
@@ -758,15 +818,33 @@ const PerformStage: React.FC<{
                 <span className="flex-1" />
                 {isActiveBar && <span className="text-purple-300">· here</span>}
               </div>
-              <div className="font-bold truncate">{chordName}</div>
+              <div className="font-bold truncate flex items-center gap-1">
+                <span>{chordName}</span>
+                {/* HSE terminology: harmonic function glyph per your accessibility
+                    proposal — circle (Tonic), triangle (Dominant), square
+                    (Subdominant), paired with a letter so it's not color-only. */}
+                {(() => {
+                  // Use the bar's first step's notes for the function.
+                  const fn = path.steps[barIdx * 4]?.notes?.length
+                    ? analyzeChord(path.steps[barIdx * 4].notes).function
+                    : "color";
+                  if (fn === "tonic")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Tonic — I" aria-label="Tonic">○<sub>T</sub></span>;
+                  if (fn === "dominant")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Dominant — V" aria-label="Dominant">△<sub>D</sub></span>;
+                  if (fn === "subdominant")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Subdominant — IV" aria-label="Subdominant">□<sub>S</sub></span>;
+                  if (fn === "predominant")
+                    return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Predominant — ii" aria-label="Predominant">◇<sub>P</sub></span>;
+                  return null;
+                })()}
+              </div>
               {isActiveBar && previewVoicing.length > 0 && (
                 <div
                   className="text-[10px] font-mono text-neutral-300 mt-0.5 truncate"
-                  title={previewVoicing.map((n) => NOTE_NAMES[(n % 12 + 12) % 12] + (Math.floor(n / 12) - 1)).join(" · ")}
+                  title={previewVoicing.map(midiToName).join(" · ")}
                 >
-                  {previewVoicing
-                    .map((n) => NOTE_NAMES[(n % 12 + 12) % 12] + (Math.floor(n / 12) - 1))
-                    .join(" ")}
+                  {previewVoicing.map(midiToName).join(" ")}
                 </div>
               )}
               {/* Tick playhead — 4 cells per bar (one per beat in 4/4).
@@ -821,7 +899,7 @@ const CommitStage: React.FC<{
   onExportWav: () => void;
   isExportingWav: boolean;
   onOpenLeadSheet: () => void;
-  onOpenInspector: () => void;
+  onOpenInspector?: () => void;
   tempo: number;
   wavMode: RenderMode;
   setWavMode: (m: RenderMode) => void;

@@ -12,13 +12,81 @@ export interface HarmonicPath {
   mvpReady?: boolean;
   feel?: string;
   /** Composer / writer (for standards). Optional — only present on
-   *  curated studies / standards. */
+   * curated studies / standards. */
   composer?: string;
-  /** Musical key (concert pitch). Optional. Examples: "F", "Bb", "G-", "Eb". */
+  /** Musical key (concert pitch). Optional. Examples: "F", "Bb", "G-", "Eb".
+   * Can also declare a progressive tonality drift: "D minor → C major". */
   key?: string;
+  /** Optional name alias used by some callers. Falls back to `title`. */
+  name?: string;
+  /** Phase 5: when true, each bar steps up by `sequenceInterval` semitones
+   * (default 2). Used by Tchaikovsky persona for sequence_ascent. */
+  sequenceStepper?: boolean;
+  /** Phase 5: semitone interval per bar when sequenceStepper is true.
+   * Defaults to 2. */
+  sequenceInterval?: number;
+  /** Phase 3: when true, the persona slices the path and loops each
+   * slice as a motif. Mirrors `PersonaRules.sliceAndRepeat` on the
+   * path object so concept exercises can be authored as raw paths. */
+  sliceAndRepeat?: boolean;
+  /** Phase 3: free-form technique tags surfaced in the catalog /
+   * picker (e.g. "ii_v_i", "tritone_substitution", "modal"). */
+  techniques?: string[];
+  /** Phase 1: persona-side rule mirror — when true, the path is meant
+   *  to be heard with the bass held while upper voices move (Miles's
+   *  modal restraint, Rachmaninov's frozen bass). Derived markers
+   *  pick this up alongside the persona rule. */
+  bassIsolation?: boolean;
+  /** Phase 1: persona-side rule mirror — when true, the bar-strip
+   *  motif tracker highlights transformations across bars (Brahms
+   *  developing variation). Mirrors `persona.rules.motifTracker`. */
+  motifTracker?: boolean;
 }
 
-export const PATHS: HarmonicPath[] = [
+// ---------------------------------------------------------------------------
+// Path length policy
+// ---------------------------------------------------------------------------
+// Each HarmonicStep is one BEAT (1/4 of a bar in 4/4). So
+// `path.steps.length / 4` is the bar count. We require every path to be
+// between MIN_PATH_BARS and MAX_PATH_BARS bars long, padded/trimmed at
+// module-load by `padPath()` below.
+
+export const STEPS_PER_BAR = 4;
+export const MIN_PATH_BARS = 24;
+export const MAX_PATH_BARS = 64;
+
+/**
+ * padPath — returns a copy of `path` whose steps array sits inside
+ * `[MIN_PATH_BARS, MAX_PATH_BARS]` bars (i.e. steps in
+ * `[MIN * STEPS_PER_BAR, MAX * STEPS_PER_BAR]`).
+ *
+ *   - Short paths: cycle the existing steps until they hit MIN bars.
+ *   - Long paths: slice to MAX bars.
+ *   - Already-in-range paths: pass through unchanged.
+ *
+ * The cycling strategy for short paths is "loop the form" — the most
+ * musically sensible padding for both concept exercises (where the
+ * short phrase is meant to be repeated) and standards (where looping
+ * the 32-bar head three times is a standard practice technique).
+ */
+export function padPath(path: HarmonicPath): HarmonicPath {
+  const minSteps = MIN_PATH_BARS * STEPS_PER_BAR;
+  const maxSteps = MAX_PATH_BARS * STEPS_PER_BAR;
+  let steps = path.steps;
+  // Pad by cycling.
+  while (steps.length < minSteps) {
+    const need = Math.min(steps.length, minSteps - steps.length);
+    steps = steps.concat(steps.slice(0, need));
+  }
+  // Trim to ceiling.
+  if (steps.length > maxSteps) {
+    steps = steps.slice(0, maxSteps);
+  }
+  if (steps === path.steps) return path;
+  return { ...path, steps };
+}
+
+export const RAW_PATHS: HarmonicPath[] = [
   {
     id: "path-1",
     title: "Path I: The Resolution (II-V-I)",
@@ -846,6 +914,359 @@ export const PATHS: HarmonicPath[] = [
       },
     ],
   },
+
+  // -------------------------------------------------------------------------
+  // Phase 5: classical-persona paths (Scriabin, Rachmaninov, Brahms,
+  // Tchaikovsky, Mahler). Each is a 4-bar, 4-step path the persona loads
+  // by default. Notes are voiced for the persona's signature technique —
+  // quartal stacks for Scriabin, open drop-3 for Rachmaninov, etc.
+  // -------------------------------------------------------------------------
+  {
+    id: "mystic_prometheus",
+    title: "Path XXXIII: The Mystic Chord",
+    description:
+      "Quartal stacks that never resolve. Color as destination, not decoration.",
+    composer: "A. Scriabin",
+    key: "C",
+    feel: "mystic / non-functional",
+    steps: [
+      { name: "C quartal", notes: [48, 53, 58, 63], descriptions: "Stacked fourths on C." },
+      { name: "Gb quartal", notes: [42, 47, 52, 57], descriptions: "Stacked fourths on Gb." },
+      { name: "B quartal", notes: [47, 52, 57, 62], descriptions: "Stacked fourths on B." },
+      { name: "E quartal", notes: [40, 45, 50, 55], descriptions: "Stacked fourths on E." },
+    ],
+  },
+  {
+    id: "bell_sonority",
+    title: "Path XXXIV: The Bell",
+    description:
+      "Low root, wide gap, high chord. The Dies irae shadow hangs over every bar.",
+    composer: "S. Rachmaninov",
+    key: "C minor",
+    feel: "mournful / pianistic",
+    steps: [
+      { name: "Cm", notes: [36, 48, 51, 55], descriptions: "Low root, wide gap, mid voicing." },
+      { name: "AbM", notes: [44, 51, 56, 63], descriptions: "Tritone step, bell sonority." },
+      { name: "Fm", notes: [41, 48, 53, 58], descriptions: "Subdominant minor, sparse." },
+      { name: "C5", notes: [36, 48, 60], descriptions: "Open fifth, frozen bass." },
+    ],
+  },
+  {
+    id: "developing_variation",
+    title: "Path XXXV: The Motif Grows",
+    description:
+      "One motif, four transformations. Track it across all four bars.",
+    composer: "J. Brahms",
+    key: "C minor",
+    feel: "developing / contrapuntal",
+    steps: [
+      { name: "Cm", notes: [48, 51, 55, 58], descriptions: "Statement — close, dense." },
+      { name: "Cm/Ab", notes: [44, 51, 55, 58], descriptions: "Inversion — bass above root." },
+      { name: "AbM", notes: [44, 51, 56, 63], descriptions: "Augmentation — wide spread." },
+      { name: "Cm", notes: [48, 51, 55, 58], descriptions: "Return, transformed." },
+    ],
+  },
+  {
+    id: "sequence_ascent",
+    title: "Path XXXVI: The Ascent",
+    description:
+      "Same shape, stepped up by a second, three times. Climax on the fourth.",
+    composer: "P. I. Tchaikovsky",
+    key: "D minor",
+    feel: "lyrical / sequential",
+    sequenceStepper: true,
+    sequenceInterval: 2,
+    steps: [
+      { name: "Dm", notes: [50, 53, 57, 60], descriptions: "Sequence 1." },
+      { name: "Em", notes: [52, 55, 59, 62], descriptions: "Sequence 2 — up a 2nd." },
+      { name: "F#m", notes: [54, 57, 61, 64], descriptions: "Sequence 3 — up a 2nd." },
+      { name: "GM", notes: [55, 59, 62, 67], descriptions: "Climax — major resolution." },
+    ],
+  },
+  {
+    id: "progressive_tonality",
+    title: "Path XXXVII: The Journey",
+    description:
+      "Start in one key, end in another. No return. The path itself is the point.",
+    composer: "G. Mahler",
+    key: "D minor → C major",
+    feel: "orchestral / progressive",
+    steps: [
+      { name: "Dm", notes: [50, 53, 57, 62], descriptions: "Begin — D minor." },
+      { name: "BbM", notes: [46, 53, 58, 62], descriptions: "Drift — third relation." },
+      { name: "F#m", notes: [42, 49, 54, 59], descriptions: "Displacement — half-key away." },
+      { name: "CM", notes: [48, 52, 55, 60], descriptions: "End — C major, foreign key." },
+    ],
+  },
+
+  // -------------------------------------------------------------------------
+  // Phase 1: persona signature paths (XXXVIII–LIV). One 4-bar study per
+  // persona, demonstrating the technique the persona is known for. The
+  // behavioral rules (sequenceStepper / sequenceInterval, key arrow,
+  // bassIsolation, sliceAndRepeat, motifTracker) are wired so the
+  // bar-strip markers fire in the UI. padPath() cycles each 4-step
+  // source into the 24-bar audio loop automatically.
+  // -------------------------------------------------------------------------
+  {
+    id: "prometheus_flame",
+    title: "Path XXXVIII: The Flame",
+    description:
+      "Scriabin's quartal flame: stacked fourths burning in place while the bass shifts underneath.",
+    composer: "A. Scriabin",
+    key: "C",
+    feel: "mystic / quartal",
+    steps: [
+      { name: "C quartal held", notes: [36, 41, 46, 51], descriptions: "C2 / F2 / Bb2 / Eb3 — the mystic stack." },
+      { name: "C quartal (root rises)", notes: [41, 46, 51, 56], descriptions: "Bass lifts from C2 to F2; chord stays." },
+      { name: "C quartal + 7", notes: [36, 41, 46, 51, 54], descriptions: "Add the leading 7th — flame grows brighter." },
+      { name: "C quartal cluster", notes: [36, 41, 46, 51, 51], descriptions: "Cluster on Eb3 — heat." },
+    ],
+  },
+  {
+    id: "prelude_chord",
+    title: "Path XXXIX: The Prelude Chord",
+    description:
+      "Rachmaninov's bell sonority: low root, frozen bass, wide voicing — the piano as orchestra.",
+    composer: "S. Rachmaninov",
+    key: "C# minor",
+    feel: "mournful / pianistic",
+    steps: [
+      { name: "C#m low", notes: [37, 49, 52, 56], descriptions: "C#2 / C#3 / E3 / G#3 — the bell strikes." },
+      { name: "C#m sustained bass", notes: [37, 53, 56, 61], descriptions: "Bass frozen; upper voices drift." },
+      { name: "A maj bell", notes: [45, 52, 56, 64], descriptions: "Bass rises to A1 — bell two." },
+      { name: "C#m9 resolve", notes: [37, 51, 54, 60, 64], descriptions: "Resolve to C#m9 — grief made harmony." },
+    ],
+  },
+  {
+    id: "symphony_theme",
+    title: "Path XL: The Theme and Variations",
+    description:
+      "Brahms's developing variation: one motif, four guises. Listen for what stays the same.",
+    composer: "J. Brahms",
+    key: "F minor",
+    feel: "developing / contrapuntal",
+    steps: [
+      { name: "Fm statement", notes: [41, 44, 48, 53], descriptions: "F2 / Ab2 / B2 / F3 — the theme." },
+      { name: "Fm inversion", notes: [53, 56, 60, 65], descriptions: "Bass on F3 — motif turned upside down." },
+      { name: "Ab maj (relative)", notes: [44, 48, 52, 56], descriptions: "Relative major — variation 3." },
+      { name: "Fm return transformed", notes: [41, 48, 53, 58, 63], descriptions: "Return — but never the same." },
+    ],
+  },
+  {
+    id: "siren",
+    title: "Path XLI: The Siren",
+    description:
+      "Tchaikovsky's descending sequence: same shape, stepped down by a whole step each bar.",
+    composer: "P. I. Tchaikovsky",
+    key: "D minor",
+    feel: "lyrical / descending",
+    sequenceStepper: true,
+    sequenceInterval: -1,
+    steps: [
+      { name: "Am", notes: [45, 48, 52, 57], descriptions: "Bar 1 — sequence starts on A." },
+      { name: "G", notes: [43, 47, 50, 55], descriptions: "Bar 2 — down a whole step to G." },
+      { name: "F", notes: [41, 45, 48, 53], descriptions: "Bar 3 — down to F." },
+      { name: "E", notes: [40, 44, 47, 52], descriptions: "Bar 4 — bottom of the descent, E." },
+    ],
+  },
+  {
+    id: "adagio",
+    title: "Path XLII: The Adagio",
+    description:
+      "Mahler's slow key drift: F minor opens, Ab major answers. The key signature itself is the journey.",
+    composer: "G. Mahler",
+    key: "F minor → Ab major",
+    feel: "orchestral / slow_drift",
+    steps: [
+      { name: "Fm", notes: [41, 44, 48, 53], descriptions: "Begin — F minor." },
+      { name: "Gm", notes: [43, 46, 50, 55], descriptions: "Drift — neighbor minor." },
+      { name: "Gm7", notes: [43, 46, 50, 55, 58], descriptions: "Seventh arrives." },
+      { name: "AbM", notes: [44, 48, 52, 56], descriptions: "Resolution — Ab major, foreign key." },
+    ],
+  },
+  {
+    id: "giant_steps_cycle",
+    title: "Path XLIII: The Cycle",
+    description:
+      "Coltrane's major-third cycle: B → G → Eb → B. Tonic returns, but everything between it has changed.",
+    composer: "J. Coltrane",
+    key: "B major (tonal center)",
+    feel: "giant_steps / cycling",
+    steps: [
+      { name: "B", notes: [47, 50, 54, 59], descriptions: "B major — first tonal center." },
+      { name: "G", notes: [43, 47, 50, 55], descriptions: "Down a major third — G." },
+      { name: "Eb", notes: [39, 43, 46, 51], descriptions: "Down another major third — Eb." },
+      { name: "B", notes: [47, 50, 54, 59], descriptions: "Return to B — sheets of sound in between." },
+    ],
+  },
+  {
+    id: "invention_1",
+    title: "Path XLIV: The Invention",
+    description:
+      "Bach's two-part invention: subject, inversion, answer, dominant — counterpoint as conversation.",
+    composer: "J.S. Bach",
+    key: "C major",
+    feel: "contrapuntal",
+    steps: [
+      { name: "C subject", notes: [48, 52, 55, 60], descriptions: "C / E / G / C — the subject." },
+      { name: "C inversion", notes: [60, 64, 67, 72], descriptions: "Subject inverted — C5 / E5 / G5 / C6." },
+      { name: "C answer", notes: [48, 52, 55, 60], descriptions: "Answer — back to the original shape." },
+      { name: "G V7", notes: [43, 47, 50, 55, 59], descriptions: "Dominant G7 — drive to cadence." },
+    ],
+  },
+  {
+    id: "whole_tone_study",
+    title: "Path XLV: The Whole-Tone Garden",
+    description:
+      "Debussy's planing: parallel whole-tone clusters drifting by half step. No gravity, only color.",
+    composer: "C. Debussy",
+    key: "C whole-tone",
+    feel: "impressionist / planing",
+    steps: [
+      { name: "C WT", notes: [48, 50, 52, 54], descriptions: "C / D / E / F# — whole-tone stack on C." },
+      { name: "Db WT", notes: [49, 51, 53, 55], descriptions: "Db / Eb / F / G — planed up a half step." },
+      { name: "Eb WT", notes: [51, 53, 55, 57], descriptions: "Eb / F / G / A — planed again." },
+      { name: "F WT", notes: [53, 55, 57, 59], descriptions: "F / G / A / B — floating." },
+    ],
+  },
+  {
+    id: "ambient_field",
+    title: "Path XLVI: The Ambient Field",
+    description:
+      "Eno's drone: sustained low root, soft upper Lydian color. The chord changes, the field doesn't.",
+    composer: "B. Eno",
+    key: "C Lydian",
+    feel: "ambient / drone",
+    steps: [
+      { name: "C drone", notes: [36, 48, 50, 54], descriptions: "C2 / C4 / D / F# — Lydian on low C." },
+      { name: "F drone", notes: [41, 53, 55, 59], descriptions: "F2 / F4 / G / B — drone moves." },
+      { name: "G drone", notes: [43, 55, 57, 61], descriptions: "G2 / G4 / A / C# — Lydian lift." },
+      { name: "C drone", notes: [36, 48, 50, 54], descriptions: "Return to C — nothing happened." },
+    ],
+  },
+  {
+    id: "koyaanisqatsi_ostinato",
+    title: "Path XLVII: The Koyaanisqatsi Ostinato",
+    description:
+      "Glass's additive ostinato: Dm and Dm7 in alternating pattern. Repetition as revelation.",
+    composer: "P. Glass",
+    key: "D minor",
+    feel: "minimalist / additive",
+    steps: [
+      { name: "Dm", notes: [50, 53, 57], descriptions: "D / F / A — bare triad." },
+      { name: "Dm + 7", notes: [50, 53, 57, 60], descriptions: "Add the minor 7th — C." },
+      { name: "Dm", notes: [50, 53, 57], descriptions: "Back to triad." },
+      { name: "Dm + 7", notes: [50, 53, 57, 60], descriptions: "And again — additive pulse." },
+    ],
+  },
+  {
+    id: "monk_stab",
+    title: "Path XLVIII: The Monk Stab",
+    description:
+      "Monk's angular attack: stride bass, slash chord, tritone-related surprise, return.",
+    composer: "T. Monk",
+    key: "Bb minor",
+    feel: "angular / dissonant",
+    steps: [
+      { name: "Bbm", notes: [46, 49, 53, 58], descriptions: "Bb / Db / F / Ab — the stab." },
+      { name: "Bbm (slash)", notes: [58, 46, 49, 53], descriptions: "Slash chord — Ab first." },
+      { name: "Gb maj7", notes: [42, 46, 49, 54, 58], descriptions: "Surprise move to Gb maj7 — tritone-related." },
+      { name: "Bbm return", notes: [46, 49, 53, 58], descriptions: "Return to Bbm — but you've heard the tritone." },
+    ],
+  },
+  {
+    id: "so_what_vamp",
+    title: "Path XLIX: So What Vamp",
+    description:
+      "Miles's modal restraint: Dm7 holds, Em7 answers, Dm7 returns. Bass rarely moves — the harmonic rhythm is the music.",
+    composer: "M. Davis",
+    key: "D Dorian",
+    feel: "modal / cool",
+    // bassIsolation mirrors the persona-side rule on the path so the
+    // bar-strip marker / test introspection see a single source of truth.
+    bassIsolation: true,
+    steps: [
+      { name: "Dm7 (D Dorian)", notes: [50, 53, 57, 60], descriptions: "D / F / A / C — D Dorian center." },
+      { name: "Dm7 sustained", notes: [50, 53, 57, 60], descriptions: "Held — Miles says nothing." },
+      { name: "Em7 (E Dorian)", notes: [52, 55, 59, 62], descriptions: "Lift to E Dorian — modal answer." },
+      { name: "Dm7 return", notes: [50, 53, 57, 60], descriptions: "Return — restraint confirmed." },
+    ],
+  },
+  {
+    id: "my_funny_valentine",
+    title: "Path L: My Funny Valentine",
+    description:
+      "Chet's ballad tone: sparse Cm, Ab maj7, G7. The space between chords is the music.",
+    composer: "R. Rodgers / L. Hart",
+    key: "C minor",
+    feel: "ballad / sparse",
+    steps: [
+      { name: "Cm", notes: [48, 51, 55], descriptions: "C / Eb / G — sparse Cm." },
+      { name: "Cm held", notes: [48, 51, 55], descriptions: "Held — breath." },
+      { name: "Ab maj7", notes: [44, 48, 52, 55, 58], descriptions: "Ab / C / Eb / G / Bb — warmth." },
+      { name: "G7", notes: [43, 47, 50, 55, 59], descriptions: "G / B / D / F / Ab — pull toward Cm." },
+    ],
+  },
+  {
+    id: "salt_peanuts_figure",
+    title: "Path LI: Salt Peanuts Figure",
+    description:
+      "Dizzy's bebop angularity: Bb / G7 / Cm7 / F7 — major and minor ii-V chains at speed.",
+    composer: "K. Clarke / T. Monk (attrib.)",
+    key: "Bb major",
+    feel: "bebop / angular",
+    steps: [
+      { name: "Bb", notes: [46, 50, 53, 58], descriptions: "Bb / D / F / Bb — tonic." },
+      { name: "G7", notes: [43, 47, 50, 55, 59], descriptions: "G / B / D / F / Ab — V of Cm." },
+      { name: "Cm7", notes: [48, 51, 55, 58], descriptions: "C / Eb / G / Bb — minor ii answer." },
+      { name: "F7", notes: [41, 45, 48, 53, 57], descriptions: "F / A / C / Eb / Gb — V of Bb." },
+    ],
+  },
+  {
+    id: "red_clay_changes",
+    title: "Path LII: Red Clay Changes",
+    description:
+      "Hubbard's hard-bop line: Fm7 / Eb7alt / Abmaj7 / Db13 — bluesy minor changes with altered dominants.",
+    composer: "F. Hubbard",
+    key: "F minor",
+    feel: "hard_bop / blues",
+    steps: [
+      { name: "Fm7", notes: [41, 44, 48, 51], descriptions: "F / Ab / C / Eb — minor statement." },
+      { name: "Eb7 alt", notes: [39, 43, 46, 49, 53], descriptions: "Eb / G / Bb / Db / F — altered with b9 + #11." },
+      { name: "Ab maj7", notes: [44, 48, 52, 55, 58], descriptions: "Ab / C / Eb / G / Bb — relative major." },
+      { name: "Db13", notes: [37, 41, 44, 50, 53, 57], descriptions: "Db / F / Ab / D / F / A — turnaround with the 13th." },
+    ],
+  },
+  {
+    id: "footprints_vamp",
+    title: "Path LIII: Footprints Vamp",
+    description:
+      "Shorter's modal geometry: Cm / Ab / Db / Cm. Three-key vamp, cyclical, elliptical.",
+    composer: "W. Shorter",
+    key: "C minor (modal)",
+    feel: "modal / vamp",
+    steps: [
+      { name: "Cm vamp", notes: [48, 51, 55, 58], descriptions: "C / Eb / G / Bb — modal Cm." },
+      { name: "Ab vamp", notes: [44, 48, 51, 55], descriptions: "Ab / C / Eb / G — rotation to Ab." },
+      { name: "Db vamp", notes: [49, 53, 56, 60], descriptions: "Db / F / Ab / C — further rotation." },
+      { name: "Cm vamp", notes: [48, 51, 55, 58], descriptions: "Return to Cm — elliptical phrase closes." },
+    ],
+  },
+  {
+    id: "color_shape_study",
+    title: "Path LIV: Color Shapes",
+    description:
+      "Kandinsky's color-form correspondence: triangle (major), circle (minor), darker triangle (dim), brighter triangle (aug).",
+    composer: "W. Kandinsky (synth)",
+    key: "C",
+    feel: "synthesis / geometric",
+    steps: [
+      { name: "C major triad", notes: [48, 52, 55], descriptions: "C / E / G — yellow triangle." },
+      { name: "C minor triad", notes: [48, 51, 55], descriptions: "C / Eb / G — blue circle." },
+      { name: "C dim triad", notes: [48, 51, 54], descriptions: "C / Eb / Gb — darker triangle." },
+      { name: "C aug triad", notes: [48, 52, 56], descriptions: "C / E / G# — brighter triangle." },
+    ],
+  },
 ];
 
 
@@ -853,12 +1274,65 @@ export const PATHS: HarmonicPath[] = [
 // Study materials — generated by scripts/ingest_standards.py.
 // 19 jazz standards from the Isaac Raz MasterClass, parsed into playable
 // HarmonicPath entries with proper MIDI notes (audioEngine-renderable).
+//
+// These are NOT included in ALL_PATHS — they're surfaced separately
+// through the Masterclass picker (src/components/PlaySessionRail.tsx),
+// which prepends a picked song to the user's paths state on demand.
+// Keeping them out of ALL_PATHS means the main path browser stays
+// focused on curated educational concepts.
 // ---------------------------------------------------------------------------
+import { CONCEPT_PATHS } from "./conceptPaths";
 import { STUDIES_PATHS as GENERATED_STUDIES_PATHS } from "./studies";
 
-export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS;
+export const STUDIES_PATHS: HarmonicPath[] = GENERATED_STUDIES_PATHS.map((p) => {
+  const padded = padPath(p);
+  // Backfill `name` from `title` so LiveScoreDisplay's abcjs header
+  // (which reads `name`) doesn't print "undefined" when the source
+  // entry only set `title`.
+  if (padded.name == null) {
+    return { ...padded, name: padded.title };
+  }
+  return padded;
+});
+
+/**
+ * Curated PATHS exposed to consumers — already padded to the
+ * [MIN_PATH_BARS, MAX_PATH_BARS] bar range and name-backfilled.
+ *
+ * Phase 3: spreads the educational CONCEPT_PATHS in alongside the
+ * curated RAW_PATHS so the persona bar-strip markers fire on the
+ * concept exercises too.
+ */
+export const PATHS: HarmonicPath[] = [...RAW_PATHS, ...CONCEPT_PATHS].map((p) => {
+  const padded = padPath({
+    ...p,
+    name: p.name ?? p.title,
+  });
+  // Warn in dev if a raw path was over the cap and had to be trimmed.
+  // (Under-length paths get padded silently — that's the intended
+  // behavior.)
+  if (p.steps.length > MAX_PATH_BARS * STEPS_PER_BAR && padded.steps.length < p.steps.length) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[paths] '${p.id}' was ${(p.steps.length / STEPS_PER_BAR).toFixed(1)} bars — ` +
+        `trimmed to ${MAX_PATH_BARS} bars to fit policy. ` +
+        `Consider splitting into multiple paths.`,
+    );
+  }
+  return padded;
+});
 
 export const ALL_PATHS: HarmonicPath[] = [...PATHS, ...STUDIES_PATHS];
+
+/**
+ * Look up a HarmonicPath across both curated PATHS and STUDIES_PATHS.
+ * Use this anywhere a path id might come from a practice set, an
+ * import, or the masterclass catalog — not just from the main
+ * browser.
+ */
+export function findPathById(id: string): HarmonicPath | undefined {
+  return ALL_PATHS.find((p) => p.id === id) ?? STUDIES_PATHS.find((p) => p.id === id);
+}
 
 // ─── Practice Sets ─────────────────────────────────────────────────────────────
 

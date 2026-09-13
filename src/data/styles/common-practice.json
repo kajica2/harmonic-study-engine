@@ -1,0 +1,10 @@
+{
+  "id": "common-practice",
+  "name": "Common-Practice (Baroque–Classical)",
+  "description": "Functional tonal harmony with strict voice-leading. Parallel perfect fifths and octaves forbidden; leading tones resolve up by semitone.",
+  "constraints": {
+    "forbiddenIntervals": ["parallelFifth", "parallelOctave", "hiddenFifth", "hiddenOctave"],
+    "allowedNCTs": ["passingTone", "neighborTone", "anticipation", "escapeTone", "suspension", "pedal"],
+    "requiredResolutions": ["leadingToneResolves", "tritoneResolves", "guideToneResolves"]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "quizAutoGenerate": true,
+  "curatedFirst": true,
+  "description": "Quiz configuration. quizAutoGenerate=true enables quizEngine fallback for missing topics; curatedFirst=true gives precedence to curated JSON."
+}
