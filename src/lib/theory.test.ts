@@ -25,6 +25,7 @@ import {
   getShapeForNote,
   voiceLeadingDistance,
   voiceLeadingScore,
+  voiceLeadingScoreNumeric,
   analyzeChord,
   applyVoiceLeading,
   applyVoicing,
@@ -116,6 +117,29 @@ describe("voiceLeadingScore", () => {
     expect(voiceLeadingScore([60, 64, 70], [60, 64, 70])).toBe(
       "common tone on top — held",
     );
+  });
+});
+
+describe("voiceLeadingScoreNumeric", () => {
+  it("returns 100 for empty prev or curr (no motion to measure)", () => {
+    expect(voiceLeadingScoreNumeric([], [60, 64, 67])).toBe(100);
+    expect(voiceLeadingScoreNumeric([60, 64, 67], [])).toBe(100);
+  });
+  it("returns 100 for an identical chord pair (distance 0)", () => {
+    expect(voiceLeadingScoreNumeric([60, 64, 67], [60, 64, 67])).toBe(100);
+  });
+  it("scores a small stepwise motion near the top of the range", () => {
+    // C triad [60,64,67] → F triad [65,69,72]: each voice +5 st
+    // distance: 5+5+5 = 15 + bass motion 5 = 20
+    // score = max(0, 100 - 4*20) = 20
+    expect(voiceLeadingScoreNumeric([60, 64, 67], [65, 69, 72])).toBe(20);
+  });
+  it("clamps to 0 for extreme motion", () => {
+    // Two unrelated 4-note chords 12 st apart → distance huge
+    const prev = [60, 64, 67, 71];
+    const curr = [60 + 12, 64 + 12, 67 + 12, 71 + 12];
+    // distance is exactly 4*12 + 12 (bass) = 60; score = max(0, 100-240) = 0
+    expect(voiceLeadingScoreNumeric(prev, curr)).toBe(0);
   });
 });
 

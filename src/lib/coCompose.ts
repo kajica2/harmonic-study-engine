@@ -33,8 +33,15 @@ export interface ProposeAlternativeArgs {
 export interface AlternativeChord {
   /** The active chord (input). */
   active: ChordAnalysis;
+  /** The active chord's MIDI notes (root position). Exposed so callers
+   * can run `voiceLeadingScoreNumeric(activeNotes, altNotes)` without
+   * having to reverse-engineer from `active.bass`. */
+  activeNotes: number[];
   /** The proposed replacement. Null if no substitute fits the key context. */
   alternative: ChordAnalysis | null;
+  /** The alternative chord's MIDI notes (root position). Null iff
+   * `alternative` is null. */
+  alternativeNotes: number[] | null;
   /** Human-readable technique label (tritone substitution, modal mixture, …). */
   technique: string;
   /** Why this substitution works, in theory terms. */
@@ -316,7 +323,9 @@ export function proposeAlternative(args: ProposeAlternativeArgs): AlternativeCho
     // a note about why.
     return {
       active,
+      activeNotes,
       alternative: null,
+      alternativeNotes: null,
       technique,
       explanation: `${humanize(technique)} does not apply to a ${active.family} ${active.function} chord (${active.roman}). Try another bar.`,
       voiceLeadingDistance: 0,
@@ -327,7 +336,9 @@ export function proposeAlternative(args: ProposeAlternativeArgs): AlternativeCho
   const distance = voiceLeading(activeNotes, applied.notes);
   return {
     active,
+    activeNotes,
     alternative: alt,
+    alternativeNotes: applied.notes,
     technique,
     explanation: applied.explanation,
     voiceLeadingDistance: distance,

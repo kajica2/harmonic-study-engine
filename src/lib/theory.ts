@@ -520,6 +520,33 @@ export function voiceLeadingScore(
 }
 
 /**
+ * Numeric voice-leading score (0-100). Complements the string-based
+ * `voiceLeadingScore` for callers that need a scalar threshold (e.g.
+ * the v1 gating criterion "voiceLeadingScore ≥ 50 for ≥ 95% of
+ * proposals across 10K samples").
+ *
+ * Calibration:
+ *   - distance 0  → 100 (no motion, identical chord)
+ *   - distance 25 → 0   (5 voices × 5 semitones each — at the edge of
+ *                       reasonable voice-leading)
+ *   - linear in between, clamped to [0, 100]
+ *
+ * Reference: `voiceLeadingDistance` sums absolute voice motion in
+ * semitones across all chord tones plus the bass. A four-note chord
+ * where every voice moves 6 semitones = distance 24. The 25-cap is
+ * conservative: anything beyond that is "revoice this" territory.
+ */
+export function voiceLeadingScoreNumeric(
+  prevNotes: number[],
+  currNotes: number[],
+): number {
+  if (prevNotes.length === 0 || currNotes.length === 0) return 100;
+  const distance = voiceLeadingDistance(prevNotes, currNotes);
+  const score = Math.max(0, 100 - 4 * distance);
+  return Math.round(score);
+}
+
+/**
  * Generate a single contextual alternative voicing for the current chord:
  *  - "inversion" — shift bass up by an octave
  *  - "drop2" — take the second voice from the top and drop it an octave
