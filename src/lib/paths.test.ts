@@ -13,7 +13,13 @@
  *  - The 7 Phase 3 concept paths (LV–LXI) exist with correct metadata
  */
 import { describe, it, expect } from "vitest";
-import { PATHS, STUDIES_PATHS, ALL_PATHS, COMPOSER_PATHS } from "./paths";
+import {
+  PATHS,
+  STUDIES_PATHS,
+  ALL_PATHS,
+  COMPOSER_PATHS,
+  SECTION_PATHS,
+} from "./paths";
 
 describe("PATHS array shape", () => {
   it("PATHS has the 8 built-in paths", () => {
@@ -124,14 +130,18 @@ describe("ALL_PATHS backfill", () => {
     }
   });
 
-  it("ALL_PATHS includes PATHS + STUDIES_PATHS + COMPOSER_PATHS with no duplicate IDs", () => {
+  it("ALL_PATHS includes PATHS + STUDIES_PATHS + COMPOSER_PATHS + SECTION_PATHS with no duplicate IDs", () => {
     // PATHS is the curated set + concept paths; STUDIES_PATHS is the
     // masterclass deep-dive block (Solar, Cherokee, …); COMPOSER_PATHS
-    // is the 7 19th-century composers seeded from the catalog.
-    // ALL_PATHS is the union — the practice-session player uses it
-    // for the full catalog.
+    // is the 7 19th-century composers seeded from the catalog;
+    // SECTION_PATHS is the 10 section composers (Debussy, Stravinsky,
+    // …) seeded via per-kind synthesizers. ALL_PATHS is the union —
+    // the practice-session player uses it for the full catalog.
     expect(ALL_PATHS.length).toBe(
-      PATHS.length + STUDIES_PATHS.length + COMPOSER_PATHS.length,
+      PATHS.length +
+        STUDIES_PATHS.length +
+        COMPOSER_PATHS.length +
+        SECTION_PATHS.length,
     );
     const ids = ALL_PATHS.map((p) => p.id);
     const set = new Set(ids);
