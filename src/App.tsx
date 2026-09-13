@@ -600,13 +600,10 @@ export default function App() {
     rhythmEngine.setTimeSignature(timeSignature);
   }, [timeSignature]);
 
-  useEffect(() => {
-    // Pre-existing TS2345: beatType widened to BackingStyle (includes
-    // "off"); rhythmEngine.setBeat wants narrower BeatType. The runtime
-    // accepts any BackingStyle (off = silent) so this is purely a
-    // tightening we can safely cast through.
-    (rhythmEngine as unknown as { setBeat: (b: BackingStyle) => void }).setBeat(beatType);
-  }, [beatType]);
+  // beatType is owned by backingEngine — see the useEffect below that
+  // calls backingEngine.setStyle(beatType) when playback starts. The
+  // rhythm engine only owns transport (tempo, time signature, metronome
+  // click, measure-start callback); it doesn't synthesize the beat.
 
   useEffect(() => {
     const handler = () => {
