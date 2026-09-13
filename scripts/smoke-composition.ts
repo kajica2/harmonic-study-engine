@@ -30,6 +30,16 @@ await page.goto(URL, { waitUntil: "networkidle", timeout: 15000 });
 // Give React a moment to hydrate.
 await page.waitForTimeout(1500);
 
+// Force the active persona to Coltrane (mapped to John Coltrane via
+// harmonicInfluence). This exercises the chart viewer render path.
+// We do this AFTER load + hydration so we can rely on a fresh React
+// state; the next reload picks up the persisted value.
+await page.evaluate(() => {
+  localStorage.setItem("synesthesia_selectedPersonaId", "coltrane");
+});
+await page.reload({ waitUntil: "networkidle", timeout: 15000 });
+await page.waitForTimeout(1500);
+
 // Assertions: key UI surfaces from Phase 2 should be visible.
 const checks = [
   { name: "PracticeHeader", selector: 'header, [aria-label*="Practice" i]' },
@@ -40,6 +50,13 @@ const checks = [
   { name: "CoComposePanel", selector: '[aria-label*="Co-composition" i]' },
   { name: "FormPlanner", selector: '[aria-label*="Form" i]' },
   { name: "QuizPanel", selector: '[aria-label*="Quiz" i]' },
+  // Composer-catalog v2: the chart viewer renders only when the active
+  // persona has a harmonicInfluence. For this smoke we force Coltrane
+  // via localStorage so the chart definitely shows.
+  {
+    name: "ComposerChartViewer",
+    selector: '[data-testid^="composer-chart-"]',
+  },
 ];
 
 const results: Array<{ name: string; present: boolean }> = [];

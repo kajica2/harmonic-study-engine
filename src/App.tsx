@@ -77,6 +77,7 @@ import { downloadText } from "./lib/download";
 import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
 import { PersonaLensBanner } from "./components/PersonaLensBanner";
+import { ComposerChartViewer } from "./components/ComposerChartViewer";
 import { TexturePanel } from "./components/TexturePanel";
 import { FormPlanner } from "./components/FormPlanner";
 import { FormTemplatePicker } from "./components/FormTemplatePicker";
@@ -1239,6 +1240,17 @@ export default function App() {
         {/* Persona behavioral lens — shows when the active persona
             has a documented behavioral rule set (Bach/Coltrane/Miles). */}
         <PersonaLensBanner personaId={selectedPersonaId} />
+
+        {/* Composer chart viewer — shows the active persona's harmonic
+            influence as a small dense panel. Renders nothing if the
+            persona has no harmonicInfluence (most personas). */}
+        {(() => {
+          const persona = PERSONAS.find((x) => x.id === selectedPersonaId);
+          const composerId = persona?.harmonicInfluence?.[0]
+            ?.composerId as Parameters<typeof ComposerChartViewer>[0]["composerId"] | undefined;
+          if (!composerId) return null;
+          return <ComposerChartViewer composerId={composerId} />;
+        })()}
 
         {/* Texture — per-track mute toggles + counter-line layer toggle. */}
         <TexturePanel
