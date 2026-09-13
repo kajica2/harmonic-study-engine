@@ -6,17 +6,20 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ALL_PATHS, PATHS, STUDIES_PATHS } from "../src/lib/paths";
+import { ALL_PATHS, PATHS, STUDIES_PATHS, COMPOSER_PATHS } from "../src/lib/paths";
 
 describe("HarmonicPath catalog invariants", () => {
-  it("PATHS, STUDIES_PATHS, and ALL_PATHS are all defined", () => {
+  it("PATHS, STUDIES_PATHS, COMPOSER_PATHS, and ALL_PATHS are all defined", () => {
     expect(Array.isArray(PATHS)).toBe(true);
     expect(Array.isArray(STUDIES_PATHS)).toBe(true);
+    expect(Array.isArray(COMPOSER_PATHS)).toBe(true);
     expect(Array.isArray(ALL_PATHS)).toBe(true);
   });
 
-  it("ALL_PATHS is PATHS + STUDIES_PATHS", () => {
-    expect(ALL_PATHS.length).toBe(PATHS.length + STUDIES_PATHS.length);
+  it("ALL_PATHS is PATHS + STUDIES_PATHS + COMPOSER_PATHS", () => {
+    expect(ALL_PATHS.length).toBe(
+      PATHS.length + STUDIES_PATHS.length + COMPOSER_PATHS.length,
+    );
     // First PATHS-N entries match
     expect(ALL_PATHS.slice(0, PATHS.length)).toEqual(PATHS);
   });

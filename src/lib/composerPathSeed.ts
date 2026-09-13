@@ -27,8 +27,12 @@ import {
   type BarChart,
   type ChartBar,
 } from "./composerCatalog";
-import type { HarmonicPath, HarmonicStep } from "./paths";
-import { padPath, MIN_PATH_BARS, STEPS_PER_BAR } from "./paths";
+import type { HarmonicPath, HarmonicStep } from "./pathsHelpers";
+import {
+  padPath,
+  MIN_PATH_BARS,
+  STEPS_PER_BAR,
+} from "./pathsHelpers";
 
 /** Composer ids that have bar-by-bar charts and can be seeded. */
 export const BAR_COMPOSER_IDS: ComposerId[] = [
@@ -96,6 +100,7 @@ export function seedPathFromComposer(
   const cycled: HarmonicPath = {
     id: `${idPrefix}-${targetBars}b`,
     title: `${barChart.composerName} study (${targetBars} bars, seeded from catalog)`,
+    name: `${barChart.composerName} study (${targetBars} bars, seeded from catalog)`,
     description: `Bar-by-bar reduction of ${barChart.composerName}'s work, seeded from docs/COMPOSER-HARMONIC-INNOVATIONS.md. ${barChart.workContext}. Study reduction, not literal transcription.`,
     steps,
     mvpReady: true,
