@@ -15,7 +15,7 @@ import {
 
 describe("briefingForPath", () => {
   it("returns the curated objective for an inApp path with `objective` set", () => {
-    const b = briefingForPath("star-eyes");
+    const b = briefingForPath("study-star-eyes");
     expect(b).not.toBeNull();
     expect(b!.inApp).toBe(true);
     expect(b!.objective).toContain("Sing the melody first");
@@ -23,17 +23,19 @@ describe("briefingForPath", () => {
   });
 
   it("falls back to a templated objective for an inApp=false path", () => {
-    const b = briefingForPath("solar");
+    // Use what-is-this-thing-called-love — it's an inApp=false
+    // masterclass entry that has a curated mainExercise, so the
+    // templated fallback can quote it. (study-solar is inApp=true
+    // as of Sprint 7 — the "17 new masterclass tunes" commit.)
+    const b = briefingForPath("what-is-this-thing-called-love");
     expect(b).not.toBeNull();
     expect(b!.inApp).toBe(false);
     expect(b!.objective).toMatch(/^Coming soon/);
-    // The fallback quotes the mainExercise so the briefing still
-    // teaches something rather than just saying "coming soon".
-    expect(b!.objective).toContain("Diatonic Solar solo");
+    expect(b!.objective).toContain("Three stages of singing a tune");
   });
 
   it("always includes the description field", () => {
-    const b = briefingForPath("star-eyes");
+    const b = briefingForPath("study-star-eyes");
     expect(b!.description).toContain("Foundational diatonic exercise");
   });
 
@@ -46,8 +48,8 @@ describe("briefingForPath", () => {
 
   it("returns the same entry regardless of how many times it's called", () => {
     // Idempotence check — the briefing shouldn't mutate the catalog.
-    const a = briefingForPath("star-eyes");
-    const b = briefingForPath("star-eyes");
+    const a = briefingForPath("study-star-eyes");
+    const b = briefingForPath("study-star-eyes");
     expect(a?.objective).toBe(b?.objective);
   });
 
@@ -57,7 +59,7 @@ describe("briefingForPath", () => {
     // curated line (it's better than the templated fallback).
     // We don't have one in the data today, but the logic should
     // honor it when it shows up.
-    const b = briefingForPath("star-eyes");
+    const b = briefingForPath("study-star-eyes");
     expect(b!.entry.objective).toBeDefined();
     expect(b!.objective).toBe(b!.entry.objective);
   });

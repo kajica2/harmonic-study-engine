@@ -20,7 +20,16 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", "dist", "**/vite.config.ts", ".venv"],
     setupFiles: ["./tests/setup.ts"],
-    environmentMatchGlobs: [["src/components/**/*.test.tsx", "jsdom"]],
+    environmentMatchGlobs: [
+      ["src/components/**/*.test.tsx", "jsdom"],
+      // Hook tests that use @testing-library/react's renderHook need a DOM
+      ["tests/usePathGenerator.test.ts", "jsdom"],
+      ["tests/useSessionStore.test.ts", "jsdom"],
+      ["tests/useDDSPProbe.test.ts", "jsdom"],
+      ["tests/useBassNotes.test.ts", "jsdom"],
+      // webAudio shim is read off window.AudioContext
+      ["tests/webAudio.test.ts", "jsdom"],
+    ],
     coverage: {
       provider: "v8",
       include: ["src/lib/**", "src/hooks/**"],
