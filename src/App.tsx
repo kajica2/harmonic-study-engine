@@ -70,6 +70,7 @@ import { downloadText } from "./lib/download";
 import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
 import { PersonaLensBanner } from "./components/PersonaLensBanner";
+import { TexturePanel } from "./components/TexturePanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore } from "./hooks/useSessionStore";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
@@ -1124,6 +1125,17 @@ export default function App() {
         {/* Persona behavioral lens — shows when the active persona
             has a documented behavioral rule set (Bach/Coltrane/Miles). */}
         <PersonaLensBanner personaId={selectedPersonaId} />
+
+        {/* Texture — per-track mute toggles + counter-line layer toggle. */}
+        <TexturePanel
+          drumsMuted={drumsMuted}
+          bassMuted={bassMuted}
+          pianoMuted={pianoMuted}
+          setDrumsMuted={setDrumsMuted}
+          setBassMuted={setBassMuted}
+          setPianoMuted={setPianoMuted}
+          counterLineActive={false}
+        />
 
         {/* Play Session Rail — guided workflow */}
         <PlaySessionRail
