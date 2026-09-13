@@ -82,6 +82,7 @@ import { FormPlanner } from "./components/FormPlanner";
 import { FormTemplatePicker } from "./components/FormTemplatePicker";
 import { StylePackPicker } from "./components/StylePackPicker";
 import { StyleWarnings } from "./components/StyleWarnings";
+import { CoComposePanel } from "./components/CoComposePanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore } from "./hooks/useSessionStore";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
@@ -1168,6 +1169,19 @@ export default function App() {
             violations={[]}
           />
         )}
+
+        {/* CoComposePanel — "what if?" reharmonization suggestion. */}
+        {(() => {
+          const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
+          const seed = (path.id.charCodeAt(0) || 0) ^ ((activeBar + 1) * 0x9e3779b9);
+          return (
+            <CoComposePanel
+              pathId={path.id}
+              barIndex={activeBar}
+              seed={seed >>> 0}
+            />
+          );
+        })()}
 
         {/* Persona behavioral lens — shows when the active persona
             has a documented behavioral rule set (Bach/Coltrane/Miles). */}
