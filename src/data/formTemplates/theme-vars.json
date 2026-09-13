@@ -1,0 +1,12 @@
+{
+  "id": "theme-vars",
+  "name": "Theme and Variations (40-bar)",
+  "description": "Classical theme-and-variations form. Each variation reworks the theme (rhythm, melody, harmony).",
+  "sections": [
+    { "id": "T",    "length": 8, "cadence": "ii-V-I" },
+    { "id": "V1",   "length": 8, "cadence": "half-cadence" },
+    { "id": "V2",   "length": 8, "cadence": "ii-V-I" },
+    { "id": "V3",   "length": 8, "cadence": "ii-V-I" },
+    { "id": "Coda", "length": 8, "cadence": "plagal" }
+  ]
+}
