@@ -48,6 +48,8 @@ export interface PersonaRules {
   reverbDistance?: boolean;
 }
 
+export type ContourProfile = "leaping" | "stepwise" | "angular" | "neutral";
+
 export interface Persona {
   id: string;
   name: string;
@@ -67,6 +69,12 @@ export interface Persona {
   techniques?: string[];
   scale?: string;
   rhythmLayers?: string[];
+  /**
+   * Melodic contour preference. Drives `personaMelodyFilter.ts` to
+   * bias the genre-neutral Markov output. Optional — personas without
+   * the field get "neutral" (no bias).
+   */
+  contourProfile?: ContourProfile;
   rules?: PersonaRules;
   // Original fields
   originalSongId: string; // references PATH id
