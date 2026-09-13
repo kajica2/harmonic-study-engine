@@ -57,10 +57,14 @@ import { recorder } from "./lib/recorder";
 import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
 import { exportToMidiFile } from "./lib/midiExport";
 import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
+import { STEPS_PER_BAR } from "./lib/paths";
+import { suggestMelody, pcSet } from "./lib/melodyMarkov";
 import { useAsyncAction } from "./lib/useAsyncAction";
 import { InlineErrorPill } from "./components/InlineStatus";
 import { RecordingModal } from "./components/RecordingModal";
 import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
+import { MelodyLane } from "./components/MelodyLane";
+import { MelodyToolbar } from "./components/MelodyToolbar";
 import { PlaySessionRail } from "./components/PlaySessionRail";
 import { downloadText } from "./lib/download";
 import { PathBriefing } from "./components/PathBriefing";
@@ -149,6 +153,10 @@ export default function App() {
     setMetronomeOn,
     scoreDisplayMode,
     setScoreDisplayMode,
+    melodyByStep,
+    setMelodyByStep,
+    counterMelodyByStep,
+    setCounterMelodyByStep,
   } = session;
 
 
@@ -2699,6 +2707,66 @@ export default function App() {
 
             {showLiveScore && (
               <div className="w-full mt-2">
+                {/* Melody layer — suggested Markov output for the active bar.
+                    Edits write back to useSessionStore.melodyByStep under
+                    the key `${pathId}::${barIndex}`. */}
+                {(() => {
+                  const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
+                  const stepKey = `${path.id}::${activeBar}`;
+                  const stored = melodyByStep[stepKey] ?? [];
+                  const chordNotes = step?.notes ?? [];
+                  const handleSuggest = () => {
+                    const seed =
+                      (path.id.charCodeAt(0) || 0) ^
+                      ((activeBar + 1) * 0x9e3779b9) ^
+                      ((Date.now() & 0xffff) >>> 0);
+                    const raw = suggestMelody({
+                      notes: chordNotes,
+                      stepsPerBar: STEPS_PER_BAR,
+                      seed,
+                    });
+                    setMelodyByStep({ ...melodyByStep, [stepKey]: raw });
+                  };
+                  const handleRegenerate = () => {
+                    const seed =
+                      (path.id.charCodeAt(0) || 0) ^
+                      ((activeBar + 1) * 0x9e3779b9) ^
+                      (((Date.now() + 1) & 0xffff) >>> 0);
+                    const raw = suggestMelody({
+                      notes: chordNotes,
+                      stepsPerBar: STEPS_PER_BAR,
+                      seed,
+                    });
+                    setMelodyByStep({ ...melodyByStep, [stepKey]: raw });
+                  };
+                  const handleMelodyChange = (next: number[]) => {
+                    setMelodyByStep({ ...melodyByStep, [stepKey]: next });
+                  };
+                  return (
+                    <div className="mb-2 flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+                          Melody
+                        </span>
+                        <MelodyToolbar
+                          onSuggest={handleSuggest}
+                          onRegenerate={handleRegenerate}
+                          disabled={chordNotes.length === 0}
+                        />
+                      </div>
+                      <MelodyLane
+                        pathId={path.id}
+                        barIndex={activeBar}
+                        stepsPerBar={STEPS_PER_BAR}
+                        melody={stored.length === STEPS_PER_BAR ? stored : Array(STEPS_PER_BAR).fill(0)}
+                        counterMelody={counterMelodyByStep[stepKey]}
+                        onChange={handleMelodyChange}
+                        disabled={chordNotes.length === 0}
+                      />
+                    </div>
+                  );
+                })()}
+
                 <LiveScoreDisplay
                   path={path}
                   activeStepIndex={activeStepIndex}
