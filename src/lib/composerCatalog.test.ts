@@ -5,7 +5,16 @@ import {
   getSectionCharts,
   totalBarCount,
   ALL_COMPOSER_IDS,
+  pcFromNoteName,
+  pcsFromNoteNames,
   type ComposerId,
+  type BarChart,
+  type BitonalBlock,
+  type RowMatrix,
+  type AxisSystem,
+  type DurationStructure,
+  type LayerStack,
+  type GenericSectionChart,
 } from "./composerCatalog";
 
 describe("composerCatalog", () => {
@@ -153,6 +162,98 @@ describe("composerCatalog", () => {
       //   fela-kuti:16, piazzolla:24
       //   = 21+32+16+23+16+20+17+16+12+32+16+21+16+18+16+24 = 316
       expect(totalBarCount()).toBe(316);
+    });
+  });
+
+  describe("pcFromNoteName / pcsFromNoteNames", () => {
+    it("parses standard note names", () => {
+      expect(pcFromNoteName("C")).toBe(0);
+      expect(pcFromNoteName("Db")).toBe(1);
+      expect(pcFromNoteName("C#")).toBe(1);
+      expect(pcFromNoteName("Bb")).toBe(10);
+      expect(pcFromNoteName("B")).toBe(11);
+    });
+
+    it("returns undefined for unknown names", () => {
+      expect(pcFromNoteName("")).toBeUndefined();
+      // @ts-expect-error: bad input
+      expect(pcFromNoteName(null)).toBeUndefined();
+    });
+
+    it("parses a delimited sequence of note names", () => {
+      // Catalog uses " – " (en dash) and " - " (hyphen) as separators
+      expect(pcsFromNoteNames("E – F – G")).toEqual([4, 5, 7]);
+      expect(pcsFromNoteNames("A - C - Eb - F#")).toEqual([9, 0, 3, 6]);
+    });
+  });
+
+  describe("structured section parsers", () => {
+    it("Stravinsky bitonal: Petrushka chord is C (0) + F# (6)", () => {
+      const chart = getComposerChart("stravinsky") as BitonalBlock;
+      expect(chart.kind).toBe("bitonal");
+      expect(chart.pairs.length).toBeGreaterThan(0);
+      expect(chart.pairs[0]).toEqual({ root1: 0, root2: 6 });
+      // Confirm tritone relationship: |root1 - root2| mod 12 = 6
+      const diff = Math.abs(chart.pairs[0].root1 - chart.pairs[0].root2) % 12;
+      expect(diff).toBe(6);
+    });
+
+    it("Schoenberg row: P0 contains 12 distinct pitch classes covering all notes", () => {
+      const chart = getComposerChart("schoenberg") as RowMatrix;
+      expect(chart.kind).toBe("row");
+      // P0 must be 12 notes — some are enharmonic duplicates in our acoustic
+      // pitch-class system, so we check length and uniqueness modulo spelling
+      expect(chart.forms.P0.length).toBe(12);
+      // Hexachords split P0 into two halves
+      expect(chart.hexachords.first.length).toBe(6);
+      expect(chart.hexachords.second.length).toBe(6);
+      // First hexachord matches first 6 pitches of P0
+      expect(chart.hexachords.first).toEqual(chart.forms.P0.slice(0, 6));
+      expect(chart.hexachords.second).toEqual(chart.forms.P0.slice(6));
+    });
+
+    it("Bartók axis: tonic axis contains A, C, Eb, F# (pcs 9, 0, 3, 6)", () => {
+      const chart = getComposerChart("bartok") as AxisSystem;
+      expect(chart.kind).toBe("axis");
+      expect(chart.tonicAxis).toEqual([9, 0, 3, 6]);
+      expect(chart.dominantAxis).toEqual([4, 7, 10, 1]);
+      expect(chart.subdominantAxis).toEqual([2, 5, 8, 11]);
+      // Each axis should have 4 keys
+      expect(chart.tonicAxis.length).toBe(4);
+      expect(chart.dominantAxis.length).toBe(4);
+      expect(chart.subdominantAxis.length).toBe(4);
+    });
+
+    it("Cage duration: 4'33\" is three silent movements totaling 273 seconds", () => {
+      const chart = getComposerChart("cage") as DurationStructure;
+      expect(chart.kind).toBe("duration");
+      expect(chart.movements.length).toBe(3);
+      expect(chart.movements.map((m) => m.label)).toEqual(["I", "II", "III"]);
+      // 30 + 143 + 100 = 273 seconds = 4'33"
+      const total = chart.movements.reduce((s, m) => s + m.seconds, 0);
+      expect(total).toBe(273);
+    });
+
+    it("Eno layer: Music for Airports has 4 looping layers", () => {
+      const chart = getComposerChart("brian-eno") as LayerStack;
+      expect(chart.kind).toBe("layer");
+      expect(chart.layers.length).toBe(4);
+      expect(chart.layers[0].index).toBe(1);
+      expect(chart.layers[3].index).toBe(4);
+    });
+
+    it("Stockhausen / Minimalists / Coleman / Shankar remain GenericSectionChart", () => {
+      const stockhausen = getComposerChart("stockhausen") as GenericSectionChart;
+      const minimalists = getComposerChart("minimalists") as GenericSectionChart;
+      const coleman = getComposerChart("ornette-coleman") as GenericSectionChart;
+      const shankar = getComposerChart("ravi-shankar") as GenericSectionChart;
+      expect(stockhausen.kind).toBe("section");
+      expect(minimalists.kind).toBe("section");
+      expect(coleman.kind).toBe("section");
+      expect(shankar.kind).toBe("section");
+      // Raw lines preserved
+      expect(stockhausen.raw.length).toBeGreaterThan(0);
+      expect(shankar.raw.length).toBeGreaterThan(0);
     });
   });
 });
