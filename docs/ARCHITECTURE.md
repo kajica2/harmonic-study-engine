@@ -188,3 +188,45 @@ devs can install via `pip install ddsp` (works on macOS arm64 with
 | Persona doesn't auto-load a path | Check `defaultPath` in personas.json resolves to an id in `ALL_PATHS`. |
 | Path doesn't pad correctly | The `padPath` helper in paths.ts adds steps up to 24 bars. If your path is already longer it gets truncated at MAX_PATH_BARS. |
 | Chord analysis says "unknown" | The `analyzeChord` heuristic fails on inversions or voicings without a clear 3rd above the bass. This is a known limitation — see `paths.test.ts > "notes the inverted-chord limitation on Roman numerals (TODO)"` for the pinned test. |
+
+## Composition layer (added 2026-09-13)
+
+The composition layer adds 9 functional modules under `src/lib/`:
+
+| Module | What |
+|---|---|
+| `melodyMarkov.ts` | Order-2 Markov melody generator (genre-neutral core). |
+| `personaMelodyFilter.ts` | Persona-conditioned surface (leaping / stepwise / angular). |
+| `counterpointRules.ts` | Species-1 parallel-5ths / parallel-octaves / hidden-5ths / hidden-octaves checker. |
+| `formPlanner.ts` | 4 templates (AABA / ABAC / theme-vars / through-composed) + bar-invariant clamp (24-64). |
+| `stylePack.ts` | JSON loader + validator for style packs. |
+| `styleEnforcer.ts` | Applies a pack's `forbiddenIntervals` to a melody/counter-line pair. |
+| `coCompose.ts` | "What if?" reharmonization proposer (tritone sub, modal mixture, secondary dominant, passing diminished). |
+| `quizEngine.ts` | Auto-generates Roman / tension / function questions from `analyzeChord`. |
+
+Pure-data additions live under `src/data/`:
+
+| Path | Contents |
+|---|---|
+| `src/data/styles/{common-practice,jazz,modal,post-tonal}.json` | 4 style packs (adding a style = adding a JSON file). |
+| `src/data/formTemplates/{aaba,abac,theme-vars,through-composed}.json` | 4 form templates (hand-authored JSON, loaded in v1). |
+| `src/data/quizzes/{roman-numerals,tensions,voice-leading,modulations,form}.json` | 50 curated quiz questions (10 per topic). |
+| `src/data/quizzes/config.json` | `quizAutoGenerate: true`, `curatedFirst: true`. |
+
+UI surfaces (mounted in `App.tsx` between `<header>` and `<main>`):
+
+- **PathBriefing** — per-path briefing card.
+- **FormTemplatePicker + FormPlanner** — 4 template cards + section block strip.
+- **StylePackPicker + StyleWarnings** — radio group of 4 packs + inline violation list.
+- **TexturePanel** — 3 track mute toggles + counter-line toggle.
+- **MelodyLane + MelodyToolbar** — per-bar melody display above LiveScoreDisplay.
+- **CoComposePanel** — "what if?" suggestion with technique explanation.
+- **QuizPanel** — radio group; curated JSON first, auto-gen fallback.
+
+Composition state lives in `useSessionStore` (5 new fields: `melodyByStep`, `counterMelodyByStep`, `stylePackId`, `quizScore`, `feedbackHistory`). The `useFeedback` hook appends accept/reject events to `feedbackHistory` for the L9 learning loop.
+
+For the full design + implementation plan, see:
+
+- `docs/COMPOSITION-ENGINE-PLAN.md` — 9 layers × 7 sections each + roadmap + risks
+- `docs/COMPOSITION-MVP-PLAN.md` — 28 bite-sized tasks (Phase 1 pure logic, Phase 2 UI, Phase 3 verify)
+- `docs/COMPOSITION.md` — user-facing feature tour
