@@ -124,7 +124,23 @@
       "synthetic_scale"
     ],
     "contourProfile": "angular",
-    "preferredStylePackId": "post-tonal"
+    "preferredStylePackId": "post-tonal",
+    "harmonicInfluence": [
+      {
+        "composerId": "bartok",
+        "composerName": "Bartók",
+        "devices": [
+          "Symmetrical scales",
+          "Quartal harmony",
+          "Polychords",
+          "Folk modes",
+          "Axis system (tritone)"
+        ],
+        "keyWork": "Music for Strings, Percussion and Celesta",
+        "romanExample": "Tonic axis A — C — Eb — F#",
+        "docsAnchor": "#bartok"
+      }
+    ]
   },
   {
     "id": "rachmaninov",
@@ -318,7 +334,23 @@
       "giant_steps_cycle"
     ],
     "contourProfile": "leaping",
-    "preferredStylePackId": "modal"
+    "preferredStylePackId": "modal",
+    "harmonicInfluence": [
+      {
+        "composerId": "john-coltrane",
+        "composerName": "John Coltrane",
+        "devices": [
+          "Coltrane changes",
+          "Major-third cycles",
+          "Modal jazz",
+          "Sheets of sound",
+          "Substitutions"
+        ],
+        "keyWork": "Giant Steps",
+        "romanExample": "I — V7/bVI — bVI — V7/bIII — bIII",
+        "docsAnchor": "#john-coltrane"
+      }
+    ]
   },
   {
     "id": "bach",
@@ -356,7 +388,21 @@
       "canon"
     ],
     "contourProfile": "stepwise",
-    "preferredStylePackId": "common-practice"
+    "preferredStylePackId": "common-practice",
+    "harmonicInfluence": [
+      {
+        "composerId": "wendy-carlos",
+        "composerName": "Wendy Carlos",
+        "devices": [
+          "Bach on Moog",
+          "Functional tonality",
+          "Just intonation exploration"
+        ],
+        "keyWork": "Switched-On Bach (Bach, WTC I Prelude No. 1)",
+        "romanExample": "I — ii4/2 — V6/5 — I",
+        "docsAnchor": "#wendy-carlos"
+      }
+    ]
   },
   {
     "id": "debussy",
@@ -394,7 +440,23 @@
       "mode_mixing"
     ],
     "contourProfile": "stepwise",
-    "preferredStylePackId": "modal"
+    "preferredStylePackId": "modal",
+    "harmonicInfluence": [
+      {
+        "composerId": "debussy",
+        "composerName": "Debussy",
+        "devices": [
+          "Non-functional harmony",
+          "Parallelism",
+          "Whole-tone and pentatonic scales",
+          "Modal color",
+          "Extended chords as sonority"
+        ],
+        "keyWork": "Voiles",
+        "romanExample": "Whole-tone on C (no function)",
+        "docsAnchor": "#debussy"
+      }
+    ]
   },
   {
     "id": "eno",
@@ -432,7 +494,23 @@
       "ambient_field"
     ],
     "contourProfile": "neutral",
-    "preferredStylePackId": "modal"
+    "preferredStylePackId": "modal",
+    "harmonicInfluence": [
+      {
+        "composerId": "brian-eno",
+        "composerName": "Brian Eno",
+        "devices": [
+          "Ambient music",
+          "Drones",
+          "Static harmony",
+          "Generative systems",
+          "Texture over progression"
+        ],
+        "keyWork": "Music for Airports",
+        "romanExample": "Layered loops, no functional progression",
+        "docsAnchor": "#brian-eno"
+      }
+    ]
   },
   {
     "id": "glass",
@@ -470,7 +548,23 @@
       "gradual_substitution"
     ],
     "contourProfile": "stepwise",
-    "preferredStylePackId": "modal"
+    "preferredStylePackId": "modal",
+    "harmonicInfluence": [
+      {
+        "composerId": "minimalists",
+        "composerName": "Minimalists",
+        "devices": [
+          "Static harmony",
+          "Repetition",
+          "Phasing",
+          "Additive process",
+          "Modal tonality"
+        ],
+        "keyWork": "Einstein on the Beach (Glass)",
+        "romanExample": "C — Am — F — G (loop)",
+        "docsAnchor": "#minimalists"
+      }
+    ]
   },
   {
     "id": "monk",
@@ -546,7 +640,23 @@
       "cool_inversion"
     ],
     "contourProfile": "leaping",
-    "preferredStylePackId": "modal"
+    "preferredStylePackId": "modal",
+    "harmonicInfluence": [
+      {
+        "composerId": "miles-davis",
+        "composerName": "Miles Davis",
+        "devices": [
+          "Modal jazz",
+          "Fewer chord changes",
+          "Quartal voicings",
+          "Static vamps",
+          "Chromaticism"
+        ],
+        "keyWork": "So What",
+        "romanExample": "i7 (D Dorian) — bii7 (Eb Dorian)",
+        "docsAnchor": "#miles-davis"
+      }
+    ]
   },
   {
     "id": "chet",

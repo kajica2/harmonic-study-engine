@@ -50,6 +50,28 @@ export interface PersonaRules {
 
 export type ContourProfile = "leaping" | "stepwise" | "angular" | "neutral";
 
+/**
+ * Reference to a composer in `docs/COMPOSER-HARMONIC-INNOVATIONS.md` whose
+ * harmonic devices influenced this persona. Lightweight — the full chart
+ * is loaded from the docs / `composerCatalog.ts` on demand. v1 schema:
+ *   - composerId: matches the `### <name>` heading in the docs page
+ *     (lowercase, kebab-case — e.g. "the-beatles", "john-coltrane").
+ *   - devices: subset of that composer's harmonic-innovation bullets that
+ *     apply to this persona's playing language.
+ *   - keyWork: the most-cited representative piece.
+ *   - romanExample: one bar from the chart (e.g. "bII" or "i — bVI — bVII"),
+ *     shown in the PersonaLensBanner as a one-line signature.
+ */
+export interface ComposerHarmonicInfluence {
+  composerId: string;
+  composerName: string;
+  devices: string[];
+  keyWork: string;
+  romanExample: string;
+  /** Optional link to the catalog section in the docs. */
+  docsAnchor?: string;
+}
+
 export interface Persona {
   id: string;
   name: string;
@@ -81,6 +103,18 @@ export interface Persona {
    * 2026-09-13 this is a SUGGESTION not a lock; user can pick any pack.
    */
   preferredStylePackId?: string;
+  /**
+   * Harmonic-influence entries from `docs/COMPOSER-HARMONIC-INNOVATIONS.md`
+   * that this persona's language is shaped by. Each entry is a lightweight
+   * reference (composer id + device list + key-work) — the full chart lives
+   * in the docs page and is loaded on demand via `composerCatalog.ts`.
+   *
+   * Optional — personas without the field show no harmonic-influence
+   * section in the PersonaLensBanner. Currently mapped for the 7 personas
+   * that overlap directly with a composer in the catalog (bach, coltrane,
+   * debussy, eno, glass, miles, scriabin → Bartók via axis system).
+   */
+  harmonicInfluence?: ComposerHarmonicInfluence[];
   rules?: PersonaRules;
   // Original fields
   originalSongId: string; // references PATH id
