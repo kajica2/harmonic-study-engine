@@ -4,7 +4,9 @@ import {
   hasBehavioralLens,
   lensForPersona,
 } from "../lib/personaLens";
-import { Sparkles } from "lucide-react";
+import { Sparkles, BookOpen } from "lucide-react";
+import { PERSONAS } from "../lib/personas";
+import type { ComposerHarmonicInfluence } from "../lib/personas";
 
 /**
  * PersonaLensBanner — surfaces the curated behavioral prompt for
@@ -40,6 +42,9 @@ export const PersonaLensBanner: React.FC<PersonaLensBannerProps> = ({
         : personaId === "miles"
           ? "Miles"
           : (personaId ?? "");
+  const persona = PERSONAS.find((p) => p.id === personaId);
+  const influence: ComposerHarmonicInfluence | undefined =
+    persona?.harmonicInfluence?.[0];
 
   return (
     <div
@@ -64,6 +69,30 @@ export const PersonaLensBanner: React.FC<PersonaLensBannerProps> = ({
         <p className="text-sm text-neutral-200 mt-0.5 leading-snug">
           {stepPrompt ?? lens.prompt}
         </p>
+        {influence && (
+          <div
+            className="mt-1.5 flex items-baseline gap-1.5 text-[11px] font-mono text-neutral-400"
+            data-testid="harmonic-influence"
+          >
+            <BookOpen
+              size={11}
+              className="flex-shrink-0 text-neutral-500"
+              aria-hidden
+            />
+            <span>
+              <span className="text-neutral-500">harmonic influence:</span>{" "}
+              <span className="text-neutral-300">
+                {influence.composerName}
+              </span>
+              {" · "}
+              <span className="italic">{influence.keyWork}</span>
+              {" · "}
+              <span className="text-[color:var(--color-brand-strong)]">
+                {influence.romanExample}
+              </span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
