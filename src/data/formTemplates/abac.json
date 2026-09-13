@@ -1,0 +1,11 @@
+{
+  "id": "abac",
+  "name": "ABAC (32-bar)",
+  "description": "AABA variant with a distinct C section instead of an A' return. Common in show tunes.",
+  "sections": [
+    { "id": "A", "length": 8, "cadence": "ii-V-I" },
+    { "id": "B", "length": 8, "cadence": "V/V-V-I" },
+    { "id": "A", "length": 8, "cadence": "ii-V-I" },
+    { "id": "C", "length": 8, "cadence": "plagal" }
+  ]
+}
