@@ -16,11 +16,18 @@
 
 import { mulberry32 } from "../magenta/noise";
 import { analyzeChord, type ChordAnalysis } from "./theory";
+import { PERSONAS } from "./personas";
 
 export interface ProposeAlternativeArgs {
   pathId: string;
   barIndex: number;
   seed: number;
+  /**
+   * Optional: when supplied, the picker up-weights techniques
+   * associated with this persona's harmonic influence (per
+   * `Persona.harmonicInfluence[0].composerId`).
+   */
+  personaId?: string;
 }
 
 export interface AlternativeChord {
@@ -42,20 +49,115 @@ const TECHNIQUES = [
   "secondary_dominant",
   "passing_diminished",
   "axis_modulation",
+  "coltrane_change",
 ] as const;
 
 type Technique = (typeof TECHNIQUES)[number];
 
 /**
+ * Per-persona technique weights. When a personaId is supplied to
+ * `proposeAlternative`, the picker up-weights techniques associated
+ * with that persona's harmonic influence (per `Persona.harmonicInfluence`).
+ *
+ * The persona's `composerId` is mapped to a bias — e.g. Coltrane's
+ * `john-coltrane` influence up-weights `tritone_substitution` and
+ * `coltrane_change`; Bartók's `bartok` influence up-weights
+ * `axis_modulation`.
+ *
+ * Bias values are > 1.0 to increase pick probability; 1.0 = neutral.
+ * Sum doesn't need to be 1 — the picker normalizes.
+ */
+const PERSONA_TECHNIQUE_BIAS: Record<string, Partial<Record<Technique, number>>> = {
+  // Bach → Wendy Carlos (functional tonality, voice-leading)
+  "wendy-carlos": {
+    secondary_dominant: 2.0,
+    tritone_substitution: 1.5,
+  },
+  // Coltrane → John Coltrane (major-third cycles, tritone subs, Giant Steps)
+  "john-coltrane": {
+    coltrane_change: 3.0,
+    tritone_substitution: 2.0,
+  },
+  // Debussy → Debussy (modal mixture, parallel color)
+  "debussy": {
+    modal_mixture: 3.0,
+    axis_modulation: 1.5,
+  },
+  // Eno → Brian Eno (static, non-functional — favors techniques that
+  // produce unusual substitutions)
+  "brian-eno": {
+    passing_diminished: 1.5,
+    axis_modulation: 1.5,
+  },
+  // Glass → Minimalists (drones, slow harmonic change — modal)
+  "minimalists": {
+    modal_mixture: 2.0,
+  },
+  // Miles → Miles Davis (modal jazz, quartal)
+  "miles-davis": {
+    modal_mixture: 2.0,
+    passing_diminished: 1.5,
+  },
+  // Scriabin → Bartók (axis system, symmetrical scales)
+  "bartok": {
+    axis_modulation: 3.0,
+    modal_mixture: 1.5,
+  },
+};
+
+/**
  * Pick a technique deterministically from (pathId, barIndex, seed).
- * The same triple always returns the same technique — useful for
- * reproducible suggestions across reloads.
+ * When `personaId` is supplied and matches a bias map, weighted
+ * sampling favors the persona's preferred techniques. The same
+ * (pathId, barIndex, seed, personaId) tuple always returns the same
+ * technique — useful for reproducible suggestions across reloads.
  */
 function pickTechnique(args: ProposeAlternativeArgs): Technique {
-  const seed = hashStringToSeed(args.pathId) ^ ((args.barIndex + 1) * 0x9e3779b9) ^ (args.seed >>> 0);
-  const rng = mulberry32(seed >>> 0);
-  const idx = Math.floor(rng() * TECHNIQUES.length);
-  return TECHNIQUES[idx];
+  const baseSeed =
+    hashStringToSeed(args.pathId) ^
+    ((args.barIndex + 1) * 0x9e3779b9) ^
+    (args.seed >>> 0);
+  const personaSeed = args.personaId
+    ? hashStringToSeed(args.personaId)
+    : 0;
+  const rng = mulberry32((baseSeed ^ personaSeed) >>> 0);
+
+  // Build weighted pool from TECHNIQUES × bias
+  const weights = TECHNIQUES.map((t) => {
+    let w = 1.0;
+    if (args.personaId) {
+      const bias =
+        PERSONA_TECHNIQUE_BIAS[args.personaId] ??
+        // Try the persona's mapped composer id as fallback
+        // (Persona.harmonicInfluence[0].composerId)
+        lookupComposerBiasForPersona(args.personaId);
+      if (bias && bias[t]) w *= bias[t]!;
+    }
+    return w;
+  });
+  const totalWeight = weights.reduce((s, w) => s + w, 0);
+  let pick = rng() * totalWeight;
+  for (let i = 0; i < TECHNIQUES.length; i++) {
+    pick -= weights[i];
+    if (pick <= 0) return TECHNIQUES[i];
+  }
+  return TECHNIQUES[TECHNIQUES.length - 1];
+}
+
+/**
+ * Resolve a personaId to its persona's mapped composer bias (if any).
+ * Looks up `Persona.harmonicInfluence[0].composerId` and uses that as
+ * the key into `PERSONA_TECHNIQUE_BIAS`. Returns undefined if the
+ * persona has no influence entry.
+ */
+function lookupComposerBiasForPersona(
+  personaId: string,
+): Partial<Record<Technique, number>> | undefined {
+  // Lazy import to avoid a circular dep — personas.ts → composerCatalog.ts
+  // (we don't import composerCatalog here, just PERSONAS).
+  const persona = PERSONAS.find((p) => p.id === personaId);
+  const composerId = persona?.harmonicInfluence?.[0]?.composerId;
+  return composerId ? PERSONA_TECHNIQUE_BIAS[composerId] : undefined;
 }
 
 /** Tiny FNV-1a-ish hash so pathId seeds aren't zero for empty strings. */
@@ -175,6 +277,20 @@ function applyTechnique(active: ChordAnalysis, technique: Technique): {
         explanation: `Axis modulation (Bartók): ${active.rootName} (I) → ${PC_NAME[axisRoot]} (I a tritone away). The two keys are axis-related — they share no functional dominant, so the motion is symmetrical rather than tonal. Bartók's tonic axis (A–C–Eb–F#) is the canonical example.`,
       };
     }
+    case "coltrane_change": {
+      // Coltrane-style major-third modulation: from a tonic chord, move
+      // up a major third (e.g. Bmaj7 → D7/Gmaj7). The dominant of the
+      // new key resolves to the new tonic. The major-third cycle (B →
+      // G → Eb → B) is the structural device in Giant Steps.
+      if (active.function !== "tonic") return null;
+      const majorThirdUp = (rootPc + 4) % 12;
+      const quality =
+        active.family === "minor" ? "min7" : active.family === "major" ? "maj7" : "dom7";
+      return {
+        notes: chordFromQuality(majorThirdUp, quality),
+        explanation: `Coltrane change: ${active.rootName} (I) → ${PC_NAME[majorThirdUp]} (I a major third up). The major-third cycle (B → G → Eb → B) is the structural device in Giant Steps — each new tonic is approached by its own V7, creating rapid modulation by major thirds rather than fifths.`,
+      };
+    }
   }
 }
 
@@ -225,6 +341,7 @@ function humanize(t: Technique): string {
     secondary_dominant: "Secondary dominant",
     passing_diminished: "Passing diminished",
     axis_modulation: "Axis modulation",
+    coltrane_change: "Coltrane change",
   }[t];
 }
 

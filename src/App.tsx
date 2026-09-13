@@ -1194,7 +1194,9 @@ export default function App() {
           />
         )}
 
-        {/* CoComposePanel — "what if?" reharmonization suggestion. */}
+        {/* CoComposePanel — "what if?" reharmonization suggestion.
+            personaId biases the technique picker (Coltrane → major-third
+            modulations, Scriabin → Bartók axis modulations, etc.). */}
         {(() => {
           const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
           const seed = (path.id.charCodeAt(0) || 0) ^ ((activeBar + 1) * 0x9e3779b9);
@@ -1203,6 +1205,7 @@ export default function App() {
               pathId={path.id}
               barIndex={activeBar}
               seed={seed >>> 0}
+              personaId={selectedPersonaId}
             />
           );
         })()}

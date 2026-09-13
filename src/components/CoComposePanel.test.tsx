@@ -47,6 +47,21 @@ describe("CoComposePanel", () => {
     // The header line includes the technique slug, formatted with underscores → spaces
     expect(region.textContent).toMatch(/(tritone substitution|modal mixture|secondary dominant|passing diminished)/i);
   });
+
+  it("accepts an optional personaId prop without crashing", () => {
+    render(
+      <CoComposePanel
+        pathId="path-1"
+        barIndex={4}
+        seed={42}
+        personaId="coltrane"
+      />,
+    );
+    // The region renders with a technique label (any of the 6 is fine —
+    // Coltrane's bias toward coltrane_change + tritone_substitution
+    // doesn't change the rendering shape, only the picker probability).
+    expect(screen.getByRole("region")).toBeTruthy();
+  });
 });
 
 // Re-import for the onAccept type
