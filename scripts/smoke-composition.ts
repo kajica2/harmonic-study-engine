@@ -63,6 +63,13 @@ const checks = [
     name: "SheetMusicExportButton",
     selector: 'button[aria-label*="sheet music PDF" i]',
   },
+  // Backing-track picker — user can drop in a .mov / .mpg / .mp4 as
+  // an audio source. The trigger button is visible in the practice
+  // toolbar next to the Play Along chip.
+  {
+    name: "BackingTrackPicker",
+    selector: '[data-testid="backing-track-load"], [data-testid="backing-track-toggle"]',
+  },
 ];
 
 const results: Array<{ name: string; present: boolean }> = [];

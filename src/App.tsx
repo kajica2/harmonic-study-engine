@@ -23,7 +23,7 @@ function triadFromRoot(
   return notes;
 }
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Play,
   Pause,
@@ -122,6 +122,8 @@ import { LeadSheet } from "./components/LeadSheet";
 import { ModalShell, useModalLabel } from "./components/ModalShell";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
+import { BackingTrackPicker } from "./components/BackingTrackPicker";
+import type { BackingTrackFile } from "./lib/backingTrack";
 import {
   PathCatalog,
   type BehavioralRuleId,
@@ -245,6 +247,32 @@ export default function App() {
   const canvasSize = useCanvasSize(canvasContainerRef, { width: 800, height: 400 });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
+  // User-provided audio source — when loaded, plays alongside (or
+  // instead of) the synth during practice. See BackingTrackPicker.
+  const [backingTrack, setBackingTrack] = useState<BackingTrackFile | null>(
+    null,
+  );
+  const [backingTrackMuted, setBackingTrackMuted] = useState(false);
+  // Revoke the previous object URL when the track is replaced or on
+  // unmount, so we don't leak blob URLs.
+  useEffect(() => {
+    return () => {
+      if (backingTrack) URL.revokeObjectURL(backingTrack.url);
+    };
+  }, [backingTrack]);
+  const handleBackingTrackLoaded = useCallback((t: BackingTrackFile) => {
+    setBackingTrack((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return t;
+    });
+    setBackingTrackMuted(false);
+  }, []);
+  const handleBackingTrackUnloaded = useCallback(() => {
+    setBackingTrack((prev) => {
+      if (prev) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  }, []);
   const [isDDSPLoading, setIsDDSPLoading] = useState(false);
   const ddspAction = useAsyncAction();
   const [ddspServerOnline, setDDSPServerOnline] = useState(false);
@@ -2582,6 +2610,14 @@ export default function App() {
                     >
                       {audioEngine.melodyMuted ? "○ Play Along" : "● Play Along"}
                     </ToolChip>
+                    <BackingTrackPicker
+                      track={backingTrack}
+                      onLoaded={handleBackingTrackLoaded}
+                      onUnloaded={handleBackingTrackUnloaded}
+                      isPlayingAuto={isPlayingAuto}
+                      muted={backingTrackMuted}
+                      onToggleMuted={() => setBackingTrackMuted((m) => !m)}
+                    />
                     <ToolChip
                       active={isLooping}
                       onClick={() => setIsLooping(!isLooping)}
