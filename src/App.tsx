@@ -58,6 +58,12 @@ import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
 import { exportToMidiFile } from "./lib/midiExport";
 import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
 import { STEPS_PER_BAR } from "./lib/paths";
+import {
+  planForm,
+  MIN_PATH_BARS,
+  MAX_PATH_BARS,
+  type FormTemplateId,
+} from "./lib/formPlanner";
 import { suggestMelody, pcSet } from "./lib/melodyMarkov";
 import { useAsyncAction } from "./lib/useAsyncAction";
 import { InlineErrorPill } from "./components/InlineStatus";
@@ -71,6 +77,8 @@ import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
 import { PersonaLensBanner } from "./components/PersonaLensBanner";
 import { TexturePanel } from "./components/TexturePanel";
+import { FormPlanner } from "./components/FormPlanner";
+import { FormTemplatePicker } from "./components/FormTemplatePicker";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore } from "./hooks/useSessionStore";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
@@ -1121,6 +1129,25 @@ export default function App() {
 
         {/* Per-path briefing — explains the practice loop for the active path. */}
         <PathBriefing pathId={path.id} />
+
+        {/* Form planner — MVP shows a default AABA plan; v1 will let the
+            user pick + reorder. The picker lets the user see all 4 templates. */}
+        {(() => {
+          const barCount = Math.max(MIN_PATH_BARS, Math.min(MAX_PATH_BARS, Math.floor(path.steps.length / 4)));
+          const result = planForm({ bars: barCount, template: "aaba" });
+          const plan = result.ok ? result.plan : null;
+          return (
+            <>
+              <FormTemplatePicker
+                activeId={null}
+                onPick={() => {
+                  /* MVP: no-op; v1 will call setPlan(planForm({...})) */
+                }}
+              />
+              <FormPlanner plan={plan} />
+            </>
+          );
+        })()}
 
         {/* Persona behavioral lens — shows when the active persona
             has a documented behavioral rule set (Bach/Coltrane/Miles). */}
