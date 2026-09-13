@@ -1322,7 +1322,37 @@ export const PATHS: HarmonicPath[] = [...RAW_PATHS, ...CONCEPT_PATHS].map((p) =>
   return padded;
 });
 
-export const ALL_PATHS: HarmonicPath[] = [...PATHS, ...STUDIES_PATHS];
+// Composer-catalog v2: 7 19th-century composers, seeded from the
+// harmonic-innovations catalog. Each path is a 24-bar study reduction
+// of the composer's signature harmonic device (per the catalog).
+// Section-only composers (Debussy, Stravinsky, Schoenberg, Bartók,
+// Cage, Stockhausen, Minimalists, Coleman, Eno, Shankar) need
+// specialized synthesis (v2 work).
+//
+// composerPathSeed.ts depends on pathsHelpers.ts (NOT paths.ts) to
+// break the static circular dependency. We import the seed function
+// directly here at the bottom of the file so all other exports
+// (PATHS, STUDIES_PATHS, ALL_PATHS) are in place when we call it.
+import { seedPathFromComposer } from "./composerPathSeed";
+
+export const COMPOSER_PATHS: HarmonicPath[] = [
+  "beethoven",
+  "schubert",
+  "berlioz",
+  "chopin",
+  "liszt",
+  "wagner",
+  "verdi",
+].flatMap((id) => {
+  const path = seedPathFromComposer(id as Parameters<typeof seedPathFromComposer>[0]);
+  return path ? [path] : [];
+});
+
+export const ALL_PATHS: HarmonicPath[] = [
+  ...PATHS,
+  ...STUDIES_PATHS,
+  ...COMPOSER_PATHS,
+];
 
 /**
  * Look up a HarmonicPath across both curated PATHS and STUDIES_PATHS.
@@ -1331,7 +1361,11 @@ export const ALL_PATHS: HarmonicPath[] = [...PATHS, ...STUDIES_PATHS];
  * browser.
  */
 export function findPathById(id: string): HarmonicPath | undefined {
-  return ALL_PATHS.find((p) => p.id === id) ?? STUDIES_PATHS.find((p) => p.id === id);
+  return (
+    ALL_PATHS.find((p) => p.id === id) ??
+    STUDIES_PATHS.find((p) => p.id === id) ??
+    COMPOSER_PATHS.find((p) => p.id === id)
+  );
 }
 
 // ─── Practice Sets ─────────────────────────────────────────────────────────────

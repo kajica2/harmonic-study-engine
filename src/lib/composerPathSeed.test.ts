@@ -6,7 +6,11 @@ import {
   BAR_COMPOSER_IDS,
   SECTION_COMPOSER_IDS,
 } from "./composerPathSeed";
-import { MIN_PATH_BARS, MAX_PATH_BARS, STEPS_PER_BAR } from "./paths";
+import {
+  MIN_PATH_BARS,
+  MAX_PATH_BARS,
+  STEPS_PER_BAR,
+} from "./pathsHelpers";
 
 describe("composerPathSeed", () => {
   describe("seedPathFromComposer", () => {
