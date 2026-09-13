@@ -187,7 +187,8 @@ function voiceLeading(active: number[], alt: number[]): number {
   return d;
 }
 
-/** Build a chord from a root pc and a quality. MIDI pitches in root position. */
+/**
+ * Build a chord from a root pc and a quality. MIDI pitches in root position. */
 function chordFromQuality(rootPc: number, quality: string, octave = 4): number[] {
   const root = rootPc + 12 * (octave + 1);
   const intervals: Record<string, number[]> = {
@@ -198,6 +199,82 @@ function chordFromQuality(rootPc: number, quality: string, octave = 4): number[]
     "min7b5": [0, 3, 6, 10],
   };
   return (intervals[quality] ?? [0, 4, 7, 10]).map((iv) => root + iv);
+}
+
+/**
+ * Re-bass a root-position chord so the bass note is the closest
+ * pitch class (in octave 3) to the active chord's bass. Keeps the
+ * same pitch-class set — only the inversion changes. This is the
+ * v1 criterion #3 fix: root-changing techniques (tritone sub,
+ * secondary dominant, axis modulation) produce alt chords whose
+ * theoretical bass is 5-7 semitones from the active bass. By
+ * inverting the alt so its bass is the closest available pc to the
+ * active bass, the bass motion drops to ≤ 6 semitones (the maximum
+ * possible given the pitch-class set) and the upper voices stay in
+ * the same register.
+ *
+ * Returns the re-bassed MIDI notes, ascending.
+ */
+function reBassToActive(activeNotes: number[], altNotes: number[]): number[] {
+  if (altNotes.length === 0) return altNotes;
+  const activeBass = Math.min(...activeNotes);
+  const activeBassPc = ((activeBass % 12) + 12) % 12;
+  // Find the pitch class in the alt whose pc is closest to activeBassPc.
+  const altPcs = [...new Set(altNotes.map((n) => ((n % 12) + 12) % 12))];
+  let bestPc = altPcs[0];
+  let bestDist = Infinity;
+  for (const pc of altPcs) {
+    // Circular distance on the chromatic circle.
+    const d = Math.min(
+      Math.abs(pc - activeBassPc),
+      12 - Math.abs(pc - activeBassPc),
+    );
+    if (d < bestDist) {
+      bestDist = d;
+      bestPc = pc;
+    }
+  }
+  // Place the new bass in octave 3 (MIDI 48-59) so it's near the
+  // typical active-bass range (MIDI 36-60 from the test fixture).
+  // For active bass in low register, octave 2 (36-47). Use whichever
+  // is closer to activeBass.
+  const targetBassOctave =
+    Math.abs(activeBass - (bestPc + 36)) <
+    Math.abs(activeBass - (bestPc + 48))
+      ? 36
+      : 48;
+  const newBass = bestPc + targetBassOctave;
+  // Build remaining voices in ascending order, each at the octave
+  // closest to activeBass for that pc.
+  const remainingPcs = altPcs.filter((pc) => pc !== bestPc);
+  const upper: number[] = [];
+  for (const pc of remainingPcs) {
+    // Try octaves 4, 3, 5 (60-71, 48-59, 72-83) — pick the closest
+    // to activeBass that yields a note > newBass.
+    const candidates = [
+      pc + 48,
+      pc + 60,
+      pc + 72,
+      pc + 36,
+    ].filter((n) => n > newBass);
+    if (candidates.length === 0) {
+      // All candidates ≤ newBass — pick the highest one.
+      upper.push(pc + 72);
+    } else {
+      // Pick closest to activeBass.
+      let best = candidates[0];
+      let bestD = Math.abs(best - activeBass);
+      for (const c of candidates) {
+        const dd = Math.abs(c - activeBass);
+        if (dd < bestD) {
+          bestD = dd;
+          best = c;
+        }
+      }
+      upper.push(best);
+    }
+  }
+  return [newBass, ...upper.sort((a, b) => a - b)];
 }
 
 /**
@@ -332,13 +409,14 @@ export function proposeAlternative(args: ProposeAlternativeArgs): AlternativeCho
     };
   }
 
-  const alt = analyzeChord(applied.notes);
-  const distance = voiceLeading(activeNotes, applied.notes);
+  const reBassed = reBassToActive(activeNotes, applied.notes);
+  const alt = analyzeChord(reBassed);
+  const distance = voiceLeading(activeNotes, reBassed);
   return {
     active,
     activeNotes,
     alternative: alt,
-    alternativeNotes: applied.notes,
+    alternativeNotes: reBassed,
     technique,
     explanation: applied.explanation,
     voiceLeadingDistance: distance,

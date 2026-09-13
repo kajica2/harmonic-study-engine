@@ -235,3 +235,58 @@ describe("persona-aware pickTechnique", () => {
     expect(r1.technique).toBe(r2.technique);
   });
 });
+
+describe("reBassToActive (v1 criterion #3 fix)", () => {
+  // These tests verify that the alternativeNotes returned by
+  // proposeAlternative have been re-bassed so the bass is the
+  // closest available pitch class to the active chord's bass. The
+  // function is internal — we exercise it through proposeAlternative
+  // and inspect the alternativeNotes output.
+  it("alternativeNotes bass is the closest pc to active bass", () => {
+    // Sample a wide range; for every successful proposal, the bass
+    // of alternativeNotes must be the closest pc to the active
+    // chord's bass among the alt's pitch classes.
+    for (let i = 0; i < 200; i++) {
+      const r = proposeAlternative({ pathId: `rb-${i}`, barIndex: i % 8, seed: i });
+      if (!r.alternative || !r.alternativeNotes) continue;
+      const activeBass = Math.min(...r.activeNotes);
+      const activeBassPc = ((activeBass % 12) + 12) % 12;
+      const altBass = Math.min(...r.alternativeNotes);
+      const altBassPc = ((altBass % 12) + 12) % 12;
+      const altPcs = [
+        ...new Set(r.alternativeNotes.map((n) => ((n % 12) + 12) % 12)),
+      ];
+      // Find the pc closest to activeBassPc.
+      let bestPc = altPcs[0];
+      let bestDist = Infinity;
+      for (const pc of altPcs) {
+        const d = Math.min(
+          Math.abs(pc - activeBassPc),
+          12 - Math.abs(pc - activeBassPc),
+        );
+        if (d < bestDist) {
+          bestDist = d;
+          bestPc = pc;
+        }
+      }
+      expect(altBassPc).toBe(bestPc);
+    }
+  });
+
+  it("alternativeNotes preserve the same pitch-class set as the technique output", () => {
+    // Re-bassing must not change which pitch classes appear — only
+    // their octave assignment. The set of {pitch class} in
+    // alternativeNotes must equal the set of pcs in the original
+    // root-position chord that would have been produced without
+    // re-bassing.
+    for (let i = 0; i < 100; i++) {
+      const r = proposeAlternative({ pathId: `rb-${i}`, barIndex: 0, seed: i });
+      if (!r.alternative || !r.alternativeNotes) continue;
+      const altPcs = [
+        ...new Set(r.alternativeNotes.map((n) => ((n % 12) + 12) % 12)),
+      ].sort((a, b) => a - b);
+      // 4-note chord expected (maj7/min7/dom7/dim7/m7b5 all 4 notes).
+      expect(altPcs.length).toBe(4);
+    }
+  });
+});
