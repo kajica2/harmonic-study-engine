@@ -16,6 +16,9 @@ interface CoComposePanelProps {
   pathId: string;
   barIndex: number;
   seed: number;
+  /** Optional: personaId biases the technique picker toward the persona's
+   *  harmonic influence. Wired from App.tsx via the active persona. */
+  personaId?: string;
   onAccept?: (alternative: AlternativeChord) => void;
 }
 
@@ -30,9 +33,10 @@ export const CoComposePanel: React.FC<CoComposePanelProps> = ({
   pathId,
   barIndex,
   seed,
+  personaId,
   onAccept,
 }) => {
-  const alt = proposeAlternative({ pathId, barIndex, seed });
+  const alt = proposeAlternative({ pathId, barIndex, seed, personaId });
 
   return (
     <section

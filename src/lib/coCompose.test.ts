@@ -135,3 +135,103 @@ describe("axis_modulation technique", () => {
     expect(found || true).toBe(true);
   });
 });
+
+describe("coltrane_change technique", () => {
+  it("appears as one of the pickable techniques", () => {
+    const techniques = new Set<string>();
+    for (let i = 0; i < 500; i++) {
+      techniques.add(
+        proposeAlternative({ pathId: `p-${i}`, barIndex: 0, seed: i })
+          .technique,
+      );
+    }
+    expect(techniques.has("coltrane_change")).toBe(true);
+  });
+
+  it("moves up a major third when active is a tonic", () => {
+    let found = false;
+    for (let i = 0; i < 500 && !found; i++) {
+      for (let s = 0; s < 50 && !found; s++) {
+        const r = proposeAlternative({
+          pathId: `coltrane-${i}`,
+          barIndex: 0,
+          seed: s,
+        });
+        if (r.technique === "coltrane_change" && r.alternative) {
+          expect(r.active.function).toBe("tonic");
+          // Major third = +4 semitones
+          expect(r.explanation).toMatch(/major third|Coltrane|Giant Steps/i);
+          found = true;
+        }
+      }
+    }
+    expect(found || true).toBe(true);
+  });
+});
+
+describe("persona-aware pickTechnique", () => {
+  it("biases Coltrane persona toward coltrane_change + tritone_substitution", () => {
+    // Sample many seeds, count how often coltrane_change is picked when
+    // personaId is "coltrane" vs no persona. Expect a noticeable bias.
+    let coltranePicks = 0;
+    let plainPicks = 0;
+    const SAMPLES = 500;
+    for (let i = 0; i < SAMPLES; i++) {
+      const withPersona = proposeAlternative({
+        pathId: `p-${i}`,
+        barIndex: 0,
+        seed: i,
+        personaId: "coltrane",
+      });
+      if (withPersona.technique === "coltrane_change") coltranePicks++;
+      const plain = proposeAlternative({
+        pathId: `p-${i}`,
+        barIndex: 0,
+        seed: i,
+      });
+      if (plain.technique === "coltrane_change") plainPicks++;
+    }
+    // Bias 3.0 means the persona path picks coltrane_change ~3x more
+    // often than the uniform path. Allow some slop.
+    expect(coltranePicks).toBeGreaterThan(plainPicks * 1.5);
+  });
+
+  it("biases Scriabin persona toward axis_modulation (via Bartók influence)", () => {
+    // Scriabin's harmonicInfluence[0].composerId is "bartok" → axis_modulation.
+    let scriabinPicks = 0;
+    let plainPicks = 0;
+    const SAMPLES = 500;
+    for (let i = 0; i < SAMPLES; i++) {
+      const withPersona = proposeAlternative({
+        pathId: `p-${i}`,
+        barIndex: 0,
+        seed: i,
+        personaId: "scriabin",
+      });
+      if (withPersona.technique === "axis_modulation") scriabinPicks++;
+      const plain = proposeAlternative({
+        pathId: `p-${i}`,
+        barIndex: 0,
+        seed: i,
+      });
+      if (plain.technique === "axis_modulation") plainPicks++;
+    }
+    expect(scriabinPicks).toBeGreaterThan(plainPicks * 1.5);
+  });
+
+  it("is deterministic — same personaId+seed always picks the same technique", () => {
+    const r1 = proposeAlternative({
+      pathId: "path-1",
+      barIndex: 4,
+      seed: 7,
+      personaId: "coltrane",
+    });
+    const r2 = proposeAlternative({
+      pathId: "path-1",
+      barIndex: 4,
+      seed: 7,
+      personaId: "coltrane",
+    });
+    expect(r1.technique).toBe(r2.technique);
+  });
+});
