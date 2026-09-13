@@ -1,0 +1,10 @@
+{
+  "id": "post-tonal",
+  "name": "Post-tonal / atonal",
+  "description": "No tonal rules. All intervals and motions allowed. Useful for serialist composition and aleatoric sketches.",
+  "constraints": {
+    "forbiddenIntervals": [],
+    "allowedNCTs": ["passingTone", "neighborTone", "anticipation", "escapeTone", "suspension", "pedal", "modalMixture", "chromaticApproach"],
+    "requiredResolutions": []
+  }
+}

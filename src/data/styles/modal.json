@@ -1,0 +1,10 @@
+{
+  "id": "modal",
+  "name": "Modal (post-1950s jazz, folk, film)",
+  "description": "Non-functional harmony. Avoids leading-tone resolution. Parallel 5ths/octaves forbidden (preserved from common practice); modal mixture allowed.",
+  "constraints": {
+    "forbiddenIntervals": ["parallelFifth", "parallelOctave", "hiddenFifth", "hiddenOctave"],
+    "allowedNCTs": ["passingTone", "neighborTone", "anticipation", "escapeTone", "modalMixture"],
+    "requiredResolutions": []
+  }
+}
