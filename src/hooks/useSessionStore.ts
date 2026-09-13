@@ -20,6 +20,7 @@ import { InstrumentType } from "../lib/audio";
 import { BackingStyle } from "../lib/backingEngine";
 import { TimeSignature } from "../lib/rhythm";
 import { RenderMode } from "../lib/loopWav";
+import { VoicingId } from "../lib/theory";
 import { useHistory } from "../lib/useHistory";
 
 // ---------- setter type aliases ------------------------------------------
@@ -78,7 +79,7 @@ function loadBool(key: string, fallback: boolean): boolean {
 
 // ---------- store type ---------------------------------------------------
 
-export type VoicingType = "closed" | "open";
+export type VoicingType = VoicingId;
 export type ArpType =
   | "none"
   | "up"
@@ -290,7 +291,19 @@ export function useSessionStore(): SessionStore {
   // voicing
   const [voicingType, setVoicingType] = useState<VoicingType>(() => {
     const saved = loadString("synesthesia_voicingType", "closed");
-    return saved === "open" ? "open" : "closed";
+    // VoicingId has 9 valid values; coerce anything else to the default.
+    const valid: VoicingType[] = [
+      "closed",
+      "drop2",
+      "minimum_motion",
+      "spread",
+      "inversion",
+      "quartal",
+      "open_drop3",
+      "closed_dense",
+      "melody_first",
+    ];
+    return (valid.includes(saved as VoicingType) ? saved : "closed") as VoicingType;
   });
   const [optimizeVoiceLeading, setOptimizeVoiceLeading] = useState(() =>
     loadBool("synesthesia_optimizeVoiceLeading", false),

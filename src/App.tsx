@@ -28,8 +28,6 @@ import { audioEngine, InstrumentType } from "./lib/audio";
 import { rhythmEngine } from "./lib/rhythm";
 import { playbackClock } from "./lib/playbackClock";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
-import { useHistory } from "./lib/useHistory";
-import { usePersistedState } from "./lib/usePersistedState";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
@@ -86,98 +84,77 @@ import {
 // downloadText moved to src/lib/download.ts (extracted by main)
 
 export default function App() {
-  const [paths, setPaths] = useState<HarmonicPath[]>(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_paths");
-      const parsed = saved ? JSON.parse(saved) : PATHS;
-      // Backfill `name` alias from `title` for LiveScoreDisplay's abcjs
-      // T: header (and any other read site that expects it).
-      const backfilled = parsed.map((p: HarmonicPath) => ({
-        ...p,
-        name: p.name ?? p.title,
-      }));
-      // Merge in any curated PATHS that aren't already in the user's
-      // saved state. Songs (STUDIES_PATHS) are NOT auto-merged — they
-      // get pulled in only when the user picks one from the Masterclass
-      // picker, which prepends to paths state.
-      if (saved) {
-        const ids = new Set(backfilled.map((p: HarmonicPath) => p.id));
-        const missing = PATHS.filter((p) => !ids.has(p.id));
-        if (missing.length) return [...backfilled, ...missing];
-      }
-      return backfilled;
-    } catch {
-      return PATHS;
-    }
-  });
+  // Persistent session state — paths, transport, voicing, mutes,
+  // arpeggiator, persona, loop range, metronome, humanizer. Hydrated
+  // from localStorage by the hook (same `synesthesia_*` keys HEAD's
+  // useSessionStore used, so existing user prefs survive reload).
+  const session = useSessionStore();
+  const {
+    paths,
+    setPaths,
+    activePathIndex,
+    setActivePathIndex,
+    activeStepIndex,
+    setActiveStepIndex,
+    tempo,
+    setTempo,
+    tempoHistory,
+    wavMode,
+    setWavMode,
+    humanizeAmount,
+    setHumanizeAmount,
+    humanizePersonaId,
+    setHumanizePersonaId,
+    timeSignature,
+    setTimeSignature,
+    beatType,
+    setBeatType,
+    transposeShift,
+    setTransposeShift,
+    voicingType,
+    setVoicingType,
+    instrument,
+    setInstrument,
+    drumsMuted,
+    setDrumsMuted,
+    bassMuted,
+    setBassMuted,
+    pianoMuted,
+    setPianoMuted,
+    optimizeVoiceLeading,
+    setOptimizeVoiceLeading,
+    volume,
+    setVolume,
+    selectedPersonaId,
+    setSelectedPersonaId,
+    showTheoryLabels,
+    setShowTheoryLabels,
+    kbRange,
+    setKbRange,
+    arpType,
+    setArpType,
+    arpRate,
+    setArpRate,
+    arpGate,
+    setArpGate,
+    arpOctaves,
+    setArpOctaves,
+    isLooping,
+    setIsLooping,
+    loopStartBar,
+    setLoopStartBar,
+    loopEndBar,
+    setLoopEndBar,
+    metronomeOn,
+    setMetronomeOn,
+  } = session;
 
-  const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
-  const [recentSessions] = useState(() => getRecentSessions(5));
-  const [activePracticeSet, setActivePracticeSet] = useState<{
-    set: Parameters<typeof PracticeSessionPlayer>[0]["set"];
-    options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
-  } | null>(null);
 
-  const [activePathIndex, setActivePathIndex] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_activePathIndex");
-      if (saved !== null) {
-        const val = Number(saved);
-        const savedPaths = localStorage.getItem("synesthesia_paths");
-        const currentPaths = savedPaths ? JSON.parse(savedPaths) : PATHS;
-        if (val >= 0 && val < currentPaths.length) return val;
-      }
-    } catch {}
-    return 0;
-  });
+  const isLoopingRef = useRef(isLooping);
 
-  const [activeStepIndex, setActiveStepIndex] = useState(() => {
-    try {
-      const saved = localStorage.getItem("synesthesia_activeStepIndex");
-      if (saved !== null) {
-        const val = Number(saved);
-        const savedPaths = localStorage.getItem("synesthesia_paths");
-        const currentPaths = savedPaths ? JSON.parse(savedPaths) : PATHS;
-
-        const activePathIdxSaved = localStorage.getItem(
-          "synesthesia_activePathIndex",
-        );
-        const activePathIdx = activePathIdxSaved
-          ? Number(activePathIdxSaved)
-          : 0;
-
-        const currentPath = currentPaths[activePathIdx] || currentPaths[0];
-        if (currentPath && val >= 0 && val < currentPath.steps.length)
-          return val;
-      }
-    } catch {}
-    return 0;
-  });
-
-  const [activeMidis, setActiveMidis] = useState<number[]>([]);
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
-  // Phase 5 refactor: extracted to src/lib/useCanvasSize (tested in
-  // src/lib/useCanvasSize.test.ts). Listens to window.resize AND a
-  // ResizeObserver on the container so sidebar toggles trigger
-  // re-measurement, not just viewport changes.
-  const canvasSize = useCanvasSize(canvasContainerRef, { width: 800, height: 400 });
-
-  const [transposeShift, setTransposeShift] = usePersistedState<number>({
-    key: "synesthesia_transposeShift",
-    defaultValue: 0,
-    serialize: String,
-    deserialize: (raw) => Number(raw),
-  });
-
-  const [voicingType, setVoicingType] = usePersistedState<VoicingId>({
-    key: "synesthesia_voicingType",
-    defaultValue: "closed",
-    serialize: (v) => v,
-    // Guard against any stale legacy / corrupt value.
-    deserialize: (raw) =>
-      raw && (raw as VoicingId) in VOICINGS ? (raw as VoicingId) : "closed",
-  });
-
+  // Ephemeral transport state — MIDI device lists, recorder status,
+  // UI flags. These don't need to survive reload; the session
+  // hook owns everything that's user preference.
   const [midiOutputs, setMidiOutputs] = useState<any[]>([]);
   const [selectedMidiOutId, setSelectedMidiOutId] = useState<string>("");
   // Phase 5: MIDI input state — mirrors the MIDI Out pattern.
@@ -189,10 +166,14 @@ export default function App() {
   const [midiInStatus, setMidiInStatus] = useState<string>("");
   const midiInStatusTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [instrument, setInstrument] = usePersistedState<InstrumentType>({
-    key: "synesthesia_instrument",
-    defaultValue: "epiano",
-  });
+
+  // MIDI / recording ephemeral state
+  // MIDI / recording ephemeral state
+  const [activeMidis, setActiveMidis] = useState<number[]>([]);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Phase 5 refactor: extracted to src/lib/useCanvasSize. Listens to
+  // window.resize AND a ResizeObserver so sidebar toggles re-measure.
+  const canvasSize = useCanvasSize(canvasContainerRef, { width: 800, height: 400 });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
   const [isDDSPLoading, setIsDDSPLoading] = useState(false);
@@ -201,201 +182,64 @@ export default function App() {
   const [isRenderingWav, setIsRenderingWav] = useState(false);
   const [wavExportError, setWavExportError] = useState<string | null>(null);
   const [wavExportStatus, setWavExportStatus] = useState<string | null>(null);
-  const [wavMode, setWavMode] = usePersistedState<RenderMode>({
-    key: "synesthesia_wavMode",
-    defaultValue: "block",
-  });
   // Whether the OpenRouter API key is configured at build time.
-  // The Gemini/Cloud options are disabled in the UI when this is false.
   const hasOpenRouterKey = Boolean(
     (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined)?.trim(),
   );
 
-  const [tempo, setTempo, tempoHistory] = useHistory<number>(
-    () => {
-      try {
-        const saved = localStorage.getItem("synesthesia_tempo");
-        return saved !== null ? Number(saved) : 60;
-      } catch {
-        return 60;
-      }
-    },
-  );
-
-  const [volume, setVolume] = usePersistedState<number>({
-    key: "synesthesia_volume",
-    defaultValue: 50,
-    serialize: String,
-    deserialize: (raw) => Number(raw),
-  });
-
-  // Persona Sync
-  const [selectedPersonaId, setSelectedPersonaId] = usePersistedState<string>({
-    key: "synesthesia_selectedPersonaId",
-    defaultValue: "",
-  });
-
-  // Collapsible / Foldable states for space optimization
+  // UI panel / folding
   const [isArpFolded, setIsArpFolded] = useState(false);
-  const [isGenFolded, setIsGenFolded] = useState(true); // default folded to conserve screen height
+  const [isGenFolded, setIsGenFolded] = useState(true);
   const [activePanel, setActivePanel] = useState<"paths" | "practice" | "catalog">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
 
-  const [kbRange, setKbRange] = usePersistedState<{ from: number; to: number }>({
-    key: "synesthesia_kbRange",
-    defaultValue: { from: 36, to: 72 },
-  });
+  // Practice sets + recent sessions
+  const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
+  const [recentSessions] = useState(() => getRecentSessions(5));
+  const [activePracticeSet, setActivePracticeSet] = useState<{
+    set: Parameters<typeof PracticeSessionPlayer>[0]["set"];
+    options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
+  } | null>(null);
 
-  useEffect(() => {
-    audioEngine.setInstrument(instrument);
-  }, [instrument]);
-
-  const [timeSignature, setTimeSignature] = usePersistedState<
-    "4/4" | "6/8" | "7/8" | "11/4" | "tintal"
-  >({
-    key: "synesthesia_timeSignature",
-    defaultValue: "4/4",
-  });
-
-  const [beatType, setBeatType] = usePersistedState<BackingStyle>({
-    key: "synesthesia_beatType",
-    defaultValue: "off",
-    // The stored value was JSON-stringified, e.g. `"jazz"`. Migrate
-    // old beat-type strings to the new BackingStyle names.
-    deserialize: (raw) => {
-      const legacy = JSON.parse(raw) as string;
-      const map: Record<string, BackingStyle> = {
-        none: "off",
-        metronome: "off",
-        jazz: "swing",
-        bossa: "bossa",
-        techno: "funk",
-      };
-      return map[legacy] ?? "off";
-    },
-  });
-
-  // Per-track backing mute toggles. Default all on. Lets the user
-  // practice with just drums + piano comping (mute bass for bass
-  // practice) or strip everything but the bass (drums + piano muted).
-  // Stored as "1"/"0" (NOT JSON) to match the pre-existing key format
-  // and avoid a one-time migration for every returning user.
-  const [drumsMuted, setDrumsMuted] = usePersistedState<boolean>({
-    key: "synesthesia_drumsMuted",
-    defaultValue: false,
-    serialize: (v) => (v ? "1" : "0"),
-    deserialize: (raw) => raw === "1",
-  });
-  const [bassMuted, setBassMuted] = usePersistedState<boolean>({
-    key: "synesthesia_bassMuted",
-    defaultValue: false,
-    serialize: (v) => (v ? "1" : "0"),
-    deserialize: (raw) => raw === "1",
-  });
-  const [pianoMuted, setPianoMuted] = usePersistedState<boolean>({
-    key: "synesthesia_pianoMuted",
-    defaultValue: false,
-    serialize: (v) => (v ? "1" : "0"),
-    deserialize: (raw) => raw === "1",
-  });
-
+  // Generator knobs
   const [genLength, setGenLength] = useState(1);
   const [genComplexity, setGenComplexity] = useState(1);
 
-  const [optimizeVoiceLeading, setOptimizeVoiceLeading] = usePersistedState<boolean>({
-    key: "synesthesia_optimizeVoiceLeading",
-    defaultValue: false,
-  });
-
-  const [showTheoryLabels, setShowTheoryLabels] = usePersistedState<boolean>({
-    key: "synesthesia_showTheoryLabels",
-    defaultValue: false,
-  });
-
-  const [showImportExport, setShowImportExport] = useState(false);
-  const [showCheatsheet, setShowCheatsheet] = useState(false);
-
-  // Live bass notes from the backing engine. Empty until the
-  // user picks a backing style and presses Auto.
-  const bassMidis = useBassNotes();
-
-  const [arpType, setArpType] = usePersistedState<
-    | "none"
-    | "up"
-    | "down"
-    | "upDown"
-    | "downUp"
-    | "random"
-    | "converge"
-    | "diverge"
-  >({
-    key: "synesthesia_arpType",
-    defaultValue: "none",
-  });
-
-  const [arpRate, setArpRate] = usePersistedState<number>({
-    key: "synesthesia_arpRate",
-    defaultValue: 4,
-    serialize: String,
-    deserialize: (raw) => Number(raw),
-  });
-
-  const [arpGate, setArpGate] = usePersistedState<number>({
-    key: "synesthesia_arpGate",
-    defaultValue: 80,
-    serialize: String,
-    deserialize: (raw) => Number(raw),
-  });
-
-  const [arpOctaves, setArpOctaves] = usePersistedState<number>({
-    key: "synesthesia_arpOctaves",
-    defaultValue: 1,
-    serialize: String,
-    deserialize: (raw) => Number(raw),
-  });
-
-  // Diatonic-scale practice mode. "auto" picks the mode from
-  // the chord's quality (maj / min / mix / locrian), or the user
-  // can pin a specific mode. "scaleMode" controls which.
+  // Scale + drill ephemeral
   const [scaleMode, setScaleMode] = useState<string>("auto");
   const [scaleBusy, setScaleBusy] = useState(false);
   const [scaleModeOpen, setScaleModeOpen] = useState(false);
-
-  // Rhythm drill state — same pattern as scaleBusy. We keep it
-  // tiny because the drill is mostly self-scheduling on the audio
-  // clock; only the button label needs to flip.
   const [drillBusy, setDrillBusy] = useState(false);
   const [drillIter, setDrillIter] = useState<DrillSubdivision | null>(null);
 
-  const [isLooping, setIsLooping] = usePersistedState<boolean>({
-    key: "synesthesia_isLooping",
-    defaultValue: true,
-  });
-  const isLoopingRef = useRef(isLooping);
+  // Modal / inspector visibility
+  const [showImportExport, setShowImportExport] = useState(false);
+  const [showCheatsheet, setShowCheatsheet] = useState(false);
 
-  // Loop a sub-range of bars within a path. Both inclusive.
-  // `null` for loopEndBar means "loop to the end of the path".
-  // The user sets these by clicking bars in the bar strip (see
-  // PlaySessionRail). When `isLooping` is true, the auto-advance
-  // wraps between loopStartBar and loopEndBar instead of the full
-  // path. When isLooping is false, the range is ignored (full-path
-  // playback) but still visible as a hint.
-  const [loopStartBar, setLoopStartBar] = usePersistedState<number | null>({
-    key: "synesthesia_loopStartBar",
-    defaultValue: null,
-    serialize: (v) => String(v ?? ""),
-    deserialize: (raw) => (raw === "" ? null : Number(raw)),
-  });
-  const [loopEndBar, setLoopEndBar] = usePersistedState<number | null>({
-    key: "synesthesia_loopEndBar",
-    defaultValue: null,
-    serialize: (v) => String(v ?? ""),
-    deserialize: (raw) => (raw === "" ? null : Number(raw)),
-  });
+  // Bass-line tracking (live, not persisted)
+  const bassMidis = useBassNotes();
 
-  useEffect(() => {
-    isLoopingRef.current = isLooping;
-  }, [isLooping]);
+  // Etude state
+  const [etudeAlgorithm, setEtudeAlgorithm] = useState<EtudeAlgorithm>("magenta_rnn");
+  const [isGeneratingML, setIsGeneratingML] = useState(false);
+  const [etudeStatus, setEtudeStatus] = useState<string | null>(null);
+  const [hdStatus, setHdStatus] = useState<string | null>(null);
+  const [, setHDSoundsTick] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showRecordingModal, setShowRecordingModal] = useState(false);
+  const [isMediaRecording, setIsMediaRecording] = useState(false);
+  const [mediaRecordingStatus, setMediaRecordingStatus] = useState<string | null>(null);
+  const [mediaRecordingError, setMediaRecordingError] = useState<string | null>(null);
+  const [mediaRecordingElapsed, setMediaRecordingElapsed] = useState(0);
+  const [mp4BlobUrl, setMp4BlobUrl] = useState<string | null>(null);
+  const ddspApiUrl = (import.meta.env.VITE_DDSP_API as string | undefined) ||
+    "http://127.0.0.1:8765";
+  const backend = useDDSPProbe(ddspApiUrl);
+  const synesthesiaCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [showLeadSheet, setShowLeadSheet] = useState(false);
+  const [showChordInspector, setShowChordInspector] = useState(false);
+  const inspectorHistory = useMemo(() => makeInspectorHistory(), []);
+  const [showLiveScore, setShowLiveScore] = useState(true);
 
   const tm = useTimeoutRef();
 
@@ -880,7 +724,7 @@ export default function App() {
   }, [isPlayingAuto, beatType, tempo, path.steps.length]);
 
   // Sync the few remaining vanilla useState values to localStorage.
-  // Everything else is persisted by usePersistedState directly.
+  // Everything else is persisted by useSessionStore.
   useEffect(() => {
     try {
       localStorage.setItem("synesthesia_paths", JSON.stringify(paths));
@@ -905,35 +749,6 @@ export default function App() {
     setActiveStepIndex(0);
     setTransposeShift(0);
   };
-
-  const [etudeAlgorithm, setEtudeAlgorithm] =
-    useState<EtudeAlgorithm>("magenta_rnn");
-  const [isGeneratingML, setIsGeneratingML] = useState(false);
-  const [etudeStatus, setEtudeStatus] = useState<string | null>(null);
-  const [hdStatus, setHdStatus] = useState<string | null>(null);
-  const [, setHDSoundsTick] = useState(0); // force re-render when HD toggles
-
-  const [isRecording, setIsRecording] = useState(false);
-  const [showRecordingModal, setShowRecordingModal] = useState(false);
-
-  // Media recording (audio + canvas video → MP4 via server transcode)
-  const [isMediaRecording, setIsMediaRecording] = useState(false);
-  const [mediaRecordingStatus, setMediaRecordingStatus] = useState<
-    string | null
-  >(null);
-  const [mediaRecordingError, setMediaRecordingError] = useState<string | null>(
-    null,
-  );
-  const [mediaRecordingElapsed, setMediaRecordingElapsed] = useState(0);
-  const [mp4BlobUrl, setMp4BlobUrl] = useState<string | null>(null);
-  const ddspApiUrl =
-    (import.meta.env.VITE_DDSP_API as string | undefined) ||
-    "http://127.0.0.1:8765";
-  const synesthesiaCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [showLeadSheet, setShowLeadSheet] = useState(false);
-  const [showChordInspector, setShowChordInspector] = useState(false);
-  const inspectorHistory = useMemo(() => makeInspectorHistory(), []);
-  const [showLiveScore, setShowLiveScore] = useState(true);
 
   const handleGenerateEtude = async () => {
     const lengthMap = [8, 16, 32];
@@ -1301,6 +1116,8 @@ export default function App() {
           setTempo={setTempo}
           transposeShift={transposeShift}
           setTransposeShift={setTransposeShift}
+          metronomeOn={metronomeOn}
+          setMetronomeOn={setMetronomeOn}
           selectedPersonaId={selectedPersonaId}
           setSelectedPersonaId={setSelectedPersonaId}
           personas={PERSONAS}
