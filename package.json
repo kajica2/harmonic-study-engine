@@ -33,7 +33,8 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "soundfont-player": "^0.12.0",
-    "svg2pdf.js": "^2.7.0"
+    "svg2pdf.js": "^2.7.0",
+    "tone": "^15.1.22"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
