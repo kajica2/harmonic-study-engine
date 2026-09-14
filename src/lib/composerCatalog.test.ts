@@ -84,9 +84,9 @@ describe("composerCatalog", () => {
   });
 
   describe("getBarCharts", () => {
-    it("returns 16 bar charts (Beethoven → Piazzolla)", () => {
+    it("returns 32 bar charts (16 original + 9 jazz + 7 classical)", () => {
       const charts = getBarCharts();
-      expect(charts.length).toBe(16);
+      expect(charts.length).toBe(32);
     });
 
     it("every bar chart has non-empty bars and work context", () => {
@@ -126,26 +126,41 @@ describe("composerCatalog", () => {
   });
 
   describe("ALL_COMPOSER_IDS", () => {
-    it("contains all 26 composers across 4 eras", () => {
-      expect(ALL_COMPOSER_IDS.length).toBe(26);
+    it("contains all 42 composers across 5 eras", () => {
+      expect(ALL_COMPOSER_IDS.length).toBe(42);
     });
 
-    it("contains the 7 persona-mapped composers", () => {
-      // bach → wendy-carlos (functional tonality + electronic timbre)
-      // coltrane → john-coltrane (direct)
-      // debussy → debussy (direct)
-      // eno → brian-eno (direct)
-      // glass → minimalists (Glass is a member)
-      // miles → miles-davis (direct)
-      // scriabin → bartok (axis system, symmetrical scales)
+    it("contains all 16 persona-mapped composers", () => {
+      // direct (same id): bach, debussy, brian-eno, miles-davis,
+      //   john-coltrane, rachmaninov, brahms, tchaikovsky, mahler,
+      //   thelonious-monk, sonny-rollins, wayne-shorter, dizzy-gillespie,
+      //   chet-baker, freddie-hubbard, joe-henderson, stan-getz, nina-simone
+      // mapped: wendy-carlos (→Bach), minimalists (→Glass), bartok (→Scriabin),
+      //   philip-glass (direct), augusto-novaro (direct)
       const expected: ComposerId[] = [
+        "bach",
         "wendy-carlos",
         "john-coltrane",
         "debussy",
         "brian-eno",
         "minimalists",
+        "philip-glass",
         "miles-davis",
         "bartok",
+        "thelonious-monk",
+        "sonny-rollins",
+        "wayne-shorter",
+        "dizzy-gillespie",
+        "chet-baker",
+        "freddie-hubbard",
+        "joe-henderson",
+        "stan-getz",
+        "nina-simone",
+        "rachmaninov",
+        "brahms",
+        "tchaikovsky",
+        "mahler",
+        "augusto-novaro",
       ];
       for (const id of expected) {
         expect(ALL_COMPOSER_IDS).toContain(id);
@@ -161,7 +176,14 @@ describe("composerCatalog", () => {
       //   john-coltrane:16, the-beatles:21, kraftwerk:16, wendy-carlos:18,
       //   fela-kuti:16, piazzolla:24
       //   = 21+32+16+23+16+20+17+16+12+32+16+21+16+18+16+24 = 316
-      expect(totalBarCount()).toBe(316);
+      // New jazz batch 1: monk:16, rollins:16, shorter:12, gillespie:16 = 60
+      //   316 + 60 = 376
+      // New jazz batch 2: baker:16, hubbard:24, henderson:16, getz:16, simone:12 = 84
+      //   376 + 84 = 460
+      // New classical: bach:18, rachmaninov:16, brahms:16, tchaikovsky:16,
+      //   mahler:16, glass:16, novaro:12 = 110
+      //   460 + 110 = 570
+      expect(totalBarCount()).toBe(570);
     });
   });
 
