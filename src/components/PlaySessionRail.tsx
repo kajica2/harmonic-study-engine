@@ -85,7 +85,7 @@ const STAGE_LABELS: Record<Stage, { title: string; subtitle: string }> = {
   choose:       { title: "Choose Path",     subtitle: "Pick a curated 16-bar harmonic preset" },
   perform:      { title: "Perform",         subtitle: "Audition / practice / revise" },
   commit:       { title: "Record & Export", subtitle: "Capture your take — MIDI, lead sheet, performance" },
-  masterclass:  { title: "Masterclass",     subtitle: "33 working tunes from the WCJA curriculum (MC 1–40 + PJ 1–4)" },
+  masterclass:  { title: "Masterclass",     subtitle: "40 working tunes from the WCJA curriculum (MC 1–40 + PJ 1–4)" },
 };
 
 const STAGE_ORDER: Stage[] = ["choose", "perform", "commit", "masterclass"];
