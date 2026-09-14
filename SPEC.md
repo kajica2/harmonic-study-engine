@@ -18,7 +18,7 @@ it. When you change a value, update every site in the same commit.
   - `src/magenta/personaProfiles.ts` — header comment ("currently 17")
 - Drift history: 12 → 14 → 17 across commits `ce6f449` and `22844d4`.
 
-### 2. Masterclass tunes — **38**
+### 2. Masterclass tunes — **40**
 
 - Source of truth: `src/data/masterclass.ts` (count of `inApp:` field
   occurrences; the `MASTERCLASS_TUNES` array length).
