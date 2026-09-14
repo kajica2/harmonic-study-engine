@@ -9,7 +9,7 @@
 
 import React from "react";
 import { Sparkles, Check } from "lucide-react";
-import { proposeAlternative, type AlternativeChord } from "../lib/coCompose";
+import { proposeAlternative, PERSONA_TECHNIQUE_BIAS, TECHNIQUES, type AlternativeChord } from "../lib/coCompose";
 import { midiToName } from "../lib/theory";
 
 interface CoComposePanelProps {
@@ -38,17 +38,26 @@ export const CoComposePanel: React.FC<CoComposePanelProps> = ({
 }) => {
   const alt = proposeAlternative({ pathId, barIndex, seed, personaId });
 
+  // Persona-biased technique weights (displayed under "What if?")
+  const biasMap = personaId ? PERSONA_TECHNIQUE_BIAS[personaId] || {} : {};
+  const preferred = TECHNIQUES.filter((t) => (biasMap as Record<string, number>)[t] && (biasMap as Record<string, number>)[t]! > 1.0);
+
   return (
     <section
       role="region"
       aria-label="Co-composition suggestion"
       className="rounded-lg border border-purple-700/50 bg-purple-950/20 p-3 flex flex-col gap-2"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Sparkles size={14} className="text-purple-300" aria-hidden="true" />
         <span className="text-[10px] font-mono uppercase tracking-wider text-purple-200">
           What if? · {alt.technique.replace(/_/g, " ")}
         </span>
+        {preferred.length > 0 && personaId && (
+          <span className="text-[9px] font-mono text-purple-400/80 bg-purple-900/30 px-1 rounded">
+            persona: {preferred.map(t => t.replace(/_/g, " ")).join(", ")}
+          </span>
+        )}
       </div>
       <div className="text-[12px] font-mono text-purple-100">
         bar {barIndex + 1}: <span className="text-neutral-300">{midiToName(60)}</span> →{" "}

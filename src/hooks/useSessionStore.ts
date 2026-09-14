@@ -14,7 +14,7 @@
  * effect dependency arrays in the rest of App.tsx.
  */
 
-import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react";
+import { Dispatch, SetStateAction, useCallback, useEffect, useState, useRef } from "react";
 import { HarmonicPath, HarmonicStep, ALL_PATHS } from "../lib/paths";
 import { InstrumentType } from "../lib/audio";
 import { BackingStyle } from "../lib/backingEngine";
@@ -124,6 +124,10 @@ export interface SessionStore {
   setTempo: (next: number | ((prev: number) => number)) => void;
   /** Undo/redo over tempo specifically — used by the +/- 5 hotkeys. */
   tempoHistory: ReturnType<typeof useHistory<number>>[2];
+
+  /** Revert the last coCompose Accept mutation. Idempotent (only undoes
+   * the most recent setHarmonicStep). Safe to call repeatedly. */
+  revertLastAccept: () => void;
 
   timeSignature: TimeSignature;
   setTimeSignature: Setter<TimeSignature>;
@@ -452,6 +456,8 @@ export function useSessionStore(): SessionStore {
     Array<{ personaId: string; suggestion: string; accepted: boolean }>
   >(() => loadJSON("synesthesia_feedbackHistory", []));
 
+  const lastStepRef = useRef<{ pathId: string; stepIndex: number; step: HarmonicStep } | null>(null);
+
   // Persist on change. useState's setter identity is stable, so this
   // effect runs only when the value actually changes.
   useEffect(() => {
@@ -490,6 +496,8 @@ export function useSessionStore(): SessionStore {
           if (activePathIndex < 0 || activePathIndex >= prev.length) return prev;
           const path = prev[activePathIndex];
           if (stepIndex < 0 || stepIndex >= path.steps.length) return prev;
+          // Save pre-mutation step so revertLastAccept can restore it.
+          lastStepRef.current = { pathId: path.id, stepIndex, step: path.steps[stepIndex] };
           // Replace the step at stepIndex; preserve everything else.
           const newSteps = path.steps.slice();
           newSteps[stepIndex] = step;
@@ -562,6 +570,24 @@ export function useSessionStore(): SessionStore {
     setStylePackId,
     quizScore,
     setQuizScore,
+    revertLastAccept: useCallback(() => {
+      const saved = lastStepRef.current;
+      if (!saved) return; // nothing to revert (idempotent)
+      setPaths((prev) => {
+        const pIdx = prev.findIndex((p) => p.id === saved.pathId);
+        if (pIdx < 0) return prev;
+        const path = prev[pIdx];
+        if (saved.stepIndex < 0 || saved.stepIndex >= path.steps.length) return prev;
+        const newSteps = path.steps.slice();
+        newSteps[saved.stepIndex] = saved.step;
+        const newPath = { ...path, steps: newSteps };
+        const newPaths = prev.slice();
+        newPaths[pIdx] = newPath;
+        return newPaths;
+      });
+      // Consume the snapshot so repeated calls are no-ops (idempotent).
+      lastStepRef.current = null;
+    }, [setPaths]),
     feedbackHistory,
     setFeedbackHistory,
   };

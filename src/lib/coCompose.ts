@@ -50,7 +50,7 @@ export interface AlternativeChord {
   voiceLeadingDistance: number;
 }
 
-const TECHNIQUES = [
+export const TECHNIQUES = [
   "tritone_substitution",
   "modal_mixture",
   "secondary_dominant",
@@ -74,7 +74,7 @@ type Technique = (typeof TECHNIQUES)[number];
  * Bias values are > 1.0 to increase pick probability; 1.0 = neutral.
  * Sum doesn't need to be 1 — the picker normalizes.
  */
-const PERSONA_TECHNIQUE_BIAS: Record<string, Partial<Record<Technique, number>>> = {
+export const PERSONA_TECHNIQUE_BIAS: Record<string, Partial<Record<Technique, number>>> = {
   // Bach → Wendy Carlos (functional tonality, voice-leading)
   "wendy-carlos": {
     secondary_dominant: 2.0,
