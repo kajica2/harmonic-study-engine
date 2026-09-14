@@ -1,0 +1,99 @@
+{
+  "source": "harmonic-study-engine / pure chromatic-direction matrix",
+  "arpeggiator_target": "arpeggiator (spelling corrected from 'arpegiator')",
+  "identity": "Inkling (OpenRouter) \u2014 confirmed, no switch",
+  "ways": [
+    {
+      "way": 1,
+      "interval_dir": "asc",
+      "interval_type": "triad",
+      "instrument_dir": "asc",
+      "paired": false,
+      "notes": "ascending chromatic triad, ascending instrument"
+    },
+    {
+      "way": 2,
+      "interval_dir": "asc",
+      "interval_type": "triad",
+      "instrument_dir": "desc",
+      "paired": false,
+      "notes": "ascending triad, descending instrument"
+    },
+    {
+      "way": 3,
+      "interval_dir": "desc",
+      "interval_type": "triad",
+      "instrument_dir": "asc",
+      "paired": false,
+      "notes": "descending triad, ascending instrument"
+    },
+    {
+      "way": 4,
+      "interval_dir": "desc",
+      "interval_type": "triad",
+      "instrument_dir": "desc",
+      "paired": false,
+      "notes": "descending triad, descending instrument"
+    },
+    {
+      "way": 5,
+      "interval_dir": "asc",
+      "interval_type": "triad",
+      "instrument_dir": "asc",
+      "paired": true,
+      "pattern": "one_up_one_down",
+      "notes": "paired: up/down, ascending instrument"
+    },
+    {
+      "way": 6,
+      "interval_dir": "asc",
+      "interval_type": "triad",
+      "instrument_dir": "desc",
+      "paired": true,
+      "pattern": "one_up_one_down",
+      "notes": "paired: up/down, descending instrument"
+    },
+    {
+      "way": 7,
+      "interval_dir": "desc",
+      "interval_type": "triad",
+      "instrument_dir": "asc",
+      "paired": true,
+      "pattern": "one_down_one_up",
+      "notes": "paired: down/up, ascending instrument"
+    },
+    {
+      "way": 8,
+      "interval_dir": "desc",
+      "interval_type": "triad",
+      "instrument_dir": "desc",
+      "paired": true,
+      "pattern": "one_down_one_up",
+      "notes": "paired: down/up, descending instrument"
+    }
+  ],
+  "engraving_constraints": "COLTRANE-SHAW-ENGRAVING.md \u2014 no 8va on sax/trumpet, quartal voicings, per-note articulation (marcato+tenuto highs, acciaccatura Shaw grace notes), ghost notes (x), beam against meter, exact slurs, harmon mute Stem in/out + o/+, 2-4 bars rest before mute change",
+  "build_order": "data_first (this file) \u2192 minimal_ui \u2192 logic",
+  "verified": "0 files edited before this write; plan written pre-touch",
+  "parameters": {
+    "galactic_core_mass_m": {
+      "inputs": "m",
+      "formula": "root = 57 + round(12*m)",
+      "constraint": "clamped to trumpet range",
+      "note": "from pasted table"
+    },
+    "rhythmic_slider": {
+      "inputs": "slider",
+      "output": "base_subdivision",
+      "formula": "events_per_bar from table above",
+      "note": "from pasted table"
+    },
+    "brownian_drag_b": {
+      "inputs": "b",
+      "formula": "duration = beat * (1 - 0.5*b)",
+      "output": "note_length",
+      "note": "from pasted table"
+    },
+    "source_formulas": "pasted table: | Galactic core mass m | Root pitch | root=57+round(12m) (clamped) | | Rhythmic slider | Base subdivision | Events per bar | | Brownian drag b | Note length | duration=beat*(1-0.5b) |"
+  }
+}
