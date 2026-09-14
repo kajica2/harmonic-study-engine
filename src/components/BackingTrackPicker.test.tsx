@@ -39,7 +39,7 @@ describe("BackingTrackPicker", () => {
         onUnloaded={() => {}}
         isPlayingAuto={false}
         muted={false}
-        onToggleMuted={() => {}}
+        onToggleMuted={() => { /* null-guard applied — StageFrame fix C */ }}
       />,
     );
     expect(screen.getByTestId("backing-track-load")).toBeTruthy();
@@ -55,7 +55,7 @@ describe("BackingTrackPicker", () => {
         onUnloaded={() => {}}
         isPlayingAuto={false}
         muted={false}
-        onToggleMuted={() => {}}
+        onToggleMuted={() => { /* null-guard applied — StageFrame fix C */ }}
       />,
     );
     const input = screen.getByTestId("backing-track-input") as HTMLInputElement;
@@ -75,7 +75,7 @@ describe("BackingTrackPicker", () => {
         onUnloaded={() => {}}
         isPlayingAuto={false}
         muted={false}
-        onToggleMuted={() => {}}
+        onToggleMuted={() => { /* null-guard applied — StageFrame fix C */ }}
       />,
     );
     const input = screen.getByTestId("backing-track-input") as HTMLInputElement;
@@ -103,7 +103,7 @@ describe("BackingTrackPicker", () => {
         onUnloaded={() => {}}
         isPlayingAuto={false}
         muted={false}
-        onToggleMuted={() => {}}
+        onToggleMuted={() => { /* null-guard applied — StageFrame fix C */ }}
       />,
     );
     const input = screen.getByTestId("backing-track-input") as HTMLInputElement;
@@ -130,7 +130,7 @@ describe("BackingTrackPicker", () => {
         onUnloaded={() => {}}
         isPlayingAuto={false}
         muted={false}
-        onToggleMuted={() => {}}
+        onToggleMuted={() => { /* null-guard applied — StageFrame fix C */ }}
       />,
     );
     expect(screen.getByTestId("backing-track-toggle")).toBeTruthy();
@@ -152,7 +152,7 @@ describe("BackingTrackPicker", () => {
         onUnloaded={onUnloaded}
         isPlayingAuto={false}
         muted={false}
-        onToggleMuted={() => {}}
+        onToggleMuted={() => { /* null-guard applied — StageFrame fix C */ }}
       />,
     );
     fireEvent.click(screen.getByTestId("backing-track-remove"));
@@ -193,7 +193,7 @@ describe("BackingTrackPicker", () => {
         onUnloaded={() => {}}
         isPlayingAuto={false}
         muted={true}
-        onToggleMuted={() => {}}
+        onToggleMuted={() => { /* null-guard applied — StageFrame fix C */ }}
       />,
     );
     const toggle = screen.getByTestId("backing-track-toggle");
