@@ -908,3 +908,497 @@ Roman: `V – V7 – I – I7 – IV – iv – I – VI7 – ii – V7 – I`
 - **Notes:** Piazzolla combines tango rhythm with jazz harmony, chromatic bass motion, and classical counterpoint. The bII (Bb) and bVI (F) create a dark, non-functional color typical of nuevo tango.
 - **One-line Takeaway:** Transformed tango into concert music by blending classical, jazz, and Argentine tradition.
 - **Study Prompt:** Analyze *Adiós Nonino* for jazz harmony and counterpoint over tango rhythm.
+
+---
+
+### Thelonious Monk
+- **Harmonic Innovation:** Quartal harmony, tritone substitution, chromatic voice-leading, angular melody over functional changes.
+- **Key Works:** 'Round Midnight; Blue Monk; Straight, No Chaser; Epistrophy; Ruby My Dear.
+
+**Chord Changes — 'Round Midnight (Eb minor, 16-bar theme)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Ebm | i |
+| 2 | Ebm | i |
+| 3 | Fm7b5/Bb7 | iiø – V7 (to IV) |
+| 4 | Abm | iv |
+| 5 | D7 | V7/bIII (tritone sub of Ab7) |
+| 6 | Gb | bIII |
+| 7 | Gbm | bIII (parallel minor) |
+| 8 | G7 | V7 (tritone sub of Db7) |
+| 9 | C7 | V7/V |
+| 10 | F7 | V7/iv |
+| 11 | Bb7/Eb | V7/IV (bass climb) |
+| 12 | Ebm | i |
+| 13 | G7 | V7 (tritone sub of C7) |
+| 14 | Gb | bII |
+| 15 | Fm7/Bb7 | ii – V7 (turnaround) |
+| 16 | Ebm | i |
+
+- **Notes:** Monk treats the standard form as a series of tritone substitutions. Each dominant resolves not to its expected tonic but to a chord a tritone away, creating the hallmark "Monkish" angularity. The bridge (bars 5–8) cycles through bIII and its parallel minor, never landing on the tonic for the whole section.
+- **One-line Takeaway:** Made tritone substitution and chromatic sidestepping a structural principle, not just an embellishment.
+- **Study Prompt:** Compare the harmony of 'Round Midnight with a standard 32-bar AABA form — map each tritone sub to its conventional resolution.
+
+---
+
+### Sonny Rollins
+- **Harmonic Innovation:** Motivic-harmonic integration; pedal points; calypso vamps; side-slipping; thematic improvisation over simple changes.
+- **Key Works:** St. Thomas; Oleo; Airegin; The Bridge; Moritat (Mack the Knife).
+
+**Chord Changes — St. Thomas (C major, 16-bar calypso)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | C | I |
+| 2 | C | I |
+| 3 | G7 | V7 |
+| 4 | C | I |
+| 5 | C | I |
+| 6 | C | I |
+| 7 | G7 | V7 |
+| 8 | C | I |
+| 9 | G7 | V7 |
+| 10 | C | I |
+| 11 | F | IV |
+| 12 | F | IV |
+| 13 | C | I |
+| 14 | C | I |
+| 15 | G7 | V7 |
+| 16 | C | I |
+
+- **Notes:** St. Thomas uses the simplest possible harmonic framework — calypso rhythm over I–V7. Rollins's innovation is motivic: he develops a single melodic cell (the calypso tune) across the entire form, and his solos build thematic bridges that create harmonic interest where the changes are deliberately plain.
+- **One-line Takeaway:** Proved that motivic development can carry a solo's harmonic interest even over static changes.
+- **Study Prompt:** Transcribe Rollins's solo on St. Thomas and identify every occurrence of the opening calypso motif.
+
+---
+
+### Wayne Shorter
+- **Harmonic Innovation:** Suspended chord harmony (sus4 as tonic); chromatic mediants; third-related key movement; open-ended forms; blues-bop fusion.
+- **Key Works:** Footprints; Juju; Speak No Evil; E.S.P.; Infant Eyes.
+
+**Chord Changes — Footprints (C minor, 12-bar in 3/4)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Cm7 | i7 |
+| 2 | Cm7 | i7 |
+| 3 | Fm7 | iv7 |
+| 4 | Fm7 | iv7 |
+| 5 | Cm7 | i7 |
+| 6 | Cm7 | i7 |
+| 7 | Fm7 | iv7 |
+| 8 | Fm7 | iv7 |
+| 9 | Cm7 | i7 |
+| 10 | Abmaj7 | bVI |
+| 11 | G7b9 | V7 (resolution) |
+| 12 | Cm7 | i7 |
+
+- **Notes:** Footprints is a minor blues variation in 3/4. The bVI–V–i resolution in bars 10–12 replaces the conventional IV–V–i with a chromatic-mediant approach (Ab to G to Cm). Shorter's innovation is in the *form* as much as the harmony: the 12-bar 3/4 structure was unusual for jazz, and the wide-interval melody (descending perfect fifths across the first 8 bars) creates harmonic space without changing chords.
+- **One-line Takeaway:** Extended jazz harmony into post-modal territory by suspending chord function and letting open form guide harmonic motion.
+- **Study Prompt:** Map the bass motion in Footprints — how do the descending 5ths in the melody relate to the static i7–iv7 vamp?
+
+---
+
+### Dizzy Gillespie
+- **Harmonic Innovation:** Bebop harmony (extended dominants, diminished scale, altered tensions); Afro-Cuban cross-rhythms harmonized with jazz changes; big-band arranging with chromatic inner voices.
+- **Key Works:** A Night in Tunisia; Salt Peanuts; Groovin' High; Manteca; Con Alma.
+
+**Chord Changes — A Night in Tunisia (D minor, 16-bar theme)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Dm | i |
+| 2 | Dm | i |
+| 3 | Edim7 | ii°7 |
+| 4 | A7b9 | V7 (bebop dominant) |
+| 5 | Dm | i |
+| 6 | Eb7 | bII7 (tritone sub of A7) |
+| 7 | Dm | i |
+| 8 | Dm | i |
+| 9 | G7 | V7/iv |
+| 10 | Gm | iv (minor) |
+| 11 | C7 | V7/bVII |
+| 12 | F | bVII (Afro-Cuban vamp) |
+| 13 | Dm | i |
+| 14 | Eb7 | bII7 |
+| 15 | A7b13 | V7 (altered dominant) |
+| 16 | Dm | i |
+
+- **Notes:** The A section (bars 1–8) alternates between Dm and a ii°7–V7 that never resolves to iv. The bridge (bars 9–12) introduces an Afro-Cuban harmonic vamp — iv–bVII moving to a bVII pedal before returning. The bII7 dominant substitution (Eb7 for A7) appears in both sections, creating the exotic harmonic color that defines the tune. The altered V7b13 in bar 15 (A7b13 with raised root = Eb in the bass) foreshadows Coltrane's later symmetrical harmony.
+- **One-line Takeaway:** Fused bebop chromatic harmony with Afro-Cuban rhythm into a new harmonic vernacular.
+- **Study Prompt:** Analyze A Night in Tunisia for the relationship between the Afro-Cuban bass vamp in the bridge and the chromatic bebop harmony of the A section.
+
+---
+
+### Chet Baker
+- **Harmonic Innovation:** Cool jazz lyrical harmony; chromatic passing chords over static ballad forms; rubato harmonic pacing.
+- **Key Works:** My Funny Valentine; It Could Happen to You; Time After Time; I Fall in Love Too Easily; Let's Get Lost.
+
+**Chord Changes — My Funny Valentine (C minor, 16-bar ballad)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Cm7 | i7 |
+| 2 | Cm7 | i7 |
+| 3 | Fm7 | iv7 |
+| 4 | Fm7 | iv7 |
+| 5 | Abmaj7 | bVImaj7 |
+| 6 | Abmaj7 | bVImaj7 |
+| 7 | G7 | V7 |
+| 8 | G7 | V7 |
+| 9 | Gm7b5 | iiø/V |
+| 10 | C7 | V7/V |
+| 11 | Fm7 | iv7 |
+| 12 | Fm7 | iv7 |
+| 13 | Abmaj7 | bVImaj7 |
+| 14 | Dm7 | ii7 (sub) |
+| 15 | G7b9 | V7 (altered) |
+| 16 | Cmaj9 | I (Picardy resolution) |
+
+- **Notes:** Baker's signature ballad treatment keeps the harmony slow-moving (2 bars per chord) and emphasizes the iv–bVI–V turnaround. The Picardy third at bar 16 (Cmaj9 instead of Cm7) lifts the final phrase into major, an expressive device Baker used in many live renditions. The iiø–V7/V in bars 9–10 creates a secondary dominant pull without leaving the tonic orbit.
+- **One-line Takeaway:** Proved that lyrical simplicity and rubato phrasing could carry as much harmonic depth as bebop complexity.
+- **Study Prompt:** Compare two Baker recordings of My Funny Valentine (1952 vs. 1958) and notate the changes in rubato pacing.
+
+---
+
+### Freddie Hubbard
+- **Harmonic Innovation:** Hard-bop blues-modal hybrid harmony; extended vamps with chromatic passing diminished chords; pentatonic-inflected harmony over static tonics.
+- **Key Works:** Red Clay; Crisis; Hub-Tones; Little Sunflower; Dolphin Dance.
+
+**Chord Changes — Red Clay (Eb minor, 24-bar vamp-heavy form)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Ebm7 | i7 |
+| 2 | Ebm7 | i7 |
+| 3 | Ebm7 | i7 |
+| 4 | Ebm7 | i7 |
+| 5 | Ebm7 | i7 |
+| 6 | Ebm7 | i7 |
+| 7 | Bbm7 | v7 |
+| 8 | Bbm7 | v7 |
+| 9 | Abmaj7 | bVImaj7 |
+| 10 | Abd7 | bVI°7 (dim. passing) |
+| 11 | Ebm7 | i7 |
+| 12 | Gbmaj7 | bIIImaj7 |
+| 13 | Ebm7 | i7 |
+| 14 | Ebm7 | i7 |
+| 15 | Ebm7 | i7 |
+| 16 | Ebm7 | i7 |
+| 17 | Bbm7 | v7 |
+| 18 | Bbm7 | v7 |
+| 19 | Abmaj7 | bVImaj7 |
+| 20 | Abmaj7 | bVImaj7 |
+| 21 | A7b9 | V7/iv (tritone sub of Eb7) |
+| 22 | Dbmaj7 | bII |
+| 23 | Ebm7 | i7 |
+| 24 | Ebm7 | i7 |
+
+- **Notes:** Red Clay's A section is a sustained i7 vamp (12 bars of Ebm7 with only v and bVI passing). The B section (bars 19–22) introduces a tritone-sub chain — A7b9 (V7/iv) resolved to Dbmaj7 (bII), then back to i. Hubbard's harmonic signature is the way he stacks pentatonic melodies over these static vamps, creating implied harmonic movement without changing the underlying chord.
+- **One-line Takeaway:** Expanded hard-bop vocabulary by treating the minor vamp as a canvas for pentatonic and diminished-color harmony.
+- **Study Prompt:** Isolate the pentatonic lines Hubbard plays over the Ebm7 vamp in Red Clay and map their implied upper structures.
+
+---
+
+### Joe Henderson
+- **Harmonic Innovation:** Dark-modal post-bop harmony; tritone-key relationships; pedal-point tension; blues-infused harmonic progressions with altered dominants.
+- **Key Works:** Recorda Me; Page One; Inner Urge; Blue Bossa; Isotope.
+
+**Chord Changes — Recorda Me (D minor, 16-bar post-bop)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Dm7 | i7 |
+| 2 | Dm7 | i7 |
+| 3 | Dm7 | i7 |
+| 4 | Dm7 | i7 |
+| 5 | Gm7 | iv7 |
+| 6 | Gm7 | iv7 |
+| 7 | A7 | V7 (dominant) |
+| 8 | A7 | V7 |
+| 9 | Dm7 | i7 |
+| 10 | Gm7 | iv7 |
+| 11 | A7 | V7 |
+| 12 | Dm7 | i7 |
+| 13 | Bb7 | bII7 (tritone sub of E7) |
+| 14 | E7b9 | V7/bVI (altered) |
+| 15 | Abmaj7 | bVImaj7 |
+| 16 | Dm7 | i7 (resolving) |
+
+- **Notes:** Recorda Me alternates between a Dm7 vamp and a modal iv–V7 pattern. The turn in bars 13–15 introduces a tritone-key relationship: Bb7 (bII) resolving to E7b9 (V7/bVI), landing on Abmaj7 (bVI) before returning to Dm7. This chain of chromatic dominant resolutions is Henderson's harmonic fingerprint — creating tension by moving through keys a tritone apart.
+- **One-line Takeaway:** Made the tritone relationship between dominant and tonic a structural principle of post-bop composition.
+- **Study Prompt:** Map every dominant chord in Recorda Me to its tritone-substituted resolution — how many resolve to the expected target vs. chromatic mediant?
+
+---
+
+### Stan Getz
+- **Harmonic Innovation:** Bossa nova harmonic vocabulary; cool jazz over extended chord voicings; II7 and bVII7 substitutions in major-key tonal harmony.
+- **Key Works:** The Girl from Ipanema; Desafinado; Corcovado; One Note Samba; Samba de Uma Nota Só.
+
+**Chord Changes — The Girl from Ipanema (F major, 16-bar bossa nova)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Fmaj7 | Imaj7 |
+| 2 | G7 | II7 (secondary) |
+| 3 | Gm7 | ii7 |
+| 4 | Gm7 | ii7 |
+| 5 | Fmaj7 | Imaj7 |
+| 6 | Fmaj7 | Imaj7 |
+| 7 | G7 | II7 |
+| 8 | Gm7 | ii7 |
+| 9 | Bb7 | bVII7 (borrowed) |
+| 10 | Fmaj7 | Imaj7 |
+| 11 | Bb7 | bVII7 |
+| 12 | Fmaj7 | Imaj7 |
+| 13 | Gm7 | ii7 |
+| 14 | C7 | V7 |
+| 15 | Fmaj7 | Imaj7 |
+| 16 | C7 | V7 (turnaround) |
+
+- **Notes:** The bossa nova harmonic vocabulary uses II7 (G7) as a secondary dominant that defers resolution back to ii7 (Gm7) rather than moving directly to V7. The bVII7 substitution (Bb7 resolving to Fmaj7) is a hallmark of Jobim's writing that Getz brought to a global audience. The entire 16-bar cycle centers on I and ii7, with V7 appearing only in the turnaround — creating a floating, non-urgent harmonic rhythm.
+- **One-line Takeaway:** Introduced bossa nova's gentle secondary-dominant vocabulary to the global jazz audience.
+- **Study Prompt:** Write a 16-bar original in the style of Ipanema using II7–ii7 and bVII7–I as the primary harmonic motion.
+
+---
+
+### Nina Simone
+- **Harmonic Innovation:** Gospel-blues harmonic fusion; dramatic modal shifts within a single key; tritone substitutions on blues forms; cross-rhythmic harmonic pacing.
+- **Key Works:** I Put a Spell on You; Feeling Good; Sinnerman; Mississippi Goddam; Don't Let Me Be Misunderstood.
+
+**Chord Changes — I Put a Spell on You (F minor, 12-bar blues variation)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Fm | i |
+| 2 | Fm | i |
+| 3 | Bb7 | IV7 (blues) |
+| 4 | Bb7 | IV7 |
+| 5 | Fm | i |
+| 6 | Fm | i |
+| 7 | Db7 | bII7 (tritone sub of G7) |
+| 8 | C7 | V7 (blues-turned dominant) |
+| 9 | Fm | i |
+| 10 | Db7 | bII7 |
+| 11 | C7 | V7 |
+| 12 | Fm | i |
+
+- **Notes:** Simone turns a standard 12-bar blues into a gospel-drenched harmonic statement by replacing the conventional IV7 (Bb7) with a bII7 tritone substitution (Db7 for G7) at bar 7, then landing on the V7 (C7) a bar later. The alternation between Db7 and C7 in the last 4 bars creates a chromatic major-third relationship under the tonic pedal F — the same intervallic structure Coltrane used in Giant Steps, but in a blues context serving a gospel vocal delivery.
+- **One-line Takeaway:** Fused gospel, blues, and jazz harmony into a single, emotionally direct harmonic language.
+- **Study Prompt:** Analyze Sinnerman for the way Simone moves between the gospel IV7 and the jazz bII7 substitution within a single 12-bar form.
+
+---
+
+### J.S. Bach
+- **Harmonic Innovation:** Functional tonality foundation; equal temperament exploration; harmonic sequence architecture; invertible counterpoint over structural bass lines.
+- **Key Works:** Well-Tempered Clavier (WTC I & II); St. Matthew Passion; Mass in B minor; Chorales.
+
+**Chord Changes — Prelude in C major, BWV 846 (C major, 18-bar harmonic sequence)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | C | I |
+| 2 | Dm7/C | ii4/2 |
+| 3 | G7/B | V6/5 |
+| 4 | C | I |
+| 5 | Am7/C | vi4/2 |
+| 6 | D7/C | V4/2/V |
+| 7 | G/B | V6 |
+| 8 | C | I |
+| 9 | Am7/C | vi4/2 |
+| 10 | D7/C | V4/2/V |
+| 11 | G/B | V6 |
+| 12 | C | I |
+| 13 | F/C | IV4/2 |
+| 14 | G7/B | V6/5 |
+| 15 | C | I |
+| 16 | F/C | IV4/2 |
+| 17 | G7/B | V6/5 |
+| 18 | C | I |
+
+- **Notes:** The WTC I Prelude is a continuous arpeggiation of functional harmony — each bar is a 4/2 inversion that walks the bass down the C major scale by step. The entire progression is circular: the IV4/2–V6/5–I cadence in bars 13–18 mirrors bars 1–4 transposed down a fifth. Bach demonstrates that equal temperament makes all keys equally accessible, even in a piece that never leaves C major.
+- **One-line Takeaway:** Established functional tonality as the lingua franca of Western harmony by codifying every chord's role within the key.
+- **Study Prompt:** Map each bar of the WTC I Prelude to its scale degree in C major — how does the bass line trace the full diatonic scale?
+
+---
+
+### Sergei Rachmaninov
+- **Harmonic Innovation:** Bell sonorities from extended tertian stacks; chromatic-mediant shifts within a minor-key framework; lush late-Romantic harmony with chromatic voice-leading.
+- **Key Works:** Piano Concerto No. 2; Rhapsody on a Theme of Paganini; Symphony No. 2; Études-Tableaux; Vocalise.
+
+**Chord Changes — Piano Concerto No. 2, mvt. I opening (C minor, 16 bars)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Cdim | i° (bell-like) |
+| 2 | Cm | i |
+| 3 | Ab | bVI |
+| 4 | G7 | V7 |
+| 5 | Cm | i |
+| 6 | Gm7b5 | vø |
+| 7 | C7 | V7/iv |
+| 8 | Fm | iv |
+| 9 | Fm/Ab | iv (bass climb) |
+| 10 | Fm/C | iv6/4 |
+| 11 | G7 | V7 |
+| 12 | Cm | i |
+| 13 | Abmaj7 | bVImaj7 |
+| 14 | Dm7b5 | iiø7 |
+| 15 | G7 | V7 |
+| 16 | Cm | i (fermata) |
+
+- **Notes:** The opening Cdim chord in the piano's low register creates the bell-like sonority Rachmaninov is known for — a 3-note cluster that resolves to Cm via common tone. The bVI–V relationship (Ab to G7) is the harmonic engine of the theme, appearing three times across the 16 bars. The iv6/4–V7–i in bars 10–12 is Rachmaninov's favorite cadential expansion, delaying resolution for dramatic effect.
+- **One-line Takeaway:** Amplified functional harmony to orchestral scale through extended chord stacks and chromatic-mediant color.
+- **Study Prompt:** Isolate the bell-like opening chord (Cdim) and trace how each voice resolves across the first 4 bars.
+
+---
+
+### Johannes Brahms
+- **Harmonic Innovation:** Developing variation applied to harmony; third-related key shifts within a phrase; modal mixture in classical form; hemiolic harmonic rhythm.
+- **Key Works:** Intermezzo in A, op. 118 no. 2; Symphony No. 4; German Requiem; Violin Concerto; Clarinet Quintet.
+
+**Chord Changes — Intermezzo in A major, op. 118 no. 2 (A major, 16 bars)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | A | I |
+| 2 | E/G# | V6 |
+| 3 | F#m7 | vi7 |
+| 4 | C#m7 | iii7 |
+| 5 | D | IV |
+| 6 | D#dim7 | vii°7/ii |
+| 7 | E7 | V7 |
+| 8 | A | I |
+| 9 | F7 | bII7 (Neapolitan) |
+| 10 | E7 | V7 |
+| 11 | Am | i (parallel minor) |
+| 12 | E7 | V7 |
+| 13 | F | bII |
+| 14 | Dm7 | iv (modal mixture) |
+| 15 | E7 | V7 |
+| 16 | A | I |
+
+- **Notes:** Brahms's developing variation appears in how the same melodic cell transforms across harmonic contexts — the A–E/G#–F#m7 arch in bars 1–3 recurs as Am–E7–F (bars 11–13) but in parallel minor. The Neapolitan F7 in bar 9 is a sudden harmonic shift typical of Brahms: it arrives without preparation, then takes 7 bars to resolve back to I through the parallel minor.
+- **One-line Takeaway:** Brought structural developing variation into the harmonic domain, making every chord relationship intentional and derived.
+- **Study Prompt:** Trace the opening 3-bar phrase (A–E/G#–F#m7) through its transformations in bars 9–16 — how does Brahms vary it each time?
+
+---
+
+### Pyotr Ilyich Tchaikovsky
+- **Harmonic Innovation:** Descending chromatic bass sequences in minor; expressive augmented-sixth chords; modal mixture for pathos; sequence-based harmonic development in sonata form.
+- **Key Works:** Symphony No. 6 'Pathétique'; Romeo and Juliet; Swan Lake; Piano Concerto No. 1; Nutcracker.
+
+**Chord Changes — Symphony No. 6 'Pathétique', mvt. I opening (B minor, 16 bars)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Bm | i |
+| 2 | Bm | i |
+| 3 | Em/B | iv6/4 |
+| 4 | F#7 | V7 |
+| 5 | G | bVI (Neapolitan-related) |
+| 6 | Em | iv |
+| 7 | F#7 | V7 |
+| 8 | Bm | i |
+| 9 | Bm/E | i (bass climb) |
+| 10 | F#7/C# | V6/5 |
+| 11 | Bm/D | i6 |
+| 12 | G#dim7 | vii°7/ii |
+| 13 | F#7 | V7 |
+| 14 | Bm | i |
+| 15 | C#7 | V7/iv (augmented sixth) |
+| 16 | Bm | i |
+
+- **Notes:** The Pathétique opens with a descending bass line from B down to F# over bars 1–4, creating the falling-fifths sequence that defines the movement's harmonic character. The bVI–iv–V7–i in bars 5–8 is Tchaikovsky's signature expressive progression: the bVI (G major) is a Neapolitan-related chord that introduces the flat side of the key for maximum pathos. The augmented sixth (C#7 = V7/iv) in bar 15 pulls toward iv before the final i.
+- **One-line Takeaway:** Made descending chromatic bass lines and augmented-sixth chords the emotional center of Romantic symphonic harmony.
+- **Study Prompt:** Write a 16-bar sequence in B minor that uses the bVI–iv–V7 progression as its harmonic engine, following Tchaikovsky's bass-line contour.
+
+---
+
+### Gustav Mahler
+- **Harmonic Innovation:** Progressive tonality (ending in a different key from the start); interrupted cadences at structural boundaries; orchestral density as harmonic color; mediant and submediant shift as formal device.
+- **Key Works:** Symphony No. 5 (Adagietto); Symphony No. 2 'Resurrection'; Symphony No. 9; Symphony No. 8 'Symphony of a Thousand'; Das Lied von der Erde.
+
+**Chord Changes — Symphony No. 5, Adagietto (F major, 16 bars)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | F | I (sustained) |
+| 2 | Cm7 | v7 |
+| 3 | Dm | vi |
+| 4 | Gm7 | ii7 |
+| 5 | C7sus4 | V7sus |
+| 6 | C7 | V7 |
+| 7 | F | I |
+| 8 | Bb | IV |
+| 9 | Gm7 | ii7 |
+| 10 | C7sus4 | V7sus |
+| 11 | C7 | V7 |
+| 12 | F | I |
+| 13 | Ab | bVI (progressive shift) |
+| 14 | Eb | bIII (mediant shift) |
+| 15 | D7 | V7/V (enharmonic pivot) |
+| 16 | Gm7 C7 | ii7 – V7 (back to F) |
+
+- **Notes:** The Adagietto is Mahler's most tonal movement — a love letter in F major — yet even here the final bars shift to Ab and Eb (bVI and bIII), looking toward the progressive tonality that defines his later symphonies. The V7sus in bars 5 and 10 delays resolution so long that the tonic feels like a relief rather than a destination. The piece ends in F, but the journey passes through harmonic regions that Mahler's predecessors would have reserved for development sections.
+- **One-line Takeaway:** Used progressive tonality and interrupted cadence to make the very idea of a "tonic" feel provisional.
+- **Study Prompt:** Compose an 8-bar phrase in F major that moves through bVI and bIII before returning to I — model Mahler's harmonic pacing.
+
+---
+
+### Philip Glass
+- **Harmonic Innovation:** Additive/subtractive harmonic process; minimalist cyclic harmony — patterns layered and shifted against each other; arpeggiated structures that create implied harmonic motion.
+- **Key Works:** Metamorphosis; Einstein on the Beach; Glassworks; Koyaanisqatsi; The Hours.
+
+**Chord Changes — Metamorphosis One (C minor, 16-bar additive cycle)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | Cm | i |
+| 2 | Bbmaj7 | bVII |
+| 3 | Cm | i (repeat) |
+| 4 | Bbmaj7 | bVII (repeat) |
+| 5 | Cm | i |
+| 6 | Abmaj7 | bVI |
+| 7 | Cm | i |
+| 8 | Bbmaj7 | bVII |
+| 9 | Abmaj7 | bVI |
+| 10 | Cm | i (return) |
+| 11 | Fm7 | iv7 (additive expansion) |
+| 12 | Cm | i |
+| 13 | Bbmaj7 | bVII |
+| 14 | Cm | i |
+| 15 | Bbmaj7 Abmaj7 | bVII – bVI (cycle close) |
+| 16 | Cm | i |
+
+- **Notes:** Metamorphosis One is built from a single arpeggiated pattern in C minor. The harmony changes only when Glass adds or subtracts a note from the cycle — the bVII (Bbmaj7) appears in bar 2, the bVI (Abmaj7) appears in bar 6, and the iv7 (Fm7) expands the cycle in bar 11. The harmonic motion is a side effect of the process, not a goal. Despite staying within C minor for all 16 bars, the piece creates the illusion of harmonic development through register and rhythmic density.
+- **One-line Takeaway:** Proved that harmonic interest can emerge from process-driven cycling, not just chord-to-chord progression.
+- **Study Prompt:** Write a 16-bar additive process in C minor that starts with i, adds bVII, then bVI, then iv — following Glass's pattern.
+
+---
+
+### Augusto Novaro
+- **Harmonic Innovation:** Systematic sight-reading pedagogy; diatonic scale-based harmonic progression; sequential position-reading exercises for all instruments and clefs.
+- **Key Works:** Sight-Reading Method; 24 Diatonic Studies in All Keys; Harmonic Drills for Instrumentalists.
+
+**Chord Changes — Diatonic scale exercise (C major, 12 bars)**
+
+| Bar | Chord | Roman |
+|-----|-------|-------|
+| 1 | C | I (tonic) |
+| 2 | Dm | ii |
+| 3 | Em | iii |
+| 4 | F | IV |
+| 5 | G | V |
+| 6 | Am | vi |
+| 7 | Bdim | vii° |
+| 8 | C | I (cadence) |
+| 9 | F | IV (subdominant expansion) |
+| 10 | G7 | V7 |
+| 11 | C | I |
+| 12 | C | I (solid) |
+
+- **Notes:** Novaro's method reduces harmony to its diatonic skeleton — a single ascending scale (bars 1–7) harmonized with each degree's native chord. The exercise then reharmonizes the final 4 bars with IV–V7–I, the most common cadential formula, to drill the transition from theoretical knowledge to practical reading. While simple, this is the pedagogical root of how countless musicians learn to associate scale degrees with harmonic functions.
+- **One-line Takeaway:** Codified diatonic harmony into a sequential reading method that remains foundational in music pedagogy.
+- **Study Prompt:** Harmonize the ascending C major scale with only diatonic chords — then write an 8-bar melody over it following Novaro's sequential approach.
