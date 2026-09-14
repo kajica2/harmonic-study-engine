@@ -52,6 +52,7 @@ import {
 import { audioEngine, InstrumentType } from "./lib/audio";
 import { rhythmEngine } from "./lib/rhythm";
 import { playbackClock } from "./lib/playbackClock";
+import { usePlaybackState } from "./hooks/use-playback-state";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
@@ -616,7 +617,8 @@ export default function App() {
         target?.isContentEditable;
       if (isTyping) return;
 
-      // Global Escape: close any open modal first, then stop playback.
+      const { playing, progress } = usePlaybackState(); // B-deep wire
+    // Global Escape: close any open modal first, then stop playback.
       if (e.key === "Escape") {
         if (showImportExport) {
           setShowImportExport(false);
