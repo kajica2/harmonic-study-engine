@@ -93,7 +93,6 @@ import { synthesizeAndPlay, checkDDSPStatus } from "./lib/ddspSynth";
 import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
-import { exportToMidiFile } from "./lib/midiExport";
 import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
 import { STEPS_PER_BAR } from "./lib/paths";
 import type { AlternativeChord } from "./lib/coCompose";
@@ -108,7 +107,11 @@ import { loadStylePack, type StylePackId } from "./lib/stylePack";
 import { suggestMelody, pcSet } from "./lib/melodyMarkov";
 import { useAsyncAction } from "./lib/useAsyncAction";
 import { InlineErrorPill } from "./components/InlineStatus";
-import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
+// Lazy: loads `abcjs` (a large dedupe-library) only when the score
+// display is actually mounted (js-*: lazy-load non-critical libs).
+const LiveScoreDisplay = lazy(() =>
+  import("./components/LiveScoreDisplay").then((m) => ({ default: m.LiveScoreDisplay })),
+);
 import { MelodyLane } from "./components/MelodyLane";
 import { MelodyToolbar } from "./components/MelodyToolbar";
 import { PlaySessionRail } from "./components/PlaySessionRail";
@@ -1574,7 +1577,9 @@ function AppShell() {
               setMediaRecordingStatus(null);
             }
           }}
-          onExportMidi={() => {
+          onExportMidi={async () => {
+            // Deferred: pulls midi-writer-js only on the first click.
+            const { exportToMidiFile } = await import("./lib/midiExport");
             const dataUri = exportToMidiFile(path);
             const a = document.createElement("a");
             a.href = dataUri;
@@ -3097,12 +3102,14 @@ function AppShell() {
                   );
                 })()}
 
+                <Suspense fallback={null}>
                 <LiveScoreDisplay
                   path={path}
                   activeStepIndex={activeStepIndex}
                   transposeShift={transposeShift}
                   tempo={tempo}
                 />
+              </Suspense>
               </div>
             )}
 

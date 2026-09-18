@@ -96,6 +96,7 @@ The 3 high-value items already shipped; remaining are incremental.
 | `js-index-maps` | ☐ | `contexts.find(x => x.id === …)` lookups in render paths (`App.tsx:1274` etc.) → build `Map` once |
 | `js-early-exit`, `js-length-check-first` | ✅ | Existing guards (e.g. `if (!alt.alternative) return`) |
 | `js-request-idle-callback` | ☐ | Defer `getRecentSessions(5)` + practice-set hydration to idle (they run on first paint today) |
+| `js-lazy-load-lib` | ✅ | `LiveScoreDisplay` → `React.lazy` (splits `abcjs` ~160 kB raw / ~54 kB gzip out of the initial ~511 kB main chunk; fetched only when the score mounts). Sheet-music PDF (jsPDF/svg2pdf + `sheetMusicExport`) already dynamic-`import()`ed; `@magenta/music` lazy (`magentaHelper`/`quantize`); MIDI export now `await import("./lib/midiExport")` so `midi-writer-js` loads on first export click |
 
 **Effort:** ~0.5–1 day.
 
