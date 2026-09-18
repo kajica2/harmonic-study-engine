@@ -17,8 +17,10 @@ broken.
   `/synthesize`, FX reverb at `/fx/reverb`, recording upload at
   `/recordings/upload`. Works without it; `/health` returns
   `status: "degraded"` on HF Spaces free tier, `status: "ok"` locally.
-- **Tests:** Vitest 2 (node env for pure logic, jsdom for React
-  components). 185 tests across 7 files.
+- **Tests:** Vitest 5 (node env for pure logic, jsdom for React
+  components). 363 tests across 72 frontend files + 29 backend
+  pytest tests. Per-file env routing via the `projects` API
+  (`JSDOM_FILES` list in `vitest.config.ts`).
 
 ## Top-level data flow
 
@@ -77,6 +79,13 @@ broken.
 | `src/lib/soundfont.ts` | FluidR3 GM soundfont loader (HD Sounds toggle). Cached per-instrument. |
 | `src/lib/midiOut.ts` / `midiIn.ts` | Web MIDI output + input wrappers. `midin` CustomEvent on window. |
 | `src/lib/playbackClock.ts` | Singleton rAF clock. Dispatches `tick` events to subscribers. |
+| `src/lib/guideTones.ts` | Pure MIDI→chord-role classifier (`classifyGuideTone`): root/3rd/5th/7th/9th/color/off. |
+| `src/lib/guideToneTrail.ts` | Pure fold of classifier matches into a per-run tally (3rd/7th hits vs misses, chord-tone hits, off notes). |
+| `src/lib/performanceLog.ts` | Append-only take log in localStorage (`hse.performance.log.v1`, cap 50). `recordTake`, `updateTakeRating`, `recordGuideToneResult`. |
+| `src/components/GuideToneFeedback.tsx` | Live classifier chip + MIDI device picker. Rendered inside `PracticeHeader`. |
+| `src/components/RecentTakesPanel.tsx` | "Recent takes" read side of the mastery log: 1–5 ratings + guide-tone progress bar. Mounted by App when takes exist. |
+| `src/hooks/usePerformanceLog.ts` | React view over `performanceLog.ts`; re-reads localStorage after every mutation. |
+| `src/hooks/useGuideToneTrail.ts` | Subscribes to `midiOut.onNoteOn`, classifies against the current chord (ref-fed), `begin()`/`end()` a recording run. |
 | `src/lib/useBassNotes.ts` | Subscribes to backing engine to surface bass line to UI. |
 | `src/lib/scalePlayer.ts` / `rhythmDrill.ts` | Scale practice + 3-iteration rhythm drill. |
 | `src/lib/scoreGenerator.ts` / `scoreExport.ts` | abcjs + MusicXML/Score21 export. |
@@ -138,8 +147,11 @@ The pure-helpers split lets the math be tested without Web Audio:
 - React components are tested via `@testing-library/react` with
   jsdom env. RTL setup pattern is in `InlineStatus.test.tsx`.
 
-`vitest.config.ts` routes `src/components/**/*.test.tsx` to jsdom;
-everything else is node env.
+`vitest.config.ts` routes per-file to jsdom via the `projects` API; a
+new DOM test file must be added to the shared `JSDOM_FILES` list —
+the per-file `// @vitest-environment` comment is ignored under
+multi-project mode. The CI drift gate (`assets/check-links.cjs`)
+rederives test counts from `tests/*.test.ts`.
 
 ## Adding a new persona
 
@@ -230,3 +242,46 @@ For the full design + implementation plan, see:
 - `docs/COMPOSITION-ENGINE-PLAN.md` — 9 layers × 7 sections each + roadmap + risks
 - `docs/COMPOSITION-MVP-PLAN.md` — 28 bite-sized tasks (Phase 1 pure logic, Phase 2 UI, Phase 3 verify)
 - `docs/COMPOSITION.md` — user-facing feature tour
+
+## Mastery / performance layer (added 2026-09-18)
+
+The practice loop's feedback and persistence layers (roadmap options
+C + G), arranged so the classifier's data can feed the take log:
+
+### Data flow
+
+```
+midiOut.onNoteOn ─► GuideToneFeedback   (live chip, per-note classify)
+                 └► useGuideToneTrail   (tallies WHILE a take records)
+                          │  end()
+                          ▼
+   App.onResult ─► recordGuideToneResult(id, {hit, miss}) ─► performanceLog
+   App.recordTake (on recorder start) ─┬─► take entry (path, tempo, meter, …)
+                                       └─► returned take id handed to the trail
+   RecentTakesPanel ◄── usePerformanceLog.takes ── read side (ratings + GT bar)
+```
+
+- `useGuideToneTrail(currentChordNotes)` is mounted once in App.tsx
+  **after** the `currentChordNotes` useMemo (hooks order: it needs
+  `currentChordNotes` to be defined first).
+- A take is logged the moment recording starts (so even an interrupted
+  take is captured); the guide-tone tally is attached on result — no
+  tally is written for takes where the player never played a note
+  (`totalNotes > 0` guard in App.tsx).
+- `performanceLog.ts` shape-guards reads (drops entries without string
+  `id`/`recordedAt`) so future schema additions stay additive.
+
+### Storage
+
+Single versioned key `hse.performance.log.v1`, append-only, pruned to
+50 takes (mirrors the 50-session cap in `practiceStore.ts`). All
+takes are opaque to the server — no sync yet (see `FUTURE_PLANNING.md`
+item 12).
+
+### Test boundary
+
+`guideToneTrail.ts` + `performanceLog.ts` are pure (take `midi`,
+`chordNotes`, `localStorage` via the jsdom MemoryStorage polyfill) and
+fully unit-tested (`tests/guideToneTrail.test.ts`,
+`tests/performanceLog.test.ts`). The classifier itself lives in
+`guideTones.ts` (`tests/guideTones.test.ts`).
