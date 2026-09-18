@@ -4,7 +4,8 @@ Status as of 2026-09-18 (session freeze). Everything below is grounded
 in the current codebase — no roadmap item pretends an unpublished
 feature exists. Companion docs: `IMPROVEMENT_PLAN.md` (the 8-option
 teardown), `IMPROVEMENT_PLAN_TOP10.md`, `docs/COMPOSITION-ENGINE-PLAN.md`,
-`docs/COMPOSITION-MVP-PLAN.md`, `TODO.md`, `CHANGELOG.md`.
+`docs/COMPOSITION-MVP-PLAN.md`, `TODO.md`, `CHANGELOG.md`,
+`PERF_ROADMAP.md` (Vercel React Best Practices, phased).
 
 ## Where we are (verified baseline)
 

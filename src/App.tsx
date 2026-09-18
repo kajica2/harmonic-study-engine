@@ -85,6 +85,7 @@ import { exportToMidiFile } from "./lib/midiExport";
 import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
 import { STEPS_PER_BAR } from "./lib/paths";
 import type { AlternativeChord } from "./lib/coCompose";
+import { ensureStorageSchemaVersion, K, storageSet } from "./lib/storage";
 import {
   planForm,
   MIN_PATH_BARS,
@@ -163,6 +164,11 @@ function ModalFallback() {
 }
 
 export default function App() {
+  // Run the localStorage schema gate before any hook hydrates from
+  // storage (client-localstorage-schema). No-op after the first call;
+  // never throws.
+  ensureStorageSchemaVersion();
+
   // Persistent session state — paths, transport, voicing, mutes,
   // arpeggiator, persona, loop range, metronome, humanizer. Hydrated
   // from localStorage by the hook (same `synesthesia_*` keys HEAD's
@@ -887,20 +893,10 @@ export default function App() {
   // Sync the few remaining vanilla useState values to localStorage.
   // Everything else is persisted by useSessionStore.
   useEffect(() => {
-    try {
-      localStorage.setItem("synesthesia_paths", JSON.stringify(paths));
-      localStorage.setItem(
-        "synesthesia_activePathIndex",
-        String(activePathIndex),
-      );
-      localStorage.setItem(
-        "synesthesia_activeStepIndex",
-        String(activeStepIndex),
-      );
-      localStorage.setItem("synesthesia_tempo", String(tempo));
-    } catch (e) {
-      console.warn("localStorage persistence error:", e);
-    }
+    storageSet(K.paths, JSON.stringify(paths));
+    storageSet(K.activePathIndex, String(activePathIndex));
+    storageSet(K.activeStepIndex, String(activeStepIndex));
+    storageSet(K.tempo, String(tempo));
   }, [paths, activePathIndex, activeStepIndex, tempo]);
 
   const handleGeneratePath = () => {

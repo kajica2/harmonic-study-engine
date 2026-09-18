@@ -23,6 +23,16 @@ import { RenderMode } from "../lib/loopWav";
 import { VoicingId } from "../lib/theory";
 import { ScoreDisplayMode } from "../lib/displayMode";
 import { useHistory } from "../lib/useHistory";
+import {
+  K,
+  FEEDBACK_HISTORY_MAX,
+  storageGet,
+  storageGetJSON,
+  storageGetNumber,
+  storageGetBool,
+  storageSet,
+  storageSetCap,
+} from "../lib/storage";
 
 // ---------- setter type aliases ------------------------------------------
 //
@@ -43,39 +53,19 @@ export type Setter<T> = Dispatch<SetStateAction<T>>;
 // doesn't have to know about localStorage edge cases.
 
 function loadString(key: string, fallback: string): string {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ?? fallback;
-  } catch {
-    return fallback;
-  }
+  return storageGet(key) ?? fallback;
 }
 
 function loadNumber(key: string, fallback: number): number {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved !== null ? Number(saved) : fallback;
-  } catch {
-    return fallback;
-  }
+  return storageGetNumber(key, fallback);
 }
 
 function loadJSON<T>(key: string, fallback: T): T {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
-  }
+  return storageGetJSON(key, fallback);
 }
 
 function loadBool(key: string, fallback: boolean): boolean {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved !== null ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
-  }
+  return storageGetBool(key, fallback);
 }
 
 // ---------- store type ---------------------------------------------------
@@ -459,27 +449,29 @@ export function useSessionStore(): SessionStore {
   const lastStepRef = useRef<{ pathId: string; stepIndex: number; step: HarmonicStep } | null>(null);
 
   // Persist on change. useState's setter identity is stable, so this
-  // effect runs only when the value actually changes.
+  // effect runs only when the value actually changes. Writes go through
+  // the shared storage helpers (schema-registered keys; corruption-safe;
+  // feedbackHistory is capped so the stored log stays bounded).
   useEffect(() => {
-    try { localStorage.setItem("synesthesia_humanizeAmount", String(humanizeAmount)); } catch {}
+    storageSet(K.humanizeAmount, String(humanizeAmount));
   }, [humanizeAmount]);
   useEffect(() => {
-    try { localStorage.setItem("synesthesia_humanizePersonaId", humanizePersonaId); } catch {}
+    storageSet(K.humanizePersonaId, humanizePersonaId);
   }, [humanizePersonaId]);
   useEffect(() => {
-    try { localStorage.setItem("synesthesia_melodyByStep", JSON.stringify(melodyByStep)); } catch {}
+    storageSet(K.melodyByStep, JSON.stringify(melodyByStep));
   }, [melodyByStep]);
   useEffect(() => {
-    try { localStorage.setItem("synesthesia_counterMelodyByStep", JSON.stringify(counterMelodyByStep)); } catch {}
+    storageSet(K.counterMelodyByStep, JSON.stringify(counterMelodyByStep));
   }, [counterMelodyByStep]);
   useEffect(() => {
-    try { localStorage.setItem("synesthesia_stylePackId", stylePackId ?? ""); } catch {}
+    storageSet(K.stylePackId, stylePackId ?? "");
   }, [stylePackId]);
   useEffect(() => {
-    try { localStorage.setItem("synesthesia_quizScore", JSON.stringify(quizScore)); } catch {}
+    storageSet(K.quizScore, JSON.stringify(quizScore));
   }, [quizScore]);
   useEffect(() => {
-    try { localStorage.setItem("synesthesia_feedbackHistory", JSON.stringify(feedbackHistory)); } catch {}
+    storageSetCap(K.feedbackHistory, feedbackHistory, FEEDBACK_HISTORY_MAX);
   }, [feedbackHistory]);
 
   return {

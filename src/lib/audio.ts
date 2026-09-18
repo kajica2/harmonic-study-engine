@@ -6,6 +6,7 @@ import {
   stopAllSoundfonts,
   soundfontAvailable,
 } from "./soundfont";
+import { K, storageGet, storageSet } from "./storage";
 
 /**
  * Whether to route notes through FluidR3 soundfont samples instead
@@ -14,14 +15,10 @@ import {
  * cached, so the richer sound wins without a repeat-fetch penalty.
  */
 function readHDSetting(): boolean {
-  try {
-    // Default true — FluidR3 soundfont is dramatically richer than the
-    // oscillator synth and the CDN load is cached after first fetch.
-    const stored = localStorage.getItem("synesthesia_hdSounds");
-    return stored === null ? true : stored === "1";
-  } catch {
-    return true;
-  }
+  // Default true — FluidR3 soundfont is dramatically richer than the
+  // oscillator synth and the CDN load is cached after first fetch.
+  const stored = storageGet(K.hdSounds);
+  return stored === null ? true : stored === "1";
 }
 
 /**
@@ -125,11 +122,7 @@ class AudioEngine {
 
   setHDSounds(enabled: boolean) {
     this.useHDSounds = enabled;
-    try {
-      localStorage.setItem("synesthesia_hdSounds", enabled ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
+    storageSet(K.hdSounds, enabled ? "1" : "0");
     if (!enabled) stopAllSoundfonts();
   }
 

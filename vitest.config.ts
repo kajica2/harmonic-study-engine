@@ -17,6 +17,7 @@ const JSDOM_FILES = [
   "src/lib/sheetMusicExport.test.ts",
   "src/lib/useCanvasSize.test.ts",
   "src/lib/backingTrack.test.ts",
+  "src/lib/storage.test.ts",
   "tests/usePathGenerator.test.ts",
   "tests/useSessionStore.test.ts",
   "tests/useDDSPProbe.test.ts",
