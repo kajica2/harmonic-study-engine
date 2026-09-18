@@ -23,7 +23,7 @@ function triadFromRoot(
   return notes;
 }
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
 import {
   Play,
   Pause,
@@ -73,8 +73,6 @@ import { generateHarmonicPath } from "./lib/generator";
 import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, transposeChordName, NOTE_NAMES_FLAT, type VoicingId } from "./lib/theory";
 import { useCanvasSize } from "./lib/useCanvasSize";
 import { velocityToGain } from "./lib/audioHelpers";
-import { ImportExportModal } from "./components/ImportExportModal";
-import { exportSheetMusicPDF, downloadSheetMusicPDF } from "./lib/sheetMusicExport";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
 import { generateGeminiEtude } from "./lib/geminiHelper";
@@ -95,7 +93,6 @@ import { loadStylePack, type StylePackId } from "./lib/stylePack";
 import { suggestMelody, pcSet } from "./lib/melodyMarkov";
 import { useAsyncAction } from "./lib/useAsyncAction";
 import { InlineErrorPill } from "./components/InlineStatus";
-import { RecordingModal } from "./components/RecordingModal";
 import { LiveScoreDisplay } from "./components/LiveScoreDisplay";
 import { MelodyLane } from "./components/MelodyLane";
 import { MelodyToolbar } from "./components/MelodyToolbar";
@@ -118,6 +115,10 @@ import { usePersistedState } from "./lib/usePersistedState";
 import { useFeedback } from "./hooks/useFeedback";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
 import { usePathGenerator } from "./hooks/usePathGenerator";
+import { usePerformanceLog } from "./hooks/usePerformanceLog";
+import { useGuideToneTrail } from "./hooks/useGuideToneTrail";
+import { transitionsMissed } from "./lib/guideToneTrail";
+import { RecentTakesPanel } from "./components/RecentTakesPanel";
 import { MobileCommandBar } from "./components/MobileCommandBar";
 import { LeadSheet } from "./components/LeadSheet";
 import { ModalShell, useModalLabel } from "./components/ModalShell";
@@ -133,6 +134,32 @@ import {
 
 // downloadText moved to src/lib/download.ts (extracted by main)
 
+// Heavy modal surfaces are code-split: they pull the publishing stack
+// (abcjs, jsPDF, svg2pdf.js, midi-writer-js) and are only on screen
+// after the user acts. Loading them lazily keeps the first-paint
+// bundle lean; each loads on first open with a small fallback.
+const ImportExportModal = lazy(() =>
+  import("./components/ImportExportModal").then((m) => ({
+    default: m.ImportExportModal,
+  })),
+);
+const RecordingModal = lazy(() =>
+  import("./components/RecordingModal").then((m) => ({
+    default: m.RecordingModal,
+  })),
+);
+
+/** Suspense fallback for the lazily-loaded modals in this file. */
+function ModalFallback() {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+      <div className="rounded-2xl border border-white/10 bg-neutral-900 px-6 py-4 text-sm text-neutral-300">
+        Loading…
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   // Persistent session state — paths, transport, voicing, mutes,
   // arpeggiator, persona, loop range, metronome, humanizer. Hydrated
@@ -140,6 +167,7 @@ export default function App() {
   // useSessionStore used, so existing user prefs survive reload).
   const session = useSessionStore();
   const feedback = useFeedback();
+  const performance = usePerformanceLog();
   const {
     paths,
     setPaths,
@@ -396,6 +424,10 @@ export default function App() {
     }
     return current.map((n) => n + transposeShift + (barDriftShifts[activeStepIndex] ?? 0));
   }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType, barDriftShifts]);
+
+  // Guide-tone trail — counts 3rd/7th hits during a take so the
+  // finished recording writes the tally onto the performance log.
+  const guideTrail = useGuideToneTrail(currentChordNotes);
 
   useEffect(() => {
     // Initialize audio engine on first interaction
@@ -1021,6 +1053,9 @@ export default function App() {
         instrument === "trumpet" || instrument === "sax"
           ? "Bb"
           : "Concert";
+      const { exportSheetMusicPDF, downloadSheetMusicPDF } = await import(
+        "./lib/sheetMusicExport"
+      );
       const blob = await exportSheetMusicPDF({
         path,
         instrument: pitch,
@@ -1460,6 +1495,20 @@ export default function App() {
               setMediaRecordingStatus(
                 `Recording (${mime.includes("video") ? "video" : "audio-only"})…`,
               );
+              // Log a take for the performance/mastery log (option G) —
+              // one entry per recorded take on this path. The guide-tone
+              // trail starts counting now; its tally is attached to the
+              // take once the recording finishes (below).
+              const take = performance.record({
+                pathId: path.id,
+                pathTitle: path.title,
+                tempo,
+                meter: timeSignature,
+                instrument,
+                personaId: selectedPersonaId,
+                durationSec: path.steps.length * (60 / tempo) * 4,
+              });
+              guideTrail.begin();
               // Tick elapsed seconds while recording
               const tick = () => {
                 setMediaRecordingElapsed(audioRecorder.elapsedSec);
@@ -1478,6 +1527,15 @@ export default function App() {
                 clearTimeout(timeout);
                 off();
                 setIsMediaRecording(false);
+                // Stop the guide-tone trail and fold its tally into the
+                // take that was logged when the recording started.
+                const trail = guideTrail.end();
+                if (take && trail && trail.totalNotes > 0) {
+                  performance.trail(take.id, {
+                    transitionsHit: trail.guideHits,
+                    transitionsMissed: transitionsMissed(trail),
+                  });
+                }
                 setMediaRecordingStatus(
                   `Recording captured (${result.durationSec.toFixed(1)}s) — uploading…`,
                 );
@@ -1573,6 +1631,17 @@ export default function App() {
             setPaths(paths.map((pp, i) => (i === activePathIndex ? newPath : pp)));
           }}
         />
+
+        {/* Performance mastery log — recent takes (roadmap option G).
+            Hidden until the first take exists so first paint stays
+            untouched. */}
+        {performance.takes.length > 0 && (
+          <RecentTakesPanel
+            takes={performance.takes}
+            onRate={(id, rating) => performance.rate(id, rating)}
+            onClear={() => performance.clear()}
+          />
+        )}
 
         {/* Synesthesia Composer Personas Ribbon */}
         <div className="bg-[color:var(--color-bg-1)] border border-[color:var(--color-border)] rounded-[var(--radius-xl)] p-4 sm:p-5 flex flex-col gap-4 shadow-[0_4px_18px_rgba(0,0,0,0.35)]">
@@ -3144,38 +3213,42 @@ export default function App() {
         </div>
       </main>
 
-      {showImportExport && (
-        <ImportExportModal
-          currentPath={path}
-          onImport={(newPaths) => {
-            if (newPaths.length === 0) return;
-            // Append imported charts to the path list, active = first
-            const merged = [...newPaths, ...paths];
-            setPaths(merged);
-            setActivePathIndex(0);
-            setActiveStepIndex(0);
-            setTransposeShift(0);
-          }}
-          onClose={() => setShowImportExport(false)}
-        />
-      )}
+      <Suspense fallback={<ModalFallback />}>
+        {showImportExport && (
+          <ImportExportModal
+            currentPath={path}
+            onImport={(newPaths) => {
+              if (newPaths.length === 0) return;
+              // Append imported charts to the path list, active = first
+              const merged = [...newPaths, ...paths];
+              setPaths(merged);
+              setActivePathIndex(0);
+              setActiveStepIndex(0);
+              setTransposeShift(0);
+            }}
+            onClose={() => setShowImportExport(false)}
+          />
+        )}
+      </Suspense>
 
-      {showRecordingModal && (
-        <RecordingModal
-          notes={recorder.notes}
-          tempo={tempo}
-          mp4Url={mp4BlobUrl}
-          onClose={() => {
-            setShowRecordingModal(false);
-            // Free the blob URL when the modal closes — keeps
-            // memory pressure low across many takes.
-            if (mp4BlobUrl) {
-              URL.revokeObjectURL(mp4BlobUrl);
-              setMp4BlobUrl(null);
-            }
-          }}
-        />
-      )}
+      <Suspense fallback={<ModalFallback />}>
+        {showRecordingModal && (
+          <RecordingModal
+            notes={recorder.notes}
+            tempo={tempo}
+            mp4Url={mp4BlobUrl}
+            onClose={() => {
+              setShowRecordingModal(false);
+              // Free the blob URL when the modal closes — keeps
+              // memory pressure low across many takes.
+              if (mp4BlobUrl) {
+                URL.revokeObjectURL(mp4BlobUrl);
+                setMp4BlobUrl(null);
+              }
+            }}
+          />
+        )}
+      </Suspense>
 
       {showLeadSheet && (
         <ModalShell

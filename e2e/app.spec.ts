@@ -102,3 +102,111 @@ test("Coltrane persona activates slice-and-repeat badge in live score", async ({
   await expect(badge).toBeVisible({ timeout: 8_000 });
   await expect(badge).toContainText("Slice & Repeat");
 });
+
+test("practice transport starts and pauses the loop", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("heading", { name: /Choose a mastermind/ }).waitFor({ timeout: 10_000 });
+
+  // The header's dominant action toggles between Start/Pause. Clicking
+  // Start also loads the deferred audio chunk, so this doubles as a
+  // smoke check that tone.js code-splits in cleanly at runtime.
+  const start = page.getByRole("button", { name: "Start practice" });
+  await expect(start).toBeVisible({ timeout: 5_000 });
+  await start.click();
+
+  const pause = page.getByRole("button", { name: "Pause practice" });
+  await expect(pause).toBeVisible({ timeout: 10_000 });
+  await pause.click();
+  await expect(page.getByRole("button", { name: "Start practice" })).toBeVisible({ timeout: 5_000 });
+});
+
+test("keyboard shortcuts cheatsheet opens and dismisses", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("heading", { name: /Choose a mastermind/ }).waitFor({ timeout: 10_000 });
+
+  const trigger = page.getByRole("button", { name: "Show keyboard shortcuts" });
+  await expect(trigger).toBeVisible({ timeout: 5_000 });
+  await trigger.click();
+
+  const dialog = page.locator('[aria-modal="true"]');
+  await expect(dialog).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("heading", { name: /Keyboard Shortcuts/i })).toBeVisible();
+
+  // ModalShell wires Esc to dismiss — press it and confirm the modal
+  // leaves the a11y tree entirely (not just visually hidden).
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+});
+
+test("Import/Export modal code-splits in and opens", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("heading", { name: /Choose a mastermind/ }).waitFor({ timeout: 10_000 });
+
+  // The Import/Export modal is React.lazy'd — opening it fetches the
+  // chunk on demand, so this verifies the code-split path (not just
+  // that the UI exists).
+  const openBtn = page.getByRole("button", { name: /Import \/ Export/ }).first();
+  await expect(openBtn).toBeVisible({ timeout: 5_000 });
+  await openBtn.click();
+
+  const dialog = page.locator('[aria-modal="true"]');
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
+  // The publishing stack lives in this lazy chunk too.
+  await expect(page.getByRole("heading", { name: /Import & export/i })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("button", { name: "Real Book" })).toBeVisible({ timeout: 5_000 });
+});
+
+test("recent takes panel renders seeded takes and persists a self-rating", async ({ page }) => {
+  // Seed one take through the app's own log key, exactly as the
+  // practice rail's Record Take flow writes it.
+  await page.addInitScript(() => {
+    // Only seed on the first navigation — addInitScript runs on every
+    // page load, so guard so a reload doesn't clobber the persisted
+    // self-rating the test is about to add.
+    if (localStorage.getItem("hse.performance.log.v1")) return;
+    const seed = [
+      {
+        id: "seed-take",
+        recordedAt: new Date().toISOString(),
+        pathId: "autumn-leaves",
+        pathTitle: "Autumn Leaves",
+        tempo: 120,
+        meter: "4/4",
+        instrument: "Bright",
+        personaId: "scriabin",
+        durationSec: 12.5,
+        // Guide-tone tally written by the classifier at record end
+        transitionsHit: 3,
+        transitionsMissed: 2,
+      },
+    ];
+    localStorage.setItem("hse.performance.log.v1", JSON.stringify(seed));
+  });
+
+  await page.goto("/");
+  await page.getByRole("heading", { name: /Choose a mastermind/ }).waitFor({ timeout: 10_000 });
+
+  // The panel only mounts once a take exists — seeded above.
+  const panel = page.getByRole("region", { name: "Recent takes" });
+  await expect(panel).toBeVisible({ timeout: 5_000 });
+  await expect(panel).toContainText("Autumn Leaves");
+  // Tempo + meter + instrument summarized in the mono meta row.
+  await expect(panel).toContainText("120 BPM");
+  await expect(panel).toContainText("4/4");
+
+  // The option-C tally rides on the take: 3/5 guide tones = 60%.
+  await expect(panel).toContainText("3/5");
+  await expect(panel.getByRole("progressbar", { name: "Guide-tone accuracy 60%" })).toBeVisible();
+
+  // Rate the take 4/5 — the button flips to active and persists.
+  const rate5 = panel.getByRole("radio", { name: /^5 — mastered$/ });
+  await rate5.click();
+  await expect(rate5).toHaveAttribute("aria-checked", "true");
+
+  // The rating survives a reload (written back to localStorage).
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Recent takes" })).toBeVisible({ timeout: 5_000 });
+  await expect(
+    page.getByRole("region", { name: "Recent takes" }).getByRole("radio", { name: /^5 — mastered$/ }),
+  ).toHaveAttribute("aria-checked", "true");
+});

@@ -23,6 +23,26 @@ export default defineConfig(() => {
       // in via dynamic import chains.
       rollupOptions: {
         external: (id) => /\.test\.(ts|tsx)$/.test(id),
+        // Split the heavyweight vendor libs into stable, cacheable
+        // chunks. This is a pure caching/parallelism win — dangerously
+        // large libs (magentaHelper is already a dynamic chunk) get
+        // their own cache line so a redeploy of app code doesn't
+        // re-download megabytes.
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
+            if (/node_modules\/lucide-react\//.test(id)) return 'ui';
+            if (/node_modules\/tone\//.test(id)) return 'audio';
+            if (/node_modules\/abcjs\//.test(id)) return 'score';
+            if (/node_modules\/(jspdf|svg2pdf|fflate)\//.test(id)) return 'publish';
+            if (/node_modules\/midi-writer-js\//.test(id)) return 'midi';
+            // Everything else — including @magenta/music, which must stay
+            // inside its own dynamic-import chunk rather than being merged
+            // into an eager vendor bundle — is left to Rollup's resolution.
+            return undefined;
+          },
+        },
       },
     },
     resolve: {
