@@ -71,6 +71,31 @@ completed items `- [x]` to stop the loop.
       device is connected. Do NOT auto-detect chords (out of scope) — just
       the listener + indicator.
 
+- [x] **First-try vs rep-3 snapshots (FUTURE_PLANNING #2)** — added
+      optional `rep` field to `PerformanceTake`, auto-stamped on
+      `recordTake` as `prior_count_on_same_path + 1`. New
+      `getPreviousTakeWithTally` + `guideToneAccuracy` helpers in
+      `performanceLog.ts`. `RecentTakesPanel` now renders a `rep N`
+      badge per row and a `±% vs rep #N-1` diff subline. 22 new tests
+      in `performanceLog.test.ts` (889 total).
+
+## Phase 7 — Masterclass enablement (FUTURE_PLANNING #4)
+
+The roadmap calls for batched one-MC-family-at-a-time enablement of
+the 35 masterclass tunes that ship with `inApp: false`. Per-tune
+tasks (one iteration each) live in `MASTERCLASS_TODO.md` so this
+file stays tight. The pointer below is the only item the loop reads
+from `TODO.md` for Phase 7; the per-tune work is in
+`MASTERCLASS_TODO.md`.
+
+- [ ] **Phase 7 — Masterclass enablement backlog** —
+      `MASTERCLASS_TODO.md` lists 35 per-tune `- [ ]` items (one
+      per masterclass tune), batched by MC class. The loop picks
+      the highest-priority unchecked item there, implements it,
+      then marks it `- [x]` per LOOP-PROMPT step 6. When the file
+      reaches 35/35 `- [x]`, this pointer is also `- [x]` and
+      Phase 7 is closed.
+
 ## Constraints (read LOOP-PROMPT.md before each iteration)
 
 - **Never** kill sibling processes (Hermes WhatsApp bridge owns :3000).
