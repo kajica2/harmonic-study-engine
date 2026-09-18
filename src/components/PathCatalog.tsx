@@ -355,7 +355,7 @@ export const PathCatalog = memo(function PathCatalog({
                 key={p.id}
                 data-testid="catalog-card"
                 data-path-id={p.id}
-                className="flex flex-col gap-2 p-3 rounded-xl border border-transparent bg-neutral-900/40 hover:bg-neutral-900/80 hover:border-neutral-800 transition-colors"
+                className="flex flex-col gap-2 p-3 rounded-xl border border-transparent bg-neutral-900/40 hover:bg-neutral-900/80 hover:border-neutral-800 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_140px]"
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-xs text-neutral-200 line-clamp-2">

@@ -75,11 +75,11 @@ The 3 high-value items already shipped; remaining are incremental.
 
 | Rule | Status | Evidence / work |
 |------|--------|-----------------|
-| `rendering-conditional-render` | ◐ | ~16 `{x && (...)}` sites (`App.tsx:1260,1660+,2470+`); switch array-branch/`&&` returns to ternaries where the branch returns arrays (avoids rendering `false` nodes). Style-level win |
-| `rendering-hoist-jsx` | ☐ | Extract the ~700-line sidebar (Personas ribbon → catalog/practice tabs, `App.tsx` ~1650–2300) and the right column into components (`SidebarPanel`, `VisualizationColumn`) — also unlocks finer memo boundaries |
-| `rendering-content-visibility` | ☐ | `PathCatalog` list: add `content-visibility:auto` + `contain-intrinsic-size` on row containers for long catalogs |
+| `rendering-conditional-render` | ✅/◐ | Audited all ~16 `{x && (...)}` sites in App: none return array branches (all single JSX nodes, safe). `false`-node pattern not present in `.map` returns. No change needed beyond audit |
+| `rendering-hoist-jsx` | ◐ | AuditionControls, MidiInPicker already extracted. Full ~700-line sidebar (`SidebarPanel`) + right-column (`VisualizationColumn`) extraction remains a dedicated PR (1–2 days, roadmap estimate) |
+| `rendering-content-visibility` | ✅ | `PathCatalog` cards: `content-visibility:auto` + `contain-intrinsic-size:auto 140px` (long catalogs skip offscreen layout/repaint). LiveScore is a single SVG — not applicable |
 | `rendering-svg-precision` | N/A | No heavy dynamic SVG coordinate strings |
-| `rendering-usetransition-loading` | ☐ | Fold into `rerender-transitions` item (startTransition around path/pack loads) |
+| `rendering-usetransition-loading` | ✅ | Folded into `rerender-transitions` (startTransition around path select + tab switch shipped in Phase 2) |
 | `rendering-resource-hints` / `rendering-script-defer-async` | ☐ | Deferred with `bundle-preload` phase |
 
 **Effort:** JSX extraction 1–2 days; rest under a day.
