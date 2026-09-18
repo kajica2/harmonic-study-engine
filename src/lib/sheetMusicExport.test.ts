@@ -33,15 +33,18 @@ vi.mock("svg2pdf.js", () => ({
   svg2pdf: vi.fn(async () => Promise.resolve()),
 }));
 vi.mock("jspdf", () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      setFont: vi.fn(),
-      setFontSize: vi.fn(),
-      text: vi.fn(),
-      addPage: vi.fn(),
-      output: vi.fn(() => new Blob(["fake pdf"], { type: "application/pdf" })),
-    })),
-  };
+  // A class (not an arrow factory) so `new jsPDF()` is legal — mocks
+  // that return arrow functions are not constructible under vitest 5.
+  class MockJsPDF {
+    setFont(): void {}
+    setFontSize(): void {}
+    text(): void {}
+    addPage(): void {}
+    output(): Blob {
+      return new Blob(["fake pdf"], { type: "application/pdf" });
+    }
+  }
+  return { default: MockJsPDF };
 });
 
 // jsdom doesn't ship URL.createObjectURL/revokeObjectURL — polyfill
