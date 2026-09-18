@@ -7,6 +7,7 @@
  */
 
 import { stepsPerBar } from "./loopWav";
+import { transitionsMissed, type GuideToneTrail } from "./guideToneTrail";
 import type { HarmonicPath } from "./paths";
 import type { TimeSignature } from "./rhythm";
 
@@ -82,4 +83,24 @@ export function formatStepEyebrow(
  */
 export function formatTempo(tempo: number): string {
   return `${Math.round(tempo)} bpm`;
+}
+
+/**
+ * Build the live "✓ N · ✗ M" guide-tone tally chip that sits next to
+ * GuideToneFeedback in the PracticeHeader. Returns null when no notes
+ * have landed yet — the chip stays hidden during silence so it
+ * doesn't distract from the latest-match chip.
+ *
+ * Example: totalNotes=4, guideHits=3 -> "✓ 3 · ✗ 1"
+ *
+ * The ✓ / ✗ glyphs come from FUTURE_PLANNING's "Near term" item #1:
+ * "guide-tone live streak in the practice header." Reuses
+ * `transitionsMissed` from guideToneTrail so the meaning stays
+ * consistent with the take record written by the mastery log.
+ */
+export function formatGuideToneTally(
+  trail: GuideToneTrail,
+): string | null {
+  if (trail.totalNotes === 0) return null;
+  return `✓ ${trail.guideHits} · ✗ ${transitionsMissed(trail)}`;
 }

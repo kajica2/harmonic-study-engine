@@ -1355,8 +1355,21 @@ function AppShell() {
         chordName={transposeChordName(step.name ?? "", transposeShift)}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
+        guideToneTrail={guideTrail.tally}
         isPlaying={isPlayingAuto}
-        onPlayPause={() => setIsPlayingAuto(!isPlayingAuto)}
+        onPlayPause={() => {
+          // Start/stop the live guide-tone tally alongside the
+          // practice loop. `begin()` is idempotent (per its
+          // useCallback impl), so the recording-flow's later
+          // `guideTrail.begin()` at the take start is a safe
+          // re-entry. `end()` returns null when not active.
+          if (isPlayingAuto) {
+            guideTrail.end();
+          } else {
+            guideTrail.begin();
+          }
+          setIsPlayingAuto(!isPlayingAuto);
+        }}
         tempo={tempo}
         onTempoChange={setTempo}
         isLooping={isLooping}

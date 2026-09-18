@@ -2,10 +2,12 @@ import React from "react";
 import { Play, Pause, Repeat } from "lucide-react";
 import {
   formatChordReadout,
+  formatGuideToneTally,
   formatStepEyebrow,
   formatTempo,
 } from "../lib/practiceHeader";
 import { GuideToneFeedback } from "./GuideToneFeedback";
+import type { GuideToneTrail } from "../lib/guideToneTrail";
 import type { BackingStyle } from "../lib/backingEngine";
 import type { HarmonicPath } from "../lib/paths";
 import type { TimeSignature } from "../lib/rhythm";
@@ -46,6 +48,10 @@ interface PracticeHeaderProps {
   /** Transposed chord notes (MIDI) for the active step — fed to
    *  the GuideToneFeedback classifier. */
   chordNotes: number[];
+  /** Live guide-tone tally from useGuideToneTrail. Renders a small
+   *  "✓ N · ✗ M" chip next to GuideToneFeedback so sight-reading
+   *  practice gets immediate feedback without recording. */
+  guideToneTrail?: GuideToneTrail;
 
   // Transport
   isPlaying: boolean;
@@ -92,6 +98,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   chordName,
   timeSignature,
   chordNotes,
+  guideToneTrail,
   isPlaying,
   onPlayPause,
   tempo,
@@ -112,6 +119,9 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
     timeSignature,
   );
   const eyebrow = formatStepEyebrow(path, activeStepIndex);
+  const guideToneLabel = guideToneTrail
+    ? formatGuideToneTally(guideToneTrail)
+    : null;
 
   return (
     <div
@@ -138,8 +148,20 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
         >
           {readout}
         </div>
-        <div className="mt-1.5">
+        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
           <GuideToneFeedback chordNotes={chordNotes} />
+          {guideToneLabel && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 text-[11px] t-mono text-neutral-200"
+              role="status"
+              aria-live="polite"
+              data-testid="guide-tone-tally"
+              title="Live guide-tone tally since the practice loop started"
+            >
+              <span aria-hidden>GT</span>
+              <span>{guideToneLabel}</span>
+            </span>
+          )}
         </div>
       </div>
 
