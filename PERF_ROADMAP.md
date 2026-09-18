@@ -76,7 +76,7 @@ The 3 high-value items already shipped; remaining are incremental.
 | Rule | Status | Evidence / work |
 |------|--------|-----------------|
 | `rendering-conditional-render` | ✅/◐ | Audited all ~16 `{x && (...)}` sites in App: none return array branches (all single JSX nodes, safe). `false`-node pattern not present in `.map` returns. No change needed beyond audit |
-| `rendering-hoist-jsx` | ◐ | AuditionControls, MidiInPicker already extracted. Full ~700-line sidebar (`SidebarPanel`) + right-column (`VisualizationColumn`) extraction remains a dedicated PR (1–2 days, roadmap estimate) |
+| `rendering-hoist-jsx` | ◐ | AuditionControls, MidiInPicker already extracted. Full ~700-line sidebar (`SidebarPanel`) + right-column (`VisualizationColumn`) extraction remains a dedicated PR (1–2 days, roadmap estimate). **Caution (2026-09-18):** `PersonasRibbon` extraction was attempted via scripted tooling and **reverted in `5a525ff`** — the automation layer drifted 129 vs 145 leaf lines, so it was NOT byte-faithful. Extraction must be a **de-indent-8 + re-indent job done with a real editor, byte-exact cut/paste**, then gate-green; do not re-attempt with scripted heredoc/bin-editing |
 | `rendering-content-visibility` | ✅ | `PathCatalog` cards: `content-visibility:auto` + `contain-intrinsic-size:auto 140px` (long catalogs skip offscreen layout/repaint). LiveScore is a single SVG — not applicable |
 | `rendering-svg-precision` | N/A | No heavy dynamic SVG coordinate strings |
 | `rendering-usetransition-loading` | ✅ | Folded into `rerender-transitions` (startTransition around path select + tab switch shipped in Phase 2) |
