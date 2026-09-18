@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { NOTE_NAMES, PITCH_COLORS } from "../lib/theory";
+import { useSynesthesiaActive } from "./SynesthesiaProvider";
 
 /**
  * Per-key layer. Each layer is a different stream of MIDI notes
@@ -52,8 +53,8 @@ const LAYER_DEFS: LayerConfig[] = [
 ];
 
 interface PianoKeyboardProps {
-  /** Currently audible synth notes (kept for backwards compat). */
-  activeMidis: number[];
+  /** Currently audible synth notes (optional — falls back to context). */
+  activeMidis?: number[];
   /** Static chord-tone layer (default: current chord of the path). */
   chordMidis?: number[];
   /** Live sounding-notes layer (default: same as activeMidis). */
@@ -76,9 +77,15 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
   startMidi = 48,
   octaves = 2,
 }) => {
+  // The live note set comes from SynesthesiaProvider so keyboard renders
+  // subscribe to exactly the handler they draw from (note events never
+  // re-render App's whole tree). The prop is kept for legacy call sites.
+  const contextMidis = useSynesthesiaActive();
+  const resolvedActive = activeMidis ?? contextMidis;
+
   // Default the "sound" layer to the legacy `activeMidis` prop so
   // existing call sites (which only pass activeMidis) keep working.
-  const liveSound = soundingMidis ?? activeMidis;
+  const liveSound = soundingMidis ?? resolvedActive;
 
   // Each layer is toggleable. The user can show any combination.
   // Default: chord + sound ON, bass OFF (stub).

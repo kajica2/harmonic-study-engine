@@ -66,6 +66,14 @@ import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
 import { PianoKeyboard } from "./components/PianoKeyboard";
 import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
 import { MidiInPicker } from "./components/MidiInPicker";
+import {
+  SynesthesiaProvider,
+  useSynesthesiaSetActive,
+} from "./components/SynesthesiaProvider";
+import {
+  AuditionToggleButton,
+  AuditionHint,
+} from "./components/AuditionControls";
 import { PracticeSetBrowser } from "./components/PracticeSetBrowser";
 import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -164,6 +172,14 @@ function ModalFallback() {
 }
 
 export default function App() {
+  return (
+    <SynesthesiaProvider>
+      <AppShell />
+    </SynesthesiaProvider>
+  );
+}
+
+function AppShell() {
   // Run the localStorage schema gate before any hook hydrates from
   // storage (client-localstorage-schema). No-op after the first call;
   // never throws.
@@ -268,8 +284,11 @@ export default function App() {
     defaultValue: "roman-numerals",
   });
   const [selectedMidiInId, setSelectedMidiInId] = useState<string>("");
-  // MIDI / recording ephemeral state
-  const [activeMidis, setActiveMidis] = useState<number[]>([]);
+  // MIDI / recording ephemeral state. The live note set lives in
+  // SynesthesiaProvider; App only ever WRITES it (via the stable setter),
+  // so note events don't re-render this whole tree. Consumers read it
+  // through useSynesthesiaActive().
+  const setActiveMidis = useSynesthesiaSetActive();
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   // Phase 5 refactor: extracted to src/lib/useCanvasSize. Listens to
   // window.resize AND a ResizeObserver so sidebar toggles re-measure.
@@ -2435,32 +2454,10 @@ export default function App() {
                   >
                     <ChevronLeft />
                   </button>
-                  {activeMidis.length > 0 ? (
-                    <button
-                      onClick={() => {
-                        audioEngine.stopAll();
-                        midiOut.stopAll();
-                        setActiveMidis([]);
-                        setIsPlayingAuto(false);
-                      }}
-                      aria-label="Stop chord"
-                      className="w-11 h-11 flex items-center justify-center rounded-full surface-1 border border-[color:var(--color-border)] active:bg-[color:var(--color-bg-2)] transition-colors"
-                    >
-                      <Square size={18} className="fill-current text-[color:var(--color-brand)]" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        audioEngine.playChord(currentChordNotes);
-                        midiOut.playChord(currentChordNotes);
-                        setActiveMidis(currentChordNotes);
-                      }}
-                      aria-label="Play chord"
-                      className="w-11 h-11 flex items-center justify-center rounded-full bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] hover:bg-[color:var(--color-brand-strong)] active:scale-95 transition-transform"
-                    >
-                      <Play size={20} className="fill-current translate-x-[1px]" />
-                    </button>
-                  )}
+                  <AuditionToggleButton
+                    chordMidis={currentChordNotes}
+                    onStopped={() => setIsPlayingAuto(false)}
+                  />
                   <button
                     onClick={() =>
                       setActiveStepIndex(
@@ -2487,11 +2484,7 @@ export default function App() {
                   controls, so the user sees the inspector exists before
                   they have to dig into the Commit & Export stage. */}
               <div className="flex items-center justify-between gap-2 mb-3 px-1 text-xs">
-                <p className="t-small text-[color:var(--color-text-3)] flex-1">
-                  {activeMidis.length > 0
-                    ? "Auditioning this chord — click ◂ ▸ to step, or open the editor to tweak the voicing."
-                    : "Click play to audition this chord. Use ◂ ▸ to step through the path."}
-                </p>
+                <AuditionHint />
                 <button
                   onClick={() => setShowChordInspector(true)}
                   className="flex-shrink-0 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-md)] px-2.5 py-1.5 flex items-center gap-1.5 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)] hover:border-[color:var(--color-brand-strong)] transition-colors"
@@ -2938,7 +2931,6 @@ export default function App() {
               <ErrorBoundary scope="Synesthesia Canvas">
                 <SynesthesiaCanvas
                 visualTheme={activePersonaVisualTheme}
-                activeMidis={activeMidis}
                 width={canvasSize.width}
                 height={canvasSize.height}
                 showLabels={showTheoryLabels}
@@ -3114,9 +3106,7 @@ export default function App() {
             </div>
             <div className="w-full bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 p-4 shadow-2xl">
               <PianoKeyboard
-                activeMidis={activeMidis}
                 chordMidis={currentChordNotes}
-                soundingMidis={activeMidis}
                 bassMidis={bassMidis}
                 onPlayNote={(midi) => {
                   audioEngine.playNote(midi);

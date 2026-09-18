@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback } from "react";
 import { getShapeForNote, getColorForNote } from "../lib/theory";
 import { VisualTheme } from "../lib/personas";
+import { useSynesthesiaActive } from "./SynesthesiaProvider";
 
 function calculateDissonance(midis: number[]): number {
   if (midis.length < 2) return 0;
@@ -76,7 +77,6 @@ function getIntervalLabel(midi: number, rootMidi: number): string {
 }
 
 interface CanvasProps {
-  activeMidis: number[];
   width: number;
   height: number;
   showLabels?: boolean;
@@ -96,7 +96,6 @@ interface CanvasProps {
 
 // Kandinsky inspired visualization
 export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
-  activeMidis,
   width,
   height,
   showLabels,
@@ -107,6 +106,11 @@ export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
   onCanvasReady,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // The synth's live note set arrives via context (see SynesthesiaProvider)
+  // so this draw-only component re-renders exactly when notes change —
+  // never App and its sibling panels.
+  const activeMidis = useSynesthesiaActive();
 
   // Store persistent fading shapes
   const artifactsRef = useRef<
