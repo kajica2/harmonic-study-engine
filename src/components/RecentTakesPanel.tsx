@@ -12,7 +12,12 @@
  */
 import React from "react";
 import { Trash2, Clock } from "lucide-react";
-import { formatRelativeTime, type PerformanceTake } from "../lib/performanceLog";
+import {
+  formatRelativeTime,
+  getPreviousTakeWithTally,
+  guideToneAccuracy,
+  type PerformanceTake,
+} from "../lib/performanceLog";
 
 const RATE_LABELS = ["struggled", "getting there", "comfortable", "solid", "mastered"];
 
@@ -52,6 +57,7 @@ export const RecentTakesPanel = React.memo(function RecentTakesPanel({
           <TakeRow
             key={t.id}
             take={t}
+            allTakes={takes}
             onRate={(rating) => onRate(t.id, rating)}
           />
         ))}
@@ -96,16 +102,61 @@ const GuideToneProgress: React.FC<{ take: PerformanceTake }> = ({ take }) => {
   );
 };
 
+/**
+ * RepDiff — the "first try vs rep #3" subline shown when a take has
+ * a recorded tally AND an immediately-previous take on the same path
+ * also has a tally. Renders the absolute accuracy delta as
+ * "+15% vs rep #N" (positive = improvement).
+ *
+ * Hidden when no prior take with a tally exists, when the current
+ * take has no tally yet, or when the current take is rep #1.
+ */
+const RepDiff: React.FC<{
+  take: PerformanceTake;
+  allTakes: PerformanceTake[];
+}> = ({ take, allTakes }) => {
+  const prev = getPreviousTakeWithTally(allTakes, take);
+  if (!prev) return null;
+  const cur = guideToneAccuracy(take);
+  const pre = guideToneAccuracy(prev);
+  if (cur === null || pre === null) return null;
+  const deltaPct = Math.round((cur - pre) * 100);
+  const sign = deltaPct > 0 ? "+" : "";
+  const color =
+    deltaPct > 0
+      ? "text-emerald-300"
+      : deltaPct < 0
+        ? "text-rose-300"
+        : "text-neutral-400";
+  return (
+    <div className="mt-0.5 text-[10px] font-mono">
+      <span className={color}>
+        {sign}
+        {deltaPct}% vs rep #{prev.rep}
+      </span>
+    </div>
+  );
+};
+
 const TakeRow: React.FC<{
   take: PerformanceTake;
+  allTakes: PerformanceTake[];
   onRate: (rating: number) => void;
-}> = ({ take, onRate }) => (
+}> = ({ take, allTakes, onRate }) => (
   <li className="flex flex-wrap items-center justify-between gap-2 py-2">
     <div className="min-w-0">
       <div className="flex items-center gap-2">
         <span className="font-bold text-sm text-[color:var(--color-text-1)] truncate">
           {take.pathTitle}
         </span>
+        {typeof take.rep === "number" && (
+          <span
+            className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[color:var(--color-border)] text-neutral-400"
+            title={`Repetition #${take.rep} on this path`}
+          >
+            rep {take.rep}
+          </span>
+        )}
         <span className="text-[10px] font-mono text-neutral-500">
           {formatRelativeTime(take.recordedAt)}
         </span>
@@ -116,7 +167,10 @@ const TakeRow: React.FC<{
       </div>
       {typeof take.transitionsHit === "number" &&
         typeof take.transitionsMissed === "number" && (
-          <GuideToneProgress take={take} />
+          <>
+            <GuideToneProgress take={take} />
+            <RepDiff take={take} allTakes={allTakes} />
+          </>
         )}
     </div>
 

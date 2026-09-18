@@ -35,6 +35,13 @@ export interface PerformanceTake {
   transitionsHit?: number;
   /** Note-ons during the take that were NOT a guide tone. */
   transitionsMissed?: number;
+  /** Which repetition of this path the take is — counted by
+   *  `recordTake` (1 = first take on this path, 2 = second, ...).
+   *  Optional in the schema so older takes stay shape-valid; missing
+   *  values render as "rep ?". The roadmap calls for a "first try vs
+   *  rep #3" comparison row in the Recent takes panel — this field
+   *  plus `guideToneAccuracy` powers that diff. */
+  rep?: number;
 }
 
 /** Versioned key — bump when the shape changes and add a migration. */
@@ -75,15 +82,21 @@ function persist(takes: PerformanceTake[]): void {
 
 /**
  * Append a take (returns the stored copy) and prune to `MAX_TAKES`.
- * `recordedAt` is stamped here so callers can't drift clocks.
+ * `recordedAt` is stamped here so callers can't drift clocks. The
+ * `rep` field is auto-computed: 1 = first take on this path, 2 =
+ * second, etc. (counted across all stored takes on the same pathId).
+ * No shape migration needed — `rep` is optional in the schema, so
+ * older takes stay valid.
  */
 export function recordTake(
-  input: Omit<PerformanceTake, "id" | "recordedAt">,
+  input: Omit<PerformanceTake, "id" | "recordedAt" | "rep">,
 ): PerformanceTake {
+  const prior = loadTakes().filter((t) => t.pathId === input.pathId).length;
   const take: PerformanceTake = {
     ...input,
     id: nextId(),
     recordedAt: new Date().toISOString(),
+    rep: prior + 1,
   };
   const all = [...loadTakes(), take].slice(-MAX_TAKES);
   persist(all);
@@ -154,4 +167,57 @@ export function formatRelativeTime(
   if (day < 7) return `${day}d ago`;
   const wk = Math.floor(day / 7);
   return `${wk}w ago`;
+}
+
+/**
+ * Guide-tone accuracy as a 0..1 fraction, or null when no tally has
+ * been recorded yet (older takes, or a take whose recording was
+ * interrupted before the trail ended).
+ */
+export function guideToneAccuracy(
+  take: PerformanceTake,
+): number | null {
+  if (take.transitionsHit === undefined) return null;
+  if (take.transitionsMissed === undefined) return null;
+  if (!Number.isInteger(take.transitionsHit)) return null;
+  if (!Number.isInteger(take.transitionsMissed)) return null;
+  const total = take.transitionsHit + take.transitionsMissed;
+  if (total === 0) return null;
+  return take.transitionsHit / total;
+}
+
+/**
+ * Look up the immediately-previous take on the same path that has
+ * a guide-tone tally. Used by the "first try vs rep #3" diff row in
+ * the Recent takes panel. Returns null when there is no prior take
+ * with a tally (first take, or only the current take has data).
+ *
+ * `takes` should be the full log (append-ordered). We match by
+ * `pathId` and require both reps to be integers — that filters out
+ * pre-`rep`-field legacy entries from the diff even when they
+ * happen to sit adjacent.
+ */
+export function getPreviousTakeWithTally(
+  takes: PerformanceTake[],
+  take: PerformanceTake,
+): PerformanceTake | null {
+  if (typeof take.rep !== "number" || take.rep <= 1) return null;
+  const targetRep = take.rep - 1;
+  // Walk backwards through the log; find the closest entry with the
+  // same pathId AND rep === targetRep AND a recorded tally.
+  for (let i = takes.length - 1; i >= 0; i--) {
+    const t = takes[i];
+    if (t.transitionsHit === undefined) continue;
+    if (t.transitionsMissed === undefined) continue;
+    if (
+      t.id !== take.id &&
+      t.pathId === take.pathId &&
+      t.rep === targetRep &&
+      Number.isInteger(t.transitionsHit) &&
+      Number.isInteger(t.transitionsMissed)
+    ) {
+      return t;
+    }
+  }
+  return null;
 }
