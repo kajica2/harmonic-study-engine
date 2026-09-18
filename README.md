@@ -8,17 +8,26 @@ and full export to MIDI / MusicXML / Score21 / MP4.
 
 ## What works
 
-- **17 synesthesia personas** — 12 jazz/electronic (Kandinsky,
+- **Performance / mastery log** — every take recorded from the
+  practice rail's Record Take flow is persisted to a local log
+  (timestamp, path, tempo, meter, instrument, persona, loop
+  duration); a "Recent takes" panel below the practice loop shows
+  the latest takes with 1–5 self-ratings that stick across reloads.
+  Each take also carries a live guide-tone tally fed by the
+  classifier — "3/5 guide tones · 60%" with a fill bar — so 3rd/7th
+  accuracy trends between takes.
+- **22 personas** — 12 jazz/electronic (Kandinsky,
   Coltrane, Bach, Debussy, Eno, Glass, Monk, Miles, Chet Baker,
   Dizzy, Freddie Hubbard, Wayne Shorter) + 5 classical
-  (Scriabin, Rachmaninov, Brahms, Tchaikovsky, Mahler). Each
+  (Scriabin, Rachmaninov, Brahms, Tchaikovsky, Mahler) + 5 more
+  jazz voices (Simone, Novaro, Getz, Rollins, Henderson). Each
   persona sets the visual theme, instrument voicing, tempo,
   default path, and (where historically documented) the
   synesthesia color map. Badges in the UI distinguish
   "documented" synesthesia (Kandinsky, Scriabin) from
   "interpretive" coloring (everyone else).
 - **Curated harmonic paths** — 8 built-in + 5 classical persona
-  paths (Paths XXXIII–XXXVII) + 36-tune masterclass catalog
+  paths (Paths XXXIII–XXXVII) + 38-tune catalog
   (Star Eyes, Cherokee, Solar, Out of Nowhere, I'll Remember
   April, Blue Bossa, etc.) with composer + key + technique
   filters in the Path Catalog tab.
@@ -248,7 +257,7 @@ Coverage:
 - `tests/useSessionStore.test.ts` — localStorage hydration + the
   legacy `beatType` migration map
 
-307 tests passing as of this commit (278 frontend it() + 29 backend def test_).
+363 tests passing as of this commit (334 frontend it() + 29 backend def test_) = 363.
 Both counts verified by `npm test` and `npm run test:py` against the
 repo today. New tests added for previously-untested lib files
 (useBassNotes, importRealBook, ireal — the ones the older "What to

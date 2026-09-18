@@ -50,23 +50,32 @@ function findLine(file, needle) {
   return -1;
 }
 
-// ---------- 1. Personas — 17 -----------------------------------------------
+// ---------- 1. Personas — read from SPEC --------------------------------
+// SPEC.md is the source of truth; the gate parses the count there so a
+// persona-list change is a one-site edit (SPEC + data), not a drive-by
+// edit to this gate too.
 
 function checkPersonas() {
   const json = JSON.parse(read("src/data/personas.json"));
-  const expected = Array.isArray(json) ? json.length : null;
-  if (expected !== 17) {
-    fail(`src/data/personas.json length = ${expected}, SPEC says 17`);
+  const actual = Array.isArray(json) ? json.length : null;
+  const specMatch = read("SPEC.md").match(/###\s*1\.\s*Personas\s*—\s*\*\*(\d+)\*\*/);
+  if (!specMatch) {
+    fail(`SPEC.md: cannot find "### 1. Personas — **N**"`);
+    return;
+  }
+  const expected = parseInt(specMatch[1], 10);
+  if (actual !== expected) {
+    fail(`src/data/personas.json length = ${actual}, SPEC says ${expected}`);
     return;
   }
   // README.md feature list
   const readme = read("README.md");
-  const m = readme.match(/(\d+)\s+masterclass\s+persona/);
+  const m = readme.match(/(\d+)\s+personas?\b/);
   if (!m) {
-    fail(`README.md: cannot find "N masterclass persona(s)" pattern`);
+    fail(`README.md: cannot find "N persona(s)" pattern`);
   } else if (parseInt(m[1], 10) !== expected) {
-    const ln = findLine("README.md", `${m[1]} masterclass persona`);
-    fail(`README.md:${ln} — "masterclass persona" count = ${m[1]}, expected ${expected}`);
+    const ln = findLine("README.md", `${m[1]} persona`);
+    fail(`README.md:${ln} — "persona(s)" count = ${m[1]}, expected ${expected}`);
   }
   // personaProfiles.ts header comment
   const pp = read("src/magenta/personaProfiles.ts");

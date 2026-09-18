@@ -2,8 +2,8 @@
  * magenta/personaProfiles.ts
  * ──────────────────────────
  * Humanizer parameters per persona. One row per `Persona.id` in
- * `src/lib/personas.ts` (currently 17 — the original 12 from the
- * Magenta plan plus the five added since).
+ * `src/lib/personas.ts` (currently 22 — the original 12 from the
+ * Magenta plan plus the ten added since).
  *
  * Fields map directly onto the per-persona humanizer table:
  *   - `placementMs`  — fixed timing bias, in ms. Positive = ahead of

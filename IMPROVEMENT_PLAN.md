@@ -191,7 +191,32 @@ playwright only if you want).
 
 ### G. Mastery / performance log
 
-**What:** A small persistence layer (`src/lib/performanceLog.ts`)
+**Status: ✅ shipped (2026-09).** Implemented as an MVP that stands on
+its own before the classifier ships:
+
+  - `src/lib/performanceLog.ts` — typed, append-only take log in
+    localStorage (`hse.performance.log.v1`, capped at 50), with
+    shape-guarded reads and a pure `formatRelativeTime` helper.
+  - `src/hooks/usePerformanceLog.ts` — live view over the log.
+  - Recorded one entry per take from the rail's Record Take flow
+    (timestamp, path, tempo, meter, instrument, persona, loop duration).
+  - `src/components/RecentTakesPanel.tsx` — "Recent takes" read side:
+    newest first, with 1–5 self-rating persisted back into the log.
+  - `tests/performanceLog.test.ts` (18 tests) + an e2e covering seed →
+    render → rate → survives reload.
+
+**Updated: the guide-tone bridge ships too (option C → G).** The
+classifier data now feeds the log: `src/lib/guideToneTrail.ts` +
+`useGuideToneTrail` count 3rd/7th hits vs misses while a take records,
+and `recordGuideToneResult` attaches the tally to the take. The panel
+renders it as "3/5 guide tones · 60%" with a fill bar.
+
+Still deferred (per the original deferral note):
+
+  - "first-try vs rep #3" snapshot
+  - take-comparison UI / timing heat map
+
+**What (original spec):** A small persistence layer (`src/lib/performanceLog.ts`)
 that records one entry per take:
 
   - timestamp

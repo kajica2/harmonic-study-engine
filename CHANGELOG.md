@@ -81,6 +81,28 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Guide-tone data feeds the mastery log (option C → option G)** —
+  `src/lib/guideToneTrail.ts` folds classifier results into a per-run
+  tally (3rd/7th hits vs misses) and `useGuideToneTrail` counts note-ons
+  live while a take records; the finished tally is attached to the take
+  via `recordGuideToneResult`. The Recent takes panel renders it as
+  "3/5 guide tones · 60%" with a fill bar. 16 new unit tests.
+  334 frontend tests (was 318).
+- **Performance / mastery log** (option G from `IMPROVEMENT_PLAN.md`)
+  — `src/lib/performanceLog.ts` persists one entry per take (timestamp,
+  path, tempo, meter, instrument, persona, loop duration) to
+  `hse.performance.log.v1`, capped at 50; `usePerformanceLog` hook;
+  `RecentTakesPanel` renders the last takes with 1–5 self-ratings that
+  write straight back into the log. Takes are recorded from the rail's
+  Record Take flow. 18 unit tests + an e2e (seed → render → rate →
+  survives reload).
+- **Vendor code-splitting** — `vite.config.ts` `manualChunks` splits
+  react/ui/audio/score/publish/midi; Import/Export + Recording modals
+  are `React.lazy`; sheet-music export + tone.js + jspdf load on
+  demand. Main bundle 1.8 MB → 510 KB eager.
+- **e2e expansion** — `e2e/app.spec.ts` grew from 3 to 7 tests
+  (practice transport start/pause, keyboard-shortcuts cheatsheet,
+  lazy modal, mastery-log panel).
 - **Path Catalog tab** — filterable grid view in the left sidebar
   (composer, key, behavioural-rule chips, technique tags).
   `src/components/PathCatalog.tsx` + RTL tests; wired as the third
@@ -149,6 +171,11 @@ bottom-sheet command bar.
   start of this sprint.
 
 ### Changed
+- **Vitest upgraded to v5** — vitest 2.1.9 → 5.0.1, `@vitest/coverage-v8`
+  5.0.1. Config migrated to the `projects` API (per-file jsdom env via
+  a tracked `JSDOM_FILES` list — `environmentMatchGlobs` was removed).
+  Fixes 6 npm vulnerabilities (2 critical). Remaining criticals are
+  transitive no-fix from `@magenta/music`.
 - **Personas** — 17 total (was 12). Added: Scriabin, Rachmaninov,
   Brahms, Tchaikovsky, Mahler. Each persona carries an extended
   schema (synesthesiaStatus, dates, nationality, tagline,

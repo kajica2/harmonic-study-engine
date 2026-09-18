@@ -2,7 +2,7 @@
 
 The contract for this repo. The values in this file are the source of
 truth — every other place in the codebase that mentions them must stay
-in lockstep, and `assets/check-links.js` enforces that.
+in lockstep, and `assets/check-links.cjs` enforces that.
 
 ## Counts that get cited in many places
 
@@ -10,28 +10,29 @@ These five values have historically drifted across commits. Each one
 is named below with its source of truth and every site that mentions
 it. When you change a value, update every site in the same commit.
 
-### 1. Personas — **17**
+### 1. Personas — **22**
 
 - Source of truth: `src/data/personas.json` (length of the array).
 - Reference sites:
-  - `README.md` — features list ("17 masterclass personas")
-  - `src/magenta/personaProfiles.ts` — header comment ("currently 17")
-- Drift history: 12 → 14 → 17 across commits `ce6f449` and `22844d4`.
+  - `README.md` — features list ("22 personas")
+  - `src/magenta/personaProfiles.ts` — header comment ("currently 22")
+- Drift history: 12 → 14 → 17 → 22 across commits `ce6f449`,
+  `22844d4`, and the post-classical expansion (Simone, Novaro, Getz,
+  Rollins, Henderson).
 
-### 2. Masterclass tunes — **40**
+### 2. Masterclass tunes — **38**
 
 - Source of truth: `src/data/masterclass.ts` (count of `inApp:` field
-  occurrences; the `MASTERCLASS_TUNES` array length).
-- Of those 38: 1 with `inApp: true` (currently `star-eyes`), 37 with
-  `inApp: false` ("Coming soon" in the picker).
+  occurrences in the `MASTERCLASS_TUNES` array).
+- Of those 38: 3 with `inApp: true` (currently `star-eyes`, `solar`,
+  `cherokee`), 35 with `inApp: false` ("Coming soon" in the picker).
 - Reference sites:
-  - `README.md` — features list ("38-tune working catalog")
+  - `README.md` — features list ("38-tune catalog")
   - `README.md` — "What works without DDSP" section
-  - `src/data/masterclass.ts` — file header comment ("33 working tunes
-    + concept files" — needs an update if you bump this; check the
-    comment stays in lockstep with the array)
+  - `src/data/masterclass.ts` — file header comment (check it stays in
+    lockstep with the array if you bump this)
 
-### 3. Tests — **307** (278 frontend + 29 backend)
+### 3. Tests — **363** (334 frontend + 29 backend)
 
 - Source of truth: re-derive with `npm test` and `npm run test:py`.
   The frontend total is the count of `it(` blocks in `tests/*.test.ts`
@@ -39,8 +40,8 @@ it. When you change a value, update every site in the same commit.
   count of `def test_` in `server/tests/test_*.py`.
 - Reference sites:
   - `README.md` — Testing section
-  - `src/magenta/README.md` — "Total: 178 tests"
-- Drift history: 60 → 91 → 145 → 174 → 177 → 178 across six commits.
+  - `src/magenta/README.md` — "Total: 363 tests"
+- Drift history: 60 → 91 → 145 → 174 → 177 → 178 → 307 → 334 → 347 → 363.
   This is the most volatile count and the one the gate pays the most
   attention to.
 
@@ -69,12 +70,12 @@ it. When you change a value, update every site in the same commit.
 
 ## How the gate works
 
-`assets/check-links.js` is a pure-Node script (no deps) that walks the
+`assets/check-links.cjs` is a pure-Node script (no deps) that walks the
 files listed above and asserts every cited count matches its source of
 truth. It's run by GitHub Actions on every push to main and every PR.
 
 Failure shape: the script prints every violation as `file:line —
-expected X, got Y` and exits 1. CI red. Local: `node assets/check-links.js`.
+expected X, got Y` and exits 1. CI red. Local: `node assets/check-links.cjs`.
 
 ## Surface inventory
 
