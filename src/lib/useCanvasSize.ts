@@ -29,7 +29,11 @@ export function useCanvasSize(
     const update = () => {
       const el = ref.current;
       if (!el) return;
-      setSize({ width: el.offsetWidth, height: el.offsetHeight });
+      setSize((prev) => {
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        return prev.width === w && prev.height === h ? prev : { width: w, height: h };
+      });
     };
 
     // Initial size.

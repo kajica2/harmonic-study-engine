@@ -3000,10 +3000,13 @@ export default function App() {
               </div>
             </StageFrame>
 
-            {/* Canvas Area */}
+            {/* Canvas Area — fixed-height shell so the canvas backing
+                store never re-sizes while the song plays (a flex-1
+                shell let surrounding layout shift it, which retriggered
+                the ResizeObserver → resize feedback loop). */}
             <div
               ref={canvasContainerRef}
-              className="flex-1 min-h-[260px] sm:min-h-[320px] w-full relative bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-2xl"
+              className="h-[min(38vh,440px)] min-h-[280px] w-full shrink-0 relative bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 overflow-hidden shadow-2xl"
             >
               <ErrorBoundary scope="Synesthesia Canvas">
                 <SynesthesiaCanvas
