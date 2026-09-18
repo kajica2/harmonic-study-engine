@@ -67,6 +67,7 @@ import { midiIn } from "./lib/midiIn";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
 import { STUDIES_PATHS } from "./lib/paths";
 import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
+import type { PracticeSet, PracticeSession } from "./lib/paths";
 import { PianoKeyboard } from "./components/PianoKeyboard";
 import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
 import { MidiInPicker } from "./components/MidiInPicker";
@@ -184,6 +185,20 @@ export default function App() {
       <AppShell />
     </SynesthesiaProvider>
   );
+}
+
+/**
+ * Schedule a callback during browser idle (js-request-idle-callback).
+ * Falls back to a plain 0ms timeout when requestIdleCallback is
+ * unavailable. Returns a cancel function.
+ */
+function runWhenIdle(fn: () => void): () => void {
+  if (typeof window.requestIdleCallback === "function") {
+    const id = window.requestIdleCallback(() => fn(), { timeout: 1000 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = window.setTimeout(fn, 0);
+  return () => window.clearTimeout(id);
 }
 
 function AppShell() {
@@ -423,9 +438,19 @@ function AppShell() {
     startTransition(() => setActivePanel(tab));
   }, []);
 
-  // Practice sets + recent sessions
-  const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
-  const [recentSessions] = useState(() => getRecentSessions(5));
+  // Practice sets + recent sessions — hydrated off the critical path.
+  // Both read + JSON.parse the localStorage session store; deferring to
+  // idle keeps first paint unblocked. Setters are stable in prod and
+  // double-invoked (re-run) in dev StrictMode — safe either way.
+  const [practiceSets, setPracticeSets] = useState<PracticeSet[]>([]);
+  const [recentSessions, setRecentSessions] = useState<PracticeSession[]>([]);
+  useEffect(() => {
+    const cancel = runWhenIdle(() => {
+      setPracticeSets(loadPracticeSets());
+      setRecentSessions(getRecentSessions(5));
+    });
+    return cancel;
+  }, []);
   const [activePracticeSet, setActivePracticeSet] = useState<{
     set: Parameters<typeof PracticeSessionPlayer>[0]["set"];
     options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
