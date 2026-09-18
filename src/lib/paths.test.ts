@@ -176,9 +176,11 @@ describe("Phase 1 persona signature paths (XXXVIII–LIV)", () => {
     { id: "red_clay_changes",    composer: "F. Hubbard",            title: "Path LII: Red Clay Changes" },
     { id: "footprints_vamp",     composer: "W. Shorter",            title: "Path LIII: Footprints Vamp" },
     { id: "color_shape_study",   composer: "W. Kandinsky (synth)",  title: "Path LIV: Color Shapes" },
+    { id: "negative_mirror_study", composer: "E. Levy / J. Collier", title: "Path LV: Negative Harmony" },
+    { id: "modal_jazz_pedals",   composer: "M. Davis / J. Coltrane", title: "Path LVI: The Modal Jazz Pedal" },
   ];
 
-  it("all 17 persona signature paths exist in PATHS", () => {
+  it("all 19 persona signature paths exist in PATHS", () => {
     for (const { id, title } of PERSONA_PATHS) {
       const p = PATHS.find((x) => x.id === id);
       expect(p, `path '${id}' missing from PATHS`).toBeDefined();

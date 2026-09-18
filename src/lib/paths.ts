@@ -1267,6 +1267,61 @@ export const RAW_PATHS: HarmonicPath[] = [
       { name: "C aug triad", notes: [48, 52, 56], descriptions: "C / E / G# — brighter triangle." },
     ],
   },
+  {
+    id: "negative_mirror_study",
+    title: "Path LV: Negative Harmony",
+    description:
+      "Ernst Levy's negative harmony: mirror every pitch class around the tritone (the midpoint of the C–G axis). A Dm7 becomes an Ab major 7; the G7 becomes a Db7; Cmaj7 becomes F minor 7. Familiar cadences, inverted gravity — Jacob Collier's neo-soul sound.",
+    composer: "E. Levy / J. Collier",
+    key: "C major (axis = F#/Gb, pc 6)",
+    feel: "negative harmony / axis mirror",
+    techniques: ["negative_harmony", "levy_axis", "tritone_substitution"],
+    steps: [
+      // Original ii-V-I in C — the "positive" side
+      { name: "Dm7 (positive)", notes: [50, 53, 57, 60], descriptions: "D / F / A / C — ii, original." },
+      { name: "G7 (positive)", notes: [55, 59, 62, 65], descriptions: "G / B / D / F — V, original." },
+      { name: "Cmaj7 (positive)", notes: [48, 52, 55, 59], descriptions: "C / E / G / B — I, original." },
+      { name: "Cmaj7 (positive)", notes: [48, 52, 55, 59], descriptions: "C / E / G / B — cadence holds." },
+      // Mirrored around pc 6 (F#): mirror(p) = (12 - p) mod 12
+      // D(2)->F#(6) — Dm7 pcs {2,5,9,0} → {10,1,3,0} = Ab-C-Eb-C = Ab major 7 (Ab, C, Eb, G) at Ab=44
+      { name: "Abmaj7 (mirror of Dm7)", notes: [44, 48, 51, 55], descriptions: "Mirror axis 6: D→F#, F→B, A→Eb, C→C. Sounds like bVI major 7 — Collier's signature." },
+      // G7 pcs {7,11,2,5} → {5,1,10,7} = F#-C#-Bb-Gb = Db7 (Db, F, Ab, Cb) at Db=49
+      { name: "Db7 (mirror of G7)", notes: [49, 53, 56, 61], descriptions: "Mirror axis 6: G→F#, B→C#, D→Bb, F→Gb. Tritone sub in disguise — same tritone, inverted pull." },
+      // Cmaj7 pcs {0,4,7,11} → {0,8,5,1} = C-G#-Eb-C# = Fm7 (F, Ab, C, Eb) at F=53
+      { name: "Fm7 (mirror of Cmaj7)", notes: [53, 56, 60, 63], descriptions: "Mirror axis 6: C→C, E→Ab, G→Eb, B→Db. Fm7 — relative minor, gravity reversed." },
+      { name: "Fm7 (mirror)", notes: [53, 56, 60, 63], descriptions: "Fm7 sustained — the cadence resolves DOWN, not up." },
+    ],
+  },
+  {
+    id: "modal_jazz_pedals",
+    title: "Path LVI: The Modal Jazz Pedal",
+    description:
+      "Modal jazz's two signatures: (1) a pedal-tone bass with slow harmonic rhythm (Miles, Kind of Blue) and (2) the same modal shape transposed to a new tonal center (Coltrane, Impressions). D Dorian holds, E Dorian answers, then the whole mode shifts up a half step to Eb Dorian.",
+    composer: "M. Davis / J. Coltrane",
+    key: "D Dorian → Eb Dorian",
+    feel: "modal jazz / pedal",
+    techniques: ["modal", "pedal", "mode_shift", "dorian", "mixolydian"],
+    bassIsolation: true,
+    steps: [
+      // D Dorian center — pedal D, mode = D Dorian (D E F G A B C)
+      { name: "Dm7 (D Dorian)", notes: [50, 53, 57, 60], descriptions: "D / F / A / C — D Dorian. Pedal D in the bass (38)." },
+      { name: "Dm7 (D Dorian)", notes: [50, 53, 57, 60], descriptions: "Held — harmonic rhythm is the music." },
+      { name: "Ebmaj7 (D Dorian color)", notes: [51, 55, 58, 62], descriptions: "Eb / G / B / D — bright Lydian-flavored color on the D pedal." },
+      { name: "Dm7 (D Dorian)", notes: [50, 53, 57, 60], descriptions: "Back to D Dorian — the color was borrowed, not a key change." },
+      // E Dorian answer — modal vamp move (So What changes)
+      { name: "Em7 (E Dorian)", notes: [52, 55, 59, 62], descriptions: "E / G / B / D — E Dorian answers D Dorian." },
+      { name: "Em7 (E Dorian)", notes: [52, 55, 59, 62], descriptions: "Held — vamp section." },
+      { name: "Em7 (E Dorian)", notes: [52, 55, 59, 62], descriptions: "Vamp continues — listen for the G/B/D color." },
+      { name: "Dm7 (D Dorian)", notes: [50, 53, 57, 60], descriptions: "Return to D Dorian — vamp closes." },
+      // Mode shift up a half step (Impressions technique): SAME shape,
+      // NEW tonal center. D Dorian's intervals {2,1,2,2,2,1,2} from D become
+      // the same intervals from Eb = Eb F Gb Ab Bb C Db = Eb Dorian.
+      { name: "Ebm7 (Eb Dorian)", notes: [51, 54, 58, 61], descriptions: "Eb / Gb / Bb / Db — Eb Dorian. Same shape, new tonal center (Impressions)." },
+      { name: "Ebm7 (Eb Dorian)", notes: [51, 54, 58, 61], descriptions: "Held — the mode has shifted, not modulated." },
+      { name: "Fmaj7 (Eb Dorian color)", notes: [53, 57, 60, 64], descriptions: "F / A / C / E — Lydian color on the Eb pedal." },
+      { name: "Ebm7 (Eb Dorian)", notes: [51, 54, 58, 61], descriptions: "Back to Eb Dorian." },
+    ],
+  },
 ];
 
 
