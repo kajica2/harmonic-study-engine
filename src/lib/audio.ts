@@ -10,13 +10,17 @@ import {
 /**
  * Whether to route notes through FluidR3 soundfont samples instead
  * of the oscillator synth. Loaded from localStorage so the user's
- * preference persists. Default false (oscillator) for fast first-load.
+ * preference persists. Default true (soundfont) — the CDN load is
+ * cached, so the richer sound wins without a repeat-fetch penalty.
  */
 function readHDSetting(): boolean {
   try {
-    return localStorage.getItem("synesthesia_hdSounds") === "1";
+    // Default true — FluidR3 soundfont is dramatically richer than the
+    // oscillator synth and the CDN load is cached after first fetch.
+    const stored = localStorage.getItem("synesthesia_hdSounds");
+    return stored === null ? true : stored === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
