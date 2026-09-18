@@ -3,7 +3,7 @@
  * layer toggle. Binds to useSessionStore.
  */
 
-import React from "react";
+import React, { memo } from "react";
 import { Drum, Music, VolumeX } from "lucide-react";
 
 interface TexturePanelProps {
@@ -29,7 +29,7 @@ const TRACKS: Array<{
   { key: "piano", label: "Piano", Icon: Music, hint: "Piano track (bus gain)" },
 ];
 
-export const TexturePanel: React.FC<TexturePanelProps> = ({
+export const TexturePanel = memo(function TexturePanel({
   drumsMuted,
   bassMuted,
   pianoMuted,
@@ -38,7 +38,7 @@ export const TexturePanel: React.FC<TexturePanelProps> = ({
   setPianoMuted,
   counterLineActive,
   onToggleCounterLine,
-}) => {
+}: TexturePanelProps) {
   const muted = { drums: drumsMuted, bass: bassMuted, piano: pianoMuted };
   const setters = { drums: setDrumsMuted, bass: setBassMuted, piano: setPianoMuted };
 
@@ -92,4 +92,4 @@ export const TexturePanel: React.FC<TexturePanelProps> = ({
       </div>
     </section>
   );
-};
+});

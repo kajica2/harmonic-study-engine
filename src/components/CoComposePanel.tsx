@@ -7,7 +7,7 @@
  * yet mutate the active path). v1 wires Accept to applyAlternative.
  */
 
-import React from "react";
+import React, { memo } from "react";
 import { Sparkles, Check } from "lucide-react";
 import { proposeAlternative, PERSONA_TECHNIQUE_BIAS, TECHNIQUES, type AlternativeChord } from "../lib/coCompose";
 import { midiToName } from "../lib/theory";
@@ -29,13 +29,13 @@ function formatChord(alt: AlternativeChord): string {
   return `${tones}${family === "minor" ? "m" : ""} (${family})`;
 }
 
-export const CoComposePanel: React.FC<CoComposePanelProps> = ({
+export const CoComposePanel = memo(function CoComposePanel({
   pathId,
   barIndex,
   seed,
   personaId,
   onAccept,
-}) => {
+}: CoComposePanelProps) {
   const alt = proposeAlternative({ pathId, barIndex, seed, personaId });
 
   // Persona-biased technique weights (displayed under "What if?")
@@ -76,4 +76,4 @@ export const CoComposePanel: React.FC<CoComposePanelProps> = ({
       )}
     </section>
   );
-};
+});

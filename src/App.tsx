@@ -65,6 +65,7 @@ import { STUDIES_PATHS } from "./lib/paths";
 import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
 import { PianoKeyboard } from "./components/PianoKeyboard";
 import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
+import { MidiInPicker } from "./components/MidiInPicker";
 import { PracticeSetBrowser } from "./components/PracticeSetBrowser";
 import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -83,6 +84,7 @@ import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
 import { exportToMidiFile } from "./lib/midiExport";
 import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
 import { STEPS_PER_BAR } from "./lib/paths";
+import type { AlternativeChord } from "./lib/coCompose";
 import {
   planForm,
   MIN_PATH_BARS,
@@ -260,14 +262,6 @@ export default function App() {
     defaultValue: "roman-numerals",
   });
   const [selectedMidiInId, setSelectedMidiInId] = useState<string>("");
-  // Phase 5: "listening" indicator — most-recent input event summary,
-  // announced via aria-live and shown briefly in the chip. Cleared by
-  // a short timer so the chip returns to its static label.
-  const [midiInStatus, setMidiInStatus] = useState<string>("");
-  const midiInStatusTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-
-  // MIDI / recording ephemeral state
   // MIDI / recording ephemeral state
   const [activeMidis, setActiveMidis] = useState<number[]>([]);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -302,6 +296,48 @@ export default function App() {
       return null;
     });
   }, []);
+
+  // Stable handlers for the memoized sibling panels (rerender-memo).
+  // Kept in useCallback so the panels' props keep their identity and
+  // the panels skip re-rendering on every note event.
+  const handleStylePackPick = useCallback(
+    (id: StylePackId) => {
+      setStylePackId(id);
+      feedback.record({
+        personaId: selectedPersonaId,
+        suggestion: `style:${id}`,
+        accepted: true,
+      });
+    },
+    [setStylePackId, feedback.record, selectedPersonaId],
+  );
+
+  const handleCoComposeAccept = useCallback(
+    (alt: AlternativeChord) => {
+      if (!alt.alternative) return;
+      const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
+      const rootName = alt.alternative.rootName;
+      const rootPc = rootNameToPc(rootName);
+      const family = alt.alternative.family;
+      const quality: "maj" | "min" | "dim" | "dom" =
+        family === "minor" || family === "half-diminished"
+          ? "min"
+          : family === "dominant"
+            ? "dom"
+            : family === "diminished"
+              ? "dim"
+              : "maj";
+      const newStep = {
+        name: rootName + (quality === "min" ? "m" : quality === "dom" ? "7" : ""),
+        notes: triadFromRoot(rootPc, quality),
+        descriptions: alt.alternative.roman,
+      };
+      for (let s = 0; s < STEPS_PER_BAR; s++) {
+        setHarmonicStep(activeBar * STEPS_PER_BAR + s, newStep);
+      }
+    },
+    [activeStepIndex, setHarmonicStep],
+  );
   const [isDDSPLoading, setIsDDSPLoading] = useState(false);
   const ddspAction = useAsyncAction();
   const [ddspServerOnline, setDDSPServerOnline] = useState(false);
@@ -318,6 +354,18 @@ export default function App() {
   const [isGenFolded, setIsGenFolded] = useState(true);
   const [activePanel, setActivePanel] = useState<"paths" | "practice" | "catalog">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
+
+  const handlePathCatalogSelect = useCallback(
+    (id: string) => {
+      const idx = paths.findIndex((p) => p.id === id);
+      if (idx >= 0) {
+        setActivePathIndex(idx);
+        setActiveStepIndex(0);
+        setActivePanel("paths");
+      }
+    },
+    [paths, setActivePathIndex, setActiveStepIndex, setActivePanel],
+  );
 
   // Practice sets + recent sessions
   const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
@@ -453,35 +501,14 @@ export default function App() {
       setSelectedMidiInId(midiIn.getSelectedInputId() || "");
     });
 
-    // Phase 5: reflect inbound note events in the chip + aria-live
-    // region so the user knows the device is actually wired up.
-    // We don't auto-detect chords (out of scope) — just the indicator.
-    const onMidinEvent = (e: Event) => {
-      const detail = (e as CustomEvent).detail as {
-        type: string;
-        note: number;
-        velocity: number;
-        inputName: string;
-      };
-      const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-      const name = noteNames[detail.note % 12];
-      const octave = Math.floor(detail.note / 12) - 1;
-      setMidiInStatus(
-        `${detail.type === "noteon" ? "♪" : "·"} ${name}${octave}` +
-          ` v${detail.velocity}`,
-      );
-      if (midiInStatusTimeout.current) clearTimeout(midiInStatusTimeout.current);
-      midiInStatusTimeout.current = setTimeout(() => setMidiInStatus(""), 1500);
-    };
-    window.addEventListener("midin", onMidinEvent);
+    // Inbound "midin" note-event subscription lives in MidiInPicker
+    // (it re-renders only itself, not the whole app, per note event).
 
     return () => {
       window.removeEventListener("keydown", handleFirstInteraction);
       window.removeEventListener("mousedown", handleFirstInteraction);
       unsubscribeMidi();
       unsubscribeMidiIn();
-      window.removeEventListener("midin", onMidinEvent);
-      if (midiInStatusTimeout.current) clearTimeout(midiInStatusTimeout.current);
     };
   }, []);
 
@@ -1207,74 +1234,17 @@ export default function App() {
             )}
           </div>
 
-          {/* Phase 5: MIDI IN picker. Mirrors the OUT chip — same
-              visual language, different color story (cyan vs purple).
-              Lists available input devices; "no devices" or "unsupported"
-              for browsers without Web MIDI (Firefox without extension).
-              When an event arrives, the chip briefly shows the note
-              (e.g. "♪ A4 v96") and an aria-live region announces it. */}
-          <div
-            className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800"
-            title="MIDI input from a connected controller or instrument. Listens for note on/off and dispatches 'midin' events on window."
-            aria-label="MIDI input device"
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{
-                backgroundColor:
-                  midiInputs.length === 0
-                    ? "#6b7280" // gray — no inputs
-                    : selectedMidiInId
-                      ? "#22c55e" // green — listening
-                      : "#06b6d4", // cyan — devices available, none selected
-              }}
-              aria-hidden="true"
-            />
-            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
-              IN
-            </span>
-            {midiInStatus ? (
-              <span
-                className="text-xs text-emerald-300 t-mono"
-                aria-hidden="true"
-              >
-                {midiInStatus}
-              </span>
-            ) : midiInputs.length === 0 ? (
-              <span className="text-xs text-neutral-400 italic">
-                no inputs
-              </span>
-            ) : (
-              <select
-                value={selectedMidiInId}
-                onChange={(e) => {
-                  midiIn.selectInput(e.target.value || null);
-                  setSelectedMidiInId(e.target.value);
-                }}
-                className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
-                aria-label="Select MIDI input device"
-              >
-                <option value="">none</option>
-                {midiInputs.map((inp) => (
-                  <option key={inp.id} value={inp.id}>
-                    {inp.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          {/* Screen-reader announcement of inbound MIDI note events. */}
-          <div className="sr-only" aria-live="polite" aria-atomic="true">
-            {midiInStatus
-              ? `MIDI input: ${midiInStatus.replace(/^[♪·]\s*/, "")}`
-              : midiInputs.length === 0
-                ? "MIDI input: no devices connected"
-                : selectedMidiInId
-                  ? `MIDI input: listening on ${
-                      midiInputs.find((x) => x.id === selectedMidiInId)?.name ?? ""
-                    }`
-                  : "MIDI input: devices available, none selected"}
-          </div>
+          {/* Phase 5: MIDI IN picker + aria-live region. Lives in
+              MidiInPicker so inbound note events re-render only that
+              component (not the whole App tree). */}
+          <MidiInPicker
+            inputs={midiInputs}
+            selectedId={selectedMidiInId}
+            onSelect={(id) => {
+              midiIn.selectInput(id || null);
+              setSelectedMidiInId(id);
+            }}
+          />
         </div>
       </header>
 
@@ -1333,14 +1303,7 @@ export default function App() {
         <StylePackPicker
           activeId={stylePackId as StylePackId | null}
           activePersonaId={selectedPersonaId}
-          onPick={(id) => {
-            setStylePackId(id);
-            feedback.record({
-              personaId: selectedPersonaId,
-              suggestion: `style:${id}`,
-              accepted: true,
-            });
-          }}
+          onPick={handleStylePackPick}
         />
         {stylePackId && (
           <StyleWarnings
@@ -1363,32 +1326,7 @@ export default function App() {
               barIndex={activeBar}
               seed={seed >>> 0}
               personaId={selectedPersonaId}
-              onAccept={(alt) => {
-                if (!alt.alternative) return;
-                // Apply the proposed substitution to the active bar
-                // (4 steps/bar). Builds a root-position triad from the
-                // analyzed alternative's rootName + family — same
-                // shape as proposeAlternative's `applyTechnique` output.
-                const rootName = alt.alternative.rootName;
-                const rootPc = rootNameToPc(rootName);
-                const family = alt.alternative.family;
-                const quality: "maj" | "min" | "dim" | "dom" =
-                  family === "minor" || family === "half-diminished"
-                    ? "min"
-                    : family === "dominant"
-                      ? "dom"
-                      : family === "diminished"
-                        ? "dim"
-                        : "maj";
-                const newStep = {
-                  name: rootName + (quality === "min" ? "m" : quality === "dom" ? "7" : ""),
-                  notes: triadFromRoot(rootPc, quality),
-                  descriptions: alt.alternative.roman,
-                };
-                for (let s = 0; s < STEPS_PER_BAR; s++) {
-                  setHarmonicStep(activeBar * STEPS_PER_BAR + s, newStep);
-                }
-              }}
+              onAccept={handleCoComposeAccept}
             />
           );
         })()}
@@ -2323,14 +2261,7 @@ export default function App() {
                 <PathCatalog
                   paths={paths}
                   rulesByPathId={pathRulesByPathId}
-                  onSelect={(id) => {
-                    const idx = paths.findIndex((p) => p.id === id);
-                    if (idx >= 0) {
-                      setActivePathIndex(idx);
-                      setActiveStepIndex(0);
-                      setActivePanel("paths");
-                    }
-                  }}
+                  onSelect={handlePathCatalogSelect}
                 />
               )}
             </div>

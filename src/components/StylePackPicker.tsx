@@ -4,7 +4,7 @@
  * persona's preferredStylePackId with a 'Suggested by persona' badge.
  */
 
-import React from "react";
+import React, { memo } from "react";
 import { allStylePacks, type StylePack, type StylePackId } from "../lib/stylePack";
 import { PERSONAS } from "../lib/personas";
 
@@ -18,12 +18,12 @@ interface StylePackPickerProps {
   className?: string;
 }
 
-export const StylePackPicker: React.FC<StylePackPickerProps> = ({
+export const StylePackPicker = memo(function StylePackPicker({
   activeId,
   activePersonaId,
   onPick,
   className,
-}) => {
+}: StylePackPickerProps) {
   const packs: StylePack[] = allStylePacks();
   const persona = activePersonaId
     ? PERSONAS.find((p) => p.id === activePersonaId)
@@ -85,4 +85,4 @@ export const StylePackPicker: React.FC<StylePackPickerProps> = ({
       </div>
     </section>
   );
-};
+});

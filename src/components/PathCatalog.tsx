@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { Filter, Search, X } from "lucide-react";
 import type { HarmonicPath } from "../lib/paths";
 
@@ -116,12 +116,12 @@ function pathKeyPrefix(key: string | undefined): string | null {
   return arrow || null;
 }
 
-export const PathCatalog: React.FC<PathCatalogProps> = ({
+export const PathCatalog = memo(function PathCatalog({
   paths,
   rulesByPathId = {},
   onSelect,
   emptyMessage = "Nothing matches those filters.",
-}) => {
+}: PathCatalogProps) {
   const [composer, setComposer] = useState("");
   const [key, setKey] = useState<string>("");
   const [activeRules, setActiveRules] = useState<Set<BehavioralRuleId>>(
@@ -416,6 +416,6 @@ export const PathCatalog: React.FC<PathCatalogProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default PathCatalog;
