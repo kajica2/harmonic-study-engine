@@ -48,7 +48,7 @@ The 3 high-value items already shipped; remaining are incremental.
 | `rerender-memo-with-default-value` | ✅ | Hoisted `NO_VIOLATIONS` constant (was inline `violations={[]}`); remaining defaults already primitive literals |
 | `rerender-dependencies` | ✅/◐ | Audited App.tsx + session store: deps already primitives/destructured (App never lists `session`; `path.steps`, `optimizedStepsNotes`, `barDriftShifts` identities are stable). No churn found to fix |
 | `rerender-derived-state` | ✅ | Hoisted `activePackName` (was `loadStylePack(...).name` inline in JSX) + `voicingCount` in the step header |
-| `rerender-split-combined-hooks` | ☐ | `App.tsx` still declares ~49 `useState` for unrelated concerns; split into purpose-built hooks (playback, export, ui-fold, midi) so a change in one doesn't re-render the rest is a *larger* refactor — the last open Phase-2 item |
+| `rerender-split-combined-hooks` | ✅ | App ephemeral state split into purpose-built hooks: `useMidiDevices` (device lists + engine-init effect), `useExportFlow` (modals, sheet/WAV export, recording lifecycle), `useGeneratorPanel` (DDSP/etude/HD/gen knobs), `useScaleDrill`. Session prefs stay in `useSessionStore`; ui-fold booleans (`isArpFolded`/`isGenFolded`/`activePanel`) kept in App |
 | `rerender-transitions` | ✅ | Path catalog select + tab switch wrapped in `startTransition` |
 | `rerender-functional-setstate` | ✅ | Setters use functional form where reading prev (predominantly) |
 | `rerender-lazy-state-init` | ✅ | `loadPracticeSets`, `getRecentSessions`, `loadString`/`loadJSON` passed as lazy init |

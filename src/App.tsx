@@ -55,8 +55,12 @@ import { playbackClock } from "./lib/playbackClock";
 import { usePlaybackState } from "./hooks/use-playback-state";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
-import { playRhythmDrill, DrillSubdivision } from "./lib/rhythmDrill";
+import { playRhythmDrill, type DrillSubdivision } from "./lib/rhythmDrill";
 import { useBassNotes } from "./lib/useBassNotes";
+import { useMidiDevices } from "./hooks/useMidiDevices";
+import { useGeneratorPanel } from "./hooks/useGeneratorPanel";
+import { useScaleDrill } from "./hooks/useScaleDrill";
+import { useExportFlow } from "./hooks/useExportFlow";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
 import { midiIn } from "./lib/midiIn";
@@ -271,10 +275,14 @@ function AppShell() {
   // Ephemeral transport state — MIDI device lists, recorder status,
   // UI flags. These don't need to survive reload; the session
   // hook owns everything that's user preference.
-  const [midiOutputs, setMidiOutputs] = useState<any[]>([]);
-  const [selectedMidiOutId, setSelectedMidiOutId] = useState<string>("");
-  // Phase 5: MIDI input state — mirrors the MIDI Out pattern.
-  const [midiInputs, setMidiInputs] = useState<{ id: string; name: string }[]>([]);
+  const {
+    midiOutputs,
+    selectedMidiOutId,
+    setSelectedMidiOutId,
+    midiInputs,
+    selectedMidiInId,
+    setSelectedMidiInId,
+  } = useMidiDevices();
   // Composer-catalog v2: Quiz topic selector — persisted across reloads
   // so the user's last-selected topic survives.
   const [quizTopic, setQuizTopic] = usePersistedState<
@@ -283,7 +291,6 @@ function AppShell() {
     key: "quizTopic",
     defaultValue: "roman-numerals",
   });
-  const [selectedMidiInId, setSelectedMidiInId] = useState<string>("");
   // MIDI / recording ephemeral state. The live note set lives in
   // SynesthesiaProvider; App only ever WRITES it (via the stable setter),
   // so note events don't re-render this whole tree. Consumers read it
@@ -363,12 +370,25 @@ function AppShell() {
     },
     [activeStepIndex, setHarmonicStep],
   );
-  const [isDDSPLoading, setIsDDSPLoading] = useState(false);
+  const {
+    isDDSPLoading,
+    setIsDDSPLoading,
+    ddspServerOnline,
+    setDDSPServerOnline,
+    genLength,
+    setGenLength,
+    genComplexity,
+    setGenComplexity,
+    etudeAlgorithm,
+    setEtudeAlgorithm,
+    isGeneratingML,
+    setIsGeneratingML,
+    etudeStatus,
+    setEtudeStatus,
+    hdStatus,
+    setHdStatus,
+  } = useGeneratorPanel();
   const ddspAction = useAsyncAction();
-  const [ddspServerOnline, setDDSPServerOnline] = useState(false);
-  const [isRenderingWav, setIsRenderingWav] = useState(false);
-  const [wavExportError, setWavExportError] = useState<string | null>(null);
-  const [wavExportStatus, setWavExportStatus] = useState<string | null>(null);
   // Whether the OpenRouter API key is configured at build time.
   const hasOpenRouterKey = Boolean(
     (import.meta.env.VITE_OPENROUTER_API_KEY as string | undefined)?.trim(),
@@ -408,51 +428,68 @@ function AppShell() {
     options: Parameters<typeof PracticeSessionPlayer>[0]["options"];
   } | null>(null);
 
-  // Generator knobs
-  const [genLength, setGenLength] = useState(1);
-  const [genComplexity, setGenComplexity] = useState(1);
-
   // Scale + drill ephemeral
-  const [scaleMode, setScaleMode] = useState<string>("auto");
-  const [scaleBusy, setScaleBusy] = useState(false);
-  const [scaleModeOpen, setScaleModeOpen] = useState(false);
-  const [drillBusy, setDrillBusy] = useState(false);
-  const [drillIter, setDrillIter] = useState<DrillSubdivision | null>(null);
+  const {
+    scaleMode,
+    setScaleMode,
+    scaleBusy,
+    setScaleBusy,
+    scaleModeOpen,
+    setScaleModeOpen,
+    drillBusy,
+    setDrillBusy,
+    drillIter,
+    setDrillIter,
+  } = useScaleDrill();
 
-  // Modal / inspector visibility
-  const [showImportExport, setShowImportExport] = useState(false);
-  const [showCheatsheet, setShowCheatsheet] = useState(false);
-  // Sheet-music PDF export — busy state while jsPDF/svg2pdf run
-  // (typically <1s but can spike on long paths).
-  const [isExportingSheetMusic, setIsExportingSheetMusic] = useState(false);
-  const [lastExportFilename, setLastExportFilename] = useState<string | null>(
-    null,
-  );
+  // Modal / inspector / export + recording lifecycle.
+  const {
+    isRenderingWav,
+    setIsRenderingWav,
+    wavExportError,
+    setWavExportError,
+    wavExportStatus,
+    setWavExportStatus,
+    showImportExport,
+    setShowImportExport,
+    showCheatsheet,
+    setShowCheatsheet,
+    isExportingSheetMusic,
+    setIsExportingSheetMusic,
+    lastExportFilename,
+    setLastExportFilename,
+    showLeadSheet,
+    setShowLeadSheet,
+    showChordInspector,
+    setShowChordInspector,
+    showLiveScore,
+    setShowLiveScore,
+    isRecording,
+    setIsRecording,
+    showRecordingModal,
+    setShowRecordingModal,
+    isMediaRecording,
+    setIsMediaRecording,
+    mediaRecordingStatus,
+    setMediaRecordingStatus,
+    mediaRecordingError,
+    setMediaRecordingError,
+    mediaRecordingElapsed,
+    setMediaRecordingElapsed,
+    mp4BlobUrl,
+    setMp4BlobUrl,
+    setHDSoundsTick,
+  } = useExportFlow();
 
   // Bass-line tracking (live, not persisted)
   const bassMidis = useBassNotes();
 
-  // Etude state
-  const [etudeAlgorithm, setEtudeAlgorithm] = useState<EtudeAlgorithm>("magenta_rnn");
-  const [isGeneratingML, setIsGeneratingML] = useState(false);
-  const [etudeStatus, setEtudeStatus] = useState<string | null>(null);
-  const [hdStatus, setHdStatus] = useState<string | null>(null);
-  const [, setHDSoundsTick] = useState(0);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showRecordingModal, setShowRecordingModal] = useState(false);
-  const [isMediaRecording, setIsMediaRecording] = useState(false);
-  const [mediaRecordingStatus, setMediaRecordingStatus] = useState<string | null>(null);
-  const [mediaRecordingError, setMediaRecordingError] = useState<string | null>(null);
-  const [mediaRecordingElapsed, setMediaRecordingElapsed] = useState(0);
-  const [mp4BlobUrl, setMp4BlobUrl] = useState<string | null>(null);
-  const ddspApiUrl = (import.meta.env.VITE_DDSP_API as string | undefined) ||
+  const ddspApiUrl =
+    (import.meta.env.VITE_DDSP_API as string | undefined) ||
     "http://127.0.0.1:8765";
   const backend = useDDSPProbe(ddspApiUrl);
   const synesthesiaCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [showLeadSheet, setShowLeadSheet] = useState(false);
-  const [showChordInspector, setShowChordInspector] = useState(false);
   const inspectorHistory = useMemo(() => makeInspectorHistory(), []);
-  const [showLiveScore, setShowLiveScore] = useState(true);
 
   const tm = useTimeoutRef();
 
@@ -568,41 +605,6 @@ function AppShell() {
   // Guide-tone trail — counts 3rd/7th hits during a take so the
   // finished recording writes the tally onto the performance log.
   const guideTrail = useGuideToneTrail(currentChordNotes);
-
-  useEffect(() => {
-    // Initialize audio engine on first interaction
-    const handleFirstInteraction = () => {
-      audioEngine.init();
-      midiOut.init();
-      midiIn.init();
-      window.removeEventListener("keydown", handleFirstInteraction);
-      window.removeEventListener("mousedown", handleFirstInteraction);
-    };
-    window.addEventListener("keydown", handleFirstInteraction);
-    window.addEventListener("mousedown", handleFirstInteraction);
-
-    // Subscribe to MIDI outputs
-    const unsubscribeMidi = midiOut.onOutputsChange((outputs) => {
-      setMidiOutputs(outputs);
-      setSelectedMidiOutId(midiOut.getSelectedOutputId() || "");
-    });
-
-    // Subscribe to MIDI inputs (Phase 5)
-    const unsubscribeMidiIn = midiIn.onInputsChange((inputs) => {
-      setMidiInputs(inputs);
-      setSelectedMidiInId(midiIn.getSelectedInputId() || "");
-    });
-
-    // Inbound "midin" note-event subscription lives in MidiInPicker
-    // (it re-renders only itself, not the whole app, per note event).
-
-    return () => {
-      window.removeEventListener("keydown", handleFirstInteraction);
-      window.removeEventListener("mousedown", handleFirstInteraction);
-      unsubscribeMidi();
-      unsubscribeMidiIn();
-    };
-  }, []);
 
   // Update audio when step changes or arp settings change
   const arpNotes = useMemo(() => {
