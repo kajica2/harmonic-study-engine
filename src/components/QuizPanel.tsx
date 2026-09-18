@@ -69,7 +69,7 @@ const TOPIC_OPTIONS: { value: QuizTopic; label: string }[] = [
   { value: "composer-reductions", label: "Composer reductions" },
 ];
 
-export const QuizPanel: React.FC<QuizPanelProps> = ({
+export const QuizPanel = React.memo(function QuizPanel({
   pathId,
   stepIndex,
   topic,
@@ -77,7 +77,7 @@ export const QuizPanel: React.FC<QuizPanelProps> = ({
   onAnswer,
   score,
   onTopicChange,
-}) => {
+}: QuizPanelProps) {
   // Pick a curated question deterministically from the topic, OR
   // fall back to generateQuiz.
   const question = useMemo(() => {
@@ -174,7 +174,7 @@ export const QuizPanel: React.FC<QuizPanelProps> = ({
       )}
     </section>
   );
-};
+});
 
 function hashStr(s: string): number {
   let h = 2166136261 >>> 0;

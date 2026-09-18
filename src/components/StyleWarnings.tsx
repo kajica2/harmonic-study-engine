@@ -18,10 +18,13 @@ interface StyleWarningsProps {
   violations: StyleWarning[];
 }
 
-export const StyleWarnings: React.FC<StyleWarningsProps> = ({
+// Stable empty array so memoized renders don't churn on `violations={[]}`.
+export const NO_VIOLATIONS: StyleWarning[] = [];
+
+export const StyleWarnings = React.memo(function StyleWarnings({
   styleName,
   violations,
-}) => {
+}: StyleWarningsProps) {
   if (violations.length === 0) return null;
 
   return (
@@ -48,4 +51,4 @@ export const StyleWarnings: React.FC<StyleWarningsProps> = ({
       </ul>
     </section>
   );
-};
+});

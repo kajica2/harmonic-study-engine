@@ -34,7 +34,7 @@ interface Props {
  * on a phone without forcing the user to make fine discriminations
  * between five 44×44px buttons in a 360px-wide viewport.
  */
-export const MobileCommandBar: React.FC<Props> = ({
+export const MobileCommandBar = React.memo(function MobileCommandBar({
   isPlayingAuto, setIsPlayingAuto,
   activeStepIndex, setActiveStepIndex,
   pathLength,
@@ -43,7 +43,7 @@ export const MobileCommandBar: React.FC<Props> = ({
   onToggleLoop,
   melodyMuted = false,
   isLooping = false,
-}) => {
+}: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreSheetTitleId = useModalLabel("mobile-more");
 
@@ -180,4 +180,4 @@ export const MobileCommandBar: React.FC<Props> = ({
       )}
     </>
   );
-};
+});

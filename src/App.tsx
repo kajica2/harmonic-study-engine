@@ -23,7 +23,7 @@ function triadFromRoot(
   return notes;
 }
 
-import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from "react";
 import {
   Play,
   Pause,
@@ -117,7 +117,7 @@ import { TexturePanel } from "./components/TexturePanel";
 import { FormPlanner } from "./components/FormPlanner";
 import { FormTemplatePicker } from "./components/FormTemplatePicker";
 import { StylePackPicker } from "./components/StylePackPicker";
-import { StyleWarnings } from "./components/StyleWarnings";
+import { StyleWarnings, NO_VIOLATIONS } from "./components/StyleWarnings";
 import { CoComposePanel } from "./components/CoComposePanel";
 import { QuizPanel } from "./components/QuizPanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
@@ -384,13 +384,21 @@ function AppShell() {
     (id: string) => {
       const idx = paths.findIndex((p) => p.id === id);
       if (idx >= 0) {
-        setActivePathIndex(idx);
-        setActiveStepIndex(0);
-        setActivePanel("paths");
+        startTransition(() => {
+          setActivePathIndex(idx);
+          setActiveStepIndex(0);
+          setActivePanel("paths");
+        });
       }
     },
     [paths, setActivePathIndex, setActiveStepIndex, setActivePanel],
   );
+
+  // Tab switch is never urgent — defer it so the heavy canvas/keyboard
+  // layout doesn't block the click handler (rerender-transitions).
+  const handleTabSelect = useCallback((tab: "paths" | "practice" | "catalog") => {
+    startTransition(() => setActivePanel(tab));
+  }, []);
 
   // Practice sets + recent sessions
   const [practiceSets, setPracticeSets] = useState(loadPracticeSets);
@@ -451,6 +459,55 @@ function AppShell() {
   const path = paths[activePathIndex];
   const step = path.steps[activeStepIndex];
 
+  // ---- Memoization support for the remaining non-playback panels ----
+  // Handler identities are pinned with useCallback so the memo()'d
+  // MobileCommandBar / QuizPanel / RecentTakesPanel can skip re-render
+  // whenever the surrounding tree re-renders. All deps are primitives or
+  // stable setters (rerender-dependencies audit: no whole-object deps).
+
+  const handleCommandStepIndex = useCallback(
+    (i: number) =>
+      setActiveStepIndex(Math.max(0, Math.min(i, path.steps.length - 1))),
+    [setActiveStepIndex, path.steps.length],
+  );
+
+  const handleShowInspector = useCallback(() => setShowChordInspector(true), []);
+  const handleShowExport = useCallback(() => setShowImportExport(true), []);
+  const handleTogglePlayAlong = useCallback(() => {
+    audioEngine.setMelodyMuted(!audioEngine.melodyMuted);
+  }, []);
+  const handleToggleLoop = useCallback(
+    () => setIsLooping(!isLooping),
+    [isLooping],
+  );
+  const handleCommandCommit = useCallback(() => {
+    recorder.start();
+    setIsPlayingAuto(true);
+  }, []);
+
+  const handleQuizAnswer = useCallback(
+    (wasCorrect: boolean, correct: number, total: number) => {
+      setQuizScore({ correct, total });
+      if (wasCorrect) {
+        setFeedbackHistory([
+          ...feedbackHistory,
+          {
+            personaId: selectedPersonaId,
+            suggestion: `quiz:${quizTopic}`,
+            accepted: true,
+          },
+        ]);
+      }
+    },
+    [
+      setQuizScore,
+      setFeedbackHistory,
+      feedbackHistory,
+      selectedPersonaId,
+      quizTopic,
+    ],
+  );
+
   const optimizedStepsNotes = useMemo(() => {
     if (!optimizeVoiceLeading) return path.steps.map((s) => s.notes);
 
@@ -464,6 +521,16 @@ function AppShell() {
     }
     return res;
   }, [path.steps, optimizeVoiceLeading]);
+
+  // rerender-derived-state: hoist the inspector / style-pack one-off
+  // derivations out of the JSX so they're computed exactly once per
+  // relevant change, not on every tree render.
+  const activePackName = useMemo(
+    () => (stylePackId ? loadStylePack(stylePackId as StylePackId).name : ""),
+    [stylePackId],
+  );
+  const voicingCount =
+    optimizedStepsNotes[activeStepIndex]?.length ?? step.notes.length;
 
   // Phase 5: per-step transpose drift (sequenceStepper / keyDrift).
   // Added on top of the user's manual transposeShift. Declared here
@@ -1132,26 +1199,15 @@ function AppShell() {
         isPlayingAuto={isPlayingAuto}
         setIsPlayingAuto={setIsPlayingAuto}
         activeStepIndex={activeStepIndex}
-        setActiveStepIndex={(i) => {
-          setActiveStepIndex(Math.max(0, Math.min(i, path.steps.length - 1)));
-        }}
+        setActiveStepIndex={handleCommandStepIndex}
         pathLength={path.steps.length}
-        onShowInspector={() => setShowChordInspector(true)}
-        onShowExport={() => setShowImportExport(true)}
-        onTogglePlayAlong={() => audioEngine.setMelodyMuted(!audioEngine.melodyMuted)}
-        onToggleLoop={() => setIsLooping(!isLooping)}
+        onShowInspector={handleShowInspector}
+        onShowExport={handleShowExport}
+        onTogglePlayAlong={handleTogglePlayAlong}
+        onToggleLoop={handleToggleLoop}
         melodyMuted={audioEngine.melodyMuted}
         isLooping={isLooping}
-        onCommit={async () => {
-          // Reuse the same media recording flow as the rail's
-          // Record & Export tile. See the long onCommit in
-          // PlaySessionRail for the full flow (start audio recorder,
-          // upload WebM, transcode to MP4 via ffmpeg).
-          // For brevity on mobile, we just start MIDI + auto here
-          // and rely on the rail's full flow for video.
-          recorder.start();
-          setIsPlayingAuto(true);
-        }}
+        onCommit={handleCommandCommit}
       />
 
       <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[color:var(--color-border)] surface-1 flex flex-wrap gap-3 sm:gap-4 justify-between items-center backdrop-blur-xl sticky top-0 z-30">
@@ -1322,8 +1378,8 @@ function AppShell() {
         />
         {stylePackId && (
           <StyleWarnings
-            styleName={loadStylePack(stylePackId as StylePackId).name}
-            violations={[]}
+            styleName={activePackName}
+            violations={NO_VIOLATIONS}
           />
         )}
 
@@ -1357,19 +1413,7 @@ function AppShell() {
           seed={(activeStepIndex + 1) * 7}
           score={quizScore}
           onTopicChange={setQuizTopic}
-          onAnswer={(wasCorrect, correct, total) => {
-            setQuizScore({ correct, total });
-            if (wasCorrect) {
-              setFeedbackHistory([
-                ...feedbackHistory,
-                {
-                  personaId: selectedPersonaId,
-                  suggestion: `quiz:${quizTopic}`,
-                  accepted: true,
-                },
-              ]);
-            }
-          }}
+          onAnswer={handleQuizAnswer}
         />
 
         {/* Persona behavioral lens — shows when the active persona
@@ -2106,7 +2150,7 @@ function AppShell() {
                 {(["paths", "practice", "catalog"] as const).map((tab) => (
                   <button
                     key={tab}
-                    onClick={() => setActivePanel(tab)}
+                    onClick={() => handleTabSelect(tab)}
                     className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                       activePanel === tab
                         ? "bg-purple-900/30 text-purple-300 border border-purple-500/30"
@@ -2492,7 +2536,7 @@ function AppShell() {
                   <Settings2 size={11} className="text-[color:var(--color-brand)]" />
                   Edit voicing
                   <span className="t-mono text-[10px] text-[color:var(--color-text-3)] ml-1">
-                    {optimizedStepsNotes[activeStepIndex]?.length ?? step.notes.length}nd
+                    {voicingCount}nd
                   </span>
                 </button>
               </div>

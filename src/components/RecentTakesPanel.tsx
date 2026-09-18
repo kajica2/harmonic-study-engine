@@ -22,11 +22,11 @@ interface RecentTakesPanelProps {
   onClear: () => void;
 }
 
-export const RecentTakesPanel: React.FC<RecentTakesPanelProps> = ({
+export const RecentTakesPanel = React.memo(function RecentTakesPanel({
   takes,
   onRate,
   onClear,
-}) => {
+}: RecentTakesPanelProps) {
   // Newest first for the panel (the log itself is append-ordered).
   const ordered = [...takes].reverse();
   return (
@@ -58,7 +58,7 @@ export const RecentTakesPanel: React.FC<RecentTakesPanelProps> = ({
       </ul>
     </section>
   );
-};
+});
 
 /**
  * GuideToneProgress — the option G read-out fed by the option C

@@ -44,12 +44,12 @@ The 3 high-value items already shipped; remaining are incremental.
 | Rule | Status | Evidence / work |
 |------|--------|-----------------|
 | `rerender-defer-reads` | ✅ | MIDI-in chip split into `MidiInPicker` (owns its own state); `activeMidis` pulled out of App state into `SynesthesiaProvider` context (value ctx consumed only by canvas/keyboard/audition controls; App writes via the stable setter ctx) so sibling panels never re-render on note churn |
-| `rerender-memo` | ✅/◐ | `PathCatalog`, `CoComposePanel`, `TexturePanel`, `StylePackPicker` wrapped in `memo` + stable `useCallback` handlers. Remaining candidates: `QuizPanel`, `RecentTakesPanel`, `MobileCommandBar` (props stable during playback) |
-| `rerender-memo-with-default-value` | ☐ | Hoist `stylePackId ?? null`, `violations={[]}` etc. to stable module constants so memo comparisons stay true |
-| `rerender-dependencies` | ◐ | Some `useEffect`s list whole objects (e.g. `session`); tighten to primitives where the value is destructured later |
-| `rerender-derived-state` | ☐ | `loadStylePack(...).name` computed inline in JSX — derive once |
-| `rerender-split-combined-hooks` | ☐ | `App.tsx` still declares ~49 `useState` for unrelated concerns; split into purpose-built hooks (playback, export, ui-fold, midi) so a change in one doesn't re-render the rest is a *larger* refactor — worth it after `activeMidis` context extraction |
-| `rerender-transitions` | ☐ | Wrap `setActivePathIndex`/`setActivePanel("paths")` (PathCatalog select) + dataset/pack loads in `startTransition` |
+| `rerender-memo` | ✅ | `PathCatalog`, `CoComposePanel`, `TexturePanel`, `StylePackPicker`, `QuizPanel`, `RecentTakesPanel`, `MobileCommandBar`, `StyleWarnings` all `memo`'d with stable `useCallback` handlers |
+| `rerender-memo-with-default-value` | ✅ | Hoisted `NO_VIOLATIONS` constant (was inline `violations={[]}`); remaining defaults already primitive literals |
+| `rerender-dependencies` | ✅/◐ | Audited App.tsx + session store: deps already primitives/destructured (App never lists `session`; `path.steps`, `optimizedStepsNotes`, `barDriftShifts` identities are stable). No churn found to fix |
+| `rerender-derived-state` | ✅ | Hoisted `activePackName` (was `loadStylePack(...).name` inline in JSX) + `voicingCount` in the step header |
+| `rerender-split-combined-hooks` | ☐ | `App.tsx` still declares ~49 `useState` for unrelated concerns; split into purpose-built hooks (playback, export, ui-fold, midi) so a change in one doesn't re-render the rest is a *larger* refactor — the last open Phase-2 item |
+| `rerender-transitions` | ✅ | Path catalog select + tab switch wrapped in `startTransition` |
 | `rerender-functional-setstate` | ✅ | Setters use functional form where reading prev (predominantly) |
 | `rerender-lazy-state-init` | ✅ | `loadPracticeSets`, `getRecentSessions`, `loadString`/`loadJSON` passed as lazy init |
 | `rerender-no-inline-components` | ✅ | `ModalFallback` hoisted; no components defined inside `App` |
