@@ -91,11 +91,11 @@ The 3 high-value items already shipped; remaining are incremental.
 | Rule | Status | Evidence / work |
 |------|--------|-----------------|
 | `js-hoist-regexp` / constants | ✅ | `NOTE_NAMES` hoisted out of the `midin` hot handler (MidiInPicker) |
-| `js-cache-storage` | ☐ | `readHDSetting()` (`audio.ts:20`) re-reads localStorage per engine init; `allStylePacks()` rebuilds arrays per render (`StylePackPicker.tsx:27`); cache at module level |
-| `js-cache-function-results` | ☐ | `loadStylePack`/`allStylePacks` memoize at module scope (exported style data is static/import-time) |
-| `js-index-maps` | ☐ | `contexts.find(x => x.id === …)` lookups in render paths (`App.tsx:1274` etc.) → build `Map` once |
+| `js-cache-storage` | ✅/N/A | `readHDSetting()` (`audio.ts:17`) already runs at module scope (single `AudioEngine` singleton — read once per load, not per "engine init"); practice-store reads now idle-deferred (see `js-request-idle-callback`). `allStylePacks()` is a tiny `[...PACKS.values()]` spread → no measurable win |
+| `js-cache-function-results` | ✅/N/A | Style data is static/import-time (module `Map` in `stylePack.ts`, `allStylePacks` trivially cheap) — memoization adds indirection without benefit |
+| `js-index-maps` | ✅/N/A | `PERSONAS.find((x) => x.id === …)` all sit in user-action handlers / settled `useMemo` (`App.tsx:582` etc.) over a 6-element array — never a per-render hot loop; a `Map` gains nothing |
 | `js-early-exit`, `js-length-check-first` | ✅ | Existing guards (e.g. `if (!alt.alternative) return`) |
-| `js-request-idle-callback` | ☐ | Defer `getRecentSessions(5)` + practice-set hydration to idle (they run on first paint today) |
+| `js-request-idle-callback` | ✅ | `loadPracticeSets()` + `getRecentSessions(5)` moved off the first-paint path — hydrated inside `useEffect` → `window.requestIdleCallback` (1000 ms timeout, `setTimeout` fallback), so the initial `localStorage` + `JSON.parse`/merge of the practice store no longer blocks first render (`App.tsx`) |
 | `js-lazy-load-lib` | ✅ | `LiveScoreDisplay` → `React.lazy` (splits `abcjs` ~160 kB raw / ~54 kB gzip out of the initial ~511 kB main chunk; fetched only when the score mounts). Sheet-music PDF (jsPDF/svg2pdf + `sheetMusicExport`) already dynamic-`import()`ed; `@magenta/music` lazy (`magentaHelper`/`quantize`); MIDI export now `await import("./lib/midiExport")` so `midi-writer-js` loads on first export click |
 
 **Effort:** ~0.5–1 day.
