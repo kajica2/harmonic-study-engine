@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, Pause, Repeat } from "lucide-react";
+import { Play, Pause, Repeat, Drum } from "lucide-react";
 import {
   formatChordReadout,
   formatGuideToneTally,
@@ -65,6 +65,12 @@ interface PracticeHeaderProps {
   isLooping: boolean;
   onLoopToggle: () => void;
 
+  // Metronome click (audio: rhythmEngine-driven; independent of the
+  // backing track. Surfaced here in the practice header so the click
+  // on/off is visible alongside Start/Loop without hunting for it.)
+  metronomeOn: boolean;
+  onMetronomeToggle: () => void;
+
   // Backing style
   backingStyle: BackingStyle;
   onBackingStyleChange: (s: BackingStyle) => void;
@@ -105,6 +111,8 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onTempoChange,
   isLooping,
   onLoopToggle,
+  metronomeOn,
+  onMetronomeToggle,
   backingStyle,
   onBackingStyleChange,
   volume,
@@ -226,6 +234,31 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           }`}
         >
           <Repeat size={12} aria-hidden /> Loop
+        </button>
+
+        {/* Metronome click — visible toggle for the rhythmEngine's
+            audio click. Default off (per useSessionStore). The
+            backing track keeps running regardless. Mirrors the
+            toggle in PlaySessionRail so the same state has two
+            access points: this one is the practice-loop surface,
+            the PlaySessionRail one is for the guided workflow. */}
+        <button
+          onClick={onMetronomeToggle}
+          aria-pressed={metronomeOn}
+          aria-label={metronomeOn ? "Mute metronome click" : "Unmute metronome click"}
+          title={
+            metronomeOn
+              ? "Metronome click on — click to mute (backing track keeps running)"
+              : "Metronome click off — click to enable a click track during playback"
+          }
+          data-testid="metronome-toggle"
+          className={`flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-xs t-mono border transition-colors ${
+            metronomeOn
+              ? "border-[color:var(--color-brand)] text-[color:var(--color-brand)] bg-[color:var(--color-brand)]/10"
+              : "border-[color:var(--color-border)] text-neutral-400 hover:text-neutral-200 surface-1"
+          }`}
+        >
+          <Drum size={12} aria-hidden /> Click
         </button>
 
         {/* Backing style */}

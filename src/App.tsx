@@ -1374,6 +1374,8 @@ function AppShell() {
         onTempoChange={setTempo}
         isLooping={isLooping}
         onLoopToggle={() => setIsLooping(!isLooping)}
+        metronomeOn={metronomeOn}
+        onMetronomeToggle={() => setMetronomeOn(!metronomeOn)}
         backingStyle={beatType}
         onBackingStyleChange={setBeatType}
         volume={volume}
