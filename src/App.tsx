@@ -1512,8 +1512,6 @@ function AppShell() {
           setTempo={setTempo}
           transposeShift={transposeShift}
           setTransposeShift={setTransposeShift}
-          metronomeOn={metronomeOn}
-          setMetronomeOn={setMetronomeOn}
           selectedPersonaId={selectedPersonaId}
           setSelectedPersonaId={setSelectedPersonaId}
           personas={PERSONAS}
