@@ -1,11 +1,11 @@
 # Masterclass Enablement — per-tune backlog (FUTURE_PLANNING #4)
 
-Status as of 2026-09-18. The masterclass catalog at
-`src/data/masterclass.ts` has 38 entries; only **3** are
+Status as of 2026-09-20. The masterclass catalog at
+`src/data/masterclass.ts` has 38 entries; **15** are
 `inApp: true` (Star Eyes, What Is This Thing Called Love, I Got
-Rhythm). The remaining 35 ship as concept placeholders that need
-an 8-bar `HarmonicPath` entry in `src/lib/paths.ts` (or
-`src/lib/studies.ts`) and an `inApp: true` flip on the catalog
+Rhythm, plus the 12 enabled from this backlog). The remaining
+tunes ship as concept placeholders that need a playable
+`HarmonicPath` entry and an `inApp: true` flip on the catalog
 entry.
 
 This file is the per-tune iteration queue. `TODO.md` holds the
@@ -169,6 +169,6 @@ authored as `concept-*` ids)
 
 ## Status
 
-- Total tunes in this backlog: 35
+- Total tunes in this backlog: 33
 - Completed: 12
-- Remaining: 23
+- Remaining: 21 (all blocked — see per-tune sub-bullets)
