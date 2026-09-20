@@ -67,6 +67,14 @@ and full export to MIDI / MusicXML / Score21 / MP4.
 - **MIDI input listener** — `src/lib/midiIn.ts` wraps Web MIDI
   access, dispatches `midin` CustomEvent on `window`. New
   IN picker chip in the header next to the OUT chip.
+- **Batch MIDI export** — the Import & export modal now has a
+  "Batch export ▾" disclosure that picks N paths × M variations
+  (as written, transpose by N semitones, split bass / upper
+  voices, melody-only, rhythm-only, closed / open voicing) and
+  downloads the lot as a single ZIP. Pure-logic
+  `planBatchExport` + `zipBatchExport` live in
+  `src/lib/midiBatchExport.ts` (fflate-backed); the single-path
+  "Download MIDI" button keeps its one-click behavior.
 - **Mobile-first**: fixed bottom-sheet command bar,
   safe-area padding.
 - **Audio quality**: warm soft-knee saturation on the melody

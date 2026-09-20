@@ -81,6 +81,26 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Batch MIDI variations export** — `src/lib/midiBatchExport.ts`
+  packs N paths × M variations (as written, transpose, split bass /
+  upper voices, melody-only, rhythm-only, closed / open voicing)
+  into a single ZIP archive via `fflate.zipSync`. New
+  `exportMidiWithVariation(path, variation)` in
+  `src/lib/midiExport.ts` extends the legacy single-track writer;
+  `exportToMidiFile` is preserved as a thin wrapper so the existing
+  "Download MIDI" button keeps working. New "Batch export ▾"
+  disclosure in `ImportExportModal` lets the user pick variations
+  (with a semitone input for transpose, melody index for melody-only,
+  duration select for rhythm-only) and a subset of the in-app
+  masterclass catalog (+ current path). 14 new unit tests
+  (8 for variations, 6 for the batch planner / ZIP packer).
+
+### Changed
+- **`midi-writer-js` Track / Writer calls** are now centralized
+  inside two private helpers (`buildSingleTrack`,
+  `buildSplitTracks`) so the as-written / transpose / melody /
+  / rhythm variations share one code path. No behaviour change for
+  the single-track case (byte-identical to `exportToMidiFile`).
 - **Guide-tone data feeds the mastery log (option C → option G)** —
   `src/lib/guideToneTrail.ts` folds classifier results into a per-run
   tally (3rd/7th hits vs misses) and `useGuideToneTrail` counts note-ons

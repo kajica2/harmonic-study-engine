@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import {
   X,
   Download,
@@ -8,15 +8,24 @@ import {
   ClipboardList,
   FileJson,
   BookText,
+  PackageOpen,
+  ChevronDown,
 } from "lucide-react";
-import { HarmonicPath } from "../lib/paths";
+import { HarmonicPath, ALL_PATHS } from "../lib/paths";
 import {
   importIRealText,
   exportIReal,
   parseChordToMidi,
 } from "../lib/ireal";
 import { importRealBookMarkdown } from "../lib/importRealBook";
-import { exportToMidiFile } from "../lib/midiExport";
+import { exportToMidiFile, MidiVariation } from "../lib/midiExport";
+import {
+  BatchItem,
+  planBatchExport,
+  zipBatchExport,
+  downloadBatchZip,
+} from "../lib/midiBatchExport";
+import { MASTERCLASS_TUNES, availableTunes } from "../data/masterclass";
 import { ModalShell, useModalLabel } from "./ModalShell";
 
 type Tab = "url" | "chart" | "json" | "realbook";
@@ -38,6 +47,114 @@ export const ImportExportModal: React.FC<Props> = ({
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<HarmonicPath[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // --- Batch export state -------------------------------------------------
+  // Default the path selection to every in-app tune (masterclass catalog
+  // entries where inApp: true, resolved to actual HarmonicPath objects).
+  // `selectedPaths` is the user-edited subset (starts equal to the
+  // default, drops anything the user unchecks).
+  const inAppMasterclassPaths = useMemo(() => {
+    return MASTERCLASS_TUNES.filter((t) => t.inApp)
+      .map((t) => ALL_PATHS.find((p) => p.id === t.id))
+      .filter((p): p is HarmonicPath => Boolean(p));
+  }, []);
+
+  const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(
+    () => new Set(inAppMasterclassPaths.map((p) => p.id)),
+  );
+
+  const includeCurrentPath =
+    !inAppMasterclassPaths.some((p) => p.id === currentPath.id);
+  const isCurrentSelected = selectedPathIds.has(currentPath.id);
+
+  const [transposeSemitones, setTransposeSemitones] = useState(5);
+  const [melodyIndex, setMelodyIndex] = useState(0);
+  const [rhythmDuration, setRhythmDuration] = useState<"4" | "8" | "16">("8");
+
+  // Each variation kind has its own checkbox. Keeping them as a set
+  // mirrors planBatchExport's expectation that we hand it the
+  // MidiVariation[] list directly.
+  const [enabledVariations, setEnabledVariations] = useState<Set<MidiVariation["kind"]>>(
+    () => new Set(["asWritten", "transpose"]),
+  );
+
+  const togglePath = (id: string) => {
+    setSelectedPathIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleVariation = (kind: MidiVariation["kind"]) => {
+    setEnabledVariations((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  };
+
+  const buildVariations = (): MidiVariation[] => {
+    const out: MidiVariation[] = [];
+    for (const kind of enabledVariations) {
+      switch (kind) {
+        case "asWritten":
+          out.push({ kind: "asWritten" });
+          break;
+        case "transpose":
+          out.push({ kind: "transpose", semitones: transposeSemitones });
+          break;
+        case "splitTracks":
+          out.push({ kind: "splitTracks" });
+          break;
+        case "melodyOnly":
+          out.push({ kind: "melodyOnly", melodyIndex });
+          break;
+        case "rhythmOnly":
+          out.push({ kind: "rhythmOnly", noteDuration: rhythmDuration });
+          break;
+        case "closedVoicing":
+          out.push({ kind: "closedVoicing" });
+          break;
+        case "openVoicing":
+          out.push({ kind: "openVoicing" });
+          break;
+      }
+    }
+    return out;
+  };
+
+  const selectedPaths: HarmonicPath[] = useMemo(() => {
+    const all = includeCurrentPath && isCurrentSelected
+      ? [...inAppMasterclassPaths, currentPath]
+      : inAppMasterclassPaths;
+    return all.filter((p) => selectedPathIds.has(p.id));
+  }, [selectedPathIds, inAppMasterclassPaths, currentPath, includeCurrentPath, isCurrentSelected]);
+
+  const totalFiles = selectedPaths.length * enabledVariations.size;
+
+  const handleBatchExport = () => {
+    const variations = buildVariations();
+    if (variations.length === 0 || selectedPaths.length === 0) return;
+    const items: BatchItem[] = selectedPaths.map((p) => ({ path: p, variations }));
+    const results = planBatchExport(items);
+    void zipBatchExport(results).then((blob) => {
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadBatchZip(blob, `hse-midi-batch-${stamp}.zip`);
+    });
+  };
+
+  const variationLabels: { kind: MidiVariation["kind"]; label: string }[] = [
+    { kind: "asWritten", label: "As written" },
+    { kind: "transpose", label: "Transpose" },
+    { kind: "splitTracks", label: "Split bass / upper" },
+    { kind: "melodyOnly", label: "Melody only (voice index)" },
+    { kind: "rhythmOnly", label: "Rhythm only" },
+    { kind: "closedVoicing", label: "Closed voicing" },
+    { kind: "openVoicing", label: "Open voicing" },
+  ];
 
   const compute = (text: string) => {
     setError("");
@@ -271,6 +388,174 @@ export const ImportExportModal: React.FC<Props> = ({
               <Download size={16} /> Export iReal URL
             </button>
           </div>
+
+          {/* Batch export disclosure */}
+          <details className="surface-2 border border-[color:var(--color-border)] rounded-[var(--radius-md)]">
+            <summary className="cursor-pointer px-3 py-2 text-xs text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)] flex items-center gap-2 list-none">
+              <PackageOpen size={14} />
+              <span>Batch export ▾</span>
+              <span className="ml-auto t-mono text-[10px] text-[color:var(--color-text-3)]">
+                {availableTunes().length} in-app · {totalFiles} files
+              </span>
+              <ChevronDown size={12} className="opacity-60" />
+            </summary>
+            <div className="px-3 pb-3 pt-1 space-y-3">
+              {/* Variation picker */}
+              <div>
+                <div className="t-label text-[color:var(--color-text-3)] mb-1.5">
+                  Variations
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {variationLabels.map(({ kind, label }) => {
+                    const checked = enabledVariations.has(kind);
+                    return (
+                      <label
+                        key={kind}
+                        className={`flex items-center gap-1 px-2 py-1 text-[11px] t-mono rounded-[var(--radius-sm)] border cursor-pointer transition-colors ${
+                          checked
+                            ? "bg-[color:var(--color-brand)]/15 border-[color:var(--color-brand)]/40 text-[color:var(--color-text-1)]"
+                            : "surface-1 border-[color:var(--color-border)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)]"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleVariation(kind)}
+                          className="accent-[color:var(--color-brand)]"
+                          aria-label={`Toggle ${label}`}
+                        />
+                        {label}
+                      </label>
+                    );
+                  })}
+                </div>
+                {enabledVariations.has("transpose") && (
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px] t-mono text-[color:var(--color-text-3)]">
+                    <span>Transpose semitones:</span>
+                    <input
+                      type="number"
+                      value={transposeSemitones}
+                      onChange={(e) =>
+                        setTransposeSemitones(parseInt(e.target.value, 10) || 0)
+                      }
+                      className="w-16 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] py-0.5 px-1.5 t-mono text-[color:var(--color-text-1)] focus:outline-none focus:border-[color:var(--color-brand-strong)]"
+                      aria-label="Transpose semitones"
+                    />
+                  </div>
+                )}
+                {enabledVariations.has("melodyOnly") && (
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px] t-mono text-[color:var(--color-text-3)]">
+                    <span>Melody index (0–3):</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={3}
+                      value={melodyIndex}
+                      onChange={(e) =>
+                        setMelodyIndex(
+                          Math.max(0, Math.min(3, parseInt(e.target.value, 10) || 0)),
+                        )
+                      }
+                      className="w-16 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] py-0.5 px-1.5 t-mono text-[color:var(--color-text-1)] focus:outline-none focus:border-[color:var(--color-brand-strong)]"
+                      aria-label="Melody index"
+                    />
+                  </div>
+                )}
+                {enabledVariations.has("rhythmOnly") && (
+                  <div className="mt-1.5 flex items-center gap-2 text-[11px] t-mono text-[color:var(--color-text-3)]">
+                    <span>Note duration:</span>
+                    <select
+                      value={rhythmDuration}
+                      onChange={(e) =>
+                        setRhythmDuration(e.target.value as "4" | "8" | "16")
+                      }
+                      className="surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] py-0.5 px-1.5 t-mono text-[color:var(--color-text-1)] focus:outline-none focus:border-[color:var(--color-brand-strong)]"
+                      aria-label="Note duration"
+                    >
+                      <option value="4">Quarter (4)</option>
+                      <option value="8">Eighth (8)</option>
+                      <option value="16">Sixteenth (16)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Path picker */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="t-label text-[color:var(--color-text-3)]">
+                    Paths ({selectedPathIds.size} of {inAppMasterclassPaths.length + (includeCurrentPath ? 1 : 0)})
+                  </span>
+                  <div className="flex gap-1.5 text-[10px] t-mono">
+                    <button
+                      onClick={() =>
+                        setSelectedPathIds(
+                          new Set([
+                            ...inAppMasterclassPaths.map((p) => p.id),
+                            ...(includeCurrentPath ? [currentPath.id] : []),
+                          ]),
+                        )
+                      }
+                      className="px-1.5 py-0.5 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)] transition-colors"
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setSelectedPathIds(new Set())}
+                      className="px-1.5 py-0.5 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)] transition-colors"
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1">
+                  {inAppMasterclassPaths.map((p) => (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2 px-2 py-1 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] cursor-pointer text-[11px] hover:border-[color:var(--color-brand)]/40 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedPathIds.has(p.id)}
+                        onChange={() => togglePath(p.id)}
+                        className="accent-[color:var(--color-brand)]"
+                      />
+                      <span className="truncate text-[color:var(--color-text-1)]">
+                        {p.title}
+                      </span>
+                    </label>
+                  ))}
+                  {includeCurrentPath && (
+                    <label
+                      key={currentPath.id}
+                      className="flex items-center gap-2 px-2 py-1 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] cursor-pointer text-[11px] hover:border-[color:var(--color-brand)]/40 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isCurrentSelected}
+                        onChange={() => togglePath(currentPath.id)}
+                        className="accent-[color:var(--color-brand)]"
+                      />
+                      <span className="truncate text-[color:var(--color-text-1)]">
+                        {currentPath.title}{" "}
+                        <span className="t-mono text-[10px] text-[color:var(--color-text-3)]">
+                          (current)
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={handleBatchExport}
+                disabled={totalFiles === 0}
+                className="w-full flex items-center justify-center gap-2 bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] py-2 rounded-[var(--radius-md)] text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[color:var(--color-brand-strong)] transition-colors"
+              >
+                <PackageOpen size={14} /> Download .zip ({totalFiles} files)
+              </button>
+            </div>
+          </details>
 
           <details className="text-xs">
             <summary className="cursor-pointer text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)]">
