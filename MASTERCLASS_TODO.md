@@ -107,9 +107,15 @@ class numbers come first.
 ### Batch E — MC 1 encore (3 more)
 
 - [ ] **Teach Me Tonight** (`teach-me-tonight`, MC 1)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **You Don't Know What Love Is** (`you-dont-know-what-love-is`,
       MC 1)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Sweet Rosie O'Grady** (`sweet-rosie-ogrady`, MC 19)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 
 ### Batch F — Concept exercises (already in masterclass.ts,
 authored as `concept-*` ids)
