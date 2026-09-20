@@ -423,6 +423,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
                       localStorage.setItem("synesthesia_clefLayout", c);
                     } catch {}
                   }}
+                  aria-pressed={clefLayout === c}
                   className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors ${
                     clefLayout === c
                       ? "bg-purple-700 text-white"
@@ -445,6 +446,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
           {/* Chord label toggle */}
           <button
             onClick={() => setShowChords(!showChords)}
+            aria-pressed={showChords}
             className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-mono rounded-lg transition-colors ${
               showChords
                 ? "bg-purple-700 text-white border border-purple-600"
@@ -474,15 +476,14 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
           {tickDetail.isRunning && (
             <div
               className="flex items-center gap-1 bg-[color:var(--color-brand)]/15 text-[color:var(--color-brand-strong)] border border-[color:var(--color-brand)]/40 rounded-lg px-2.5 py-1.5 t-mono text-xs"
-              role="status"
-              aria-live="off"
-              aria-label={`Beat ${Math.floor(tickDetail.beat) + 1} of 4`}
+              aria-hidden="true"
             >
               <span
                 className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-brand-strong)] animate-pulse"
                 aria-hidden="true"
               />
-              Beat {Math.floor(tickDetail.beat) + 1} of 4
+              Beat {Math.floor(tickDetail.beat) + 1} of{" "}
+              {timeSignature.split("/")[0]}
             </div>
           )}
 
@@ -496,6 +497,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
                 max="2.0"
                 step="0.1"
                 value={zoomScale}
+                aria-label="Score zoom scale"
                 onChange={(e) => setZoomScale(parseFloat(e.target.value))}
                 className="w-20 accent-purple-500 cursor-pointer text-purple-500 bg-neutral-700"
               />

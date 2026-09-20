@@ -19,7 +19,8 @@ function estimateDuration(set: PracticeSet): string {
   });
   const totalBars = barsPerItem.reduce((a, b) => a + b, 0);
   const secondsPerBar = (60 / set.defaultTempo) * 4;
-  const totalSeconds = totalBars * secondsPerBar * set.defaultReps;
+  const totalSeconds = Math.round(totalBars * secondsPerBar * set.defaultReps);
+  if (totalSeconds < 60) return `${totalSeconds} sec`;
   const minutes = Math.round(totalSeconds / 60);
   return `${minutes} min`;
 }
@@ -127,13 +128,15 @@ export function PracticeSetBrowser({ sets, recentSessions, onStart, onMutate }: 
           <p className="text-[10px] text-neutral-600 uppercase tracking-widest font-semibold">
             My Sets
           </p>
-          {userSets.map((s) =>
-            renderSetCard(s, {
-              onStart,
-              onEdit: () => setEditingSet(s),
-              onDelete: handleDelete,
-            }),
-          )}
+          {userSets.map((s) => (
+            <SetCard
+              key={s.id}
+              set={s}
+              onStart={onStart}
+              onEdit={() => setEditingSet(s)}
+              onDelete={handleDelete}
+            />
+          ))}
         </div>
       )}
 
@@ -145,9 +148,9 @@ export function PracticeSetBrowser({ sets, recentSessions, onStart, onMutate }: 
               Built-in Sets
             </p>
           )}
-          {seedSets.map((s) =>
-            renderSetCard(s, { onStart }),
-          )}
+          {seedSets.map((s) => (
+            <SetCard key={s.id} set={s} onStart={onStart} />
+          ))}
         </div>
       )}
 
@@ -197,17 +200,20 @@ export function PracticeSetBrowser({ sets, recentSessions, onStart, onMutate }: 
   );
 }
 
-// ── SetCard (plain render function — avoids JSX key prop typing issues) ───────
+// ── SetCard ───────────────────────────────────────────────────────────────────
 
-function renderSetCard(
-  set: PracticeSet,
-  opts: {
-    onStart: (set: PracticeSet) => void;
-    onEdit?: () => void;
-    onDelete?: (set: PracticeSet) => void;
-  },
-): React.ReactElement {
-  const { onStart, onEdit, onDelete } = opts;
+function SetCard({
+  set,
+  onStart,
+  onEdit,
+  onDelete,
+}: {
+  set: PracticeSet;
+  onStart: (set: PracticeSet) => void;
+  onEdit?: () => void;
+  onDelete?: (set: PracticeSet) => void;
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   return (
     <div className="group relative p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all">
@@ -252,21 +258,39 @@ function renderSetCard(
           </button>
 
           {!set.seed && (onEdit || onDelete) && (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
               {onEdit && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onEdit(); }}
                   className="p-1.5 rounded-lg text-neutral-600 hover:text-neutral-200 hover:bg-white/10 transition-colors"
                   title="Edit"
+                  aria-label={`Edit set ${set.title}`}
                 >
                   <Pencil size={11} />
                 </button>
               )}
               {onDelete && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(set); }}
-                  className="p-1.5 rounded-lg text-neutral-600 hover:text-red-400 hover:bg-red-950/30 transition-colors"
-                  title="Delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirmingDelete) {
+                      onDelete(set);
+                    } else {
+                      setConfirmingDelete(true);
+                      window.setTimeout(() => setConfirmingDelete(false), 3000);
+                    }
+                  }}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    confirmingDelete
+                      ? "text-red-300 bg-red-950/40"
+                      : "text-neutral-600 hover:text-red-400 hover:bg-red-950/30"
+                  }`}
+                  title={confirmingDelete ? "Click again to confirm delete" : "Delete"}
+                  aria-label={
+                    confirmingDelete
+                      ? `Confirm delete set ${set.title}`
+                      : `Delete set ${set.title}`
+                  }
                 >
                   <Trash2 size={11} />
                 </button>

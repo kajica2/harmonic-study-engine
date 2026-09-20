@@ -279,7 +279,7 @@ export const ImportExportModal: React.FC<Props> = ({
             <textarea
               readOnly
               value={exportText}
-              className="w-full surface-2 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] py-2 px-3 t-mono text-[10px] text-[color:var(--color-text-2)] h-16 mt-2 focus:outline-none resize-none custom-scrollbar"
+              className="w-full surface-2 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] py-2 px-3 t-mono text-[10px] text-[color:var(--color-text-2)] h-16 mt-2 focus:border-[color:var(--color-border-strong)] resize-none custom-scrollbar"
               onClick={(e) => (e.target as HTMLTextAreaElement).select()}
             />
           </details>

@@ -10,7 +10,7 @@
  * Rendered by App only when at least one take exists, so first paint
  * stays untouched.
  */
-import React from "react";
+import React, { useState } from "react";
 import { Trash2, Clock } from "lucide-react";
 import {
   formatRelativeTime,
@@ -32,6 +32,7 @@ export const RecentTakesPanel = React.memo(function RecentTakesPanel({
   onRate,
   onClear,
 }: RecentTakesPanelProps) {
+  const [confirmingClear, setConfirmingClear] = useState(false);
   // Newest first for the panel (the log itself is append-ordered).
   const ordered = [...takes].reverse();
   return (
@@ -45,10 +46,23 @@ export const RecentTakesPanel = React.memo(function RecentTakesPanel({
           Recent takes
         </h3>
         <button
-          onClick={onClear}
-          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider text-neutral-500 hover:text-rose-300 hover:bg-white/5 transition-colors"
+          onClick={() => {
+            if (confirmingClear) {
+              onClear();
+            } else {
+              setConfirmingClear(true);
+              window.setTimeout(() => setConfirmingClear(false), 3000);
+            }
+          }}
+          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono uppercase tracking-wider transition-colors ${
+            confirmingClear
+              ? "text-rose-300 bg-rose-950/40"
+              : "text-neutral-500 hover:text-rose-300 hover:bg-white/5"
+          }`}
+          aria-label={confirmingClear ? "Confirm clear all takes" : "Clear all takes"}
         >
-          <Trash2 size={11} aria-hidden /> Clear
+          <Trash2 size={11} aria-hidden />{" "}
+          {confirmingClear ? "Click again to confirm" : "Clear"}
         </button>
       </div>
 

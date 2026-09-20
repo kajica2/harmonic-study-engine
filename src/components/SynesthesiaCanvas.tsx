@@ -600,6 +600,9 @@ export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
       ref={canvasRef}
       width={width}
       height={height}
+      tabIndex={0}
+      role="button"
+      aria-label="Synesthesia canvas — press Enter or Space to play the nearest chord"
       onClick={(e) => {
         if (!onNoteClick) return;
         const rect = e.currentTarget.getBoundingClientRect();
@@ -607,6 +610,16 @@ export const SynesthesiaCanvas: React.FC<CanvasProps> = ({
         const py = e.clientY - rect.top;
         const hit = hitTest(px, py);
         if (hit !== null) onNoteClick(hit);
+      }}
+      onKeyDown={(e) => {
+        if (!onNoteClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          // Keyboard alternative to click: play the artifact nearest
+          // the canvas center (keyboard users can't aim with a cursor).
+          const hit = hitTest(width / 2, height / 2);
+          if (hit !== null) onNoteClick(hit);
+        }
       }}
       onMouseMove={(e) => {
         if (!onNoteHover) return;

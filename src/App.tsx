@@ -1332,6 +1332,7 @@ function AppShell() {
                   midiOut.selectOutput(e.target.value);
                   setSelectedMidiOutId(e.target.value);
                 }}
+                aria-label="MIDI output device"
                 className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
               >
                 <option value="">none</option>
@@ -1548,6 +1549,11 @@ function AppShell() {
               // one entry per recorded take on this path. The guide-tone
               // trail starts counting now; its tally is attached to the
               // take once the recording finishes (below).
+              // Duration: 1 path step = 1 measure; measure length in
+              // quarter-beats = stepsPerMeasure / 4 (16ths per measure).
+              const stepsPerMeasure = rhythmEngine.getStepsPerMeasure();
+              const pathDurSec =
+                path.steps.length * (60 / tempo) * (stepsPerMeasure / 4);
               const take = performance.record({
                 pathId: path.id,
                 pathTitle: path.title,
@@ -1555,7 +1561,7 @@ function AppShell() {
                 meter: timeSignature,
                 instrument,
                 personaId: selectedPersonaId,
-                durationSec: path.steps.length * (60 / tempo) * 4,
+                durationSec: pathDurSec,
               });
               guideTrail.begin();
               // Tick elapsed seconds while recording
@@ -1564,8 +1570,7 @@ function AppShell() {
               };
               const interval = setInterval(tick, 250);
               // Stop after path duration + 4s lead-out
-              const pathDur = path.steps.length * (60 / tempo) * 4;
-              const stopAfter = (pathDur + 4) * 1000;
+              const stopAfter = (pathDurSec + 4) * 1000;
               const timeout = setTimeout(() => {
                 audioRecorder.stop();
                 clearInterval(interval);
@@ -1850,6 +1855,17 @@ function AppShell() {
               <div className="mb-6 pb-6 border-b border-neutral-800">
                 <div
                   onClick={() => setIsArpFolded(!isArpFolded)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setIsArpFolded(!isArpFolded);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={!isArpFolded}
+                  aria-controls="arp-panel"
+                  id="arp-header"
                   className="flex items-center justify-between mb-2 cursor-pointer select-none group"
                 >
                   <h2 className="text-sm uppercase tracking-widest text-neutral-500 font-semibold flex items-center gap-2 group-hover:text-neutral-300 transition-colors">
@@ -1860,7 +1876,15 @@ function AppShell() {
                     <span className="text-[10px] text-neutral-600 font-mono">
                       {arpType !== "none" && !isArpFolded ? arpType : ""}
                     </span>
-                    <button className="text-neutral-500 hover:text-neutral-300 transition-colors">
+                    <button
+                      onClick={() => setIsArpFolded(!isArpFolded)}
+                      aria-label={
+                        isArpFolded
+                          ? "Expand Arpeggiator section"
+                          : "Collapse Arpeggiator section"
+                      }
+                      className="text-neutral-500 hover:text-neutral-300 transition-colors"
+                    >
                       {isArpFolded ? (
                         <ChevronDown size={14} />
                       ) : (
@@ -1871,12 +1895,13 @@ function AppShell() {
                 </div>
 
                 {!isArpFolded && (
-                  <div className="mt-4 pt-1 flex flex-col gap-4">
+                  <div id="arp-panel" aria-labelledby="arp-header" className="mt-4 pt-1 flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-neutral-400">Mode</span>
                       <select
                         value={arpType}
                         onChange={(e) => setArpType(e.target.value as any)}
+                        aria-label="Arpeggiator mode"
                         className="bg-neutral-900 border border-neutral-700 text-xs text-neutral-300 rounded px-2 py-1 outline-none"
                       >
                         <option value="none">Off</option>
@@ -1908,6 +1933,7 @@ function AppShell() {
                             max="6"
                             value={arpRate}
                             onChange={(e) => setArpRate(Number(e.target.value))}
+                            aria-label="Arpeggiator rate"
                             className="flex-1 accent-purple-500"
                             title={
                               ["1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32"][
@@ -1926,6 +1952,7 @@ function AppShell() {
                             max="100"
                             value={arpGate}
                             onChange={(e) => setArpGate(Number(e.target.value))}
+                            aria-label="Arpeggiator gate"
                             className="flex-1 accent-purple-500"
                           />
                         </div>
@@ -1942,6 +1969,7 @@ function AppShell() {
                             onChange={(e) =>
                               setArpOctaves(Number(e.target.value))
                             }
+                            aria-label="Arpeggiator octaves"
                             className="flex-1 accent-purple-500"
                           />
                         </div>
@@ -1955,6 +1983,17 @@ function AppShell() {
               <div className="mb-6 pb-6 border-b border-neutral-800">
                 <div
                   onClick={() => setIsGenFolded(!isGenFolded)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setIsGenFolded(!isGenFolded);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={!isGenFolded}
+                  aria-controls="gen-panel"
+                  id="gen-header"
                   className="flex items-center justify-between mb-2 cursor-pointer select-none group"
                 >
                   <h2 className="text-sm uppercase tracking-widest text-neutral-500 font-semibold flex items-center gap-2 group-hover:text-neutral-300 transition-colors">
@@ -1965,7 +2004,15 @@ function AppShell() {
                     <span className="text-[10px] text-neutral-600 font-mono">
                       {isGenFolded ? "Closed" : "Open"}
                     </span>
-                    <button className="text-neutral-500 hover:text-neutral-300 transition-colors">
+                    <button
+                      onClick={() => setIsGenFolded(!isGenFolded)}
+                      aria-label={
+                        isGenFolded
+                          ? "Expand Generator Lab section"
+                          : "Collapse Generator Lab section"
+                      }
+                      className="text-neutral-500 hover:text-neutral-300 transition-colors"
+                    >
                       {isGenFolded ? (
                         <ChevronDown size={14} />
                       ) : (
@@ -1976,7 +2023,7 @@ function AppShell() {
                 </div>
 
                 {!isGenFolded && (
-                  <div className="mt-4 pt-1 flex flex-col gap-4">
+                  <div id="gen-panel" aria-labelledby="gen-header" className="mt-4 pt-1 flex flex-col gap-4">
                     {/* Humanizer — Magenta-driven persona-aware timing
                         jitter. 0 = grid-locked, 1 = full persona profile.
                         Live during backing-track playback. */}
@@ -2013,6 +2060,7 @@ function AppShell() {
                             onChange={(e) =>
                               setGenLength(parseInt(e.target.value))
                             }
+                            aria-label="Generated path length"
                             className="w-full accent-purple-500"
                           />
                         </div>
@@ -2036,6 +2084,7 @@ function AppShell() {
                             onChange={(e) =>
                               setGenComplexity(parseInt(e.target.value))
                             }
+                            aria-label="Generated path complexity"
                             className="w-full accent-purple-500"
                           />
                         </div>
@@ -2227,6 +2276,17 @@ function AppShell() {
                   <div className="mb-2">
                     <div
                       onClick={() => setIsPathsFolded(!isPathsFolded)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setIsPathsFolded(!isPathsFolded);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={!isPathsFolded}
+                      aria-controls="paths-panel"
+                      id="paths-header"
                       className="flex items-center justify-between mb-3 cursor-pointer select-none group"
                     >
                       <h2 className="text-sm uppercase tracking-widest text-neutral-500 font-semibold group-hover:text-neutral-300 transition-colors">
@@ -2236,7 +2296,15 @@ function AppShell() {
                         <span className="text-[10px] text-neutral-600 font-mono">
                           ({paths.length} items)
                         </span>
-                        <button className="text-neutral-500 hover:text-neutral-300 transition-colors">
+                        <button
+                          onClick={() => setIsPathsFolded(!isPathsFolded)}
+                          aria-label={
+                            isPathsFolded
+                              ? "Expand Harmonic Paths section"
+                              : "Collapse Harmonic Paths section"
+                          }
+                          className="text-neutral-500 hover:text-neutral-300 transition-colors"
+                        >
                           {isPathsFolded ? (
                             <ChevronDown size={14} />
                           ) : (
@@ -2247,7 +2315,7 @@ function AppShell() {
                     </div>
 
                     {!isPathsFolded && (
-                      <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                      <div id="paths-panel" aria-labelledby="paths-header" className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                         {paths.map((p, idx) => (
                           <button
                             key={p.id}
@@ -2640,7 +2708,7 @@ function AppShell() {
                     <input
                       type="range"
                       min={30}
-                      max={180}
+                      max={240}
                       value={tempo}
                       onChange={(e) => setTempo(parseInt(e.target.value))}
                       className="flex-1 accent-[color:var(--color-brand)] min-w-0"
@@ -3043,8 +3111,6 @@ function AppShell() {
                 </div>
                 {(isMediaRecording || mediaRecordingStatus || mediaRecordingError) && (
                   <div
-                    role="status"
-                    aria-live="polite"
                     className={`flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-full backdrop-blur ${
                       mediaRecordingError
                         ? "bg-red-900/60 text-red-200"
@@ -3057,16 +3123,25 @@ function AppShell() {
                       <>
                         <span className="w-2 h-2 rounded-full bg-red-500"></span>
                         REC {mediaRecordingElapsed.toFixed(1)}s
+                        <span className="sr-only" role="status" aria-live="polite">
+                          Recording in progress
+                        </span>
                       </>
                     ) : mediaRecordingError ? (
                       <>
                         <span className="w-2 h-2 rounded-full bg-red-500"></span>
                         Recording failed
+                        <span className="sr-only" role="status" aria-live="polite">
+                          Recording failed
+                        </span>
                       </>
                     ) : (
                       <>
                         <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                         {mediaRecordingStatus}
+                        <span className="sr-only" role="status" aria-live="polite">
+                          {mediaRecordingStatus}
+                        </span>
                       </>
                     )}
                   </div>
@@ -3181,6 +3256,7 @@ function AppShell() {
                       onChange={(e) =>
                         setKbRange({ ...kbRange, from: Number(e.target.value) })
                       }
+                      aria-label="Keyboard range start"
                       className="w-20 accent-purple-500"
                     />
                   </div>
@@ -3198,6 +3274,7 @@ function AppShell() {
                       onChange={(e) =>
                         setKbRange({ ...kbRange, to: Number(e.target.value) })
                       }
+                      aria-label="Keyboard range end"
                       className="w-20 accent-purple-500"
                     />
                   </div>

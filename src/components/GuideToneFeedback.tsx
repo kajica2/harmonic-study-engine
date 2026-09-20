@@ -36,6 +36,7 @@ export const GuideToneFeedback: React.FC<GuideToneFeedbackProps> = ({
 }) => {
   const [latest, setLatest] = useState<GuideToneMatch | null>(null);
   const [inputCount, setInputCount] = useState<number>(0);
+  const [pickerDismissed, setPickerDismissed] = useState<boolean>(false);
   const decayTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -63,7 +64,11 @@ export const GuideToneFeedback: React.FC<GuideToneFeedbackProps> = ({
     // Poll input count periodically so the device picker shows /
     // hides correctly when the user plugs or unplugs a device.
     const poll = window.setInterval(() => {
-      setInputCount(midiOut.getInputCount());
+      const count = midiOut.getInputCount();
+      setInputCount(count);
+      // If a device ever connects, re-arm the picker so it can
+      // reappear if the device later disconnects.
+      if (count > 0) setPickerDismissed(false);
     }, 1500);
     // Initial check (in case midiOut.init() ran before this mounted)
     setInputCount(midiOut.getInputCount());
@@ -83,7 +88,7 @@ export const GuideToneFeedback: React.FC<GuideToneFeedbackProps> = ({
   };
 
   // Render: device picker when no input, otherwise the latest-match chip.
-  if (inputCount === 0) {
+  if (inputCount === 0 && !pickerDismissed) {
     return (
       <div
         className="flex items-center gap-2 text-xs"
@@ -102,6 +107,7 @@ export const GuideToneFeedback: React.FC<GuideToneFeedbackProps> = ({
           <Mic size={12} aria-hidden /> Connect MIDI
         </button>
         <button
+          onClick={() => setPickerDismissed(true)}
           title="Use the computer keyboard (mapped to piano keys)"
           aria-label="Use computer keyboard"
           className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-xs surface-1 border border-[color:var(--color-border)] text-neutral-400 hover:text-neutral-100 hover:border-[color:var(--color-brand-muted)]"
@@ -109,6 +115,7 @@ export const GuideToneFeedback: React.FC<GuideToneFeedbackProps> = ({
           <Keyboard size={12} aria-hidden /> Computer keyboard
         </button>
         <button
+          onClick={() => setPickerDismissed(true)}
           title="Practice without input (just listen)"
           aria-label="Practice without input"
           className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-xs surface-1 border border-[color:var(--color-border)] text-neutral-400 hover:text-neutral-100 hover:border-[color:var(--color-brand-muted)]"

@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { PracticeSet, PracticeSetItem } from "../lib/paths";
 import { PATHS, STUDIES_PATHS } from "../lib/paths";
 import { FOCUS_TAGS } from "../data/practice_sets";
-import { X, Plus, Trash2, ChevronDown } from "lucide-react";
+import { X, Plus, Trash2 } from "lucide-react";
+import { ModalShell, useModalLabel } from "./ModalShell";
 
 interface Props {
   /** The set to edit. Pass null to create a new set. */
@@ -31,15 +32,7 @@ export function SetEditor({ initial, onSave, onDelete, onClose }: Props) {
     initial?.defaultTransposeSemitones ?? 0,
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  const titleId = useModalLabel("set-editor");
 
   function toggleTag(tag: string) {
     setFocusTags((prev) =>
@@ -94,27 +87,24 @@ export function SetEditor({ initial, onSave, onDelete, onClose }: Props) {
   };
 
   return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <ModalShell
+      labelledBy={titleId}
+      onDismiss={onClose}
+      className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 shadow-2xl"
     >
-      {/* Modal */}
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-white/10 sticky top-0 bg-neutral-900 rounded-t-2xl z-10">
-          <h2 className="text-base font-semibold text-purple-200">
-            {isNew ? "New Practice Set" : "Edit Practice Set"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-200 hover:bg-white/10 transition-colors"
-          >
-            <X size={16} />
-          </button>
-        </div>
+      {/* Header */}
+      <div className="flex items-center justify-between p-5 border-b border-white/10 sticky top-0 bg-neutral-900 rounded-t-2xl z-10">
+        <h2 id={titleId} className="text-base font-semibold text-purple-200">
+          {isNew ? "New Practice Set" : "Edit Practice Set"}
+        </h2>
+        <button
+          onClick={onClose}
+          aria-label="Close practice set editor"
+          className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-200 hover:bg-white/10 transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </div>
 
         {/* Body */}
         <div className="flex flex-col gap-5 p-5">
@@ -251,6 +241,7 @@ export function SetEditor({ initial, onSave, onDelete, onClose }: Props) {
 
                   <button
                     onClick={() => removeItem(idx)}
+                    aria-label={`Remove ${item.pathId} from set`}
                     className="flex-shrink-0 p-1.5 rounded text-neutral-600 hover:text-red-400 hover:bg-red-950/30 transition-colors mt-1"
                     title="Remove"
                   >
@@ -352,7 +343,6 @@ export function SetEditor({ initial, onSave, onDelete, onClose }: Props) {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

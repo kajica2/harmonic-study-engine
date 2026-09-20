@@ -92,7 +92,23 @@ export const MelodyLane: React.FC<MelodyLaneProps> = ({
               handleNudge(idx, -1);
             }}
             onDoubleClick={() => handleClear(idx)}
+            onKeyDown={(e) => {
+              // Keyboard alternatives to the pointer-only gestures:
+              // ArrowUp/Down nudge, Delete/Backspace resets.
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                handleNudge(idx, 1);
+              } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                handleNudge(idx, -1);
+              } else if (e.key === "Delete" || e.key === "Backspace") {
+                e.preventDefault();
+                handleClear(idx);
+              }
+            }}
             aria-label={`Melody beat ${idx + 1}, ${note != null ? labelFor(note) : "empty"}`}
+            aria-keyshortcuts="ArrowUp ArrowDown Delete"
+            title="Click: up · Right-click: down · Double-click: reset"
             className="w-full rounded border border-neutral-800 bg-neutral-900/60 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed px-1 py-1 text-[10px] font-mono leading-tight text-neutral-200"
           >
             {labelFor(note)}

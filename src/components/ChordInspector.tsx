@@ -330,33 +330,56 @@ export const ChordInspector: React.FC<Props> = (props) => {
 
             {/* Tab strip — Edit / Saved */}
             <div className="bg-black/30 rounded-xl p-3">
-              <div className="flex gap-1 mb-3" role="tablist" aria-label="Voicing tools">
-                <button
-                  role="tab"
-                  aria-selected={tab === "edit"}
-                  onClick={() => setTab("edit")}
-                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
-                    tab === "edit"
-                      ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)]"
-                      : "surface-1 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
-                  }`}
-                >
-                  Edit
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={tab === "saved"}
-                  onClick={() => setTab("saved")}
-                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
-                    tab === "saved"
-                      ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)]"
-                      : "surface-1 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
-                  }`}
-                >
-                  Saved ({savedVoicings.length})
-                </button>
-              </div>
+              <div
+              className="flex gap-1 mb-3"
+              role="tablist"
+              aria-label="Voicing tools"
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                e.preventDefault();
+                const next = tab === "edit" ? "saved" : "edit";
+                setTab(next);
+                document.getElementById("voicing-tab-" + next)?.focus();
+              }}
+            >
+                            <button
+                id="voicing-tab-edit"
+                role="tab"
+                tabIndex={tab === "edit" ? 0 : -1}
+                aria-selected={tab === "edit"}
+                aria-controls="voicing-tabpanel"
+                onClick={() => setTab("edit")}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
+                  tab === "edit"
+                    ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)]"
+                    : "surface-1 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+                }`}
+              >
+                Edit
+              </button>
+              <button
+                id="voicing-tab-saved"
+                role="tab"
+                tabIndex={tab === "saved" ? 0 : -1}
+                aria-selected={tab === "saved"}
+                aria-controls="voicing-tabpanel"
+                onClick={() => setTab("saved")}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
+                  tab === "saved"
+                    ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)]"
+                    : "surface-1 text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+                }`}
+              >
+                Saved ({savedVoicings.length})
+              </button>
+            </div>
 
+            <div
+              id="voicing-tabpanel"
+              role="tabpanel"
+              aria-labelledby={tab === "edit" ? "voicing-tab-edit" : "voicing-tab-saved"}
+              tabIndex={0}
+            >
               {tab === "edit" ? (
                 <>
                   {/* (existing edit-tab content — quick transforms + audition + ABC staff) */}
@@ -437,6 +460,7 @@ export const ChordInspector: React.FC<Props> = (props) => {
                   )}
                 </div>
               )}
+            </div>
             </div>
 
             <div className="bg-black/30 rounded-xl p-3">

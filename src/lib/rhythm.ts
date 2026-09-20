@@ -32,6 +32,14 @@ export class RhythmEngine {
     return this.metronomeEnabled;
   }
 
+  /** 16th-note steps per measure for the active time signature
+   *  (16 for 4/4, 12 for 6/8, 14 for 7/8, 44 for 11/4, 64 for
+   *  tintal). Consumers use this to convert path steps (1 step =
+   *  1 measure) into wall-clock duration. */
+  getStepsPerMeasure(): number {
+    return this.stepsPerMeasure;
+  }
+
   setTimeSignature(ts: TimeSignature) {
     this.timeSignature = ts;
     switch (ts) {

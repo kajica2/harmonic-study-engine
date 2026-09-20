@@ -99,6 +99,27 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
     setEnabled((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const numKeys = octaves * 12;
+  // Keyboard-access handlers shared by white + black keys. Space/Enter
+  // plays the note (keydown) and releases it (keyup); blur releases in
+  // case focus moves away mid-note. Arrow keys move between keys.
+  const keyAccess = (midi: number) => ({
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-label": `Play ${NOTE_NAMES[midi % 12]}`,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        onPlayNote?.(midi);
+      }
+    },
+    onKeyUp: (e: React.KeyboardEvent) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        onStopNote?.(midi);
+      }
+    },
+    onBlur: () => onStopNote?.(midi),
+  });
   const whiteKeys: Array<{
     midi: number;
     index: number;
@@ -239,9 +260,10 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
             return (
               <div
                 key={key.midi}
+                {...keyAccess(key.midi)}
                 className={`h-full border-r border-gray-300 rounded-b-md transition-colors duration-200
                   ${fillColor ? "" : "bg-white hover:bg-gray-100"}
-                  active:bg-gray-200 cursor-pointer`}
+                  active:bg-gray-200 cursor-pointer focus-visible:ring-2 focus-visible:ring-[color:var(--color-brand-strong)] focus-visible:z-20`}
                 style={{
                   width: `${whiteKeyWidth}%`,
                   backgroundColor: fillColor,
@@ -310,7 +332,8 @@ export const PianoKeyboard: React.FC<PianoKeyboardProps> = ({
             return (
               <div
                 key={key.midi}
-                className={`absolute h-full rounded-b border-x border-b border-black transition-colors duration-200 cursor-pointer pointer-events-auto z-10`}
+                {...keyAccess(key.midi)}
+                className={`absolute h-full rounded-b border-x border-b border-black transition-colors duration-200 cursor-pointer pointer-events-auto z-10 focus-visible:ring-2 focus-visible:ring-[color:var(--color-brand-strong)] focus-visible:z-20`}
                 style={{
                   left: `${key.left * whiteKeyWidth + whiteKeyWidth * 0.25}%`,
                   width: `${whiteKeyWidth * 0.5}%`,
