@@ -53,7 +53,7 @@ class numbers come first.
 - [x] **There Will Never Be Another You**
       (`study-there-will-never-be-another-you`, MC 23 / MC 24 / MC 32) —
       Warren / Gordon. F major. 32-bar AABA.
-- [ ] **Out of Nowhere** (`out-of-nowhere`, MC 25 / MC 26 / MC 27
+- [x] **Out of Nowhere** (`study-out-of-nowhere`, MC 25 / MC 26 / MC 27
       / MC 28) — Green / Heyman. G major. 32-bar AABA.
 - [ ] **Nostalgia in October** (`nostalgia-in-october`, MC 29 /
       MC 30 / MC 31) — less common, A-flat major.
@@ -122,5 +122,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 4
-- Remaining: 31
+- Completed: 5
+- Remaining: 30
