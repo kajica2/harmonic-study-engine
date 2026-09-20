@@ -146,10 +146,11 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
     inApp: true },
 
   // ----- There Will Never Be Another You / Out of Nowhere (the paraphrase arc) -----
-  { id: "there-will-never-be-another-you", title: "There Will Never Be Another You", classes: ["MC 23", "MC 24", "MC 32"],
+  { id: "study-there-will-never-be-another-you", title: "There Will Never Be Another You", classes: ["MC 23", "MC 24", "MC 32"],
     mainExercise: "Straight → syncopated → paraphrased; the 12 levels of paraphrase.",
     description: "The melody-obligation / paraphrase flagship. Best vocal record cited as a model for learning the tune.",
-    inApp: false },
+    objective: "Play the melody straight, then syncopated, then paraphrased — work the 12 levels of paraphrase.",
+    inApp: true },
   { id: "out-of-nowhere", title: "Out of Nowhere", classes: ["MC 25", "MC 26", "MC 27", "MC 28"],
     mainExercise: "Sing with the great *Out of Nowhere* / Three-Stooges harmony game; 5-♯9 line cliché.",
     description: "Paraphrase + diminished-trail study; the 3-to-9 road map through the form.",
