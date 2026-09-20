@@ -42,7 +42,7 @@ class numbers come first.
 
 ### Batch A — MC 1 (Charlie Parker foundation, 6 tunes)
 
-- [ ] **Yardbird Suite** (`yardbird-suite`, MC 4 / MC 19) —
+- [x] **Yardbird Suite** (`study-yardbird-suite`, MC 4 / MC 19) —
       Parker's contrafact on "Back Home Again in Indiana".
       B-flat, AABA. Re-use the
       `scripts/ingest_standards.py` Real Book voicing pipeline.
@@ -122,5 +122,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 0
-- Remaining: 35
+- Completed: 1
+- Remaining: 34
