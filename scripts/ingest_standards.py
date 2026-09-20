@@ -157,7 +157,7 @@ SONGS = [
         "key": "Bb",
         "tempo": 200,
         "style": "Swing Up",
-        "chords": "T44 |Bb6 |Bb6 |Bbm7 Eb7 |Bb6 |Bb6 |Bb6 |Bbm7 Eb7 |Bb6 |Bb6 Gm7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |Bb6 Gm7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |Cm7 |F7 |Bb6 |Bbm7 Eb7 |Am7 D7 |Gm7 C7 |Fm7 Bb7 |Ebmaj7 |Bb6 Gm7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7",
+        "chords": "T44 |Bb6 |Bb6 |Bbm7 Eb7 |Bb6 |Bb6 |Bb6 |Bbm7 Eb7 |Bb6 |Bb6 Gm7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |Bb6 Gm7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |Cm7 |F7 |Bb6 |Bbm7 Eb7 |Am7 D7 |Gm7 C7 |Fm7 Bb7 |Ebmaj7 |Bb6 Gm7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7 |Bb6 Gm7 |Cm7 F7 |Fm7 Bb7 |Ebmaj7",
     },
     {
         "title": "Confirmation",
