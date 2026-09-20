@@ -2527,7 +2527,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
   {
     id: "study-groovin-high",
     title: "Groovin' High — Dizzy Gillespie",
-    description: "Bb · 220 BPM · Swing Up · 28 bars",
+    description: "Bb · 220 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
     steps: [
       {
@@ -2669,6 +2669,26 @@ export const STUDIES_PATHS: HarmonicPath[] = [
         name: "Ebmaj7",
         notes: [63, 67, 70, 74],
         descriptions: "b28: Ebmaj7",
+      },
+      {
+        name: "Bb6 Gm7",
+        notes: [70, 74, 77],
+        descriptions: "b29: Bb6 Gm7",
+      },
+      {
+        name: "Cm7 F7",
+        notes: [60, 63, 67, 70],
+        descriptions: "b30: Cm7 F7",
+      },
+      {
+        name: "Fm7 Bb7",
+        notes: [65, 68, 72, 75],
+        descriptions: "b31: Fm7 Bb7",
+      },
+      {
+        name: "Ebmaj7",
+        notes: [63, 67, 70, 74],
+        descriptions: "b32: Ebmaj7",
       },
     ],
   },

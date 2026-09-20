@@ -65,8 +65,9 @@ class numbers come first.
       Note: this id is `study-cherokee` — confirm path authoring
       matches the "study-" prefix convention. (Already enabled —
       verified inApp + path + dist bundle.)
-- [ ] **Groovin' High** (`groovin-high`, MC 36) — Gillespie.
-      F major. 32-bar AABA.
+- [x] **Groovin' High** (`study-groovin-high`, MC 36) — Gillespie.
+      F major. 32-bar AABA. (Fixed truncated 28-bar path → 32 bars
+      in studies.ts + ingest_standards.py source.)
 - [ ] **Hot House** (`hot-house`, MC 10 / MC 11 / MC 12) —
       Gillespie / Fuller. G major. 32-bar AABA.
 - [ ] **Confirmation** (`confirmation`, MC 34) — Parker. F major.
@@ -123,5 +124,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 7
-- Remaining: 28
+- Completed: 8
+- Remaining: 27
