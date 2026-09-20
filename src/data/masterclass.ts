@@ -109,10 +109,11 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
     objective: "Sing the head, then vary phrase length over the turnback ii-Vs — long meter on the bridge.",
     tags: ["advanced", "improv", "sight-reading"],
     inApp: true },
-  { id: "sometimes-im-happy", title: "Sometimes I'm Happy", classes: ["MC 6", "MC 12", "MC 14-P1"],
+  { id: "study-sometimes-im-happy", title: "Sometimes I'm Happy", classes: ["MC 6", "MC 12", "MC 14-P1"],
     mainExercise: "Melody Game — wave in / wave out; sing the diminished and harmonic minor in the changes.",
     description: "Sing-along study tune; used as the canonical sing-along record across the series.",
-    inApp: false },
+    objective: "Sing the melody wave in / wave out, then sing the diminished and harmonic-minor colors in the changes.",
+    inApp: true },
 
   // ----- Solar studies -----
   { id: "study-solar", title: "Solar", classes: ["MC 6", "MC 7", "MC 8", "MC 11", "MC 14-P1", "MC 21"],

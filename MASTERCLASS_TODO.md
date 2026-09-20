@@ -46,7 +46,7 @@ class numbers come first.
       Parker's contrafact on "Back Home Again in Indiana".
       B-flat, AABA. Re-use the
       `scripts/ingest_standards.py` Real Book voicing pipeline.
-- [ ] **Sometimes I'm Happy** (`sometimes-im-happy`, MC 6 / MC 12
+- [x] **Sometimes I'm Happy** (`study-sometimes-im-happy`, MC 6 / MC 12
       / MC 14-P1) — Youmans standard. C major / G major. 32-bar AABA.
 - [ ] **Stella by Starlight** (`stella-by-starlight`, MC 18) —
       Young / Washington ballad. B-flat minor / G minor. 32-bar AABA.
@@ -122,5 +122,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 1
-- Remaining: 34
+- Completed: 2
+- Remaining: 33
