@@ -184,10 +184,11 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
     mainExercise: "Sing the melody with the recording, then listen for the 'two choruses' (head, then solo).",
     description: "Phrase-by-phrase listening study; identify 'proposal' and 'comment' in each phrase.",
     inApp: false },
-  { id: "lady-be-good", title: "Lady Be Good", classes: ["MC 12", "MC 14-P1"],
+  { id: "study-lady-be-good", title: "Lady Be Good", classes: ["MC 12", "MC 14-P1"],
     mainExercise: "3-5-3-1 triad exercise (alternating minor thirds).",
     description: "Harmonic-options-for-2-5-1 study.",
-    inApp: false },
+    objective: "Run the 3-5-3-1 triad exercise — alternating minor thirds — through the changes.",
+    inApp: true },
 
   // ----- MC 1 survey set -----
   { id: "shoe-shine-boy", title: "Shoe Shine Boy", classes: ["MC 1"],

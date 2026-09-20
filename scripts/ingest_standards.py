@@ -77,7 +77,7 @@ SONGS = [
         "key": "G",
         "tempo": 180,
         "style": "Swing Up",
-        "chords": "T44 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Am7 D7 |Gmaj7 |Am7 D7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Am7 D7 |Gmaj7 |Am7 D7 |Gm7 |C7 |Fmaj7 |Fmaj7 |Gm7 |C7 |Fmaj7 |F#o7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Am7 D7 |Gmaj7 |Am7 D7 |Gmaj7 |Gmaj7 |Gmaj7 |D7",
+        "chords": "T44 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Am7 D7 |Gmaj7 |Am7 D7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Am7 D7 |Gmaj7 |Am7 D7 |Gm7 |C7 |Fmaj7 |Fmaj7 |Gm7 |C7 |Fmaj7 |F#o7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Gmaj7 |Am7 D7 |Gmaj7 |D7",
     },
     {
         "title": "Cherokee",

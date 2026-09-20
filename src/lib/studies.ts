@@ -1015,7 +1015,7 @@ export const STUDIES_PATHS: HarmonicPath[] = [
   {
     id: "study-lady-be-good",
     title: "Lady Be Good — George Gershwin",
-    description: "G · 180 BPM · Swing Up · 36 bars",
+    description: "G · 180 BPM · Swing Up · 32 bars",
     feel: "Swing Up",
     steps: [
       {
@@ -1174,29 +1174,9 @@ export const STUDIES_PATHS: HarmonicPath[] = [
         descriptions: "b31: Gmaj7",
       },
       {
-        name: "Am7 D7",
-        notes: [69, 72, 76, 79],
-        descriptions: "b32: Am7 D7",
-      },
-      {
-        name: "Gmaj7",
-        notes: [67, 71, 74, 78],
-        descriptions: "b33: Gmaj7",
-      },
-      {
-        name: "Gmaj7",
-        notes: [67, 71, 74, 78],
-        descriptions: "b34: Gmaj7",
-      },
-      {
-        name: "Gmaj7",
-        notes: [67, 71, 74, 78],
-        descriptions: "b35: Gmaj7",
-      },
-      {
         name: "D7",
         notes: [62, 66, 69, 72],
-        descriptions: "b36: D7",
+        descriptions: "b32: D7",
       },
     ],
   },

@@ -81,8 +81,9 @@ class numbers come first.
 
 ### Batch C — MC 12 (ballad standard, 1 tune)
 
-- [ ] **Lady Be Good** (`lady-be-good`, MC 12 / MC 14-P1) —
-      Gershwin. G major. 32-bar AABA.
+- [x] **Lady Be Good** (`study-lady-be-good`, MC 12 / MC 14-P1) —
+      Gershwin. G major. 32-bar AABA. (Fixed 36-bar path → 32 bars
+      in studies.ts + ingest source.)
 
 ### Batch D — MC 1 deep cuts (5 more Parker-era)
 
@@ -128,5 +129,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 10
-- Remaining: 25
+- Completed: 11
+- Remaining: 24
