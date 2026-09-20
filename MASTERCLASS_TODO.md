@@ -75,6 +75,9 @@ class numbers come first.
       32-bar AABA.
 - [ ] **Lester Leaps In** (`lester-leaps-in`, MC 21 / MC 25) —
       Young. A-flat major. 32-bar AABA.
+      - [ ] blocked: needs Real Book source — no `study-lester-leaps-in`
+        path in studies.ts and no SONGS entry in ingest_standards.py;
+        TODO key (A♭) conflicts with standard rhythm-changes key (B♭).
 
 ### Batch C — MC 12 (ballad standard, 1 tune)
 
