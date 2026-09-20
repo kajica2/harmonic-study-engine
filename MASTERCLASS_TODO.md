@@ -88,10 +88,21 @@ class numbers come first.
 ### Batch D — MC 1 deep cuts (5 more Parker-era)
 
 - [ ] **Shoe Shine Boy** (`shoe-shine-boy`, MC 1)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **In the Middle of a Kiss** (`in-the-middle-of-a-kiss`, MC 1)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Mr. 5 by 5** (`mr-5-by-5`, MC 1)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Just Friends** (`just-friends`, MC 1 / MC 6)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Sophisticated Lady** (`sophisticated-lady`, MC 1)
+      - [ ] blocked: needs full Real Book source — existing
+        `study-sophisticated-lady` path is a truncated 17-bar form
+        (missing bridge + final A of the 32-bar AABA).
 
 ### Batch E — MC 1 encore (3 more)
 
