@@ -15,6 +15,7 @@ const JSDOM_FILES = [
   "src/hooks/useFeedback.test.ts",
   "src/hooks/useSessionStore.test.ts",
   "src/lib/sheetMusicExport.test.ts",
+  "src/lib/midiIn.test.ts",
   "src/lib/useCanvasSize.test.ts",
   "src/lib/backingTrack.test.ts",
   "src/lib/storage.test.ts",

@@ -93,7 +93,47 @@ export class MidiIn {
   }
 
   private handleMessage(msg: any, input: any) {
-    if (!msg.data || msg.data.length < 2) return;
+    if (!msg.data || msg.data.length < 1) return;
+
+    // MIDI Real-Time passthrough (1-byte system messages). Run this
+    // BEFORE the existing note-on/note-off logic so single-byte RT
+    // messages (which would fail the length < 2 guard below) are
+    // still seen. Real-Time messages ignore the selected-input
+    // filter so a clock-bearing device the user hasn't pinned in
+    // the IN picker still drives the tempo follower. Detail shape:
+    //   { kind: "tick" | "start" | "continue" | "stop", atMs: number }
+    // Guarded with typeof window so node-side consumers (and tests
+    // loading this module) do not require a DOM.
+    if (typeof window !== "undefined" && msg.data.length >= 1) {
+      const raw = msg.data[0];
+      if (
+        raw === 0xf8 ||
+        raw === 0xfa ||
+        raw === 0xfb ||
+        raw === 0xfc
+      ) {
+        const kind =
+          raw === 0xf8
+            ? "tick"
+            : raw === 0xfa
+              ? "start"
+              : raw === 0xfb
+                ? "continue"
+                : "stop";
+        try {
+          window.dispatchEvent(
+            new CustomEvent("midiclock", {
+              detail: { kind, atMs: performance.now() },
+            }),
+          );
+        } catch {
+          // CustomEvent unavailable in some test environments.
+        }
+        return;
+      }
+    }
+
+    if (msg.data.length < 2) return;
     const status = msg.data[0] & 0xf0;
     const note = msg.data[1];
     const velocity = msg.data[2] ?? 0;

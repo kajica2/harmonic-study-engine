@@ -48,6 +48,7 @@ import {
   Mic,
   Video,
   StopCircle,
+  Clock,
 } from "lucide-react";
 import { audioEngine, InstrumentType } from "./lib/audio";
 import { rhythmEngine } from "./lib/rhythm";
@@ -64,6 +65,7 @@ import { useExportFlow } from "./hooks/useExportFlow";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
 import { midiOut } from "./lib/midiOut";
 import { midiIn } from "./lib/midiIn";
+import { MidiClockFollower } from "./lib/midiClock";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
 import { STUDIES_PATHS } from "./lib/paths";
 import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
@@ -321,6 +323,64 @@ function AppShell() {
   const canvasSize = useCanvasSize(canvasContainerRef, { width: 800, height: 400 });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
+  // MIDI Clock from DAW: opt-in tempo + transport sync. Off by
+  // default so existing users see no behavior change. When on, a
+  // MidiClockFollower consumes the window "midiclock" CustomEvent
+  // that midiIn.ts dispatches on Real-Time bytes (0xF8 tick, 0xFA
+  // start, 0xFB continue, 0xFC stop). follower.onBpm is clamped
+  // into [40, 240] and pushed into the existing setTempo;
+  // follower.onTransport flips isPlayingAuto. Cleanup runs on
+  // toggle-off and on unmount (remove window listener, drop BPM /
+  // transport listeners, follower.reset()).
+  const [midiClockEnabled, setMidiClockEnabled] = useState(false);
+  const midiClockFollowerRef = useRef<MidiClockFollower | null>(null);
+  useEffect(() => {
+    if (!midiClockEnabled) return;
+    const follower = new MidiClockFollower();
+    midiClockFollowerRef.current = follower;
+    const handleClock = (e: Event) => {
+      const detail = (e as CustomEvent<{
+        kind: "tick" | "start" | "continue" | "stop";
+        atMs: number;
+      }>).detail;
+      switch (detail.kind) {
+        case "tick":
+          follower.tick(detail.atMs);
+          break;
+        case "start":
+          follower.start();
+          break;
+        case "continue":
+          follower.continueTransport();
+          break;
+        case "stop":
+          follower.stop();
+          break;
+      }
+    };
+    const offBpm = follower.onBpm((bpm) => {
+      // Clamp into the slider's natural range so an out-of-range
+      // DAW tempo doesn't push setTempo beyond the UI's [30, 240]
+      // bounds. The follower already has its own sanity bounds
+      // (defaults 30-240) but a tighter UI clamp avoids jumpy
+      // re-renders.
+      const clamped = Math.max(40, Math.min(240, bpm));
+      setTempo(clamped);
+    });
+    const offTransport = follower.onTransport((kind) => {
+      if (kind === "stop") setIsPlayingAuto(false);
+      else setIsPlayingAuto(true);
+    });
+    window.addEventListener("midiclock", handleClock);
+    return () => {
+      window.removeEventListener("midiclock", handleClock);
+      offBpm();
+      offTransport();
+      follower.removeAllListeners();
+      follower.reset();
+      midiClockFollowerRef.current = null;
+    };
+  }, [midiClockEnabled, setTempo]);
   // User-provided audio source — when loaded, plays alongside (or
   // instead of) the synth during practice. See BackingTrackPicker.
   const [backingTrack, setBackingTrack] = useState<BackingTrackFile | null>(
@@ -1356,6 +1416,38 @@ function AppShell() {
               setSelectedMidiInId(id);
             }}
           />
+
+          {/* MIDI Clock from DAW: opt-in toggle. When on, the app's
+              tempo + transport follow a DAW's MIDI Real-Time clock
+              (0xF8 tick, 0xFA start, 0xFB continue, 0xFC stop)
+              delivered through the selected IN device. See
+              docs/midiClock-feature.md. Off by default. */}
+          <label
+            className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800 cursor-pointer select-none"
+            title="When on, the app's tempo + transport follow the DAW's MIDI clock (Real-Time messages on the selected MIDI input)."
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: midiClockEnabled ? "#22c55e" : "#6b7280",
+              }}
+              aria-hidden="true"
+            />
+            <Clock size={12} className="text-emerald-400" aria-hidden />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+              CLOCK
+            </span>
+            <input
+              type="checkbox"
+              checked={midiClockEnabled}
+              onChange={(e) => setMidiClockEnabled(e.target.checked)}
+              className="accent-emerald-500 cursor-pointer"
+              aria-label="MIDI clock from DAW"
+            />
+            <span className="text-xs text-neutral-300">
+              {midiClockEnabled ? "synced" : "off"}
+            </span>
+          </label>
         </div>
       </header>
 
