@@ -48,7 +48,7 @@ class numbers come first.
       `scripts/ingest_standards.py` Real Book voicing pipeline.
 - [x] **Sometimes I'm Happy** (`study-sometimes-im-happy`, MC 6 / MC 12
       / MC 14-P1) — Youmans standard. C major / G major. 32-bar AABA.
-- [ ] **Stella by Starlight** (`stella-by-starlight`, MC 18) —
+- [x] **Stella by Starlight** (`study-stella-by-starlight`, MC 18) —
       Young / Washington ballad. B-flat minor / G minor. 32-bar AABA.
 - [ ] **There Will Never Be Another You**
       (`there-will-never-be-another-you`, MC 23 / MC 24 / MC 32) —
@@ -122,5 +122,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 2
-- Remaining: 33
+- Completed: 3
+- Remaining: 32

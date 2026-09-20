@@ -138,11 +138,12 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
     description: "Back-cycling study; the bridge is 3 minor-3rd related keys.",
     tags: ["rhythm-changes", "intermediate", "coltrane-cycle"],
     inApp: false },
-  { id: "stella-by-starlight", title: "Stella by Starlight", classes: ["MC 18"],
+  { id: "study-stella-by-starlight", title: "Stella by Starlight", classes: ["MC 18"],
     mainExercise: "F♯m7b5 → F minor 7 (the half-diminished back door before the IV minor).",
     description: "Back-cycling study; sing the function through the changes.",
+    objective: "Sing the function through the changes — feel the half-diminished back door (F♯m7b5 → Fm7) before the IV minor.",
     tags: ["modal-interchange", "intermediate", "voice-leading"],
-    inApp: false },
+    inApp: true },
 
   // ----- There Will Never Be Another You / Out of Nowhere (the paraphrase arc) -----
   { id: "there-will-never-be-another-you", title: "There Will Never Be Another You", classes: ["MC 23", "MC 24", "MC 32"],
