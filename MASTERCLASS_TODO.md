@@ -140,11 +140,11 @@ authored as `concept-*` ids)
 - [ ] **Strange Dear, But True Dear**
       (`strange-dear-but-true-dear`, MC 16)
 - [ ] **How Much Do I Love You** (`how-much-do-i-love-you`, MC 16)
-- [ ] **I'll Remember April**
-      (`ill-remember-april`, MC 35 / MC 38 / MC 39)
+- [x] **I'll Remember April**
+      (`study-ill-remember-april`, MC 35 / MC 38 / MC 39)
 
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 11
-- Remaining: 24
+- Completed: 12
+- Remaining: 23
