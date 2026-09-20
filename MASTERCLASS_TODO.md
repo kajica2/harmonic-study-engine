@@ -71,7 +71,7 @@ class numbers come first.
 - [x] **Hot House** (`study-hot-house`, MC 10 / MC 11 / MC 12) —
       Gillespie / Fuller. G major. 32-bar AABA. (Fixed truncated
       28-bar path → 32 bars in studies.ts + ingest source.)
-- [ ] **Confirmation** (`confirmation`, MC 34) — Parker. F major.
+- [x] **Confirmation** (`study-confirmation`, MC 34) — Parker. F major.
       32-bar AABA.
 - [ ] **Lester Leaps In** (`lester-leaps-in`, MC 21 / MC 25) —
       Young. A-flat major. 32-bar AABA.
@@ -125,5 +125,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 9
-- Remaining: 26
+- Completed: 10
+- Remaining: 25
