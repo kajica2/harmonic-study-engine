@@ -121,25 +121,49 @@ class numbers come first.
 authored as `concept-*` ids)
 
 - [ ] **Solar diatonic solo** (`concept-solar-diatonic-solo`, MC 8)
+      - [ ] blocked: needs concept-path authoring — no `concept-*`
+        path in conceptPaths.ts; beat-level authoring is >1 iteration.
 - [ ] **Diminished trail through changes**
       (`concept-diminished-trail`, MC 15)
+      - [ ] blocked: needs concept-path authoring — no `concept-*`
+        path in conceptPaths.ts; beat-level authoring is >1 iteration.
 - [ ] **House of Harmony (graphic)**
       (`concept-house-of-harmony`, MC 16 / MC 17 / MC 18)
+      - [ ] blocked: needs concept-path authoring — no `concept-*`
+        path in conceptPaths.ts; beat-level authoring is >1 iteration.
 - [ ] **Line cliches through the form**
       (`concept-line-cliches`, MC 27 / MC 28)
+      - [ ] blocked: needs concept-path authoring — no `concept-*`
+        path in conceptPaths.ts; beat-level authoring is >1 iteration.
 - [ ] **3-to-9 / 9-to-3 through the form**
       (`concept-three-to-nine`, MC 28 / MC 29 / MC 40)
+      - [ ] blocked: needs concept-path authoring — no `concept-*`
+        path in conceptPaths.ts; beat-level authoring is >1 iteration.
 
 ### Batch G — Deep cuts (lowest priority, can defer)
 
 - [ ] **If You Were No One** (`if-you-were-no-one`, MC 7 / MC 10)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Casba** (`casba`, MC 25)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Puerto Rico** (`puerto-rico`, MC 26)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Apostrophe** (`apostrophe`, MC 30)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **I Never Knew** (`i-never-knew`, MC 25)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **Strange Dear, But True Dear**
       (`strange-dear-but-true-dear`, MC 16)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [ ] **How Much Do I Love You** (`how-much-do-i-love-you`, MC 16)
+      - [ ] blocked: needs Real Book source — no path in studies.ts,
+        no SONGS entry in ingest_standards.py.
 - [x] **I'll Remember April**
       (`study-ill-remember-april`, MC 35 / MC 38 / MC 39)
 
