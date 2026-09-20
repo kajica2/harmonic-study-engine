@@ -1,8 +1,42 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import {defineConfig} from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+
+// -------------------------------------------------------------------------
+// Build-time stamp: surface a short commit SHA in the bundle so the UI can
+// render "build 5ff516a" at the bottom of the page. Vercel sets
+// VERCEL_GIT_COMMIT_SHA automatically on every deployment; locally we
+// shell out to git so `npm run dev` shows the working-tree HEAD instead
+// of "dev". Falls back to "dev" when git is unavailable (CI, sandbox).
+// -------------------------------------------------------------------------
+function resolveAppCommit(): string {
+  const fromVercel = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (fromVercel && fromVercel.length >= 7) return fromVercel.slice(0, 7);
+  // Use fileURLToPath(import.meta.url) so the cwd is the directory
+  // that *contains* vite.config.ts — process.cwd() inside the Vite
+  // config module isn't always the project root, especially when Vite
+  // is invoked from a parent directory or a build script.
+  const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+  try {
+    const out = execSync('git rev-parse --short HEAD', {
+      encoding: 'utf8',
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (out.length > 0) return out;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn(`[buildInfo] execSync failed:`, e);
+  }
+  return 'dev';
+}
+
+export const APP_COMMIT = resolveAppCommit();
+export const APP_BUILD_TIME = new Date().toISOString();
 
 export default defineConfig(() => {
   return {
@@ -16,6 +50,11 @@ export default defineConfig(() => {
     define: {
       global: 'globalThis',
       'global.process': 'undefined',
+      // Read by src/lib/buildInfo.ts — kept in sync via this single
+      // `define` so local dev, vercel production, and CI all stamp
+      // the same shape into the bundle.
+      __APP_COMMIT__: JSON.stringify(APP_COMMIT),
+      __APP_BUILD_TIME__: JSON.stringify(APP_BUILD_TIME),
     },
     build: {
       // Keep test files out of the production bundle. vitest picks

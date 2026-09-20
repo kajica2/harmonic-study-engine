@@ -119,6 +119,7 @@ import { PlaySessionRail } from "./components/PlaySessionRail";
 import { downloadText } from "./lib/download";
 import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
+import { BuildFooter } from "./components/BuildFooter";
 import { PersonaLensBanner } from "./components/PersonaLensBanner";
 import { ComposerChartViewer } from "./components/ComposerChartViewer";
 import { TexturePanel } from "./components/TexturePanel";
@@ -3339,6 +3340,8 @@ function AppShell() {
           onStop={() => audioEngine.stopAll()}
         />
       )}
+
+      <BuildFooter />
     </div>
   );
 }
