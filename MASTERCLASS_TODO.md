@@ -55,7 +55,7 @@ class numbers come first.
       Warren / Gordon. F major. 32-bar AABA.
 - [x] **Out of Nowhere** (`study-out-of-nowhere`, MC 25 / MC 26 / MC 27
       / MC 28) — Green / Heyman. G major. 32-bar AABA.
-- [ ] **Nostalgia in October** (`nostalgia-in-october`, MC 29 /
+- [x] **Nostalgia in October** (`study-nostalgia-in-october`, MC 29 /
       MC 30 / MC 31) — less common, A-flat major.
 
 ### Batch B — MC 7–10 (ii-V-I fluency, 5 tunes)
@@ -122,5 +122,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 5
-- Remaining: 30
+- Completed: 6
+- Remaining: 29
