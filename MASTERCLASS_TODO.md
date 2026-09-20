@@ -60,10 +60,11 @@ class numbers come first.
 
 ### Batch B — MC 7–10 (ii-V-I fluency, 5 tunes)
 
-- [ ] **Cherokee** (`study-cherokee`, MC 13 / MC 15 / MC 16 / MC 20
+- [x] **Cherokee** (`study-cherokee`, MC 13 / MC 15 / MC 16 / MC 20
       / MC 21 / MC 34) — Noble. B-flat major. 32-bar AABA.
       Note: this id is `study-cherokee` — confirm path authoring
-      matches the "study-" prefix convention.
+      matches the "study-" prefix convention. (Already enabled —
+      verified inApp + path + dist bundle.)
 - [ ] **Groovin' High** (`groovin-high`, MC 36) — Gillespie.
       F major. 32-bar AABA.
 - [ ] **Hot House** (`hot-house`, MC 10 / MC 11 / MC 12) —
@@ -122,5 +123,5 @@ authored as `concept-*` ids)
 ## Status
 
 - Total tunes in this backlog: 35
-- Completed: 6
-- Remaining: 29
+- Completed: 7
+- Remaining: 28
