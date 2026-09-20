@@ -885,6 +885,14 @@ function AppShell() {
     rhythmEngine.setTimeSignature(timeSignature);
   }, [timeSignature]);
 
+  // Sync the practice-header "Click" toggle into the rhythm engine.
+  // Without this, metronomeOn only updates UI state and the engine's
+  // metronomeEnabled stays at its default true — muting the click in
+  // the header would have no audible effect.
+  useEffect(() => {
+    rhythmEngine.setMetronomeEnabled(metronomeOn);
+  }, [metronomeOn]);
+
   // beatType is owned by backingEngine — see the useEffect below that
   // calls backingEngine.setStyle(beatType) when playback starts. The
   // rhythm engine only owns transport (tempo, time signature, metronome
