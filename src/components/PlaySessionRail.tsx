@@ -1,5 +1,7 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { HarmonicPath, STUDIES_PATHS } from "../lib/paths";
+import { gtTargetsForPath } from "../lib/gtTargets";
+import { GtCoverageRow } from "./GtCoverageRow";
 import { MASTERCLASS_TUNES, MasterclassEntry, availableTunes, tuneById } from "../data/masterclass";
 import { Persona } from "../lib/personas";
 import { midiToName, analyzeChord, type BehavioralMarker } from "../lib/theory";
@@ -575,6 +577,16 @@ const PerformStage: React.FC<{
   const currentBar = Math.floor(activeStepIndex / 4) + 1;
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
+  // Path-level guide-tone coverage map (raw canonical chord intent —
+  // first step per bar, not post-voicing sonority). Memoized on path so
+  // transpose/persona/loop changes never recompute it.
+  const gtTargets = useMemo(() => gtTargetsForPath(path), [path]);
+  if (gtTargets.length !== totalBars) {
+    console.warn(
+      `[GtCoverageRow] target/bar mismatch: ${gtTargets.length} targets vs ${totalBars} bars for path ${path.id}`,
+    );
+  }
+
   // Subscribe to the playback tick so the bar strip shows a moving
   // playhead between chord changes. Smooth 60fps; one rAF source
   // shared across the whole app via the shared useTick hook.
@@ -687,8 +699,13 @@ const PerformStage: React.FC<{
       </div>
 
       {/* Bar strip — visual progress + voicing preview (Fix #4 inline voicing) */}
-      <div className="flex items-stretch gap-1 overflow-x-auto pb-2">
-        {Array.from({ length: totalBars }).map((_, barIdx) => {
+      {/* Shared scroller: bar buttons + guide-tone coverage row scroll
+          together so columns stay aligned. The coverage row mirrors the
+          strip metrics (flex-1 min-w-[60px] gap-1) with a fixed min-h to
+          avoid CLS. */}
+      <div className="overflow-x-auto pb-2">
+        <div className="flex items-stretch gap-1">
+          {Array.from({ length: totalBars }).map((_, barIdx) => {
                   const stepIdx = barIdx * 4;
                   const chordName = path.steps[stepIdx]?.name ?? "";
                   const isActiveBar = currentBar === barIdx + 1;
@@ -851,6 +868,13 @@ const PerformStage: React.FC<{
             </button>
           );
         })}
+        </div>
+        <GtCoverageRow
+          targets={gtTargets}
+          loopStartBar={loopStartBar}
+          loopEndBar={loopEndBar}
+          currentBar={currentBar}
+        />
       </div>
 
       {/* Persona display (read-only here; choose stage sets it) */}
