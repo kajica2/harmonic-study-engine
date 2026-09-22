@@ -3,3 +3,4 @@ verbosity: "concise"
 commit_style: "feat/fix/chore(scope): description"
 gate_order: ["lint", "test", "build"]
 memory_sharing: "committed"
+wav_export_rule: "whole detected song form exactly once, in the selected render mode (arp/chords as heard), with live voicing/transpose/key-drift pitches applied"

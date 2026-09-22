@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-22T14:00:00Z"
-total_pipeline_runs: 4
+last_updated: "2026-09-22T21:40:00Z"
+total_pipeline_runs: 6
 
 flags:
   has_conventions: true
@@ -40,3 +40,18 @@ active_prevention_rules:
   - id: "PM-2026-022-001"
     when: "Cross-referencing the PRD against existing planning docs"
     action: "PRD-001 (docs/PRD-001.md) is the strategic source of truth. Add a 'PRD-001 alignment' section to FUTURE_PLANNING.md mapping each PRD phase to current state instead of duplicating phase docs."
+  - id: "ADR-003-01"
+    when: "Editing any engine/** non-test source"
+    action: "No external imports (allowlist guard in engine/purity.test.ts), no Math.random/Date.now/new Date/performance.now/require/console. Timestamps flow in as parameters. See .kai/decisions/ADR-003-engine-layout-and-purity-guard.md."
+  - id: "ADR-003-02"
+    when: "Adding tests for engine code"
+    action: "Colocate under engine/**/*.test.ts (node env). NEVER add files to tests/ - the check-links drift gate counts tests/*.test.ts only and README counts would go red."
+  - id: "ADR-005-01"
+    when: "Implementing Phase 3+ generators"
+    action: "Thread (seed, constraints) into deriveCanonicalId for determinism (REQ-ETU-15); pass nowMs from the adapter layer - engine never reads the clock."
+  - id: "W2-001"
+    when: "Adjudicating 'declared model vs actual data' premises (e.g. step=beat vs step=bar)"
+    action: "Run data forensics FIRST (parse real data: descriptions, repeat structure, ingest script intent). Doc comments and planning docs can be fiction - the paths.ts '1 step = 1 beat' claim nearly justified a transport change that would have played the entire masterclass catalog 4x too fast."
+  - id: "W2-002"
+    when: "Any agent reverting mutations in a worktree where parallel agents may be writing"
+    action: "NEVER use git checkout --/reset to restore files (it reverts to HEAD and destroys uncommitted parallel work - it happened: tester wiped docs' CHANGELOG edit). Restore from per-file copy snapshots taken at intake; verify with shasum."
