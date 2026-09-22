@@ -581,11 +581,13 @@ const PerformStage: React.FC<{
   // first step per bar, not post-voicing sonority). Memoized on path so
   // transpose/persona/loop changes never recompute it.
   const gtTargets = useMemo(() => gtTargetsForPath(path), [path]);
-  if (gtTargets.length !== totalBars) {
-    console.warn(
-      `[GtCoverageRow] target/bar mismatch: ${gtTargets.length} targets vs ${totalBars} bars for path ${path.id}`,
-    );
-  }
+  useEffect(() => {
+    if (gtTargets.length !== totalBars) {
+      console.warn(
+        `[GtCoverageRow] target/bar mismatch: ${gtTargets.length} targets vs ${totalBars} bars for path ${path.id}`,
+      );
+    }
+  }, [gtTargets.length, totalBars, path.id]);
 
   // Subscribe to the playback tick so the bar strip shows a moving
   // playhead between chord changes. Smooth 60fps; one rAF source
