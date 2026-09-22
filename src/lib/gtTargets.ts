@@ -19,6 +19,10 @@
  * agree on what counts as a guide tone.
  */
 import { STEPS_PER_BAR, type HarmonicPath, type HarmonicStep } from "./paths";
+import {
+  intervalToRole,
+  roleToGuideToneTarget,
+} from "./guideTones";
 
 export type GuideToneTargetKind = "3rd" | "7th";
 
@@ -83,11 +87,12 @@ function classifyBarTargets(
 
   const bassPc = ((sorted[0] % 12) + 12) % 12;
   const targets = new Set<GuideToneTargetKind>();
-  for (const note of sorted) {
-    const pc = ((note % 12) + 12) % 12;
+  for (let i = 0; i < sorted.length; i++) {
+    const pc = ((sorted[i] % 12) + 12) % 12;
     const interval = ((pc - bassPc) + 12) % 12;
-    if (interval === 3 || interval === 4) targets.add("3rd");
-    else if (interval === 10 || interval === 11) targets.add("7th");
+    const role = intervalToRole(interval, i === 0);
+    const target = roleToGuideToneTarget(role);
+    if (target) targets.add(target);
   }
   const arr = [...targets].sort();
   return {

@@ -43,6 +43,34 @@ const ROLE_LABEL: Record<GuideToneRole, string> = {
   color: "color tone",
   off: "off",
 };
+/**
+ * Classify a semitone interval relative to the bass into a GuideToneRole.
+ * Bass note (isBass=true or interval=0 when isBass) maps to "root".
+ */
+export function intervalToRole(
+  interval: number,
+  isBass: boolean = false,
+): GuideToneRole {
+  if (isBass) return "root";
+  const norm = ((interval % 12) + 12) % 12;
+  if (norm === 3 || norm === 4) return "third";
+  if (norm === 5 || norm === 7) return "fifth";
+  if (norm === 10 || norm === 11) return "seventh";
+  if (norm === 2 || norm === 9) return "ninth";
+  return "color";
+}
+
+/**
+ * Map a GuideToneRole to its guide-tone target label ("3rd" | "7th"),
+ * or null if the role is not a guide tone.
+ */
+export function roleToGuideToneTarget(
+  role: GuideToneRole,
+): "3rd" | "7th" | null {
+  if (role === "third") return "3rd";
+  if (role === "seventh") return "7th";
+  return null;
+}
 
 /**
  * Classify a played MIDI note against the chord's notes.
@@ -97,16 +125,8 @@ export function classifyGuideTone(
   for (let i = 0; i < sorted.length && slotRoles.length < 5; i++) {
     const pc = ((sorted[i] % 12) + 12) % 12;
     const interval = ((pc - bassPc) + 12) % 12;
-    if (i === 0) slotRoles.push({ slot: 0, role: "root" });
-    else if (interval === 3) slotRoles.push({ slot: i, role: "third" });
-    else if (interval === 4) slotRoles.push({ slot: i, role: "third" });
-    else if (interval === 5) slotRoles.push({ slot: i, role: "fifth" });
-    else if (interval === 7) slotRoles.push({ slot: i, role: "fifth" });
-    else if (interval === 10) slotRoles.push({ slot: i, role: "seventh" });
-    else if (interval === 11) slotRoles.push({ slot: i, role: "seventh" });
-    else if (interval === 2) slotRoles.push({ slot: i, role: "ninth" });
-    else if (interval === 9) slotRoles.push({ slot: i, role: "ninth" });
-    else slotRoles.push({ slot: i, role: "color" });
+    const role = intervalToRole(interval, i === 0);
+    slotRoles.push({ slot: i, role });
   }
 
   // Find the slot whose pitch class matches the played note.

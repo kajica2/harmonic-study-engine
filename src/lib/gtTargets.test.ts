@@ -9,6 +9,11 @@ import {
   gtCoverageCount,
   type GuideToneTarget,
 } from "./gtTargets";
+import {
+  intervalToRole,
+  roleToGuideToneTarget,
+  classifyGuideTone,
+} from "./guideTones";
 import type { HarmonicPath, HarmonicStep } from "./paths";
 
 /** Build a path of N bars where bar i has the given chord notes. */
@@ -218,6 +223,51 @@ describe("gtCoverageCount", () => {
     const path: HarmonicPath = { id: "test", title: "Empty", description: "", steps: [] };
     const targets = gtTargetsForPath(path);
     expect(gtCoverageCount(targets)).toEqual({ covered: 0, total: 0 });
+  });
+});
+describe("interval table parity (TD-005)", () => {
+  it("pins intervalToRole classification across all 12 chromatic intervals", () => {
+    // Bass note
+    expect(intervalToRole(0, true)).toBe("root");
+    expect(roleToGuideToneTarget("root")).toBeNull();
+
+    // Semitone mapping
+    expect(intervalToRole(0)).toBe("color"); // unison non-bass
+    expect(intervalToRole(1)).toBe("color"); // m2 / b9
+    expect(intervalToRole(2)).toBe("ninth"); // M2 / 9th
+    expect(intervalToRole(3)).toBe("third"); // m3
+    expect(intervalToRole(4)).toBe("third"); // M3
+    expect(intervalToRole(5)).toBe("fifth"); // P4 / 11th
+    expect(intervalToRole(6)).toBe("color"); // tritone
+    expect(intervalToRole(7)).toBe("fifth"); // P5
+    expect(intervalToRole(8)).toBe("color"); // m6 / b13
+    expect(intervalToRole(9)).toBe("ninth"); // M6 / 13th
+    expect(intervalToRole(10)).toBe("seventh"); // m7
+    expect(intervalToRole(11)).toBe("seventh"); // M7
+  });
+
+  it("pins roleToGuideToneTarget mapping", () => {
+    expect(roleToGuideToneTarget("third")).toBe("3rd");
+    expect(roleToGuideToneTarget("seventh")).toBe("7th");
+    expect(roleToGuideToneTarget("root")).toBeNull();
+    expect(roleToGuideToneTarget("fifth")).toBeNull();
+    expect(roleToGuideToneTarget("ninth")).toBeNull();
+    expect(roleToGuideToneTarget("color")).toBeNull();
+    expect(roleToGuideToneTarget("off")).toBeNull();
+  });
+
+  it("guarantees parity between classifyGuideTone and roleToGuideToneTarget", () => {
+    const chords = [Dm7, G7, Cmaj7, C5, Csus4, Cmaj9, Ebmaj7];
+    for (const chord of chords) {
+      for (const note of chord) {
+        const match = classifyGuideTone(note, chord);
+        const target = roleToGuideToneTarget(match.role);
+        expect(match.isGuideTone).toBe(target !== null);
+        if (match.isGuideTone) {
+          expect(["3rd", "7th"]).toContain(target);
+        }
+      }
+    }
   });
 });
 
