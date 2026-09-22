@@ -16,6 +16,7 @@ flags:
   has_postmortems: false
   has_tech_debt: true
   has_preferences: true
+  has_prd: true
 
 active_prevention_rules:
   - id: "PM-2026-009-001"
@@ -30,3 +31,12 @@ active_prevention_rules:
   - id: "PM-2026-009-004"
     when: "Authoring feature code on this repo"
     action: "Run grep for non-ASCII bytes (e2 80 9x, c2 b7, e2 99 aa, etc.) on the diff; replace em-dash with hyphen and middle-dot with ASCII separator before committing. Pre-existing non-ASCII in the codebase is NOT yours to fix unless asked."
+  - id: "PM-2026-009-005"
+    when: "Adding a wrapper aria-label around a chip that already has a labeled control inside"
+    action: "Drop the wrapper aria-label - the inner control's label is the single source of truth and screen readers would announce the chip name twice."
+  - id: "PM-2026-009-006"
+    when: "Setting outline-none on a focusable element (Tailwind)"
+    action: "Pair it with a focus-visible replacement ring/border. The three toolbar selects (IN / OUT / BASS CH) all need focus-visible:ring-1 focus-visible:ring-neutral-400/60."
+  - id: "PM-2026-022-001"
+    when: "Cross-referencing the PRD against existing planning docs"
+    action: "PRD-001 (docs/PRD-001.md) is the strategic source of truth. Add a 'PRD-001 alignment' section to FUTURE_PLANNING.md mapping each PRD phase to current state instead of duplicating phase docs."

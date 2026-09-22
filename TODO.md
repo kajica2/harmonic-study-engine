@@ -96,6 +96,23 @@ from `TODO.md` for Phase 7; the per-tune work is in
       reaches 35/35 `- [x]`, this pointer is also `- [x]` and
       Phase 7 is closed.
 
+## Phase 9 - PRD-001 polish (FUTURE_PLANNING "PRD-001 alignment")
+
+When Phase 7 (masterclass enablement) reaches 35/35, the loop should
+move on to the PRD-001 work - the strategic doc at `docs/PRD-001.md`
+is the source of truth for what comes next. `FUTURE_PLANNING.md`
+already has a PRD-aware "Recommended first moves" section listing the
+five cheapest unblockers:
+
+  - Idea type stub (REQ-IDEA-1)
+  - Privacy statement on MIDI import (REQ-IO-70)
+  - Engine modules audit for `Math.random` (REQ-FND-7)
+  - Effective key display in the header (REQ-TRANS-4)
+  - Per-exercise transpose stub (REQ-TRANS-2)
+
+Each is one PR. The first three are pure logic / one-line UI; the
+fourth and fifth are visible UI additions. Tackle in that order.
+
 ## Constraints (read LOOP-PROMPT.md before each iteration)
 
 - **Never** kill sibling processes (Hermes WhatsApp bridge owns :3000).

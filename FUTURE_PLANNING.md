@@ -113,3 +113,145 @@ mastery log (option G) and its guide-tone bridge (option C → G).
 - Never commit secrets; `.env*`, `.venv/`, `server/requirements-arm64.txt`
   stay out.
 - If a TODO item exceeds one iteration, split it before starting.
+
+---
+
+## PRD-001 alignment (2026-09-22)
+
+The strategic product doc is `docs/PRD-001.md` - mode-driven workbench
+(Compose / Etude / Explore + Learn cross-cutting). Where it conflicts
+with the tactical items above, **PRD-001 wins** (it says so itself in
+section 16). This section maps PRD phases to current state and tells
+the loop which near-term work unblocks the strategic plan.
+
+### PRD Phase 0 - Foundations
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Add `tonal`, `@tonejs/midi` | NOT STARTED | `package.json` only has `fflate` + `midi-writer-js`. Add when starting Phase 0. |
+| MIDI-first internal notes | PARTIAL | `HarmonicPath.steps[].notes` already in MIDI; `chordNames` are user-facing. No migration needed. |
+| `mulberry32` PRNG | SHIPPED | `src/magenta/noise.ts`. REQ-FND-2 / REQ-FND-3 already covered. |
+| `StyleProfile` types + 3 profiles | NOT STARTED | Current "style packs" live in `src/data/styles/` as backing-engine config, not generative style. PRD's `StyleProfile` is a separate concept covering harmony/melody/rhythm/voicing. New module. |
+| Versioned data model + migrations skeleton | PARTIAL | `usePersistedState` keys already versioned informally (e.g. `hse.performance.log.v1`). No formal migration runner. |
+| Lint rule against `Math.random` in `engine/` | NOT STARTED | No `engine/` directory today. Add when Phase 0 lands. |
+
+### PRD Phase 1 - Mode selector & scaffolding
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Mode selector component | NOT STARTED | Today the app is a single workspace; modes are sections of one screen. Big refactor. |
+| URL + localStorage persistence for mode | NOT STARTED | Easy once the selector exists. |
+| Dirty-state tracking + prompt | NOT STARTED | Requires the `Idea` model. |
+| Idea bar with chip | NOT STARTED | New global component. |
+| Empty states per mode | NOT STARTED | Most empty states are "load a path" today. |
+
+### PRD Phase 2 - Transposition
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Global transpose | SHIPPED | `transposeShift` already in session store; toolbar has +/- buttons. |
+| Per-exercise transpose (Etude) | NOT STARTED | Currently a single global shift. Etude has no separate control. |
+| Effective key display | PARTIAL | Transposed chord name shown in the bar strip; no explicit "effective key" badge. |
+| Cycle-all-12-keys | NOT STARTED | Practice loop just runs the current path. |
+| Keyboard `[` / `]` / `Shift+[` / `Shift+]` | PARTIAL | The toolbar has buttons; keyboard shortcuts exist but not in PRD's exact form. |
+
+### PRD Phase 3 - Etude mode
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Constraint panel (style, key, mode, difficulty, bars, tempo, seed) | PARTIAL | Generator lab exists (`GeneratorLab`) but is a separate surface, not "Etude mode." Today Etude = curated paths, not generated ones. |
+| Harmony / melody / difficulty generators | PARTIAL | `melodyMarkov.ts` + `coCompose.ts` exist (per `docs/COMPOSITION-MVP-PLAN.md`). Not wired to a UI mode. |
+| Piano roll for etude | NOT STARTED | Live score is staff notation (`LiveScoreDisplay`), not piano roll. |
+| Staff notation via VexFlow | NOT STARTED | Current notation uses `abcjs`. Migration to VexFlow is a PRD Phase 3 decision (Q2). |
+| MIDI export | SHIPPED | `src/lib/midiExport.ts` covers `asWritten` + `splitTracks`. |
+| MusicXML export | NOT STARTED | ABC export exists; MusicXML not. |
+
+### PRD Phase 4 - Compose mode
+
+| PRD item | Status | Notes |
+|---|---|---|
+| MIDI upload + parse | PARTIAL | `ImportExportModal` reads `.mid` files but does not retain them as a Compose session. |
+| Track role classification | PARTIAL | `midiExport.buildSplitTracks` does a lowest-note-per-step heuristic; no formal classifier. |
+| Key / melody / chord analysis | PARTIAL | `analyzeChord` exists for individual chords; no key/melody inference over a file. |
+| Editable analysis card | NOT STARTED | No Compose surface today. |
+| Accompaniment generation | NOT STARTED | `backingEngine` plays existing style tracks but does not generate accompaniment to a user's melody. |
+| WAV export | SHIPPED (limited) | `Tone.Offline` exists in `src/lib/`; used for test fixtures, not user export. |
+| Privacy statement on upload | NOT STARTED | Required by REQ-IO-70 before any upload surface ships. |
+
+### PRD Phase 5 - Explore mode
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Seed-based exploration | NOT STARTED | No Explore surface today. |
+| Reharmonize + substitute | PARTIAL | `coCompose.ts` reharmonizes a single bar; no full progression reharm. |
+| Idea cards with rationale + concept links | NOT STARTED | Depends on Pedagogy layer (Phase 6). |
+
+### PRD Phase 6 - Pedagogy
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Annotations on every artifact | NOT STARTED | `PathBriefing` is the closest existing thing - curated objectives per path, not per-generated-element. |
+| Concept registry (>= 8 concepts) | NOT STARTED | `TERMINOLOGY.md` exists as a glossary; no structured Concept type. |
+| Concept drawer | NOT STARTED | New global component. |
+| Ear training sub-mode | NOT STARTED | Quiz module (`src/data/quizzes/`) covers quiz topics; not ear training. |
+| Spaced repetition | NOT STARTED | New. |
+
+### PRD Phase 7 - Practice deepening
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Metronome | SHIPPED | `src/lib/rhythm.ts` + `metronomeEnabled` state; toolbar toggle. |
+| Count-in | PARTIAL | Metronome ticks before playback but no visible "3... 2... 1..." |
+| Section looping | SHIPPED | Loop range picker exists. |
+| A/B compare | NOT STARTED | New. |
+| Tempo ramp | NOT STARTED | New. |
+| Latency calibration | NOT STARTED | New. |
+| Web MIDI input (device list, permission) | SHIPPED | `src/lib/midiIn.ts` + `MidiInPicker.tsx` + `midiClock.ts` (clock sync). |
+| Channel routing for MIDI input | SHIPPED | Channel-split for bass (commit 63d2ca5) - the foundation PRD REQ-IO-3 needs. |
+| Played-correctly detection | NOT STARTED | New; depends on PRAC-40 latency calibration. |
+
+### PRD Phase 8 - Extended I/O
+
+| PRD item | Status | Notes |
+|---|---|---|
+| Chord-chart paste | PARTIAL | `src/lib/formTemplates/` has form data; no paste parser. |
+| Piano-roll editor | NOT STARTED | New. |
+| WAV export (user-facing) | NOT STARTED | Code path exists; not wired to a button. |
+| MusicXML export | NOT STARTED | New (Q2 / Phase 3 decision). |
+| ABC export | PARTIAL | `sheetMusicExport.ts` exists. |
+| Session sharing via URL | NOT STARTED | No URL serialization of state today (transposition and tempo are persisted locally only). |
+| `/play` route for idea links | NOT STARTED | New. |
+
+### PRD Phase 9 - Polish & launch
+
+Nothing to ship here yet; this phase only makes sense once Phases 0-8
+are close to done. Snapshot tests for all generators is the cheapest
+unblocker and can run incrementally against any shipped generator.
+
+### Recommended first moves (PRD-aware, fit in <= 1 day each)
+
+These are the highest-leverage near-term items from the PRD that are
+also small enough to land without restructuring:
+
+1. **Idea type stub (REQ-IDEA-1)** - define `Idea` as a tagged union
+   in `src/lib/idea.ts`. No consumers yet. ~30 lines + 5 tests.
+   Unblocks Phase 1 (mode selector + Idea bar).
+2. **Privacy statement on MIDI import (REQ-IO-70)** - single
+   `<aside>` next to the file input in `ImportExportModal.tsx`.
+   Trivial. Unblocks Phase 4.
+3. **Engine modules audit (REQ-FND-7)** - grep for `Math.random`
+   in `src/lib/` and replace with the existing `mulberry32` import
+   from `src/magenta/noise.ts`. Already-true invariant; the audit
+   just makes it grep-able. ~1 file touched.
+4. **Effective key display (REQ-TRANS-4)** - render the current
+   sounding key in the header next to the transposition buttons.
+   Single component, ~15 lines.
+5. **Per-exercise transpose stub (REQ-TRANS-2)** - add an
+   `exerciseTranspose` field to `useSessionStore` and a +/- pair in
+   the toolbar (disabled until Etude mode exists). No UI behavior
+   change yet; just the persisted field + UI affordance.
+
+These five items are intentionally cheap: each is one PR, no new
+external dependencies, no architectural decision needed. They prime
+the codebase for the Phase 0/1/2 work without committing to the
+multi-week Etude / Compose / Explore builds yet.
