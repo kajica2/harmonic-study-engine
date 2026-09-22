@@ -160,11 +160,15 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           <GuideToneFeedback chordNotes={chordNotes} />
           {guideToneLabel && (
             <span
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 text-[11px] t-mono text-neutral-200"
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 text-[11px] t-mono text-neutral-200${isPlaying ? "" : " opacity-60"}`}
               role="status"
               aria-live="polite"
               data-testid="guide-tone-tally"
-              title="Live guide-tone tally since the practice loop started"
+              title={
+                isPlaying
+                  ? "Live guide-tone tally since the practice loop started"
+                  : "Paused — tally frozen"
+              }
             >
               <span aria-hidden>GT</span>
               <span>{guideToneLabel}</span>

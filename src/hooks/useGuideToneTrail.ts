@@ -7,7 +7,11 @@
  * a ref so the subscription never goes stale as the step advances).
  *
  * Lifecycle:
- *   begin() — reset + start counting (called when a take starts)
+ *   begin() — start counting; idempotent (re-entry preserves the
+ *     in-progress tally so a record-flow begin() after a
+ *     transport begin() keeps pre-record notes)
+ *   reset() — clear the tally but leave the active flag alone
+ *     (used on path change)
  *   end()   — stop counting and return the tally (or null if never started)
  *   tally   — current live tally, re-rendered as notes land
  *
@@ -25,10 +29,12 @@ import {
 } from "../lib/guideToneTrail";
 
 export interface GuideToneRunApi {
-  /** Start a fresh counting run (no-op re-entrant safe). */
+  /** Start a counting run; idempotent — re-entry is a no-op. */
   begin: () => void;
   /** Stop and return the run's tally; null if never begun. */
   end: () => GuideToneTrail | null;
+  /** Clear the tally without touching the active flag. */
+  reset: () => void;
   /** Live tally while a run is active (for inline display). */
   tally: GuideToneTrail;
 }
@@ -52,6 +58,7 @@ export function useGuideToneTrail(chordNotes: number[]): GuideToneRunApi {
   }, []);
 
   const begin = useCallback(() => {
+    if (activeRef.current) return;
     activeRef.current = true;
     trailRef.current = emptyTrail();
     setTally(emptyTrail());
@@ -63,5 +70,10 @@ export function useGuideToneTrail(chordNotes: number[]): GuideToneRunApi {
     return trailRef.current;
   }, []);
 
-  return { begin, end, tally };
+  const reset = useCallback(() => {
+    trailRef.current = emptyTrail();
+    setTally(emptyTrail());
+  }, []);
+
+  return { begin, end, reset, tally };
 }

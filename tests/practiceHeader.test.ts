@@ -2,9 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   formatChordReadout,
   currentBarNumber,
+  formatGuideToneTally,
   formatStepEyebrow,
   formatTempo,
 } from "../src/lib/practiceHeader";
+import { emptyTrail } from "../src/lib/guideToneTrail";
 import type { HarmonicPath } from "../src/lib/paths";
 
 /**
@@ -89,5 +91,21 @@ describe("formatTempo", () => {
   it("rounds fractional tempos", () => {
     expect(formatTempo(120.4)).toBe("120 bpm");
     expect(formatTempo(120.6)).toBe("121 bpm");
+  });
+});
+
+describe("formatGuideToneTally pins", () => {
+  it("returns null for an empty trail", () => {
+    expect(formatGuideToneTally(emptyTrail())).toBeNull();
+  });
+
+  it("renders a {totalNotes: 4, guideHits: 3} trail as check/cross", () => {
+    const trail = {
+      totalNotes: 4,
+      guideHits: 3,
+      chordToneHits: 1,
+      offNotes: 0,
+    };
+    expect(formatGuideToneTally(trail)).toBe("✓ 3 · ✗ 1");
   });
 });

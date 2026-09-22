@@ -695,6 +695,23 @@ function AppShell() {
   // finished recording writes the tally onto the performance log.
   const guideTrail = useGuideToneTrail(currentChordNotes);
 
+  // Drive the live guide-tone tally from transport state. begin()
+  // is idempotent so the record flow's later begin() at take start
+  // safely preserves pre-record notes; end() is null-safe.
+  useEffect(() => {
+    if (isPlayingAuto) {
+      guideTrail.begin();
+    } else {
+      guideTrail.end();
+    }
+  }, [isPlayingAuto]);
+
+  // A new path starts with a clean tally but keeps the active flag
+  // (pause/resume continuity is owned by the transport effect).
+  useEffect(() => {
+    guideTrail.reset();
+  }, [path.id]);
+
   // Update audio when step changes or arp settings change
   const arpNotes = useMemo(() => {
     let notes = [...currentChordNotes];
@@ -1460,16 +1477,6 @@ function AppShell() {
         guideToneTrail={guideTrail.tally}
         isPlaying={isPlayingAuto}
         onPlayPause={() => {
-          // Start/stop the live guide-tone tally alongside the
-          // practice loop. `begin()` is idempotent (per its
-          // useCallback impl), so the recording-flow's later
-          // `guideTrail.begin()` at the take start is a safe
-          // re-entry. `end()` returns null when not active.
-          if (isPlayingAuto) {
-            guideTrail.end();
-          } else {
-            guideTrail.begin();
-          }
           setIsPlayingAuto(!isPlayingAuto);
         }}
         tempo={tempo}

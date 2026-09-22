@@ -13,6 +13,7 @@ import { defineConfig } from "vitest/config";
 const JSDOM_FILES = [
   "src/components/**/*.test.tsx",
   "src/hooks/useFeedback.test.ts",
+  "src/hooks/useGuideToneTrail.test.ts",
   "src/hooks/useSessionStore.test.ts",
   "src/lib/sheetMusicExport.test.ts",
   "src/lib/midiIn.test.ts",
