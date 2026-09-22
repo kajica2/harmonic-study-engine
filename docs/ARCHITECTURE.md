@@ -85,11 +85,12 @@ broken.
 | `src/components/GuideToneFeedback.tsx` | Live classifier chip + MIDI device picker. Rendered inside `PracticeHeader`. |
 | `src/components/RecentTakesPanel.tsx` | "Recent takes" read side of the mastery log: 1–5 ratings + guide-tone progress bar. Mounted by App when takes exist. |
 | `src/hooks/usePerformanceLog.ts` | React view over `performanceLog.ts`; re-reads localStorage after every mutation. |
-| `src/hooks/useGuideToneTrail.ts` | Subscribes to `midiOut.onNoteOn`, classifies against the current chord (ref-fed), `begin()`/`end()` a recording run. |
+| `src/hooks/useGuideToneTrail.ts` | Subscribes to `midiOut.onNoteOn`, classifies against the current chord (ref-fed), provides live practice tally + take recording run. |
 | `src/lib/useBassNotes.ts` | Subscribes to backing engine to surface bass line to UI. |
 | `src/lib/scalePlayer.ts` / `rhythmDrill.ts` | Scale practice + 3-iteration rhythm drill. |
 | `src/lib/scoreGenerator.ts` / `scoreExport.ts` | abcjs + MusicXML/Score21 export. |
 | `src/components/PlaySessionRail.tsx` | Bar strip + stage nav + voicing picker. |
+| `src/components/GtCoverageRow.tsx` | Precomputed per-bar guide-tone targets row (`✓/—`) rendered under the bar strip. |
 | `src/components/PathCatalog.tsx` | Filterable path grid (new). |
 | `src/components/SynesthesiaCanvas.tsx` | Persona-themed chord visualization. |
 | `src/components/LiveScoreDisplay.tsx` | abcjs-rendered score windowed to 4 bars. |
@@ -252,7 +253,7 @@ C + G), arranged so the classifier's data can feed the take log:
 
 ```
 midiOut.onNoteOn ─► GuideToneFeedback   (live chip, per-note classify)
-                 └► useGuideToneTrail   (tallies WHILE a take records)
+                 └► useGuideToneTrail   (live PracticeHeader tally + take record)
                           │  end()
                           ▼
    App.onResult ─► recordGuideToneResult(id, {hit, miss}) ─► performanceLog

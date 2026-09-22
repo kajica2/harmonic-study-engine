@@ -93,8 +93,8 @@ export function formatTempo(tempo: number): string {
  *
  * Example: totalNotes=4, guideHits=3 -> "✓ 3 · ✗ 1"
  *
- * The ✓ / ✗ glyphs come from FUTURE_PLANNING's "Near term" item #1:
- * "guide-tone live streak in the practice header." Reuses
+ * The ✓ / ✗ glyphs reflect the live cumulative tally (FUTURE_PLANNING
+ * item #1 / ADR-001). Reuses
  * `transitionsMissed` from guideToneTrail so the meaning stays
  * consistent with the take record written by the mastery log.
  */

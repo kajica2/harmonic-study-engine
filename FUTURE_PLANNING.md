@@ -25,26 +25,20 @@ mastery log (option G) and its guide-tone bridge (option C → G).
 
 ## Near term — small, high-leverage (≤ 1 day each)
 
-1. **Guide-tone live streak in the practice header.**
-   `useGuideToneTrail` already classifies every note-on in real time;
-   the trail is only surfaced at record end. Expose the live `tally` as
-   an inline "✓ 3 · ✗ 1" chip next to `GuideToneFeedback` so sight-
-   reading practice gets immediate feedback without recording.
-   Surface: `PracticeHeader` — it already owns `chordNotes`.
+1. **Guide-tone live tally in the practice header.** — **SHIPPED**
+   (2026-09-22, commit `eced8ed`, ADR-001). Exposes the live `tally` as
+   an inline "✓ N · ✗ M" chip next to `GuideToneFeedback` so sight-
+   reading practice gets immediate feedback without recording. Dims on
+   pause, resets on path change.
 
-2. **First-try vs rep #3 snapshots (option-G follow-up).**
-   Extend the take record with `rep` (which repetition of the path),
-   computed from `loopRange`/playhead resets. Then the Recent takes
-   panel can diff "rep 1 vs rep 3" guide-tone accuracy per path — the
-   original "Your take on Bar 4 was 80% on guide tones; last week's
-   was 65%" comparison. Needs one new field + a diff row; no schema
-   migration (added fields are optional and shape-guarded).
+2. **First-try vs rep #3 snapshots (option-G follow-up).** — **SHIPPED**
+   (2026-09-20). Rep tracking on take records (`rep`) and a `±% vs rep #N-1`
+   diff row in `RecentTakesPanel`.
 
-3. **Path-level guide-tone coverage map.**
-   Precompute which bars of each `HarmonicPath` contain a 3rd/7th in
-   their voicing; render a tiny "GT targets" row under the bar strip so
-   players know where the guide tones actually are before they play.
-   Pure function on `path.steps` → trivially unit-testable.
+3. **Path-level guide-tone coverage map.** — **SHIPPED**
+   (2026-09-22, commit `d961f8b`, ADR-002). Precomputed per-bar guide-tone
+   targets (`gtTargetsForPath`) rendered in `GtCoverageRow` below the bar
+   strip with informational `✓/—` glyphs.
 
 4. **Masterclass in-app enablement.**
    35 of 38 tunes are `inApp: false`. The ingest pipeline
