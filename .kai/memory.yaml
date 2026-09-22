@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-22T21:40:00Z"
-total_pipeline_runs: 6
+last_updated: "2026-09-23T03:00:00Z"
+total_pipeline_runs: 7
 
 flags:
   has_conventions: true
@@ -55,3 +55,9 @@ active_prevention_rules:
   - id: "W2-002"
     when: "Any agent reverting mutations in a worktree where parallel agents may be writing"
     action: "NEVER use git checkout --/reset to restore files (it reverts to HEAD and destroys uncommitted parallel work - it happened: tester wiped docs' CHANGELOG edit). Restore from per-file copy snapshots taken at intake; verify with shasum."
+  - id: "PHASE-1-01"
+    when: "Adding keyboard shortcuts to a global handler"
+    action: "Guard against metaKey/ctrlKey/altKey BEFORE the key branches to avoid stealing browser-native tab-switch (Cmd/Ctrl+1..9), Spotlight (Cmd+Space), menu mnemonics (Alt+letter), and window-minimize (Cmd+M). Shift is usually fine to allow. Pin the guard with a test that exercises the modifier combination."
+  - id: "PHASE-1-02"
+    when: "Shipping an affordance (button, chip, action) the design calls for"
+    action: "Wire it on day 1 - either functional or a visible disabled placeholder with an honest title/tooltip explaining what is missing. A `disabled` button with no onClick and no discoverability hint is a regression: review failed it twice in one phase. Phase 1 specific: the IdeaBar `+` button - disabled with title='No chord yet' when no activeStep."
