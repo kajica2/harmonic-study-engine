@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-22T13:00:00Z"
-total_pipeline_runs: 3
+last_updated: "2026-09-22T14:00:00Z"
+total_pipeline_runs: 4
 
 flags:
   has_conventions: true
@@ -17,4 +17,16 @@ flags:
   has_tech_debt: true
   has_preferences: true
 
-active_prevention_rules: []
+active_prevention_rules:
+  - id: "PM-2026-009-001"
+    when: "Introducing a new optional config / UI chip with a persisted default"
+    action: "Default the new param so callers without the explicit prop still work; gate the visual behind the param being non-empty/non-null so the chip's status dot is never mis-colored."
+  - id: "PM-2026-009-002"
+    when: "Mocking a previously-unmocked module in a hook test"
+    action: "Use vi.mock at the top of the file (before the import that captures the module) so the module-level singleton lands on the stub; provide a __setStub-setter hook for per-test swaps."
+  - id: "PM-2026-009-003"
+    when: "Augmenting a callback signature with a new optional arg"
+    action: "Keep existing callers working (the extra arg is ignored); update the listener type signature to reflect the new shape, not just the implementation."
+  - id: "PM-2026-009-004"
+    when: "Authoring feature code on this repo"
+    action: "Run grep for non-ASCII bytes (e2 80 9x, c2 b7, e2 99 aa, etc.) on the diff; replace em-dash with hyphen and middle-dot with ASCII separator before committing. Pre-existing non-ASCII in the codebase is NOT yours to fix unless asked."

@@ -12,3 +12,9 @@ Initialized 2026-09-22.
 | TD-006 | coverage map (hygiene) | Length-guard `console.warn` moved to `useEffect` in `PlaySessionRail.tsx`. | P4 | Closed — 2026-09-22, commit 14b12de |
 | TD-007 | config (test discovery) | Renamed `tests/count-tunes.test.js` to `.ts` for automatic discovery by Vitest. | P3 | Closed — 2026-09-22, commit 9ea7b82 |
 | TD-008 | docs (coverage row) | Resynced test counts across `SPEC.md`, `README.md`, `src/magenta/README.md`, and `docs/ARCHITECTURE.md` to 384 (355 frontend + 29 backend). | P3 | Closed — 2026-09-22, commit 9ea7b82 |
+| TD-009 | midi input (channel splat) | Expose `channel` (1-16) on `MidiInEvent` + `midiOut` input fan-out. Backward-compatible signature on `onNoteOn` / `onNoteOff`. | P3 | Closed — 2026-09-22, commit 63d2ca5 |
+| TD-010 | guide tones (channel filter) | `useGuideToneTrail(chordNotes, bassChannel)` drops bass-channel notes from the tally so a Stick / bass-pedal setup doesn't pollute guide-tone feedback. | P3 | Closed — 2026-09-22, commit 63d2ca5 |
+| TD-011 | piano bass layer (merge) | `useBassNotes` merges `backingEngine` stream + live MIDI bass on the configured channel (default 2). Both subscriptions clean up on unmount. | P3 | Closed — 2026-09-22, commit 63d2ca5 |
+| TD-012 | config (persisted bass channel) | `bassMidiChannel` via `usePersistedState` (`bassMidiChannel`, default 2). Header chip "BASS CH" selects 1-16. | P3 | Closed — 2026-09-22, commit 63d2ca5 |
+| TD-013 | tests (channel split pins) | +12 pins across midiIn (3), useGuideToneTrail (2), useBassNotes (7). Total tests: 969 passed / 1 skipped (+70 vs pre-feature baseline 899 / 1). | P3 | Closed — 2026-09-22, commit 63d2ca5 |
+| TD-014 | docs (channel-split spec) | `docs/midiChannelSplit-feature.md` follows `docs/midiClock-feature.md` structure. Data flow diagram included. | P3 | Closed — 2026-09-22, commit 63d2ca5 |
