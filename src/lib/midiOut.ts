@@ -9,9 +9,12 @@ export class MidiOut {
   // gives us `inputs` alongside `outputs`; we fan out incoming
   // messages to every subscribed listener. Used by the practice-loop
   // guide-tone feedback to classify what the player actually played.
+  // Callbacks receive the MIDI channel (1-16, human convention) as
+  // the last argument so consumers can split bass vs guide-tone
+  // input (see docs/midiChannelSplit-feature.md).
   private inputListeners: {
-    onNoteOn: ((midi: number, velocity: number) => void)[];
-    onNoteOff: ((midi: number) => void)[];
+    onNoteOn: ((midi: number, velocity: number, channel: number) => void)[];
+    onNoteOff: ((midi: number, channel: number) => void)[];
   } = { onNoteOn: [], onNoteOff: [] };
   private inputs: any[] = [];
 
@@ -68,12 +71,13 @@ export class MidiOut {
       input.onmidimessage = (event: any) => {
         const data: Uint8Array = event.data;
         const status = data[0] & 0xf0;
+        const channel = (data[0] & 0x0f) + 1;
         const midi = data[1];
         const velocity = data[2];
         if (status === 0x90 && velocity > 0) {
-          for (const cb of this.inputListeners.onNoteOn) cb(midi, velocity);
+          for (const cb of this.inputListeners.onNoteOn) cb(midi, velocity, channel);
         } else if (status === 0x80 || (status === 0x90 && velocity === 0)) {
-          for (const cb of this.inputListeners.onNoteOff) cb(midi);
+          for (const cb of this.inputListeners.onNoteOff) cb(midi, channel);
         }
       };
     }
@@ -82,8 +86,11 @@ export class MidiOut {
   /**
    * Subscribe to incoming note-on events. Returns an unsubscribe
    * function. Symmetric with the existing onOutputsChange API.
+   * Callback receives (midi, velocity, channel) where channel is
+   * 1-16 (human convention). Existing callers that ignore the
+   * channel argument keep working unchanged.
    */
-  onNoteOn(cb: (midi: number, velocity: number) => void): () => void {
+  onNoteOn(cb: (midi: number, velocity: number, channel: number) => void): () => void {
     this.inputListeners.onNoteOn.push(cb);
     return () => {
       this.inputListeners.onNoteOn = this.inputListeners.onNoteOn.filter(
@@ -94,9 +101,10 @@ export class MidiOut {
 
   /**
    * Subscribe to incoming note-off events. Returns an unsubscribe
-   * function.
+   * function. Callback receives (midi, channel) where channel is
+   * 1-16 (human convention).
    */
-  onNoteOff(cb: (midi: number) => void): () => void {
+  onNoteOff(cb: (midi: number, channel: number) => void): () => void {
     this.inputListeners.onNoteOff.push(cb);
     return () => {
       this.inputListeners.onNoteOff = this.inputListeners.onNoteOff.filter(

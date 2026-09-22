@@ -39,17 +39,27 @@ export interface GuideToneRunApi {
   tally: GuideToneTrail;
 }
 
-export function useGuideToneTrail(chordNotes: number[]): GuideToneRunApi {
+export function useGuideToneTrail(
+  chordNotes: number[],
+  bassChannel?: number | null,
+): GuideToneRunApi {
   const notesRef = useRef<number[]>(chordNotes);
   notesRef.current = chordNotes;
+  // Bass channel (1-16) whose note-ons are excluded from the tally
+  // (they feed the bass layer, not the guide-tone loop). null /
+  // undefined = no filtering, preserving the pre-split behavior.
+  const bassChannelRef = useRef<number | null | undefined>(bassChannel);
+  bassChannelRef.current = bassChannel;
 
   const activeRef = useRef(false);
   const trailRef = useRef<GuideToneTrail>(emptyTrail());
   const [tally, setTally] = useState<GuideToneTrail>(emptyTrail());
 
   useEffect(() => {
-    const off = midiOut.onNoteOn((midi) => {
+    const off = midiOut.onNoteOn((midi, _velocity, channel) => {
       if (!activeRef.current) return;
+      if (bassChannelRef.current != null && channel === bassChannelRef.current)
+        return;
       const match = classifyGuideTone(midi, notesRef.current);
       trailRef.current = accumulateTrail(trailRef.current, match);
       setTally(trailRef.current);

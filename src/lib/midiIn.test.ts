@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { midiIn } from "./midiIn";
+import { midiIn, type MidiInEvent } from "./midiIn";
 
 /** Detail shape dispatched on window for each Real-Time byte. Mirrors
  *  the docs/midiClock-feature.md contract. ASCII only. */
@@ -196,5 +196,77 @@ describe("midiIn - Real-Time passthrough", () => {
     ]);
 
     window.removeEventListener("midiclock", handler);
+  });
+});
+
+describe("midiIn - channel parsing", () => {
+  beforeEach(() => {
+    midiIn.selectInput(null);
+  });
+
+  it("parses channel 1 from a 0x90 note-on", async () => {
+    const input = installMidiShim("ch-noteon-1");
+    await midiIn.init();
+
+    const seen: MidiInEvent[] = [];
+    const handler = (e: Event) =>
+      seen.push((e as CustomEvent<MidiInEvent>).detail);
+    window.addEventListener("midin", handler);
+
+    input.onmidimessage?.({
+      data: new Uint8Array([0x90, 60, 96]),
+      timeStamp: 1234,
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].channel).toBe(1);
+    expect(seen[0].type).toBe("noteon");
+    expect(seen[0].note).toBe(60);
+
+    window.removeEventListener("midin", handler);
+  });
+
+  it("parses channel 2 from a 0x91 note-on", async () => {
+    const input = installMidiShim("ch-noteon-2");
+    await midiIn.init();
+
+    const seen: MidiInEvent[] = [];
+    const handler = (e: Event) =>
+      seen.push((e as CustomEvent<MidiInEvent>).detail);
+    window.addEventListener("midin", handler);
+
+    input.onmidimessage?.({
+      data: new Uint8Array([0x91, 36, 96]),
+      timeStamp: 1234,
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].channel).toBe(2);
+    expect(seen[0].type).toBe("noteon");
+    expect(seen[0].note).toBe(36);
+
+    window.removeEventListener("midin", handler);
+  });
+
+  it("parses channel 2 from a 0x81 note-off", async () => {
+    const input = installMidiShim("ch-noteoff-2");
+    await midiIn.init();
+
+    const seen: MidiInEvent[] = [];
+    const handler = (e: Event) =>
+      seen.push((e as CustomEvent<MidiInEvent>).detail);
+    window.addEventListener("midin", handler);
+
+    input.onmidimessage?.({
+      data: new Uint8Array([0x81, 36, 0]),
+      timeStamp: 1234,
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].channel).toBe(2);
+    expect(seen[0].type).toBe("noteoff");
+    expect(seen[0].note).toBe(36);
+
+    window.removeEventListener("midin", handler);
   });
 });

@@ -8,6 +8,7 @@
  *     note: number,       // MIDI note number 0-127
  *     velocity: number,   // 1-127
  *     type: "noteon" | "noteoff",
+ *     channel: number,    // MIDI channel 1-16 (human convention)
  *     inputId: string,    // source device id (e.g. for the indicator)
  *     inputName: string,  // source device name
  *     timestamp: number,  // DOMHighResTimeStamp
@@ -30,6 +31,7 @@ export interface MidiInEvent {
   note: number;
   velocity: number;
   type: MidiInEventType;
+  channel: number;
   inputId: string;
   inputName: string;
   timestamp: number;
@@ -135,6 +137,7 @@ export class MidiIn {
 
     if (msg.data.length < 2) return;
     const status = msg.data[0] & 0xf0;
+    const channel = (msg.data[0] & 0x0f) + 1;
     const note = msg.data[1];
     const velocity = msg.data[2] ?? 0;
     // Filter to the selected input when one is set.
@@ -147,6 +150,7 @@ export class MidiIn {
       note,
       velocity,
       type,
+      channel,
       inputId: input.id,
       inputName: input.name ?? input.id,
       timestamp: msg.timeStamp ?? performance.now(),

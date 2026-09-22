@@ -312,6 +312,15 @@ function AppShell() {
     key: "quizTopic",
     defaultValue: "roman-numerals",
   });
+  // MIDI channel-split: the bass channel (default 2) is treated as
+  // bass input (feeds useBassNotes, excluded from the guide-tone
+  // tally); ch1 keeps feeding the guide-tone loop. Persisted so a
+  // Stick / bass-pedal setup survives reload. See
+  // docs/midiChannelSplit-feature.md.
+  const [bassMidiChannel, setBassMidiChannel] = usePersistedState<number>({
+    key: "bassMidiChannel",
+    defaultValue: 2,
+  });
   // MIDI / recording ephemeral state. The live note set lives in
   // SynesthesiaProvider; App only ever WRITES it (via the stable setter),
   // so note events don't re-render this whole tree. Consumers read it
@@ -572,8 +581,10 @@ function AppShell() {
     setHDSoundsTick,
   } = useExportFlow();
 
-  // Bass-line tracking (live, not persisted)
-  const bassMidis = useBassNotes();
+  // Bass-line tracking (live, not persisted). Merges the backing
+  // engine's bass stream with live MIDI bass notes on the configured
+  // bass channel (default 2).
+  const bassMidis = useBassNotes(bassMidiChannel);
 
   const ddspApiUrl =
     (import.meta.env.VITE_DDSP_API as string | undefined) ||
@@ -695,7 +706,9 @@ function AppShell() {
 
   // Guide-tone trail — counts 3rd/7th hits during a take so the
   // finished recording writes the tally onto the performance log.
-  const guideTrail = useGuideToneTrail(currentChordNotes);
+  // Notes on the bass channel (bassMidiChannel) are excluded so a
+  // Stick / bass-pedal setup doesn't pollute the guide-tone tally.
+  const guideTrail = useGuideToneTrail(currentChordNotes, bassMidiChannel);
 
   // Drive the live guide-tone tally from transport state. begin()
   // is idempotent so the record flow's later begin() at take start
@@ -1436,6 +1449,39 @@ function AppShell() {
               setSelectedMidiInId(id);
             }}
           />
+
+          {/* MIDI channel-split: notes on the bass channel feed the
+              bass layer (useBassNotes) and are excluded from the
+              guide-tone tally; ch1 keeps driving guide-tone
+              feedback. See docs/midiChannelSplit-feature.md. */}
+          <div
+            className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800"
+            title="MIDI bass channel: notes on this channel feed the bass layer and are excluded from the guide-tone tally. Channel 1 = melody / guide tones, chN = bass."
+            aria-label="MIDI bass channel"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: bassMidiChannel ? "#22c55e" : "#6b7280",
+              }}
+              aria-hidden="true"
+            />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+              BASS CH
+            </span>
+            <select
+              value={bassMidiChannel}
+              onChange={(e) => setBassMidiChannel(Number(e.target.value))}
+              aria-label="MIDI bass channel"
+              className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+            >
+              {Array.from({ length: 16 }, (_, i) => i + 1).map((ch) => (
+                <option key={ch} value={ch}>
+                  {ch}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* MIDI Clock from DAW: opt-in toggle. When on, the app's
               tempo + transport follow a DAW's MIDI Real-Time clock

@@ -50,12 +50,13 @@ export const MidiInPicker: React.FC<MidiInPickerProps> = ({
         type: string;
         note: number;
         velocity: number;
+        channel: number;
       };
       const name = NOTE_NAMES[detail.note % 12];
       const octave = Math.floor(detail.note / 12) - 1;
       setStatus(
         `${detail.type === "noteon" ? "♪" : "·"} ${name}${octave}` +
-          ` v${detail.velocity}`,
+          ` v${detail.velocity} - ch${detail.channel}`,
       );
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setStatus(""), 1500);
