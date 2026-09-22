@@ -106,7 +106,7 @@ export const MidiInPicker: React.FC<MidiInPickerProps> = ({
           <select
             value={selectedId}
             onChange={(e) => onSelect(e.target.value)}
-            className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+            className="bg-transparent text-neutral-300 outline-none focus-visible:ring-1 focus-visible:ring-neutral-400/60 focus-visible:outline-none rounded cursor-pointer text-xs"
             aria-label="Select MIDI input device"
           >
             <option value="">none</option>

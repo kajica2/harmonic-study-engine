@@ -1426,7 +1426,7 @@ function AppShell() {
                   setSelectedMidiOutId(e.target.value);
                 }}
                 aria-label="MIDI output device"
-                className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+                className="bg-transparent text-neutral-300 outline-none focus-visible:ring-1 focus-visible:ring-neutral-400/60 focus-visible:outline-none rounded cursor-pointer text-xs"
               >
                 <option value="">none</option>
                 {midiOutputs.map((out) => (
@@ -1457,7 +1457,6 @@ function AppShell() {
           <div
             className="flex items-center gap-2 bg-neutral-900/50 px-2 py-1.5 rounded border border-neutral-800"
             title="MIDI bass channel: notes on this channel feed the bass layer and are excluded from the guide-tone tally. Channel 1 = melody / guide tones, chN = bass."
-            aria-label="MIDI bass channel"
           >
             <span
               className="w-1.5 h-1.5 rounded-full"
@@ -1473,7 +1472,7 @@ function AppShell() {
               value={bassMidiChannel}
               onChange={(e) => setBassMidiChannel(Number(e.target.value))}
               aria-label="MIDI bass channel"
-              className="bg-transparent text-neutral-300 outline-none cursor-pointer text-xs"
+              className="bg-transparent text-neutral-300 outline-none focus-visible:ring-1 focus-visible:ring-neutral-400/60 focus-visible:outline-none rounded cursor-pointer text-xs"
             >
               {Array.from({ length: 16 }, (_, i) => i + 1).map((ch) => (
                 <option key={ch} value={ch}>
