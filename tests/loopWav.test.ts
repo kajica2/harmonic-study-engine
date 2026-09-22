@@ -32,6 +32,12 @@ import { HarmonicPath } from "../src/lib/paths";
 
 // ---------- fixtures ----------------------------------------------------
 
+// NOTE (W2'): the renderer now detects the repeating form period and
+// renders it EXACTLY ONCE. With the final Cmaj7 byte-identical to the
+// first step, the 4-step fixture below would be read as a 3-step form
+// (steps[3] repeats steps[0]) and bar 3 would go silent. The final
+// chord is therefore given a distinct low voicing so the fixture is
+// genuinely non-repeating and all four bars render.
 const TEST_PATH: HarmonicPath = {
   id: "test",
   title: "Test Progression",
@@ -40,7 +46,7 @@ const TEST_PATH: HarmonicPath = {
     { name: "Cmaj7", notes: [60, 64, 67, 71], descriptions: "" },
     { name: "Fmaj7", notes: [60, 65, 67, 72], descriptions: "" },
     { name: "G7", notes: [59, 62, 65, 69], descriptions: "" },
-    { name: "Cmaj7", notes: [60, 64, 67, 71], descriptions: "" },
+    { name: "Cmaj7", notes: [55, 60, 64, 67], descriptions: "" },
   ],
 };
 
@@ -143,8 +149,8 @@ describe("renderPathToWav scheduling", () => {
   });
 
   it("mono mode: each oscillator is tuned to the top note of its chord", async () => {
-    // Top notes: Cmaj7=71, Fmaj7=72, G7=69, Cmaj7=71 (MIDI)
-    const topByBar = [71, 72, 69, 71];
+    // Top notes: Cmaj7=71, Fmaj7=72, G7=69, Cmaj7(low voicing)=67 (MIDI)
+    const topByBar = [71, 72, 69, 67];
     await renderPathToWav(TEST_PATH, {
       tempo: 120,
       instrument: "epiano",

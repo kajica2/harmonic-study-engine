@@ -704,6 +704,31 @@ function AppShell() {
     return current.map((n) => n + transposeShift + (barDriftShifts[activeStepIndex] ?? 0));
   }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType, barDriftShifts]);
 
+  // W2': pitches for the WAV export. Mirrors the currentChordNotes
+  // transform above for EVERY step index (voice-leading base +
+  // voicing + manual transpose + per-bar drift) so the rendered file
+  // matches what the live synth plays. The renderer slices to the
+  // detected form length itself, so no slicing happens here.
+  const exportNotesOverride = useMemo(
+    () =>
+      optimizedStepsNotes.map((notes, i) => {
+        let current = [...notes].sort((a, b) => a - b);
+        if (instrument === "trumpet" || instrument === "sax") {
+          if (arpType === "none" && current.length > 0) {
+            current = [current[current.length - 1]];
+          }
+        } else if (voicingType !== "closed") {
+          if (voicingType !== "minimum_motion") {
+            current = applyVoicing(current, voicingType);
+          }
+        }
+        return current.map(
+          (n) => n + transposeShift + (barDriftShifts[i] ?? 0),
+        );
+      }),
+    [optimizedStepsNotes, transposeShift, voicingType, instrument, arpType, barDriftShifts],
+  );
+
   // Guide-tone trail — counts 3rd/7th hits during a take so the
   // finished recording writes the tally onto the performance log.
   // Notes on the bass channel (bassMidiChannel) are excluded so a
@@ -1802,6 +1827,7 @@ function AppShell() {
                 instrument,
                 meter: timeSignature,
                 mode: wavMode,
+                notesOverride: exportNotesOverride,
               });
               downloadWavFromBlob(wav, `${path.id}.${wavMode}.wav`);
               setWavExportStatus(`Downloaded ${path.id}.${wavMode}.wav`);
@@ -2324,6 +2350,8 @@ function AppShell() {
                                   tempo,
                                   instrument,
                                   meter: timeSignature,
+                                  mode: wavMode,
+                                  notesOverride: exportNotesOverride,
                                 });
                                 downloadWavFromBlob(wavBlob, `${path.id}.wav`);
                                 setWavExportStatus(

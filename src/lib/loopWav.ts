@@ -5,11 +5,23 @@
  * in a non-realtime context, so the result is exactly what you'd hear
  * at the active tempo with the active instrument, no backend required.
  *
+ * Form semantics (W2'): the WAV contains the whole SONG FORM EXACTLY
+ * ONCE, rendered in the selected mode. Audio truth is one HarmonicStep
+ * = one BAR; live paths are padded by cycling the form (padPath), so
+ * the renderer detects the repeating period with detectFormPeriod()
+ * and renders only steps[0..period). This is export-side only: the
+ * live practice loop stays padded (e.g. 3 passes of a 32-bar tune)
+ * and is NOT affected by this module. The "1 step = 1 beat" policy in
+ * paths.ts / stepsPerBar() below remains the bar-strip labeling
+ * convention; barSeconds() here maps that labeling onto real time so
+ * non-4/4 exports match the live transport duration.
+ *
  * Output is a 16-bit mono PCM WAV blob.
  */
 
 import { HarmonicPath } from "./paths";
 import { InstrumentType } from "./audio";
+import { detectFormPeriod } from "./formPeriod";
 
 const SAMPLE_RATE = 44100;
 
@@ -212,6 +224,38 @@ export function stepsPerBar(timeSignature: string): number {
 }
 
 /**
+ * Seconds per rendered step (one step = one bar of AUDIO, but the
+ * step's share of the bar follows the meter's beat unit so the
+ * export matches the live 16th-note grid in rhythm.ts):
+ *   den 8 -> eighth-note unit (0.5 quarters)  e.g. "6/8", "7/8"
+ *   den 2 -> half-note unit    (2 quarters)
+ *   else  -> quarter-note unit (1)            e.g. "4/4", "11/4",
+ *           "tintal", and any unparseable meter string
+ */
+export function secPerStep(tempo: number, meter: string): number {
+  const m = /^\d+\/(\d+)$/.exec(meter);
+  const den = m ? parseInt(m[1], 10) : 4;
+  const unit = den === 8 ? 0.5 : den === 2 ? 2 : 1;
+  return (60 / tempo) * unit;
+}
+
+/**
+ * Wall-clock seconds for ONE rendered bar (one HarmonicStep):
+ * stepsPerBar(meter) * secPerStep(tempo, meter).
+ *
+ * Parity with the live transport (rhythm.ts stepsPerMeasure *
+ * 60 / tempo / 4) for every supported TimeSignature at 120 BPM:
+ *   "4/4"    -> 2s   (identical to the old beats-based math)
+ *   "6/8"    -> 1.5s (was 3s: 2x too long vs live)
+ *   "7/8"    -> 1.75s
+ *   "11/4"   -> 5.5s
+ *   "tintal" -> 8s   (was 2s: 4x too fast vs live)
+ */
+export function barSeconds(tempo: number, meter: string): number {
+  return stepsPerBar(meter) * secPerStep(tempo, meter);
+}
+
+/**
  * Render shapes for the loop WAV export.
  *  - block:           every chord as one block (sustained for the full bar).
  *  - arp:             every chord broken into a sweeping arpeggio.
@@ -345,10 +389,17 @@ function scheduleTopVoice(
 }
 
 /**
- * Render the entire path to a single mono WAV Blob.
- * Tempo → seconds-per-beat. Meter → beats-per-bar. Each chord occupies
- * exactly one bar. A 1-second tail is appended so the reverb release
- * doesn't get truncated on the final chord.
+ * Render the detected song form EXACTLY ONCE to a single mono WAV Blob.
+ * Only steps[0..formLen) are rendered, where formLen is the repeating
+ * period detected by detectFormPeriod(); anything past it is practice
+ * padding and is not re-rendered. Each step occupies one bar:
+ * barSeconds(tempo, meter). A 1.25s tail is appended so the final
+ * chord's release doesn't get truncated.
+ *
+ * notesOverride: when provided and long enough to cover every form
+ * bar, these pitches are scheduled instead of the raw step.notes, so
+ * the file matches the voicing/transposition the user hears live.
+ * Absent or too-short overrides fall back to the raw step.notes.
  */
 export async function renderPathToWav(
   path: HarmonicPath,
@@ -358,6 +409,7 @@ export async function renderPathToWav(
     sampleRate?: number;
     meter?: string;
     mode?: RenderMode;
+    notesOverride?: number[][];
   } = {},
 ): Promise<Blob> {
   const tempo = opts.tempo ?? 80;
@@ -365,11 +417,20 @@ export async function renderPathToWav(
   const sampleRate = opts.sampleRate ?? SAMPLE_RATE;
   const meter = opts.meter ?? "4/4";
   const mode: RenderMode = opts.mode ?? "block";
-  const beats = beatsPerBar(meter);
-  const secPerBeat = 60 / tempo;
-  const secPerBar = secPerBeat * beats;
 
-  const totalSeconds = path.steps.length * secPerBar + 1; // +1s tail for reverb fade
+  // W2': render the whole form exactly once. Live paths are padded
+  // by cycling the form (padPath), so detect the period and stop
+  // there. One step = one bar of audio.
+  const formLen = detectFormPeriod(path.steps);
+  const secPerBar = barSeconds(tempo, meter);
+
+  // All-or-nothing override: only honored when it covers every form bar.
+  const override =
+    opts.notesOverride !== undefined && opts.notesOverride.length >= formLen
+      ? opts.notesOverride
+      : undefined;
+
+  const totalSeconds = formLen * secPerBar + 1.25; // +1.25s tail for the final release
   const numChannels = 1;
   const length = Math.ceil(totalSeconds * sampleRate);
   const ctx = new OfflineAudioContext(
@@ -387,24 +448,26 @@ export async function renderPathToWav(
   master.release.value = 0.2;
   master.connect(ctx.destination);
 
-  // Render every step as a one-bar event at the bar boundary.
+  // Render every FORM step as a one-bar event at the bar boundary.
   // Block + arp paths run the chord for the FULL bar; the envelope
   // inside scheduleChord includes its own release tail that may
-  // bleed slightly into the next bar — that's the "ring out"
+  // bleed slightly into the next bar -- that's the "ring out"
   // effect, not silence. The previous version passed secPerBar * 0.9
   // which left a literal gap of silence in the last 10% of each bar.
-  path.steps.forEach((step, i) => {
+  for (let i = 0; i < formLen; i++) {
+    const step = path.steps[i];
+    const notes = override ? override[i] : step.notes;
     const startSec = i * secPerBar;
     if (mode === "mono") {
       scheduleTopVoice(
         ctx,
         master as unknown as AudioNode,
-        step.notes,
+        notes,
         startSec,
         secPerBar,
         instrument,
       );
-      return;
+      continue;
     }
     const useArp =
       mode === "arp" ||
@@ -413,7 +476,7 @@ export async function renderPathToWav(
       scheduleArpeggio(
         ctx,
         master as unknown as AudioNode,
-        step.notes,
+        notes,
         startSec,
         secPerBar,
         instrument,
@@ -422,13 +485,13 @@ export async function renderPathToWav(
       scheduleChord(
         ctx,
         master as unknown as AudioNode,
-        step.notes,
+        notes,
         startSec,
         secPerBar,
         instrument,
       );
     }
-  });
+  }
 
   const rendered = await ctx.startRendering();
   // Pull mono channel data and feed to the WAV encoder

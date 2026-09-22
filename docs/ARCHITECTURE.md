@@ -119,6 +119,16 @@ For arpeggios, the loop picks one note per tick from `arpNotes` and
 fires `playNote`. The `arpIndex++` and `arpVelocity = arpIndex%4 === 0
 ? 105 : 75` give the every-4th-step accent.
 
+WAV export is a separate offline path: `detectFormPeriod()`
+(`src/lib/formPeriod.ts`) finds the repeating form inside the padded
+step list, then `renderPathToWav()` (`src/lib/loopWav.ts`) renders
+`steps[0..period)` at `barSeconds()` per bar - meter-aware, in parity
+with the live grid in `src/lib/rhythm.ts`. Audio truth: one
+HarmonicStep = one bar of audio, in playback and export alike. The
+"Each HarmonicStep is one BEAT" comment in `src/lib/paths.ts`
+(`STEPS_PER_BAR = 4`) is the bar-strip labeling / padding convention
+only; `stepsPerBar()` maps it onto real time.
+
 ## Path metadata → behavior
 
 `HarmonicPath` extended fields drive the behavioral layer:

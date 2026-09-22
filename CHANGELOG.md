@@ -96,6 +96,21 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **WAV export renders the complete detected song form exactly
+  once** - `renderPathToWav()` (`src/lib/loopWav.ts`) now stops at
+  the period found by `detectFormPeriod()` (`src/lib/formPeriod.ts`)
+  instead of printing the full padded practice loop (e.g. 3 passes
+  of a 32-bar standard). Non-4/4 meters render at true bar
+  durations via `barSeconds()` (6/8 @ 120: 1.5s, was 3s; tintal:
+  8s, was 2s - parity with the live grid). The Path Creator "Loop
+  WAV" button now honors the selected render mode (was always
+  block), and exported pitches carry the live voicing /
+  voice-leading / transposition / key-drift via `notesOverride` -
+  the WAV is what you hear. Known limitation: forms whose tail
+  prefix-matches (e.g. a byte-identical AABA) detect the shorter
+  repeating period - three 12-bar blues catalog entries labeled
+  b1..b24 (doubled chorus) now export one 12-bar chorus, which is
+  the true musical form.
 - **`midi-writer-js` Track / Writer calls** are now centralized
   inside two private helpers (`buildSingleTrack`,
   `buildSplitTracks`) so the as-written / transpose / melody /
