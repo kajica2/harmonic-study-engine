@@ -132,7 +132,7 @@ import { StyleWarnings, NO_VIOLATIONS } from "./components/StyleWarnings";
 import { CoComposePanel } from "./components/CoComposePanel";
 import { QuizPanel } from "./components/QuizPanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
-import { useSessionStore } from "./hooks/useSessionStore";
+import { useSessionStore as useLegacySessionStore } from "./hooks/useSessionStore";
 import { usePersistedState } from "./lib/usePersistedState";
 import { useFeedback } from "./hooks/useFeedback";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
@@ -153,6 +153,14 @@ import {
   type BehavioralRuleId,
   type BehavioralRuleMap,
 } from "./components/PathCatalog";
+// PRD-001 Phase 1: mode selector + gating + idea bar.
+import { ModeSelector } from "./components/ModeSelector";
+import { ModeGate } from "./components/ModeGate";
+import { IdeaBar } from "./components/IdeaBar";
+import { DirtyPromptModal } from "./components/DirtyPromptModal";
+import { useSessionStore as useNewSessionStore } from "./state/sessionStore";
+import { ideaFromChord, isIdea } from "../engine/core/idea";
+import { isModeShortcutModifierKey } from "./hooks/useKeyDown";
 
 // downloadText moved to src/lib/download.ts (extracted by main)
 
@@ -214,7 +222,7 @@ function AppShell() {
   // arpeggiator, persona, loop range, metronome, humanizer. Hydrated
   // from localStorage by the hook (same `synesthesia_*` keys HEAD's
   // useSessionStore used, so existing user prefs survive reload).
-  const session = useSessionStore();
+  const session = useLegacySessionStore();
   const feedback = useFeedback();
   const performance = usePerformanceLog();
   const {
@@ -288,6 +296,7 @@ function AppShell() {
     feedbackHistory,
     setFeedbackHistory,
     setHarmonicStep,
+    revertLastAccept,
   } = session;
 
 
@@ -457,6 +466,19 @@ function AppShell() {
       for (let s = 0; s < STEPS_PER_BAR; s++) {
         setHarmonicStep(activeBar * STEPS_PER_BAR + s, newStep);
       }
+      // PRD-001 Phase 1: marking the Etude session dirty after a
+      // mutation. We can't intercept setHarmonicStep without touching
+      // the legacy useSessionStore.ts (Phase 1.5 migrates that hook);
+      // this is the cleanest hook site: after every setHarmonicStep
+      // dispatch, flip the dirty flag so the next mode switch opens
+      // the prompt.
+      useNewSessionStore.setState({
+        dirty: {
+          compose: "none",
+          etude: "etude-pending-accept",
+          explore: "none",
+        },
+      });
     },
     [activeStepIndex, setHarmonicStep],
   );
@@ -958,6 +980,29 @@ function AppShell() {
         return;
       }
 
+      // PRD-001 Phase 1: mode shortcuts. Document-level so they fire
+      // even when focus is on the canvas / a modal-trigger button.
+      // The `1`/`2`/`3` shortcuts are additively slotted between
+      // Cheatsheet and ArrowRight - they do NOT touch any existing
+      // branch. requestMode consults the dirty flag and either commits
+      // immediately or parks on pendingModeRequest for the modal.
+      // HIGH-001: yield to Cmd/Ctrl/Alt + digit so the browser's
+      // native tab-switch / menu behavior is not swallowed.
+      if (isModeShortcutModifierKey(e)) return;
+      if (e.key === "1") {
+        useNewSessionStore.getState().requestMode("compose");
+        e.preventDefault();
+        return;
+      } else if (e.key === "2") {
+        useNewSessionStore.getState().requestMode("etude");
+        e.preventDefault();
+        return;
+      } else if (e.key === "3") {
+        useNewSessionStore.getState().requestMode("explore");
+        e.preventDefault();
+        return;
+      }
+
       if (e.key === "ArrowRight") {
         setActiveStepIndex((prev) => Math.min(prev + 1, path.steps.length - 1));
       } else if (e.key === "ArrowLeft") {
@@ -994,6 +1039,95 @@ function AppShell() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [path.steps.length, paths.length]);
+
+  // PRD-001 Phase 1: URL <-> store sync. Two halves:
+  //  1. Boot-time read: parse location.search once and seed the store
+  //     + the legacy active-path-index.
+  //  2. Live write: subscribe to the store and debounce 200ms; emit
+  //     `mode` + `transpose` (the two canonical keys for Phase 1) via
+  //     history.replaceState. We never pushState (avoid polluting the
+  //     back stack on ephemeral tweaks).
+  // Phase 1 ships only mode + transpose here. `path` and `idea`
+  // arrive in later phases.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const m = params.get("mode");
+    if (m === "compose" || m === "etude" || m === "explore") {
+      useNewSessionStore.getState().setMode(m);
+    }
+    const t = params.get("transpose");
+    if (t !== null) {
+      const n = Number(t);
+      if (Number.isFinite(n)) {
+        useNewSessionStore.getState().setGlobalTranspose(n);
+      }
+    }
+    const ideaStr = params.get("idea");
+    if (ideaStr) {
+      // Decode a shared Idea URL. Malformed payloads are warned and
+      // dropped so the rest of the URL still works.
+      try {
+        const json = decodeURIComponent(atob(ideaStr));
+        const parsed = JSON.parse(json);
+        // Use the engine's `isIdea` type guard so every IdeaKind
+        // (chord / progression / scale / melody / seed) round-trips,
+        // not just chord-kind Ideas.
+        if (isIdea(parsed)) {
+          useNewSessionStore.getState().setCurrentIdea(parsed);
+        }
+      } catch {
+        // eslint-disable-next-line no-console
+        console.warn("[App] ?idea= payload was malformed; ignoring");
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let timer: number | null = null;
+    const write = () => {
+      const params = new URLSearchParams(window.location.search);
+      const state = useNewSessionStore.getState();
+      if (state.mode) params.set("mode", state.mode);
+      else params.delete("mode");
+      params.set("transpose", String(state.globalTranspose));
+      const search = params.toString();
+      const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+      window.history.replaceState({}, "", next);
+    };
+    const unsub = useNewSessionStore.subscribe((s, prev) => {
+      if (s.mode !== prev.mode || s.globalTranspose !== prev.globalTranspose) {
+        if (timer !== null) window.clearTimeout(timer);
+        timer = window.setTimeout(write, 200);
+      }
+    });
+    return () => {
+      unsub();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, []);
+
+  // PRD-001 Phase 1: dirty-state dispatch from existing Etude
+  // mutations. The new zustand store's `discardCurrent` emits a
+  // window CustomEvent; we forward it to the legacy
+  // revertLastAccept machinery owned by useLegacySessionStore.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onRevert = () => {
+      try {
+        revertLastAccept();
+      } catch {
+        // revertLastAccept is a no-op when lastStepRef is empty;
+        // any other error is swallowed silently so the modal flow
+        // doesn't break the UI.
+      }
+    };
+    window.addEventListener("hse:revert-last-accept", onRevert);
+    return () =>
+      window.removeEventListener("hse:revert-last-accept", onRevert);
+  }, [revertLastAccept]);
 
   useEffect(() => {
     rhythmEngine.setTempo(tempo);
@@ -1368,14 +1502,23 @@ function AppShell() {
       />
 
       <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[color:var(--color-border)] surface-1 flex flex-wrap gap-3 sm:gap-4 justify-between items-center backdrop-blur-xl sticky top-0 z-30">
-        <div className="min-w-0">
-          <h1 className="t-display-2 text-[color:var(--color-text-1)] flex items-center gap-2">
-            Harmonic Study Engine
-            <span className="text-[color:var(--color-brand-strong)] t-mono">v2</span>
-          </h1>
-          <p className="t-small text-[color:var(--color-text-3)] truncate">
-            Synesthesia-guided harmonic practice for trumpet
-          </p>
+        <div className="min-w-0 flex items-center gap-3">
+          <div>
+            <h1 className="t-display-2 text-[color:var(--color-text-1)] flex items-center gap-2">
+              Harmonic Study Engine
+              <span className="text-[color:var(--color-brand-strong)] t-mono">v2</span>
+            </h1>
+            <p className="t-small text-[color:var(--color-text-3)] truncate">
+              Synesthesia-guided harmonic practice for trumpet
+            </p>
+          </div>
+          {/* PRD-001 Phase 1: persistent top-bar mode selector. On
+              md+ screens it sits between the title and the existing
+              device controls; <md uses MobileCommandBar's mode chip
+              (a follow-up). The selector renders nothing when
+              `compact=true` is set; the default segmented control is
+              the only chrome the user sees here. */}
+          <ModeSelector />
         </div>
 
         <div className="hidden md:flex items-center gap-2 lg:gap-3 t-mono text-[color:var(--color-text-2)]">
@@ -1570,7 +1713,15 @@ function AppShell() {
         id="main"
         className="flex-1 flex flex-col w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 gap-4 sm:gap-6 max-w-screen-2xl pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-6"
       >
-        <div id="adv-live" role="status" aria-live="polite" className="sr-only" />
+        <ModeGate
+          AppMain={
+            <>
+              <div
+                id="adv-live"
+                role="status"
+                aria-live="polite"
+                className="sr-only"
+              />
 
         {/* Per-path briefing — explains the practice loop for the active path. */}
         <PathBriefing pathId={path.id} />
@@ -1854,7 +2005,24 @@ function AppShell() {
           onOpenInspector={() => setShowChordInspector(true)}
           optimizedStepsNotes={optimizedStepsNotes}
           behavioralMarkers={behavioralMarkers}
-          onPlayChord={(notes) => audioEngine.playChord(notes)}
+          onPlayChord={(notes) => {
+            audioEngine.playChord(notes);
+            // PRD-001 Phase 1: bar-click Idea mint. Any audition of the
+            // active step materializes an Idea (chord kind) so the
+            // idea-bar reflects what the user is playing with. Cheap
+            // because ideaFromChord is pure and dedup-by-id collapses
+            // repeats to the same canonical id.
+            const step = path.steps[activeStepIndex];
+            if (step && step.name) {
+              useNewSessionStore.getState().setCurrentIdea(
+                ideaFromChord(
+                  "etude",
+                  transposeChordName(step.name, transposeShift),
+                  Date.now(),
+                ),
+              );
+            }
+          }}
           onStopChord={(notes) => audioEngine.stopChord(notes)}
           onCommitVoicing={(stepIndex, notes) => {
             const key = `${path.id}::${stepIndex}`;
@@ -3490,6 +3658,19 @@ function AppShell() {
             </div>
           </div>
         </div>
+            </>
+          }
+          onOpenImportExport={() => setShowImportExport(true)}
+        />
+        {/* PRD-001 Phase 1: Idea bar (sticky inside <main>, z-10). */}
+        <IdeaBar
+          activeStep={
+            paths.length > 0
+              ? paths[activePathIndex]?.steps[activeStepIndex] ?? null
+              : null
+          }
+          transposeShift={transposeShift}
+        />
       </main>
 
       <Suspense fallback={<ModalFallback />}>
@@ -3607,6 +3788,12 @@ function AppShell() {
           onStop={() => audioEngine.stopAll()}
         />
       )}
+
+      {/* PRD-001 Phase 1: dirty-state prompt. Renders nothing when
+          pendingModeRequest is null; opens when a mode switch is
+          parked. Mounted once at the top of the tree so any consumer
+          can request a mode change without coordinating the modal. */}
+      <DirtyPromptModal />
 
       <BuildFooter />
     </div>

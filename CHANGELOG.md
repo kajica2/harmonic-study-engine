@@ -111,6 +111,66 @@ bottom-sheet command bar.
   repeating period - three 12-bar blues catalog entries labeled
   b1..b24 (doubled chorus) now export one 12-bar chorus, which is
   the true musical form.
+- **Mode selector + scaffolding (PRD-001 Phase 1)** -- the persistent
+  top-bar segmented control lives at `src/components/ModeSelector.tsx`
+  (`role="tablist"`, three segments: Compose / Etude / Explore,
+  roving tabindex, numeric `kbd` chip, mounted in `<header>` at App.tsx
+  line 1517). State is a new zustand 5 store at
+  `src/state/sessionStore.ts` with `persist` middleware under the
+  `hse.session` key (`CURRENT_SESSION_VERSION = 1`; `partialize` keeps
+  `mode` / `globalTranspose` / `currentIdea` -- `dirty` +
+  `pendingModeRequest` are session-scoped, not persisted). Phase 1
+  ships only the mode slice; the rest of `useSessionStore.ts` migrates
+  slice-by-slice in Phase 1.5 per ADR-004. `requestMode` consults the
+  per-mode dirty flag and either commits or parks onto
+  `pendingModeRequest`; the parked request opens
+  `src/components/DirtyPromptModal.tsx` (Save / Discard / Cancel on top
+  of the existing `ModalShell` -- Save persists the current Idea to
+  `hse.ideas` capped at 100 per REQ-IDEA-4; Discard dispatches a
+  `hse:revert-last-accept` window event App.tsx forwards to the legacy
+  revert machinery). Compose and Explore read `dirty === "none"` in
+  Phase 1; only Etude carries real dirty state.
+  `src/components/ModeGate.tsx` reads the effective mode (URL
+  `?mode=` -> persisted `hse.session.mode` -> legacy `"etude"`) and
+  switches the rendered surface: Etude keeps the legacy main body via
+  an `AppMain` slot; Compose renders
+  `src/components/ComposeSurface.tsx` (faded `SynesthesiaCanvas`
+  thumbnail + "Drop a .mid file to get started." + "Open import /
+  export" CTA + REQ-IO-70 privacy `<aside>`); Explore renders
+  `src/components/ExploreSurface.tsx` (three random preset chips from
+  a fixed list of 12 + the existing `<FormTemplatePicker>` +
+  `<FormPlanner>` read-only). The Idea bar at
+  `src/components/IdeaBar.tsx` sits sticky at the bottom of `<main>`
+  (z-10) above the existing `MobileCommandBar`: empty copy "Play
+  something or generate an etude to start an idea." + a disabled `+`
+  chip; populated shows the chord / scale / kind + a `from <source>`
+  pill + an `x` clear button + a `Send to...` native `<select>`
+  (Compose + Explore are disabled placeholders that `console.warn`
+  "Phase 4 / 5 wires the landing surface", Etude is wired) + Save
+  (persists to `hse.ideas`) + Share (base64 JSON `?idea=<base64>` URL
+  copied to clipboard, server-less per REQ-IO-50). URL persistence is
+  wired both ways in App.tsx: on mount a single `useEffect` parses
+  `location.search` and seeds `mode` / `transpose` / decodes a shared
+  `?idea=`; on store change a debounced (200 ms)
+  `useNewSessionStore.subscribe` writes `?mode=&transpose=` back via
+  `history.replaceState` (no `pushState`, never pollutes the back
+  stack). Keyboard shortcuts `1` / `2` / `3` switch modes (additive to
+  the existing `handleKeyDown` around App.tsx line 988, `isTyping`
+  guard preserved). The Idea type itself is pure engine/ at
+  `engine/core/idea.ts` -- discriminated union over `kind` (chord /
+  progression / scale / melody / seed) with exactly one populated
+  slot per kind; `id` is a deterministic `CanonicalId` (ADR-005) so
+  dedup collapses identical materials; `isIdea(raw)` is the runtime
+  guard for trust boundaries (URL share link, `hse.ideas`).
+  `src/lib/storage.ts` registers `K.session` and `K.ideas` with their
+  shape metadata in `STORAGE_KEYS`. Empty states per PRD 9.6 ship
+  verbatim per the design reference `docs/PHASE-1-MODE-SELECTOR.md`.
+  New tests: `engine/core/idea.test.ts` (node) +
+  `src/state/sessionStore.test.ts`, `ModeSelector.test.tsx`,
+  `IdeaBar.test.tsx`, `DirtyPromptModal.test.tsx`, `ModeGate.test.tsx`
+  (jsdom); `vitest.config.ts` `JSDOM_FILES` gets one new entry for
+  `sessionStore.test.ts` (the component tests fall under the existing
+  `src/components/**/*.test.tsx` glob).
 - **`midi-writer-js` Track / Writer calls** are now centralized
   inside two private helpers (`buildSingleTrack`,
   `buildSplitTracks`) so the as-written / transpose / melody /

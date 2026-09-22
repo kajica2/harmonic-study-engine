@@ -63,6 +63,10 @@ export const K = {
   // Versioned (own marker embedded in the key).
   performanceLog: "hse.performance.log.v1",
   pathBriefingDismissed: "hse.pathBriefing.dismissed",
+  // Phase 1: zustand session store (mode + globalTranspose + currentIdea).
+  session: "hse.session",
+  // Phase 1: named-idea library (capped at 100, REQ-IDEA-4).
+  ideas: "hse.ideas",
 } as const;
 
 export type StorageKey = (typeof K)[keyof typeof K];
@@ -124,6 +128,8 @@ export const STORAGE_KEYS: StorageKeyMeta[] = [
   { key: K.practiceSessions, since: "1", shape: "PracticeSession[] JSON (capped)" },
   { key: K.performanceLog, since: "1", shape: "PerformanceLog JSON (capped)" },
   { key: K.pathBriefingDismissed, since: "1", shape: "string[] JSON" },
+  { key: K.session, since: "1", shape: "zustand persist JSON (mode slice)" },
+  { key: K.ideas, since: "1", shape: "Idea[] JSON (capped at 100, REQ-IDEA-4)" },
 ];
 
 /**

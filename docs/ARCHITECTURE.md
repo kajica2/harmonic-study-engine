@@ -97,6 +97,14 @@ broken.
 | `src/components/PracticeSessionPlayer.tsx` | Practice-set runner. |
 | `src/components/ModalShell.tsx` | Accessible modal: focus trap, ARIA, scroll lock. |
 | `src/components/InlineStatus.tsx` | `role=status` / `role=alert` toast pill. |
+| `src/components/ModeSelector.tsx` | Top-bar segmented control: Compose / Etude / Explore. `role="tablist"` with roving tabindex; numeric `kbd` chip; mounted in `<header>` between the title and device controls. |
+| `src/components/ModeGate.tsx` | Thin orchestrator that resolves the effective mode (URL `?mode=` > persisted > legacy `"etude"`) and switches the rendered surface. Etude keeps the legacy main body via an `AppMain` slot; Compose / Explore use their own dedicated sub-components. |
+| `src/components/DirtyPromptModal.tsx` | Save / Discard / Cancel modal driven by `pendingModeRequest`. Built on `ModalShell`. |
+| `src/components/ComposeSurface.tsx` | Compose-mode empty state (PRD 9.6): faded `SynesthesiaCanvas` thumbnail + drop-zone copy + "Open import / export" CTA + REQ-IO-70 privacy `<aside>`. |
+| `src/components/ExploreSurface.tsx` | Explore-mode empty state (PRD 9.6): three random preset chips from a fixed list of 12 + the existing `<FormTemplatePicker>` + `<FormPlanner>` (read-only in Phase 1). |
+| `src/components/IdeaBar.tsx` | Sticky-bottom bar inside `<main>` (z-10) above `MobileCommandBar`. Current Idea as a chip + `Send to...` native `<select>` + Save (persists to `hse.ideas`) + Share (base64 `?idea=` URL). |
+| `src/state/sessionStore.ts` | Zustand 5 store with `persist` middleware (`hse.session`, version 1). Phase 1 ships only the mode slice: `mode`, `globalTranspose`, `currentIdea`, per-mode `dirty`, `pendingModeRequest`. The legacy `useSessionStore.ts` migrates slice-by-slice in Phase 1.5. |
+| `engine/core/idea.ts` | Pure `Idea` discriminated union (chord / progression / scale / melody / seed). `id` is a deterministic `CanonicalId`; `isIdea(raw)` is the runtime guard for trust boundaries (URL share link, `hse.ideas`). |
 | `src/data/personas.json` | Source of truth for the 17 personas (loaded by `personas.ts`). |
 
 ## Engine wiring
@@ -296,3 +304,55 @@ item 12).
 fully unit-tested (`tests/guideToneTrail.test.ts`,
 `tests/performanceLog.test.ts`). The classifier itself lives in
 `guideTones.ts` (`tests/guideTones.test.ts`).
+
+## Mode selector + scaffolding (added 2026-09-23)
+
+The top-level UI chrome that switches the app between three modes
+(Compose / Etude / Explore), enforces the PRD-001 dirty-state prompt,
+and carries the cross-mode Idea as a sticky-bottom bar. See
+`docs/PHASE-1-MODE-SELECTOR.md` for the full design rationale and
+`docs/MODES.md` for the user-facing tour.
+
+**Surface.** `src/components/ModeSelector.tsx` renders the persistent
+`role="tablist"` segmented control in `<header>` (App.tsx line 1517).
+`src/components/ModeGate.tsx` reads the effective mode (URL `?mode=`
+> persisted `hse.session.mode` > legacy `"etude"`) and switches the
+rendered surface inside `<main>`. `src/components/IdeaBar.tsx` sits
+sticky at the bottom of `<main>` (z-10).
+`src/components/DirtyPromptModal.tsx`
+is mounted once at the top of the tree; it renders nothing when
+`pendingModeRequest` is null and opens when a dirty-mode switch is
+parked.
+
+**State.** A new zustand 5 store at `src/state/sessionStore.ts`
+with `persist` middleware under the `hse.session` key
+(`CURRENT_SESSION_VERSION = 1`). Phase 1 ships only the mode slice
+(`mode`, `globalTranspose`, `currentIdea`, per-mode `dirty`,
+`pendingModeRequest`); the existing `useSessionStore.ts` migrates
+slice-by-slice in Phase 1.5 (ADR-004). `partialize` keeps only
+`mode` / `globalTranspose` / `currentIdea`; `dirty` and
+`pendingModeRequest` are session-scoped. URL persistence is wired
+both ways in App.tsx: boot-time read seeds `mode` / `transpose` /
+shared `?idea=`, and a debounced (200 ms) store subscription writes
+`?mode=&transpose=` back via `history.replaceState` (no `pushState`,
+never pollutes the back stack). Keyboard shortcuts `1` / `2` / `3`
+are added to the existing `handleKeyDown` (additive; `isTyping` guard
+preserved).
+
+**Idea object.** Pure engine/ at `engine/core/idea.ts` -- discriminated
+union over `kind` (chord / progression / scale / melody / seed) with
+exactly one populated slot per kind; `id` is a deterministic
+`CanonicalId` (ADR-005) so dedup collapses identical materials;
+`isIdea(raw)` is the runtime guard for trust boundaries (URL share
+link, `hse.ideas`). Save writes to `hse.ideas` (capped at 100);
+Share builds a base64 `?idea=<base64>` URL and copies to clipboard
+(server-less per REQ-IO-50).
+
+**Storage.** `src/lib/storage.ts` registers `K.session` (`hse.session`)
+and `K.ideas` (`hse.ideas`) with shape metadata in `STORAGE_KEYS`.
+
+**Test boundary.** Pure data in `engine/core/idea.ts`; the zustand
+store is jsdom-only (`src/state/sessionStore.test.ts` is added to the
+`JSDOM_FILES` list in `vitest.config.ts`). Component tests live
+under `src/components/ModeSelector.test.tsx`, `IdeaBar.test.tsx`,
+`DirtyPromptModal.test.tsx`, and `ModeGate.test.tsx`.
