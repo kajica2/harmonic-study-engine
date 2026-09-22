@@ -1,0 +1,20 @@
+project:
+  name: "harmonic-study-engine"
+  root: "/Users/kajicadjuric/Documents/teast"
+  languages: ["TypeScript", "Python"]
+  frameworks: ["React 19", "Vite 6", "Tailwind 4", "FastAPI"]
+  package_manager: "npm"
+  test_runner: "vitest + pytest + playwright"
+
+memory_version: "1.0"
+last_updated: "2026-09-22T00:00:00Z"
+total_pipeline_runs: 0
+
+flags:
+  has_conventions: true
+  has_decisions: false
+  has_postmortems: false
+  has_tech_debt: false
+  has_preferences: true
+
+active_prevention_rules: []

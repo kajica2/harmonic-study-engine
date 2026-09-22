@@ -1,0 +1,5 @@
+checkpoints: "auto"
+verbosity: "concise"
+commit_style: "feat/fix/chore(scope): description"
+gate_order: ["lint", "test", "build"]
+memory_sharing: "committed"
