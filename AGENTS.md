@@ -61,4 +61,4 @@ To enable a catalog tune (see MASTERCLASS_TODO.md):
 ## Conventions
 
 - Commit style: `feat/fix/chore(scope): description` (e.g. `feat(masterclass): enable Stella — study-stella + flip inApp`).
-- Node 20 in CI.
+- Node 22 in CI.
