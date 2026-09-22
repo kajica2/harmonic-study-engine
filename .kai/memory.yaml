@@ -7,14 +7,14 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-22T00:00:00Z"
-total_pipeline_runs: 0
+last_updated: "2026-09-22T12:00:00Z"
+total_pipeline_runs: 1
 
 flags:
   has_conventions: true
-  has_decisions: false
+  has_decisions: true
   has_postmortems: false
-  has_tech_debt: false
+  has_tech_debt: true
   has_preferences: true
 
 active_prevention_rules: []
