@@ -18,7 +18,7 @@ broken.
   `/recordings/upload`. Works without it; `/health` returns
   `status: "degraded"` on HF Spaces free tier, `status: "ok"` locally.
 - **Tests:** Vitest 5 (node env for pure logic, jsdom for React
-  components). 384 tests across the repo (355 frontend it() + 29 backend
+  components). 391 tests across the repo (362 frontend it() + 29 backend
   pytest tests). Per-file env routing via the `projects` API
   (`JSDOM_FILES` list in `vitest.config.ts`).
 

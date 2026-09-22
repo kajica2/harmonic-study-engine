@@ -265,7 +265,7 @@ Coverage:
 - `tests/useSessionStore.test.ts` — localStorage hydration + the
   legacy `beatType` migration map
 
-384 tests passing as of this commit (355 frontend it() + 29 backend def test_) = 384.
+391 tests passing as of this commit (362 frontend it() + 29 backend def test_) = 391.
 Both counts verified by `npm test` and `npm run test:py` against the
 repo today. New tests added for previously-untested lib files
 (useBassNotes, importRealBook, ireal — the ones the older "What to

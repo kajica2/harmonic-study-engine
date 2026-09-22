@@ -32,7 +32,7 @@ it. When you change a value, update every site in the same commit.
   - `src/data/masterclass.ts` — file header comment (check it stays in
     lockstep with the array if you bump this)
 
-### 3. Tests — **384** (355 frontend + 29 backend)
+### 3. Tests — **391** (362 frontend + 29 backend)
 
 - Source of truth: re-derive with `npm test` and `npm run test:py`.
   The frontend total is the count of `it(` blocks in `tests/*.test.ts`
@@ -41,7 +41,7 @@ it. When you change a value, update every site in the same commit.
 - Reference sites:
   - `README.md` — Testing section
   - `src/magenta/README.md` — "Total: 363 tests"
-- Drift history: 60 → 91 → 145 → 174 → 177 → 178 → 307 → 334 → 347 → 363 → 384.
+- Drift history: 60 → 91 → 145 → 174 → 177 → 178 → 307 → 334 → 347 → 363 → 384 → 391.
   This is the most volatile count and the one the gate pays the most
   attention to.
 
