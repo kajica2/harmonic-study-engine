@@ -323,6 +323,8 @@ function AppShell() {
   const canvasSize = useCanvasSize(canvasContainerRef, { width: 800, height: 400 });
 
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
+  const isPlayingAutoRef = useRef(isPlayingAuto);
+  isPlayingAutoRef.current = isPlayingAuto;
   // MIDI Clock from DAW: opt-in tempo + transport sync. Off by
   // default so existing users see no behavior change. When on, a
   // MidiClockFollower consumes the window "midiclock" CustomEvent
@@ -698,19 +700,20 @@ function AppShell() {
   // Drive the live guide-tone tally from transport state. begin()
   // is idempotent so the record flow's later begin() at take start
   // safely preserves pre-record notes; end() is null-safe.
+  const { begin: beginTrail, end: endTrail, reset: resetTrail } = guideTrail;
   useEffect(() => {
     if (isPlayingAuto) {
-      guideTrail.begin();
+      beginTrail();
     } else {
-      guideTrail.end();
+      endTrail();
     }
-  }, [isPlayingAuto]);
+  }, [isPlayingAuto, beginTrail, endTrail]);
 
   // A new path starts with a clean tally but keeps the active flag
   // (pause/resume continuity is owned by the transport effect).
   useEffect(() => {
-    guideTrail.reset();
-  }, [path.id]);
+    resetTrail();
+  }, [path.id, resetTrail]);
 
   // Update audio when step changes or arp settings change
   const arpNotes = useMemo(() => {
@@ -1662,6 +1665,8 @@ function AppShell() {
                 personaId: selectedPersonaId,
                 durationSec: pathDurSec,
               });
+              // TD-001 continuous practice: begin() is idempotent so notes played
+              // during in-progress playback roll into the recorded take.
               guideTrail.begin();
               // Tick elapsed seconds while recording
               const tick = () => {
@@ -1683,6 +1688,11 @@ function AppShell() {
                 // Stop the guide-tone trail and fold its tally into the
                 // take that was logged when the recording started.
                 const trail = guideTrail.end();
+                // TD-002 post-record resume: if transport is still playing,
+                // re-begin tally immediately so live practice feedback continues.
+                if (isPlayingAutoRef.current) {
+                  guideTrail.begin();
+                }
                 if (take && trail && trail.totalNotes > 0) {
                   performance.trail(take.id, {
                     transitionsHit: trail.guideHits,
