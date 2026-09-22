@@ -45,7 +45,7 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",
-      include: ["src/lib/**", "src/hooks/**"],
+      include: ["src/lib/**", "src/hooks/**", "engine/**"],
       exclude: ["src/lib/magentaHelper.ts", "src/lib/audio.ts"],
       reporter: ["text", "html"],
     },
@@ -54,7 +54,7 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}"],
+          include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.{ts,tsx}", "engine/**/*.test.ts"],
           exclude: [
             "node_modules",
             "dist",

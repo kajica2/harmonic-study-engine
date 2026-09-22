@@ -24,22 +24,8 @@
  */
 import type { INote } from "./INoteSequence";
 
-/**
- * mulberry32 — 32-bit seeded PRNG.
- * Tiny (~5 lines), fast, passes the basic statistical sanity checks
- * we need (we're not doing cryptography). Returns a closure that
- * yields the next uniform draw in [0,1).
- */
-export function mulberry32(seed: number): () => number {
-  let a = seed | 0;
-  return function next(): number {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// moved to engine/core/rng.ts for PRD-001 Phase 0; re-exported for API stability
+export { mulberry32, hashSeed } from "../../engine/core/rng";
 
 /**
  * Box–Muller transform. The spare sample from one transform is
@@ -120,20 +106,6 @@ export class OUDrift {
   reset(): void {
     this.x = 0;
   }
-}
-
-/**
- * Build a deterministic seed from a string (path id, persona id…).
- * Uses a tiny xorshift-style hash; collisions are acceptable because
- * this is only used to derive per-note jitter, not security.
- */
-export function hashSeed(s: string): number {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
 }
 
 /**
