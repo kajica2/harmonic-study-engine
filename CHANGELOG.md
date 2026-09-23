@@ -96,6 +96,44 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **Per-exercise transposition + sounding-key badge + cycle-all-12
+  (PRD-001 Phase 2)** -- the Etude surface now layers a
+  per-exercise offset (`exerciseTranspose`, clamped +/-12) on top
+  of the global one (`globalTranspose`, clamped +/-24); the
+  sounding shift is the sum (intentionally unclamped, +/-36
+  reachable), applied at playback / display / export time and
+  never baked into path data (REQ-TRANS-7). New
+  `src/components/TransposeControls.tsx` renders both rows in the
+  Etude StageFrame meta region (the practice rail keeps its own
+  global-only control); the +/-7 fourth/fifth chips are kept. New
+  `src/components/EffectiveKeyBadge.tsx` announces the sounding
+  key (`role="status"` / `aria-live="polite"` -- every keyboard
+  nudge is announced): keyed ("Sounding: Gb major"), drift-aware
+  ("Sounding: Eb minor -> Db major"), or a conservative pitch-only
+  fallback ("Sounding: +3 st") when no key can be claimed (the 36
+  studies paths carry no `key` field; a shared-root first/last-
+  chord heuristic may still claim one). Spelling rules -- ties go
+  flat, the author's accidental wins when it names the target
+  pitch -- live in the pure `engine/core/spelling.ts`. "Cycle 12"
+  advances the exercise offset +1 semitone (mod 12) per form pass
+  (`src/lib/keyCycle.ts` x `detectFormPeriod()`: a 32-bar form
+  padded to 96 bars advances 3x per full loop) and is suppressed
+  while a sub-range section loop is active. **Keyboard bindings
+  CHANGED (muscle-memory warning)**: `[` / `]` now transpose the
+  global offset -1 / +1 semitone and `Shift+[` / `Shift+]`
+  -12 / +12 (PRD 9.7), matched by `e.code` so Shift+[ (which
+  arrives as "{") works; tempo -5 / +5 MOVES to `,` / `.`. Two
+  latent bugs fixed: single-file MIDI export now carries the
+  sounding shift (was as-written only), and `?transpose=` is
+  finally audible + persists across reloads (the legacy
+  `transposeShift` had no persistence writer and the URL param
+  drove nothing; the zustand store is now the single source of
+  truth, boot precedence URL > persisted `hse.session` > one-shot
+  read-only adoption of legacy `synesthesia_transposeShift`
+  (when > 0) > 0). Session schema v1 -> v2
+  (`CURRENT_SESSION_VERSION = 2`; the `engine/migrations/index.ts`
+  step seeds `exerciseTranspose` + `keyCycleActive`). Design:
+  `docs/PHASE-2-TRANSPOSITION.md`.
 - **WAV export renders the complete detected song form exactly
   once** - `renderPathToWav()` (`src/lib/loopWav.ts`) now stops at
   the period found by `detectFormPeriod()` (`src/lib/formPeriod.ts`)

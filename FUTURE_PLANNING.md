@@ -149,11 +149,12 @@ the loop which near-term work unblocks the strategic plan.
 
 | PRD item | Status | Notes |
 |---|---|---|
-| Global transpose | SHIPPED | `transposeShift` already in session store; toolbar has +/- buttons. |
-| Per-exercise transpose (Etude) | NOT STARTED | Currently a single global shift. Etude has no separate control. |
-| Effective key display | PARTIAL | Transposed chord name shown in the bar strip; no explicit "effective key" badge. |
-| Cycle-all-12-keys | NOT STARTED | Practice loop just runs the current path. |
-| Keyboard `[` / `]` / `Shift+[` / `Shift+]` | PARTIAL | The toolbar has buttons; keyboard shortcuts exist but not in PRD's exact form. |
+| Global transpose | SHIPPED - Phase 2, 2026-09-23 | zustand `globalTranspose` (+/-24 clamp) is the single source of truth; persists to `hse.session` + URL-syncs (boot precedence URL > persisted > legacy one-shot > 0). Pre-Phase-2 row was wrong: the legacy `transposeShift` had NO persistence writer and `?transpose=` drove nothing audible. |
+| Per-exercise transpose (Etude) | SHIPPED - Phase 2, 2026-09-23 | `exerciseTranspose` (+/-12) via `src/components/TransposeControls.tsx` (Etude-only row); sounding shift = global + exercise, applied at playback/export time, never baked into path data (REQ-TRANS-7). |
+| Compose key + opt-in offsets (REQ-TRANS-3) | DEFERRED - Phase 4 | Full Compose-mode transposition semantics deferred with the Compose surface (`docs/PHASE-2-TRANSPOSITION.md` section 7). |
+| Effective key display | SHIPPED - Phase 2, 2026-09-23 | `src/components/EffectiveKeyBadge.tsx` (`role="status"`, `aria-live="polite"`): keyed / drift / pitch-only fallback content forms; spelling in `engine/core/spelling.ts`. |
+| Cycle-all-12-keys | SHIPPED - Phase 2, 2026-09-23 | "Cycle 12" toggle advances the exercise offset +1 mod 12 per form pass (`src/lib/keyCycle.ts` x `detectFormPeriod`); suppressed under sub-range section loops. |
+| Keyboard `[` / `]` / `Shift+[` / `Shift+]` | SHIPPED - Phase 2, 2026-09-23 | Brackets transpose the global offset -1/+1 and -12/+12 with Shift (PRD 9.7), matched by `e.code`; tempo +/-5 moved to `,` / `.` (muscle-memory change). Pre-Phase-2 row was wrong: the bracket bindings were tempo, not transpose. |
 
 ### PRD Phase 3 - Etude mode
 

@@ -1,4 +1,4 @@
-# Modes (PRD-001 Phase 1)
+# Modes (PRD-001 Phases 1-2)
 
 The Harmonic Study Engine ships in three modes -- Compose, Etude, and
 Explore -- plus a sticky-bottom Idea bar that carries a single
@@ -9,14 +9,16 @@ the seed of a Compose upload or an Explore preset. Phase 1 wires the
 shell: the selector, the per-mode dirty prompt, and the Idea bar.
 The deep feature surface for Compose (analysis card, accompaniment
 generation, export) and Explore (reharmonize / substitute / expand)
-arrives in Phases 4 and 5.
+arrives in Phases 4 and 5. Phase 2 adds the transposition layer on
+the Etude surface -- two offset rows, a sounding-key badge, and a
+cycle-all-12 practice loop (see Transposition below).
 
 Requirements traced here come from PRD-001 sections 6.1 (mode
-selector chrome), 8.1 (REQ-MODE-1..7, REQ-IDEA-1..4), 9.1 (top-level
-chrome), 9.6 (empty states), 9.7 (keyboard shortcuts), 9.8
-(accessibility), and 11.2 (URL serialization). The full design
-rationale lives in `docs/PHASE-1-MODE-SELECTOR.md`; this doc is the
-user-facing tour.
+selector chrome), 8.1 (REQ-MODE-1..7, REQ-IDEA-1..4, REQ-TRANS-1..7),
+9.1 (top-level chrome), 9.6 (empty states), 9.7 (keyboard
+shortcuts), 9.8 (accessibility), and 11.2 (URL serialization). The
+full design rationale lives in `docs/PHASE-1-MODE-SELECTOR.md` and
+`docs/PHASE-2-TRANSPOSITION.md`; this doc is the user-facing tour.
 
 ## What "modes" mean
 
@@ -69,6 +71,71 @@ plan. Each new entry into Explore mode re-draws the chips so the
 user sees different options every time.
 
 The Explorer surface lives at `src/components/ExploreSurface.tsx`.
+
+## Transposition (PRD-001 Phase 2)
+
+Two offset layers combine into the sounding shift. The Etude
+StageFrame meta region carries both control rows
+(`src/components/TransposeControls.tsx`) plus the sounding-key
+badge; the practice rail keeps its own global-only control.
+
+| Layer | Clamp | Controls | Notes |
+|---|---|---|---|
+| Global | +/-24 st | `-12 -1 0 +1 +12` row + `[` / `]` keys | persisted (`hse.session`) + URL-synced (`?transpose=`) |
+| Etude (per-exercise) | +/-12 st | `-12 -1 0 +1 +12` row + `Cycle 12` toggle + `+N st` readout | Etude surface only |
+
+Sounding shift = global + exercise. The sum is intentionally
+unclamped (+/-36 is the reachable span). It is applied at
+playback / display / export time only -- never baked into path
+data (REQ-TRANS-7). Generate, persona switch, and import reset
+the exercise offset to 0 and disengage the cycle; the row's `0`
+chip zeroes it manually.
+
+### Sounding-key badge
+
+`src/components/EffectiveKeyBadge.tsx` announces what you actually
+hear: `role="status"` + `aria-live="polite"`, so every keyboard
+nudge is announced to assistive tech (PRD 9.8). Three content
+forms (spelling in the pure `engine/core/spelling.ts`; ASCII only
+-- no flat/sharp glyphs; ties go flat; the author's accidental
+wins when it still names the target pitch class):
+
+| Form | Example | When |
+|---|---|---|
+| Keyed | `Sounding: Gb major` | the path declares a `key` (curated / concept paths) |
+| Drift | `Sounding: Eb minor -> Db major` | progressive-tonality key ("D minor -> C major"); each endpoint shifts independently |
+| Pitch-only | `Sounding: +3 st` | no key can be claimed -- the studies paths carry no `key` field; a shared-root first/last-chord heuristic (plain maj/min triads or 7ths) may still claim one |
+
+### Cycle all 12 keys
+
+The `Cycle 12` toggle (Etude row) advances the exercise offset
++1 semitone (mod 12) at each FORM PASS. The boundary comes from
+`detectFormPeriod()` (`src/lib/formPeriod.ts`), so a 32-bar form
+padded to 96 bars advances 3 times per full loop (the 95 -> 0
+wrap counts). The cycle is suppressed while a sub-range section
+loop is active -- the loop window can wrap the form boundary at
+arbitrary offsets. Turning the cycle off keeps the current
+offset. The advance decision is pure in `src/lib/keyCycle.ts`
+and never marks the session dirty (it is a view transform, not a
+composition edit).
+
+### Keyboard map (changed in Phase 2 -- muscle memory!)
+
+`[` / `]` used to be tempo -5 / +5. They now transpose the GLOBAL
+offset (PRD 9.7):
+
+| Keys | Action |
+|---|---|
+| `[` / `]` | Global transpose -1 / +1 semitone |
+| `Shift+[` / `Shift+]` | Global transpose -12 / +12 (octave) |
+| `,` / `.` | Tempo -5 / +5 BPM (the old bracket job) |
+
+Matching is by physical key, so `Shift+[` (which arrives as `{`)
+works; Cmd/Ctrl/Alt combos stay with the browser, and every
+shortcut is inactive while a text field is focused. The existing
++/-7 chips (fourth / fifth) are unchanged.
+
+Design authority: `docs/PHASE-2-TRANSPOSITION.md`.
 
 ## The mode selector
 
@@ -237,21 +304,26 @@ mount).
 
 ```
 key:        hse.session
-version:    CURRENT_SESSION_VERSION = 1
-partialize: { mode, globalTranspose, currentIdea }
+version:    CURRENT_SESSION_VERSION = 2
+partialize: { mode, globalTranspose, exerciseTranspose,
+              keyCycleActive, currentIdea }
 ```
 
-The store is the *single* source of truth for Phase 1 mode state;
-the existing `useSessionStore.ts` (paths, tempo, transpose, voicing,
-...) migrates slice-by-slice in Phase 1.5 (ADR-004). `dirty` and
+The store is the *single* source of truth for Phase 1 mode state
+and the Phase 2 transpose slice; the legacy `useSessionStore.ts`
+hook's `transposeShift` is now a read-through / write-through
+bridge to `globalTranspose`. The rest of the legacy hook migrates
+slice-by-slice in Phase 1.5 (ADR-004). `dirty` and
 `pendingModeRequest` are explicitly *not* persisted -- they are
-session-scoped Edit state, not cross-reload state.
+session-scoped Edit state, not cross-reload state. v1 payloads are
+upgraded to v2 (transpose-slice defaults) by the migration runner
+in `engine/migrations/index.ts`.
 
 `src/lib/storage.ts` registers the two new keys:
 
 | Key | Storage | Shape |
 |---|---|---|
-| `K.session` (`hse.session`) | zustand persist JSON | mode slice: `mode`, `globalTranspose`, `currentIdea` |
+| `K.session` (`hse.session`) | zustand persist JSON | mode + transpose slice: `mode`, `globalTranspose`, `exerciseTranspose`, `keyCycleActive`, `currentIdea` |
 | `K.ideas` (`hse.ideas`) | hand-managed JSON | `Idea[]`, capped at 100 entries (REQ-IDEA-4) |
 
 Both keys are added to `STORAGE_KEYS` with their shape metadata so
@@ -275,14 +347,19 @@ them on boot.
 
 ## Where to look
 
-- Design rationale: `docs/PHASE-1-MODE-SELECTOR.md`
+- Design rationale: `docs/PHASE-1-MODE-SELECTOR.md`,
+  `docs/PHASE-2-TRANSPOSITION.md`
 - PRD source of truth: `docs/PRD-001.md` (sections 6.1, 8.1, 9.6,
   9.7, 11.2)
 - Engine data type: `engine/core/idea.ts`
+- Engine key spelling (Phase 2): `engine/core/spelling.ts`
 - Store: `src/state/sessionStore.ts`
 - Components: `src/components/ModeSelector.tsx`,
   `src/components/ModeGate.tsx`, `src/components/IdeaBar.tsx`,
   `src/components/DirtyPromptModal.tsx`,
   `src/components/ComposeSurface.tsx`,
-  `src/components/ExploreSurface.tsx`
+  `src/components/ExploreSurface.tsx`,
+  `src/components/TransposeControls.tsx`,
+  `src/components/EffectiveKeyBadge.tsx`
+- Cycle-advance decision (Phase 2): `src/lib/keyCycle.ts`
 - Storage registry: `src/lib/storage.ts` (`K.session`, `K.ideas`)
