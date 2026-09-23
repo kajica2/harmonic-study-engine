@@ -23,7 +23,7 @@ function triadFromRoot(
   return notes;
 }
 
-import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from "react";
 import {
   Play,
   Pause,
@@ -68,6 +68,8 @@ import { midiIn } from "./lib/midiIn";
 import { MidiClockFollower } from "./lib/midiClock";
 import { PATHS, ALL_PATHS, HarmonicPath } from "./lib/paths";
 import { STUDIES_PATHS } from "./lib/paths";
+import { detectFormPeriod } from "./lib/formPeriod";
+import { shouldAdvanceKeyCycle } from "./lib/keyCycle";
 import { loadPracticeSets, getRecentSessions } from "./lib/practiceStore";
 import type { PracticeSet, PracticeSession } from "./lib/paths";
 import { PianoKeyboard } from "./components/PianoKeyboard";
@@ -146,6 +148,8 @@ import { LeadSheet } from "./components/LeadSheet";
 import { ModalShell, useModalLabel } from "./components/ModalShell";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
+import { TransposeControls } from "./components/TransposeControls";
+import { EffectiveKeyBadge } from "./components/EffectiveKeyBadge";
 import { BackingTrackPicker } from "./components/BackingTrackPicker";
 import type { BackingTrackFile } from "./lib/backingTrack";
 import {
@@ -158,9 +162,9 @@ import { ModeSelector } from "./components/ModeSelector";
 import { ModeGate } from "./components/ModeGate";
 import { IdeaBar } from "./components/IdeaBar";
 import { DirtyPromptModal } from "./components/DirtyPromptModal";
-import { useSessionStore as useNewSessionStore } from "./state/sessionStore";
+import { useSessionStore as useNewSessionStore, resolveBootTranspose, SESSION_STORAGE_KEY } from "./state/sessionStore";
 import { ideaFromChord, isIdea } from "../engine/core/idea";
-import { isModeShortcutModifierKey } from "./hooks/useKeyDown";
+import { isModeShortcutModifierKey, classifyTransposeKey } from "./hooks/useKeyDown";
 
 // downloadText moved to src/lib/download.ts (extracted by main)
 
@@ -299,6 +303,54 @@ function AppShell() {
     revertLastAccept,
   } = session;
 
+  // PRD-001 Phase 2 (D10/D15): the zustand store is the single source
+  // of truth for transpose. soundingShift = global + per-exercise
+  // offset drives every audible / displayed surface (the 15 read-sites
+  // below). The SUM is deliberately unclamped: -12 must mean
+  // octave-down and the full +/-36 span is pinned no-crash (D15).
+  const globalTranspose = useNewSessionStore((s) => s.globalTranspose);
+  const exerciseTranspose = useNewSessionStore((s) => s.exerciseTranspose);
+  const keyCycleActive = useNewSessionStore((s) => s.keyCycleActive);
+  const soundingShift = globalTranspose + exerciseTranspose;
+
+  // Mirror of activeStepIndex for the measure handler so the cycle
+  // decision can be computed OUTSIDE the setActiveStepIndex updater
+  // (StrictMode double-invokes updaters; a decision made inside would
+  // fire twice). Write-through in the handler + effect-sync keeps it
+  // honest for every other step mutation.
+  // PRD-001 Phase 2 (MED-001 review fix): useLayoutEffect, not
+  // useEffect. A rhythmEngine setInterval tick is a macrotask that can
+  // interleave BETWEEN a seek's commit and a passive-effect flush,
+  // reading a stale ref; layout effects run synchronously after commit
+  // and before any timer callback. Only this sync effect changes.
+  const activeStepIndexRef = useRef(activeStepIndex);
+  useLayoutEffect(() => {
+    activeStepIndexRef.current = activeStepIndex;
+  }, [activeStepIndex]);
+
+  // PRD-001 Phase 2 (MED-002 review fix) + fix round 2: the exercise
+  // row + cycle toggle are Etude-surface-only and must NEVER disagree
+  // with ModeGate's surface selection. The gate is now LIVE (it
+  // subscribes to store.mode; resolveEffectiveMode with URL
+  // precedence runs at boot only - see src/components/ModeGate.tsx).
+  // Mirror the exact same contract here: derive from the same
+  // reactive store.mode subscription. mode === null can only exist
+  // pre-boot (the gate's mount effect writes back the resolved mode);
+  // treat it as etude, matching resolveEffectiveMode's legacy
+  // fallback. During that pre-boot window the AppMain slot is not
+  // rendered at all when the gate shows Compose/Explore, so this
+  // value is inert - the two consumers can never visibly diverge.
+  const storeModeForGate = useNewSessionStore((s) => s.mode);
+  const showExerciseTranspose =
+    storeModeForGate === null || storeModeForGate === "etude";
+
+  // PRD-001 Phase 2 (D13): the 5 path generate/import/persona-switch
+  // reset sites all zero the exercise offset AND disengage the cycle.
+  // Centralized so no site drifts. Never touches `dirty`.
+  const resetTransposeSlice = useCallback(() => {
+    useNewSessionStore.getState().setExerciseTranspose(0);
+    useNewSessionStore.getState().setKeyCycleActive(false);
+  }, []);
 
   const isLoopingRef = useRef(isLooping);
 
@@ -620,6 +672,11 @@ function AppShell() {
   const path = paths[activePathIndex];
   const step = path.steps[activeStepIndex];
 
+  // Cycle-all-12 (D13): repeating form length of the active path,
+  // memoized per path identity. detectFormPeriod is pure; a 32-step
+  // form padded x3 returns 32. Recomputed only when `path` changes.
+  const formLen = useMemo(() => detectFormPeriod(path.steps), [path]);
+
   // ---- Memoization support for the remaining non-playback panels ----
   // Handler identities are pinned with useCallback so the memo()'d
   // MobileCommandBar / QuizPanel / RecentTakesPanel can skip re-render
@@ -723,8 +780,8 @@ function AppShell() {
         current = applyVoicing(current, voicingType);
       }
     }
-    return current.map((n) => n + transposeShift + (barDriftShifts[activeStepIndex] ?? 0));
-  }, [optimizedStepsNotes, activeStepIndex, transposeShift, voicingType, instrument, arpType, barDriftShifts]);
+    return current.map((n) => n + soundingShift + (barDriftShifts[activeStepIndex] ?? 0));
+  }, [optimizedStepsNotes, activeStepIndex, soundingShift, voicingType, instrument, arpType, barDriftShifts]);
 
   // W2': pitches for the WAV export. Mirrors the currentChordNotes
   // transform above for EVERY step index (voice-leading base +
@@ -745,10 +802,10 @@ function AppShell() {
           }
         }
         return current.map(
-          (n) => n + transposeShift + (barDriftShifts[i] ?? 0),
+          (n) => n + soundingShift + (barDriftShifts[i] ?? 0),
         );
       }),
-    [optimizedStepsNotes, transposeShift, voicingType, instrument, arpType, barDriftShifts],
+    [optimizedStepsNotes, soundingShift, voicingType, instrument, arpType, barDriftShifts],
   );
 
   // Guide-tone trail — counts 3rd/7th hits during a take so the
@@ -1003,6 +1060,23 @@ function AppShell() {
         return;
       }
 
+      // PRD-001 Phase 2 (D14): brackets transpose the GLOBAL offset -
+      // +/-1 semitone, Shift = +/-12 (octave). Classified by e.code
+      // (NEVER e.key: Shift+[ arrives as "{"). Placed after the
+      // isModeShortcutModifierKey guard so Cmd/Ctrl/Alt + bracket
+      // keeps its browser behavior. Tempo -5/+5 moved to , / . below.
+      const transposeIntent = classifyTransposeKey(e);
+      if (transposeIntent !== null) {
+        e.preventDefault();
+        const delta =
+          transposeIntent === "down1" ? -1
+          : transposeIntent === "up1" ? 1
+          : transposeIntent === "down12" ? -12
+          : 12;
+        setTransposeShift((p) => p + delta);
+        return;
+      }
+
       if (e.key === "ArrowRight") {
         setActiveStepIndex((prev) => Math.min(prev + 1, path.steps.length - 1));
       } else if (e.key === "ArrowLeft") {
@@ -1027,10 +1101,12 @@ function AppShell() {
         // M → toggle Play Along (mute synth melody)
         e.preventDefault();
         audioEngine.setMelodyMuted(!audioEngine.melodyMuted);
-      } else if (e.key === "[") {
+      } else if (e.code === "Comma") {
+        // Phase 2 (D14): tempo -5 moved off "[" onto "," (matched by
+        // code, consistent with the bracket transpose bindings).
         e.preventDefault();
         setTempo((t) => Math.max(30, t - 5));
-      } else if (e.key === "]") {
+      } else if (e.code === "Period") {
         e.preventDefault();
         setTempo((t) => Math.min(240, t + 5));
       }
@@ -1056,13 +1132,37 @@ function AppShell() {
     if (m === "compose" || m === "etude" || m === "explore") {
       useNewSessionStore.getState().setMode(m);
     }
-    const t = params.get("transpose");
-    if (t !== null) {
-      const n = Number(t);
-      if (Number.isFinite(n)) {
-        useNewSessionStore.getState().setGlobalTranspose(n);
+    // PRD-001 Phase 2 (D10): global transpose boot precedence, strictly
+    //   ?transpose= > persisted hse.session > ONE-SHOT adoption of the
+    //   legacy synesthesia_transposeShift (read-only, only when > 0) > 0.
+    // Before Phase 2 the ?transpose param drove nothing audible (the
+    // latent Phase-1 bug); the resolved value now lands in the zustand
+    // store that every read-site consumes. The legacy key is adopted
+    // but never written/deleted.
+    let persistedGlobal: number | null = null;
+    let legacyStored: string | null = null;
+    try {
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { state?: { globalTranspose?: unknown } };
+        const gt = parsed.state?.globalTranspose;
+        if (typeof gt === "number" && Number.isFinite(gt)) persistedGlobal = gt;
       }
+    } catch {
+      // Corrupt envelope - fall through to the legacy/default branches.
     }
+    try {
+      legacyStored = localStorage.getItem(K.transposeShift);
+    } catch {
+      legacyStored = null;
+    }
+    useNewSessionStore.getState().setGlobalTranspose(
+      resolveBootTranspose({
+        urlValue: params.get("transpose"),
+        persistedValue: persistedGlobal,
+        legacyValue: legacyStored,
+      }),
+    );
     const ideaStr = params.get("idea");
     if (ideaStr) {
       // Decode a shared Idea URL. Malformed payloads are warned and
@@ -1152,29 +1252,53 @@ function AppShell() {
 
   useEffect(() => {
     const handler = () => {
-      setActiveStepIndex((prev) => {
-        // Sub-range loop wins when active and a start bar is set.
-        const useLoop = isLoopingRef.current && loopStartBar !== null;
-        if (useLoop) {
-          const totalBars = Math.ceil(path.steps.length / 4);
-          const fromStep = loopStartBar! * 4;
-          // Inclusive end bar; +1 because we want the wrap to land on
-          // the start of (loopEndBar + 1).
-          const toStep =
-            (Math.min(loopEndBar ?? totalBars - 1, totalBars - 1) + 1) * 4;
-          if (prev + 1 >= toStep) return fromStep;
-          if (prev < fromStep) return fromStep;
-          return prev + 1;
+      // PRD-001 Phase 2 (D13): the next-step computation moved OUT of
+      // the setActiveStepIndex updater so the cycle-advance decision is
+      // made exactly once per measure (StrictMode double-invokes
+      // updater functions; a decision inside would fire twice). The
+      // ref mirrors activeStepIndex and is written through below.
+      const prev = activeStepIndexRef.current;
+      // Sub-range loop wins when active and a start bar is set.
+      const useLoop = isLoopingRef.current && loopStartBar !== null;
+      let next: number;
+      if (useLoop) {
+        const totalBars = Math.ceil(path.steps.length / 4);
+        const fromStep = loopStartBar! * 4;
+        // Inclusive end bar; +1 because we want the wrap to land on
+        // the start of (loopEndBar + 1).
+        const toStep =
+          (Math.min(loopEndBar ?? totalBars - 1, totalBars - 1) + 1) * 4;
+        if (prev + 1 >= toStep) next = fromStep;
+        else if (prev < fromStep) next = fromStep;
+        else next = prev + 1;
+      } else if (prev >= path.steps.length - 1) {
+        if (!isLoopingRef.current) {
+          setTimeout(() => setIsPlayingAuto(false), 0);
+          return;
         }
-        if (prev >= path.steps.length - 1) {
-          if (!isLoopingRef.current) {
-            setTimeout(() => setIsPlayingAuto(false), 0);
-            return prev;
-          }
-          return 0;
-        }
-        return prev + 1;
-      });
+        next = 0;
+      } else {
+        next = prev + 1;
+      }
+      activeStepIndexRef.current = next;
+      setActiveStepIndex(next);
+      // Cycle-all-12: advance iff the next index completes a form
+      // pass (suppressed under a sub-range loop). The store dispatch
+      // is QUEUED (microtask) so it never runs inside a React state
+      // transition and lands exactly once per measure.
+      if (
+        shouldAdvanceKeyCycle({
+          nextStepIndex: next,
+          formLen,
+          totalSteps: path.steps.length,
+          cycleActive: keyCycleActive,
+          subLoopActive: useLoop,
+        })
+      ) {
+        queueMicrotask(() => {
+          useNewSessionStore.getState().advanceKeyCycle();
+        });
+      }
     };
     rhythmEngine.setOnMeasureStart(handler);
     // Detach on unmount or before the next re-bind so we never leave
@@ -1182,7 +1306,7 @@ function AppShell() {
     return () => {
       rhythmEngine.setOnMeasureStart(() => {});
     };
-  }, [path.steps.length, loopStartBar, loopEndBar]);
+  }, [path.steps.length, loopStartBar, loopEndBar, formLen, keyCycleActive]);
 
   useEffect(() => {
     if (isPlayingAuto) {
@@ -1282,12 +1406,13 @@ function AppShell() {
     setActivePathIndex(0);
     setActiveStepIndex(0);
     setTransposeShift(0);
+    resetTransposeSlice();
   };
 
   const handleGenerateEtude = async () => {
     const lengthMap = [8, 16, 32];
     const len = lengthMap[genLength - 1];
-    const rootMidi = 60 + transposeShift;
+    const rootMidi = 60 + soundingShift;
 
     const isGemini = etudeAlgorithm.startsWith("gemini_");
     if (isGemini && !hasOpenRouterKey) {
@@ -1324,6 +1449,7 @@ function AppShell() {
         setActivePathIndex(0);
         setActiveStepIndex(0);
         setTransposeShift(0);
+        resetTransposeSlice();
       } catch (err) {
         console.error("Etude generation failed:", err);
         setEtudeStatus(
@@ -1338,6 +1464,7 @@ function AppShell() {
       setActivePathIndex(0);
       setActiveStepIndex(0);
       setTransposeShift(0);
+      resetTransposeSlice();
     }
   };
 
@@ -1366,6 +1493,7 @@ function AppShell() {
       setActivePathIndex(pathIdx);
       setActiveStepIndex(0);
       setTransposeShift(0);
+      resetTransposeSlice();
     }
   };
 
@@ -1687,7 +1815,7 @@ function AppShell() {
       <PracticeHeader
         path={path}
         activeStepIndex={activeStepIndex}
-        chordName={transposeChordName(step.name ?? "", transposeShift)}
+        chordName={transposeChordName(step.name ?? "", soundingShift)}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
         guideToneTrail={guideTrail.tally}
@@ -1961,8 +2089,15 @@ function AppShell() {
           }}
           onExportMidi={async () => {
             // Deferred: pulls midi-writer-js only on the first click.
-            const { exportToMidiFile } = await import("./lib/midiExport");
-            const dataUri = exportToMidiFile(path);
+            // PRD-001 Phase 2 (REQ-TRANS-7): the single-file export now
+            // carries the SOUNDING shift (global + exercise) instead of
+            // as-written. Out-of-range MIDI notes are dropped by the
+            // writer (midiExport.ts contract - unchanged).
+            const { exportMidiWithVariation } = await import("./lib/midiExport");
+            const dataUri = exportMidiWithVariation(path, {
+              kind: "transpose",
+              semitones: soundingShift,
+            });
             const a = document.createElement("a");
             a.href = dataUri;
             a.download = `${path.id}.mid`;
@@ -2017,7 +2152,7 @@ function AppShell() {
               useNewSessionStore.getState().setCurrentIdea(
                 ideaFromChord(
                   "etude",
-                  transposeChordName(step.name, transposeShift),
+                  transposeChordName(step.name, soundingShift),
                   Date.now(),
                 ),
               );
@@ -2546,7 +2681,7 @@ function AppShell() {
                           </button>
                           <button
                             onClick={() => {
-                              const s21 = toScore21(path, { transpose: transposeShift });
+                              const s21 = toScore21(path, { transpose: soundingShift });
                               downloadText(`${path.id}.s21.md`, s21, "text/markdown");
                             }}
                             title="Download Score21 markdown — scorable chord-and-pitch representation"
@@ -2560,7 +2695,7 @@ function AppShell() {
                                 title: path.title,
                                 composer: "harmonic-study-engine",
                                 tempo: tempo,
-                                transpose: transposeShift,
+                                transpose: soundingShift,
                               });
                               downloadText(
                                 `${path.id}.musicxml`,
@@ -2805,7 +2940,7 @@ function AppShell() {
               accent
               active
               eyebrow={`Step ${activeStepIndex + 1} of ${path.steps.length}`}
-              title={transposeChordName(step.name, transposeShift)}
+              title={transposeChordName(step.name, soundingShift)}
               meta={
                 <span className="flex items-center gap-2">
                   <span className="t-mono text-[10px] text-[color:var(--color-text-3)] uppercase tracking-wider">
@@ -2819,7 +2954,7 @@ function AppShell() {
                     ♭5th
                   </ToolChip>
                   <ToolChip active onClick={() => setTransposeShift(0)} title="Reset transpose">
-                    {transposeShift > 0 ? "+" : ""}{transposeShift} st
+                    {soundingShift > 0 ? "+" : ""}{soundingShift} st
                   </ToolChip>
                   <ToolChip
                     active
@@ -2828,6 +2963,23 @@ function AppShell() {
                   >
                     ♯5th
                   </ToolChip>
+                  {/* PRD-001 Phase 2: global + per-exercise transpose
+                      rows + cycle-all-12 toggle (Etude surface). The
+                      +/-7 chips above are kept (D14). MED-002 review
+                      fix + fix round 2: showExercise is derived LIVE
+                      from the same store.mode subscription ModeGate
+                      consumes - gate and control visibility switch
+                      together and can never disagree (see the
+                      storeModeForGate derivation near the top). */}
+                  <TransposeControls showExercise={showExerciseTranspose} />
+                  {/* PRD-001 Phase 2 (D12): sounding-key announcement
+                      (keyed / drift / pitch-only fallback per D11). */}
+                  <EffectiveKeyBadge
+                    sourceKey={path.key}
+                    shift={soundingShift}
+                    fallbackFirstChord={path.steps[0]?.name}
+                    fallbackLastChord={path.steps[path.steps.length - 1]?.name}
+                  />
                 </span>
               }
               actions={
@@ -2867,8 +3019,8 @@ function AppShell() {
                         // iterations (the drill still works).
                         const nextIdx = Math.min(activeStepIndex + 1, path.steps.length - 1);
                         const phraseNotes = [
-                          ...step.notes.map((n) => n + transposeShift),
-                          ...path.steps[nextIdx].notes.map((n) => n + transposeShift),
+                          ...step.notes.map((n) => n + soundingShift),
+                          ...path.steps[nextIdx].notes.map((n) => n + soundingShift),
                         ];
                         // Run the three iterations with progress
                         // callbacks so the UI can show which
@@ -3353,7 +3505,7 @@ function AppShell() {
                         setIsDDSPLoading(true);
                         await ddspAction.run(async (signal) => {
                           const notes = path.steps.map((s) =>
-                            s.notes.map((n) => n + transposeShift),
+                            s.notes.map((n) => n + soundingShift),
                           );
                           const chordDur = 60 / tempo;
                           recorder.start();
@@ -3450,7 +3602,7 @@ function AppShell() {
                 width={canvasSize.width}
                 height={canvasSize.height}
                 showLabels={showTheoryLabels}
-                rootMidi={(step.notes.length ? Math.min(...step.notes) : 60) + transposeShift}
+                rootMidi={(step.notes.length ? Math.min(...step.notes) : 60) + soundingShift}
                 onCanvasReady={(el) => { synesthesiaCanvasRef.current = el; }}
               />
                 </ErrorBoundary>
@@ -3575,10 +3727,16 @@ function AppShell() {
                 })()}
 
                 <Suspense fallback={null}>
+                {/* HIGH-001 review fix: LiveScoreDisplay takes
+                    soundingShift (global + exercise), not the global
+                    transposeShift - the on-screen score must match the
+                    exports (toScore21/toMusicXml) and the "Sounding:"
+                    badge when the exercise offset is active. The prop
+                    name on the component stays transposeShift. */}
                 <LiveScoreDisplay
                   path={path}
                   activeStepIndex={activeStepIndex}
-                  transposeShift={transposeShift}
+                  transposeShift={soundingShift}
                   tempo={tempo}
                 />
               </Suspense>
@@ -3669,7 +3827,7 @@ function AppShell() {
               ? paths[activePathIndex]?.steps[activeStepIndex] ?? null
               : null
           }
-          transposeShift={transposeShift}
+          transposeShift={soundingShift}
         />
       </main>
 
@@ -3685,6 +3843,7 @@ function AppShell() {
               setActivePathIndex(0);
               setActiveStepIndex(0);
               setTransposeShift(0);
+              resetTransposeSlice();
             }}
             onClose={() => setShowImportExport(false)}
           />

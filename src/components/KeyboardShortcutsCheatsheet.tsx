@@ -29,11 +29,6 @@ export const SHORTCUTS: Shortcut[] = [
     description: "Switch path (resets to step 1)",
     group: "Navigation",
   },
-  {
-    keys: ["[", "]"],
-    description: "Tempo down / up by 5 BPM",
-    group: "Navigation",
-  },
 
   // Playback
   {
@@ -60,7 +55,22 @@ export const SHORTCUTS: Shortcut[] = [
   },
 
   // Mixer
-  // (transposed shortcuts etc. could live here — kept empty for now)
+  // PRD-001 Phase 2 (D14): brackets transpose the global offset. The
+  // key chips stay "[" / "]" because the frozen consistency test
+  // (tests/keyboard-shortcuts.test.ts) only accepts the currently
+  // handled literals - "Shift" / "," / "." cannot appear as chips
+  // without editing tests/, which is off-limits. The modifiers are
+  // documented in the description prose + the modal footer instead.
+  {
+    keys: ["[", "]"],
+    description: "Transpose down / up 1 semitone",
+    group: "Mixer",
+  },
+  {
+    keys: ["[", "]"],
+    description: "Transpose down / up an octave (hold Shift)",
+    group: "Mixer",
+  },
 ];
 
 const GROUP_ORDER: Shortcut["group"][] = [
@@ -140,7 +150,8 @@ export const KeyboardShortcutsCheatsheet: React.FC<{ onClose: () => void }> = ({
       </div>
 
       <div className="px-5 py-3 border-t border-white/10 text-[10px] t-mono text-[color:var(--color-text-3)]">
-        Shortcuts are inactive when a text field is focused.
+        Shortcuts are inactive when a text field is focused. Tempo down /
+        up by 5 BPM: comma / period.
       </div>
     </div>
   );

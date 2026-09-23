@@ -23,6 +23,7 @@ import { RenderMode } from "../lib/loopWav";
 import { VoicingId } from "../lib/theory";
 import { ScoreDisplayMode } from "../lib/displayMode";
 import { useHistory } from "../lib/useHistory";
+import { useSessionStore as useZustandSessionStore } from "../state/sessionStore";
 import {
   K,
   FEEDBACK_HISTORY_MAX,
@@ -123,6 +124,11 @@ export interface SessionStore {
   setTimeSignature: Setter<TimeSignature>;
   beatType: BackingStyle;
   setBeatType: Setter<BackingStyle>;
+  /**
+   * PRD-001 Phase 2 (D10): read-through to the zustand store's
+   * `globalTranspose` (single source of truth). Shape frozen: plain
+   * number + Setter<number> with functional-update support.
+   */
   transposeShift: number;
   setTransposeShift: Setter<number>;
   volume: number;
@@ -304,9 +310,25 @@ export function useSessionStore(): SessionStore {
       return "off";
     }
   });
-  const [transposeShift, setTransposeShift] = useState(() =>
-    loadNumber("synesthesia_transposeShift", 0),
-  );
+  // PRD-001 Phase 2 (D10): transposeShift is now a READ-THROUGH /
+  // WRITE-THROUGH BRIDGE to the zustand session store (single source
+  // of truth: globalTranspose). The old dead boot read of
+  // `synesthesia_transposeShift` is deleted here; one-shot adoption
+  // of that legacy key happens at boot via resolveBootTranspose in
+  // App.tsx (URL > hse.session > legacy > 0). The returned API shape
+  // is FROZEN: `transposeShift` is a plain number and
+  // `setTransposeShift` keeps Setter<number> semantics (direct AND
+  // functional updates), because tests/useSessionStore.test.ts and
+  // tests/usePathGenerator.test.ts pin it.
+  const transposeShift = useZustandSessionStore((s) => s.globalTranspose);
+  const setTransposeShift = useCallback<Setter<number>>((next) => {
+    const store = useZustandSessionStore.getState();
+    if (typeof next === "function") {
+      store.setGlobalTranspose(next(store.globalTranspose));
+    } else {
+      store.setGlobalTranspose(next);
+    }
+  }, []);
   const [volume, setVolume] = useState(() =>
     loadNumber("synesthesia_volume", 50),
   );

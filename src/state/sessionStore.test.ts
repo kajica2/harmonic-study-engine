@@ -10,13 +10,19 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
 import {
   useSessionStore,
   SESSION_STORAGE_KEY,
+  CURRENT_SESSION_VERSION,
   isMode,
   MODES,
   resolveEffectiveMode,
+  resolveBootTranspose,
 } from "./sessionStore";
+import { useSessionStore as useLegacySessionStore } from "../hooks/useSessionStore";
+import { createSessionRunner } from "../../engine/migrations";
+import { K } from "../lib/storage";
 import { ideaFromChord } from "../../engine/core/idea";
 
 const STORE_API = useSessionStore.getState;
@@ -247,5 +253,215 @@ describe("isMode / MODES / resolveEffectiveMode helpers", () => {
     window.history.replaceState({}, "", "/?mode=explore");
     expect(resolveEffectiveMode(null)).toBe("explore");
     window.history.replaceState({}, "", "/");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 2 - transpose slice (D10 / D13 / D15)
+// ---------------------------------------------------------------------------
+
+describe("Phase 2: exercise transpose clamp (D10)", () => {
+  it("setExerciseTranspose clamps into [-12, 12]", () => {
+    STORE_API().setExerciseTranspose(30);
+    expect(STORE_API().exerciseTranspose).toBe(12);
+    STORE_API().setExerciseTranspose(-30);
+    expect(STORE_API().exerciseTranspose).toBe(-12);
+    STORE_API().setExerciseTranspose(5);
+    expect(STORE_API().exerciseTranspose).toBe(5);
+  });
+
+  it("nudgeExerciseTranspose clamps the accumulated result", () => {
+    STORE_API().setExerciseTranspose(10);
+    STORE_API().nudgeExerciseTranspose(5);
+    expect(STORE_API().exerciseTranspose).toBe(12);
+    STORE_API().setExerciseTranspose(-10);
+    STORE_API().nudgeExerciseTranspose(-5);
+    expect(STORE_API().exerciseTranspose).toBe(-12);
+  });
+
+  it("advanceKeyCycle rotates +1 mod 12 and wraps 11 -> 0", () => {
+    STORE_API().setExerciseTranspose(11);
+    STORE_API().advanceKeyCycle();
+    expect(STORE_API().exerciseTranspose).toBe(0);
+    STORE_API().setExerciseTranspose(4);
+    STORE_API().advanceKeyCycle();
+    expect(STORE_API().exerciseTranspose).toBe(5);
+  });
+
+  it("advanceKeyCycle NEVER touches dirty (D13 structural pin)", () => {
+    STORE_API().setMode("etude");
+    useSessionStore.setState({
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+    });
+    STORE_API().setExerciseTranspose(2);
+    STORE_API().advanceKeyCycle();
+    expect(STORE_API().exerciseTranspose).toBe(3);
+    expect(STORE_API().dirty.etude).toBe("etude-pending-accept");
+  });
+
+  it("advanceKeyCycle from all-clean dirty never SETS dirty (D13 complement)", () => {
+    // The pin above proves the cycle cannot CLOBBER a dirty value;
+    // this one proves the other direction: starting from all-'none'
+    // (clean), advanceKeyCycle must not mark any mode dirty
+    // (view transform, not a composition edit).
+    STORE_API().setMode("etude");
+    useSessionStore.setState({
+      dirty: { compose: "none", etude: "none", explore: "none" },
+    });
+    STORE_API().advanceKeyCycle();
+    // The rotation itself happened (0 -> 1), so the action ran.
+    expect(STORE_API().exerciseTranspose).toBe(1);
+    expect(STORE_API().dirty).toEqual({
+      compose: "none",
+      etude: "none",
+      explore: "none",
+    });
+  });
+
+  it("keyCycleActive toggles independently of the offset", () => {
+    expect(STORE_API().keyCycleActive).toBe(false);
+    STORE_API().setKeyCycleActive(true);
+    expect(STORE_API().keyCycleActive).toBe(true);
+    STORE_API().setKeyCycleActive(false);
+    expect(STORE_API().keyCycleActive).toBe(false);
+  });
+
+  it("resetModeSlice zeroes exerciseTranspose + keyCycleActive", () => {
+    STORE_API().setExerciseTranspose(7);
+    STORE_API().setKeyCycleActive(true);
+    STORE_API().resetModeSlice();
+    expect(STORE_API().exerciseTranspose).toBe(0);
+    expect(STORE_API().keyCycleActive).toBe(false);
+    expect(STORE_API().globalTranspose).toBe(0);
+  });
+});
+
+describe("Phase 2: resolveBootTranspose precedence (D10)", () => {
+  it("URL wins over persisted + legacy", () => {
+    expect(
+      resolveBootTranspose({ urlValue: "2", persistedValue: 5, legacyValue: "9" }),
+    ).toBe(2);
+  });
+
+  it("persisted wins over legacy when URL absent", () => {
+    expect(
+      resolveBootTranspose({ urlValue: null, persistedValue: 5, legacyValue: "9" }),
+    ).toBe(5);
+  });
+
+  it("legacy synesthesia_transposeShift adopted only when > 0", () => {
+    expect(
+      resolveBootTranspose({ urlValue: null, persistedValue: null, legacyValue: "3" }),
+    ).toBe(3);
+    // A stored 0 must NOT be adopted as a "preference" - it is the
+    // default, and adopting it would shadow nothing. But a NEGATIVE
+    // legacy value is ignored (only > 0 is adopted per D10).
+    expect(
+      resolveBootTranspose({ urlValue: null, persistedValue: null, legacyValue: "-5" }),
+    ).toBe(0);
+    expect(
+      resolveBootTranspose({ urlValue: null, persistedValue: null, legacyValue: "0" }),
+    ).toBe(0);
+  });
+
+  it("URL non-finite falls through to persisted", () => {
+    expect(
+      resolveBootTranspose({ urlValue: "abc", persistedValue: 4, legacyValue: null }),
+    ).toBe(4);
+  });
+
+  it("clamps the resolved value into [-24, 24]", () => {
+    expect(
+      resolveBootTranspose({ urlValue: "999", persistedValue: null, legacyValue: null }),
+    ).toBe(24);
+    expect(
+      resolveBootTranspose({ urlValue: "-999", persistedValue: null, legacyValue: null }),
+    ).toBe(-24);
+  });
+
+  it("all-absent resolves to 0", () => {
+    expect(
+      resolveBootTranspose({ urlValue: null, persistedValue: null, legacyValue: null }),
+    ).toBe(0);
+  });
+});
+
+describe("Phase 2: v1 -> v2 migration through the real runner", () => {
+  it("adds exerciseTranspose + keyCycleActive defaults to a v1 payload", () => {
+    const runner = createSessionRunner<Record<string, unknown>>();
+    const out = runner.run({ version: 1, mode: "etude", globalTranspose: 3 });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.version).toBe(2);
+      expect(out.value.exerciseTranspose).toBe(0);
+      expect(out.value.keyCycleActive).toBe(false);
+      expect(out.value.mode).toBe("etude");
+      expect(out.value.globalTranspose).toBe(3);
+    }
+  });
+
+  it("preserves pre-existing transpose values on a malformed v1 payload", () => {
+    const runner = createSessionRunner<Record<string, unknown>>();
+    // A v1 payload that somehow already carries values keeps them.
+    const out = runner.run({ version: 1, exerciseTranspose: 8, keyCycleActive: true });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.exerciseTranspose).toBe(8);
+      expect(out.value.keyCycleActive).toBe(true);
+    }
+  });
+});
+
+describe("Phase 2: v2 persistence round-trip", () => {
+  it("persists exerciseTranspose + keyCycleActive (dirty / pending do NOT)", async () => {
+    STORE_API().setMode("etude");
+    STORE_API().setExerciseTranspose(6);
+    STORE_API().setKeyCycleActive(true);
+    useSessionStore.setState({
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      pendingModeRequest: "compose",
+    });
+    // Let zustand persist's async write settle.
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as {
+      state: Record<string, unknown>;
+      version: number;
+    };
+    expect(parsed.version).toBe(CURRENT_SESSION_VERSION);
+    expect(parsed.state.exerciseTranspose).toBe(6);
+    expect(parsed.state.keyCycleActive).toBe(true);
+    // Session-scoped fields are NOT persisted.
+    expect(parsed.state.dirty).toBeUndefined();
+    expect(parsed.state.pendingModeRequest).toBeUndefined();
+  });
+});
+
+describe("Phase 2: REQ-TRANS-7 no-bake proof", () => {
+  it("mutating transposes + cycling never rewrites the paths payload", async () => {
+    const seedPaths = [
+      {
+        id: "p1",
+        title: "T",
+        description: "d",
+        steps: [{ name: "Cmaj7", notes: [60, 64, 67, 71], descriptions: "" }],
+      },
+    ];
+    localStorage.setItem(K.paths, JSON.stringify(seedPaths));
+    const before = localStorage.getItem(K.paths);
+
+    // Drive transposes through the legacy bridge + the store + a full
+    // cycle rotation; none of these may bake into the stored paths.
+    const { result } = renderHook(() => useLegacySessionStore());
+    act(() => result.current.setTransposeShift(4));
+    STORE_API().setExerciseTranspose(2);
+    for (let i = 0; i < 12; i++) STORE_API().advanceKeyCycle();
+    await Promise.resolve();
+
+    expect(localStorage.getItem(K.paths)).toBe(before);
+    // The cycle is a view transform: the path steps are byte-identical.
+    const parsed = JSON.parse(localStorage.getItem(K.paths) as string);
+    expect(parsed[0].steps[0].notes).toEqual([60, 64, 67, 71]);
   });
 });

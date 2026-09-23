@@ -259,15 +259,24 @@ describe("createMigrationRunner", () => {
   });
 });
 
-describe("Phase 0 session registry (skeleton)", () => {
-  it("baseline is version 1 with an empty, valid chain", () => {
-    expect(CURRENT_SESSION_VERSION).toBe(1);
-    expect(SESSION_MIGRATIONS).toEqual([]);
+describe("session registry (Phase 2: v1 -> v2)", () => {
+  it("current is version 2 with a contiguous 1->2 chain", () => {
+    expect(CURRENT_SESSION_VERSION).toBe(2);
     expect(validateMigrationChain(SESSION_MIGRATIONS, CURRENT_SESSION_VERSION)).toBeNull();
+    expect(SESSION_MIGRATIONS.map((m) => [m.from, m.to])).toEqual([[1, 2]]);
   });
 
-  it("createSessionRunner passes a v1 payload through", () => {
-    const out = createSessionRunner<{ version: number }>().run({ version: 1 });
+  it("createSessionRunner upgrades a v1 payload to v2 with defaults", () => {
+    const out = createSessionRunner<{
+      version: number;
+      exerciseTranspose?: number;
+      keyCycleActive?: boolean;
+    }>().run({ version: 1 });
     expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.version).toBe(2);
+      expect(out.value.exerciseTranspose).toBe(0);
+      expect(out.value.keyCycleActive).toBe(false);
+    }
   });
 });

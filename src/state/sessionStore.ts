@@ -1,19 +1,25 @@
 /**
- * src/state/sessionStore.ts - PRD-001 Phase 1 mode slice (ADR-004).
+ * src/state/sessionStore.ts - PRD-001 Phase 1+2 mode slice (ADR-004).
  *
  * Zustand 5 store + persist middleware (key `hse.session`). Phase 1
- * ships ONLY the mode-related slice (mode, globalTranspose, currentIdea,
- * per-mode dirty, pendingModeRequest). The legacy `useSessionStore.ts`
- * stays untouched in Phase 1 and migrates slice-by-slice in Phase 1.5.
+ * shipped the mode-related slice (mode, globalTranspose, currentIdea,
+ * per-mode dirty, pendingModeRequest). Phase 2 (D10) adds the
+ * transpose slice: `exerciseTranspose` (per-exercise offset, clamped
+ * +/-12) + `keyCycleActive` (cycle-all-12 flag) with actions
+ * setExerciseTranspose / nudgeExerciseTranspose / advanceKeyCycle /
+ * setKeyCycleActive. The legacy `useSessionStore.ts` hook's
+ * transposeShift is now a read-through/write-through BRIDGE to
+ * `globalTranspose` here (single source of truth).
  *
  * Persistence: `partialize` keeps `mode`, `globalTranspose`,
- * `currentIdea` in localStorage. `dirty` + `pendingModeRequest` are
- * session-scoped (per-mode Edit state, not cross-reload state).
+ * `currentIdea`, `exerciseTranspose`, `keyCycleActive` in
+ * localStorage. `dirty` + `pendingModeRequest` are session-scoped
+ * (per-mode Edit state, not cross-reload state).
  *
  * Migration: zustand persist's `migrate` callback delegates to the
- * engine's `createSessionRunner`. Phase 1 ships with no migrations
- * (CURRENT_SESSION_VERSION = 1, empty SESSION_MIGRATIONS). Each
- * Phase 1.5 PR appends one entry + bumps the version.
+ * engine's `createSessionRunner`. v1 -> v2 (Phase 2) appends the
+ * transpose-slice defaults; CURRENT_SESSION_VERSION = 2 and the
+ * persist envelope version mirrors it (ADR-004).
  */
 
 import { create } from "zustand";
@@ -23,6 +29,7 @@ import {
   type MigrationRunner,
 } from "../../engine/migrations";
 import type { Idea } from "../../engine/core/idea";
+import { advanceKeyCycle as nextInCycleRotation } from "../../engine/core/spelling";
 import { K } from "../lib/storage";
 
 /** The 3 modes a user can explicitly pick. `null` = legacy / first-run. */
@@ -39,13 +46,37 @@ export interface DirtyMap {
 }
 
 export const SESSION_STORAGE_KEY = K.session;
-export const CURRENT_SESSION_VERSION = 1;
+/** v2 (PRD-001 Phase 2): adds exerciseTranspose + keyCycleActive.
+ *  Keep in lockstep with engine/migrations CURRENT_SESSION_VERSION;
+ *  the persist envelope version mirrors this value (ADR-004). */
+export const CURRENT_SESSION_VERSION = 2;
 
 const sessionRunner: MigrationRunner<unknown> = createSessionRunner();
+
+/** Exercise-offset clamp (D10): +/-12 semitones. */
+export const EXERCISE_TRANSPOSE_MAX = 12;
+/** Global clamp (D15): +/-24 semitones. The SUM (soundingShift) is
+ *  intentionally NOT clamped - -12 must be able to mean octave-down
+ *  and the full reachable span is pinned no-crash at +/-36. */
+export const GLOBAL_TRANSPOSE_MAX = 24;
+
+function clampGlobal(n: number): number {
+  return Math.max(-GLOBAL_TRANSPOSE_MAX, Math.min(GLOBAL_TRANSPOSE_MAX, n));
+}
+
+function clampExercise(n: number): number {
+  return Math.max(-EXERCISE_TRANSPOSE_MAX, Math.min(EXERCISE_TRANSPOSE_MAX, n));
+}
 
 interface ModeSlice {
   mode: Mode | null;
   globalTranspose: number;
+  /** Per-exercise (Etude-surface) transpose offset, clamped +/-12.
+   *  Sounding shift = globalTranspose + exerciseTranspose (D15). */
+  exerciseTranspose: number;
+  /** Cycle-all-12 flag: advance exerciseTranspose +1 mod 12 per
+   *  form pass while active (D13). */
+  keyCycleActive: boolean;
   currentIdea: Idea | null;
   dirty: DirtyMap;
   pendingModeRequest: Mode | null;
@@ -53,6 +84,12 @@ interface ModeSlice {
   requestMode: (next: Mode) => void;
   resolveDirty: (action: "save" | "discard" | "cancel") => void;
   setGlobalTranspose: (n: number) => void;
+  setExerciseTranspose: (n: number) => void;
+  nudgeExerciseTranspose: (delta: number) => void;
+  /** Cycle-all-12 advance: exerciseTranspose := (n + 1) mod 12.
+   *  NEVER touches `dirty` (structural + pinned by test). */
+  advanceKeyCycle: () => void;
+  setKeyCycleActive: (b: boolean) => void;
   setCurrentIdea: (i: Idea | null) => void;
   saveCurrentIdea: () => void;
   discardCurrent: () => void;
@@ -66,6 +103,8 @@ export const useSessionStore = create<SessionState>()(
     (set, get) => ({
       mode: null,
       globalTranspose: 0,
+      exerciseTranspose: 0,
+      keyCycleActive: false,
       currentIdea: null,
       dirty: { compose: "none", etude: "none", explore: "none" },
       pendingModeRequest: null,
@@ -99,8 +138,22 @@ export const useSessionStore = create<SessionState>()(
         set({ mode: pending, pendingModeRequest: null });
       },
       setGlobalTranspose: (n) => {
-        const clamped = Math.max(-24, Math.min(24, n));
-        set({ globalTranspose: clamped });
+        set({ globalTranspose: clampGlobal(n) });
+      },
+      setExerciseTranspose: (n) => {
+        set({ exerciseTranspose: clampExercise(n) });
+      },
+      nudgeExerciseTranspose: (delta) => {
+        set((s) => ({ exerciseTranspose: clampExercise(s.exerciseTranspose + delta) }));
+      },
+      advanceKeyCycle: () => {
+        // Cycle-all-12: rotate the exercise offset +1 mod 12. This is
+        // a playback-affecting view transform, NOT a composition edit,
+        // so it deliberately leaves `dirty` untouched (D13).
+        set((s) => ({ exerciseTranspose: nextInCycleRotation(s.exerciseTranspose) }));
+      },
+      setKeyCycleActive: (b) => {
+        set({ keyCycleActive: b });
       },
       setCurrentIdea: (i) => set({ currentIdea: i }),
       saveCurrentIdea: () => {
@@ -150,6 +203,8 @@ export const useSessionStore = create<SessionState>()(
         set({
           mode: null,
           globalTranspose: 0,
+          exerciseTranspose: 0,
+          keyCycleActive: false,
           currentIdea: null,
           dirty: { compose: "none", etude: "none", explore: "none" },
           pendingModeRequest: null,
@@ -173,6 +228,8 @@ export const useSessionStore = create<SessionState>()(
       partialize: (s) => ({
         mode: s.mode,
         globalTranspose: s.globalTranspose,
+        exerciseTranspose: s.exerciseTranspose,
+        keyCycleActive: s.keyCycleActive,
         currentIdea: s.currentIdea,
       }),
     },
@@ -203,4 +260,44 @@ export function resolveEffectiveMode(stored: Mode | null): Mode {
 /** True for the 3 known mode string literals. */
 export function isMode(s: string): s is Mode {
   return (MODES as readonly string[]).includes(s);
+}
+
+/** Inputs for resolveBootTranspose - raw values, no DOM access. */
+export interface BootTransposeInput {
+  /** Raw `?transpose=` URL param (string | null). */
+  readonly urlValue: string | null;
+  /** Persisted hse.session globalTranspose, or null when absent. */
+  readonly persistedValue: number | null;
+  /** Raw legacy `synesthesia_transposeShift` value (string | null). */
+  readonly legacyValue: string | null;
+}
+
+/**
+ * Boot-time global transpose (D10). Precedence, strictly:
+ *   1. `?transpose=` URL param (finite number) - deep links win.
+ *   2. Persisted hse.session globalTranspose.
+ *   3. ONE-SHOT adoption of the legacy `synesthesia_transposeShift`
+ *      key - READ-ONLY (never written/deleted) and only when > 0,
+ *      matching the legacy writer's historical range.
+ *   4. 0.
+ * Result is clamped to the global range (+/-24).
+ */
+export function resolveBootTranspose(input: BootTransposeInput): number {
+  const parse = (v: string | null): number | null => {
+    if (v === null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const fromUrl = parse(input.urlValue);
+  if (fromUrl !== null) return clampGlobal(fromUrl);
+  if (
+    input.persistedValue !== null &&
+    typeof input.persistedValue === "number" &&
+    Number.isFinite(input.persistedValue)
+  ) {
+    return clampGlobal(input.persistedValue);
+  }
+  const legacy = parse(input.legacyValue);
+  if (legacy !== null && legacy > 0) return clampGlobal(legacy);
+  return 0;
 }

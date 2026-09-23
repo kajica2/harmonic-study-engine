@@ -12,7 +12,9 @@ import { defineConfig } from "vitest/config";
  */
 const JSDOM_FILES = [
   "src/components/**/*.test.tsx",
+  "src/components/EffectiveKeyBadge.test.tsx",
   "src/components/GtCoverageRow.test.tsx",
+  "src/components/TransposeControls.test.tsx",
   "src/hooks/useFeedback.test.ts",
   "src/hooks/useGuideToneTrail.test.ts",
   "src/hooks/useKeyDown.test.ts",
