@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-23T05:10:00Z"
-total_pipeline_runs: 9
+last_updated: "2026-09-23T09:20:00Z"
+total_pipeline_runs: 10
 
 flags:
   has_conventions: true
@@ -73,3 +73,9 @@ active_prevention_rules:
   - id: "PHASE-3-02"
     when: "Shipping a static feasibility/validation check next to a randomized generator"
     action: "The check must be conservative-sound (may over-warn, must never claim feasible-then-throw) and pinned by a property sweep (>=300 seeds x shape matrix) plus an audit of EVERY throw site in the generator. A static mirror of a data-dependent pass sequence lies - Phase 3 fix round item 3."
+  - id: "PHASE-3-03"
+    when: "A mount-once effect queues state updates that are not idempotent (index shifts, appends, counters)"
+    action: "Guard with a useRef one-shot (refs survive StrictMode remount) or make every setter a pure function of the same snapshot. A dedupe guard on ONE piece of state (prev.some) does NOT protect a second setter (setActivePathIndex(i=>i+1)) - MED-NEW-001 shipped past review+gates because dev-mode double-invoke is invisible to prod-built tests."
+  - id: "PHASE-3-04"
+    when: "Wiring a new consumer to index math over generated data"
+    action: "Re-derive the units convention (steps vs bars) from the PRODUCER, never inherit formulas from a spec doc that may contradict its own audit findings - the docs agent caught the activeBar divide-by-4 bug that code review missed because docs read the code line-by-line."
