@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-23T03:15:00Z"
-total_pipeline_runs: 8
+last_updated: "2026-09-23T05:10:00Z"
+total_pipeline_runs: 9
 
 flags:
   has_conventions: true
@@ -67,3 +67,9 @@ active_prevention_rules:
   - id: "PHASE-2-02"
     when: "Taking intake snapshots for mutation/revert safety (W2-002)"
     action: "Snapshot folders are per-ROUND, never reused across rounds - /tmp/phase-2-snapshots/ went STALE mid-session (Phase 1 baseline) and restoring from it would have destroyed Phase 2 work. Fresh copies to a new dated folder before each round's first edit; never restore from a folder you did not create this round."
+  - id: "PHASE-3-01"
+    when: "Implementing any pattern detector / truthfulness claim (annotations, analyzers, classifiers)"
+    action: "Every detector needs a NEGATIVE fixture that differs ONLY in the claimed property (ii-V-iii vs ii-V-I, identical prefix). Adjacency-shaped positives alone let weakened detectors silently survive the suite - proven by mutation test in Phase 3 slice 1."
+  - id: "PHASE-3-02"
+    when: "Shipping a static feasibility/validation check next to a randomized generator"
+    action: "The check must be conservative-sound (may over-warn, must never claim feasible-then-throw) and pinned by a property sweep (>=300 seeds x shape matrix) plus an audit of EVERY throw site in the generator. A static mirror of a data-dependent pass sequence lies - Phase 3 fix round item 3."
