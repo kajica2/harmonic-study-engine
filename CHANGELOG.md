@@ -96,6 +96,28 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **Etude generation engine (PRD-001 Phase 3 slice 1)** -- pure
+  TypeScript core, NOT yet user-facing (the constraint panel, adapter,
+  and staff / piano-roll views are slice 2; practice + pedagogy
+  surfaces are slice 3). New `engine/etude/`: `generateEtude`
+  (REQ-ETU-10..15) runs seeded deterministic harmony + melody
+  generators over the Phase 0 `StyleProfile` data (D21 numeral
+  grammar, template filter + fit, difficulty-scaled chromatic /
+  extension passes, weighted interval-walk melody on an 8-slot-per-bar
+  grid) under a fixed draw-order reproducibility contract
+  (harmony -> melody -> title, pinned by a 45-case x 2 byte-identity
+  matrix); `etudeToSteps` emits one `HarmonicStep`-shaped step per BAR
+  for the slice 2 adapter to cast; `feasibilityOf` is the non-throwing
+  panel warning. New `engine/pedagogy/`: the 8-concept registry
+  (REQ-PED-10, hand-curated per D17) + a truthfulness annotator -
+  annotations only claim patterns that actually fire in the generated
+  data (REQ-PED-1/2/3/11). Two documented PRD deviations (design:
+  `docs/PHASE-3-ETUDE.md`): Q2 RESOLVED -- VexFlow dropped, abcjs
+  retained for all staff rendering (REQ-ETU-21 satisfied via abcjs at
+  slice 2); and the Tone.js premise corrected -- playback is the
+  hand-rolled `audioEngine` (`tone` is a transitive dep only), so
+  REQ-ETU-22 is satisfied-in-fact. Purity floor `MIN_SCANNED_FILES`
+  12 -> 21. Docs: `docs/engine-etude.md`.
 - **Per-exercise transposition + sounding-key badge + cycle-all-12
   (PRD-001 Phase 2)** -- the Etude surface now layers a
   per-exercise offset (`exerciseTranspose`, clamped +/-12) on top

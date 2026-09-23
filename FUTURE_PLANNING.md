@@ -161,11 +161,12 @@ the loop which near-term work unblocks the strategic plan.
 | PRD item | Status | Notes |
 |---|---|---|
 | Constraint panel (style, key, mode, difficulty, bars, tempo, seed) | PARTIAL | Generator lab exists (`GeneratorLab`) but is a separate surface, not "Etude mode." Today Etude = curated paths, not generated ones. |
-| Harmony / melody / difficulty generators | PARTIAL | `melodyMarkov.ts` + `coCompose.ts` exist (per `docs/COMPOSITION-MVP-PLAN.md`). Not wired to a UI mode. |
+| Harmony / melody / difficulty generators | SHIPPED (engine) - Phase 3 slice 1, 2026-09-23 | `engine/etude/` + `engine/pedagogy/`: `generateEtude` - seeded deterministic harmony/melody generators over the Phase 0 `StyleProfile`s with difficulty scaling (REQ-ETU-10..15) + the 8-concept truthfulness annotator (REQ-PED-1/2/3/10/11). Pure engine, NOT user-facing yet - the constraint panel + adapter are slice 2. Legacy `melodyMarkov.ts`/`coCompose.ts` stay in `src/lib/` (superseded; consumers untouched). Design: `docs/PHASE-3-ETUDE.md`; docs: `docs/engine-etude.md`. |
 | Piano roll for etude | NOT STARTED | Live score is staff notation (`LiveScoreDisplay`), not piano roll. |
-| Staff notation via VexFlow | NOT STARTED | Current notation uses `abcjs`. Migration to VexFlow is a PRD Phase 3 decision (Q2). |
+| Staff notation via VexFlow | DECIDED - Q2 RESOLVED (D16): VexFlow dropped | abcjs is retained for ALL staff rendering (it is the only installed renderer; the PRD's VexFlow premise never held). REQ-ETU-21 ships via abcjs at slice 2 (new `EtudeStaffView`; `LiveScoreDisplay` untouched). `docs/PHASE-3-ETUDE.md`. |
 | MIDI export | SHIPPED | `src/lib/midiExport.ts` covers `asWritten` + `splitTracks`. |
-| MusicXML export | NOT STARTED | ABC export exists; MusicXML not. |
+| MusicXML export | PARTIAL - chords-only via scoreExport.ts; melody voice pending slice 2 | `toMusicXml` writes chord-per-bar harmony only (no melody voice); ABC export exists. |
+| Practice mechanics (metronome volume/preset/accents/subdivision, count-in, annotation surfaces, print) | NOT STARTED - pending slice 3 | Metronome toggle + section looping already exist (REQ-PRAC-20); slice 3 closes the REQ-PRAC-1/2/10/11 gaps + REQ-PED-4/5/7 surfaces + REQ-ETU-32 print, per `docs/PHASE-3-ETUDE.md`. |
 
 ### PRD Phase 4 - Compose mode
 

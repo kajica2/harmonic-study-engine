@@ -41,7 +41,9 @@ package. `engine/purity.test.ts` (policy-as-test, copied from
 
 Note this is a denylist, not a true allowlist: a brand-new dep (e.g. `tonal`)
 passes silently; adopting one inside `engine/` is a review decision. A sanity
-floor (`MIN_SCANNED_FILES = 12`) stops a broken glob from silently passing.
+floor (`MIN_SCANNED_FILES = 21`; Phase 0 shipped 12 sources, and Phase 3
+slice 1 raised the floor to 21 alongside its seven new engine sources, per
+D20) stops a broken glob from silently passing.
 
 ## API reference
 
@@ -99,7 +101,7 @@ let instanceSeq = 0;
 export function newEtude(seed: Seed, constraints: { style: string; bars: number }) {
   const canonical = deriveCanonicalId("etu", seed, constraints);
   const rng = createRng(seed);
-  const firstNote = rng.range(48, 84); // real generation arrives in Phase 3
+  const firstNote = rng.range(48, 84); // shipped for real in Phase 3 slice 1
   const instance = makeInstanceId(Date.now(), instanceSeq++);
   return { canonical, firstNote, instance };
 }
@@ -246,7 +248,10 @@ determinism (same seed => byte-identical output).
 
 ## What Phase 0 deliberately does NOT include
 
-- Generators. No `engine/etude|compose|explore` modules yet - Phases 3/4/5 (PRD 14).
+- Generators. No `engine/etude|compose|explore` modules at Phase 0 time;
+  `engine/etude/` + `engine/pedagogy/` shipped later (Phase 3 slice 1, pure
+  engine, NOT yet user-facing) - see [engine-etude.md](engine-etude.md).
+  Compose/explore generators remain Phases 4/5 (PRD 14).
 - Persistence wiring. `createSessionRunner` is exercised by tests only;
   Phase 1 hooks it into the zustand persist `migrate` callback for `hse.session`.
 - Transpose/spelling/midi utilities. PRD 10.2 lists them under `core/` and

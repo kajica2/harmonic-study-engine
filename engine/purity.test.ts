@@ -44,8 +44,10 @@ import { dirname, join, posix } from "node:path";
 
 const ENGINE = "engine";
 /** Sanity floor: a broken glob must not silently pass. Phase 0 ships
- *  12 non-test engine sources; raise this only alongside real files. */
-const MIN_SCANNED_FILES = 12;
+ *  12 non-test engine sources; Phase 3 Slice 1 adds 7 (etude types/
+ *  harmony/melody/assemble + pedagogy types/concepts/annotate) per
+ *  D20 - raise this only alongside real files. */
+const MIN_SCANNED_FILES = 21;
 
 const BANNED: readonly RegExp[] = [
   /\bMath\.random\b/, // no paren: calls AND aliasing
