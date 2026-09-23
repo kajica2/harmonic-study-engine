@@ -1,5 +1,5 @@
-import React from "react";
-import { Play, Pause, Repeat, Drum } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Play, Pause, Repeat, Drum, Settings2 } from "lucide-react";
 import {
   formatChordReadout,
   formatGuideToneTally,
@@ -7,10 +7,12 @@ import {
   formatTempo,
 } from "../lib/practiceHeader";
 import { GuideToneFeedback } from "./GuideToneFeedback";
+import { MetronomeControls } from "./MetronomeControls";
 import type { GuideToneTrail } from "../lib/guideToneTrail";
 import type { BackingStyle } from "../lib/backingEngine";
 import type { HarmonicPath } from "../lib/paths";
 import type { TimeSignature } from "../lib/rhythm";
+import type { MetronomeConfig } from "../lib/metronomePatterns";
 import {
   SCORE_MODE_HINT,
   SCORE_MODE_LABEL,
@@ -71,6 +73,13 @@ interface PracticeHeaderProps {
   metronomeOn: boolean;
   onMetronomeToggle: () => void;
 
+  /** PRD-001 Phase 3 Slice 3 (D36): the click-settings popover state.
+   *  Owned upstream (useSessionStore); this header is the click's
+   *  home surface - the PlaySessionRail's old metronome toggle was
+   *  deliberately REMOVED at dfd2be3, do not resurrect it there. */
+  metronomeConfig: MetronomeConfig;
+  onMetronomeConfigChange: (next: MetronomeConfig) => void;
+
   // Backing style
   backingStyle: BackingStyle;
   onBackingStyleChange: (s: BackingStyle) => void;
@@ -113,6 +122,8 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onLoopToggle,
   metronomeOn,
   onMetronomeToggle,
+  metronomeConfig,
+  onMetronomeConfigChange,
   backingStyle,
   onBackingStyleChange,
   volume,
@@ -130,6 +141,31 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   const guideToneLabel = guideToneTrail
     ? formatGuideToneTally(guideToneTrail)
     : null;
+
+  // PRD-001 Phase 3 Slice 3 (D36): the click-settings popover. Local
+  // ephemeral UI state (visibility is not a persisted taste - the
+  // CONFIG inside it is). Gesture-driven open; the document listeners
+  // mount only while open (PHASE-3-03-safe, full cleanup).
+  const [clickSettingsOpen, setClickSettingsOpen] = useState(false);
+  const clickSettingsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!clickSettingsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setClickSettingsOpen(false);
+    };
+    const onDown = (ev: MouseEvent) => {
+      const host = clickSettingsRef.current;
+      if (host && !host.contains(ev.target as Node)) {
+        setClickSettingsOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [clickSettingsOpen]);
 
   return (
     <div
@@ -240,12 +276,12 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           <Repeat size={12} aria-hidden /> Loop
         </button>
 
-        {/* Metronome click — visible toggle for the rhythmEngine's
+        {/* Metronome click - visible toggle for the rhythmEngine's
             audio click. Default off (per useSessionStore). The
-            backing track keeps running regardless. Mirrors the
-            toggle in PlaySessionRail so the same state has two
-            access points: this one is the practice-loop surface,
-            the PlaySessionRail one is for the guided workflow. */}
+            backing track keeps running regardless. FIX ROUND stale
+            comment: the PlaySessionRail mirror was REMOVED (dfd2be3)
+            - this header is the SINGLE access point for the click
+            toggle (the rail still drives the audio, exposes no UI). */}
         <button
           onClick={onMetronomeToggle}
           aria-pressed={metronomeOn}
@@ -264,6 +300,36 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
         >
           <Drum size={12} aria-hidden /> Click
         </button>
+
+        {/* Click settings (D36): gear button beside the Click toggle -
+            same row, same token styling. Opens the volume / preset /
+            subdivision / accents / count-in popover. z-40: above the
+            sticky header (z-30), below modals/drawers (z-50). */}
+        <div className="relative" ref={clickSettingsRef}>
+          <button
+            onClick={() => setClickSettingsOpen((v) => !v)}
+            aria-expanded={clickSettingsOpen}
+            aria-label="Click settings"
+            title="Click settings - volume, sound, subdivision, accents, count-in"
+            data-testid="metronome-settings-toggle"
+            className={`flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-xs t-mono border transition-colors ${
+              clickSettingsOpen
+                ? "border-[color:var(--color-brand)] text-[color:var(--color-brand)] bg-[color:var(--color-brand)]/10"
+                : "border-[color:var(--color-border)] text-neutral-400 hover:text-neutral-200 surface-1"
+            }`}
+          >
+            <Settings2 size={12} aria-hidden />
+          </button>
+          {clickSettingsOpen && (
+            <div className="absolute right-0 top-full mt-2 z-40 w-72 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 p-3 shadow-xl">
+              <MetronomeControls
+                config={metronomeConfig}
+                timeSignature={timeSignature}
+                onChange={onMetronomeConfigChange}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Backing style */}
         <label className="flex items-center gap-2 text-xs text-neutral-400">

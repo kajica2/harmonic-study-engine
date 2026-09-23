@@ -15,6 +15,12 @@
  * exampleNumerals parse in the D21 grammar). The annotate.test.ts
  * truthfulness suite is the second gate: a concept is only ever linked
  * from an annotation whose pattern really fires.
+ *
+ * References (fix round, DOCS M4): all 8 concepts ship
+ * `references: null` - the drawer's "label - URL" link path is
+ * DORMANT until curated references are populated on review; do NOT
+ * author placeholder/fake URLs to exercise it (the render branch is
+ * pinned by the ConceptDrawer.test.tsx D38 fixture instead).
  */
 
 import type { Concept } from "./types";

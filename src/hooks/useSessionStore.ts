@@ -19,6 +19,11 @@ import { HarmonicPath, HarmonicStep, ALL_PATHS } from "../lib/paths";
 import { InstrumentType } from "../lib/audio";
 import { BackingStyle } from "../lib/backingEngine";
 import { TimeSignature } from "../lib/rhythm";
+import {
+  DEFAULT_METRONOME_CONFIG,
+  normalizeMetronomeConfig,
+  type MetronomeConfig,
+} from "../lib/metronomePatterns";
 import { RenderMode } from "../lib/loopWav";
 import { VoicingId } from "../lib/theory";
 import { ScoreDisplayMode } from "../lib/displayMode";
@@ -180,6 +185,17 @@ export interface SessionStore {
   // backing-style drum patterns)
   metronomeOn: boolean;
   setMetronomeOn: Setter<boolean>;
+
+  /**
+   * PRD-001 Phase 3 Slice 3 (D32): metronome TASTE - volume / preset /
+   * subdivision / accents / count-in bars. Persisted as one JSON blob
+   * under K.metronomeConfig (legacy localStorage registry, NOT the
+   * zustand session-share store: click taste is a cross-session user
+   * pref like volume/instrument, not URL-shareable session state).
+   * Hydrated through normalizeMetronomeConfig (corruption-safe).
+   */
+  metronomeConfig: MetronomeConfig;
+  setMetronomeConfig: Setter<MetronomeConfig>;
 
   // WAV export mode (block / arpeggio / block-then-arp)
   wavMode: RenderMode;
@@ -422,6 +438,18 @@ export function useSessionStore(): SessionStore {
     loadBool("synesthesia_metronomeOn", false),
   );
 
+  // PRD-001 Phase 3 Slice 3 (D32): the metronome taste blob. The
+  // hydrate runs through normalizeMetronomeConfig so ANY stored shape
+  // (quota-truncated JSON, hand-edited devtools garbage, a future
+  // field set) resolves to a valid config; the persist effect below
+  // rewrites the canonical form on every change.
+  const [metronomeConfig, setMetronomeConfig] = useState<MetronomeConfig>(
+    () =>
+      normalizeMetronomeConfig(
+        loadJSON<unknown>(K.metronomeConfig, DEFAULT_METRONOME_CONFIG),
+      ),
+  );
+
   // WAV export mode
   const [wavMode, setWavMode] = useState<RenderMode>(() =>
     loadJSON<RenderMode>("synesthesia_wavMode", "block"),
@@ -495,6 +523,18 @@ export function useSessionStore(): SessionStore {
   useEffect(() => {
     storageSetCap(K.feedbackHistory, feedbackHistory, FEEDBACK_HISTORY_MAX);
   }, [feedbackHistory]);
+  // F2 FIX (D32): metronomeOn hydrated from storage at boot but had NO
+  // write path - the boot comment ("Persisted so the preference
+  // survives reloads") was FALSE at HEAD and the toggle reset on every
+  // reload. This effect makes the comment true.
+  useEffect(() => {
+    storageSet(K.metronomeOn, metronomeOn ? "1" : "0");
+  }, [metronomeOn]);
+  // PRD-001 Phase 3 Slice 3 (D32): the whole taste blob persists as
+  // one JSON write; reads are normalized corruption-safe at boot.
+  useEffect(() => {
+    storageSet(K.metronomeConfig, JSON.stringify(metronomeConfig));
+  }, [metronomeConfig]);
 
   return {
     paths,
@@ -568,6 +608,8 @@ export function useSessionStore(): SessionStore {
     setLoopEndBar,
     metronomeOn,
     setMetronomeOn,
+    metronomeConfig,
+    setMetronomeConfig,
     wavMode,
     setWavMode,
     humanizeAmount,

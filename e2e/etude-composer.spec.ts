@@ -23,8 +23,21 @@
  * stays active (identity preserved via the +1 index shift) and the
  * piano roll (gated on the ACTIVE path being the etude) stays
  * absent.
+ *
+ * FIX ROUND (TESTER HIGH) adds: (a) the TD-035 gate leg - the
+ * Co-compose region is ABSENT while an etude path is active (test 1)
+ * and PRESENT while a curated path is active (test 2 positive
+ * control, so the gate can never be "fixed" by blanket removal), and
+ * (b) a third test: Escape CANCELS an active count-in pre-roll
+ * (guards the requestPlayState-routed Escape stop, REVIEWER M2).
  */
 import { test, expect, type Page } from "@playwright/test";
+// TD-033e (D43): FIRST_PATH_TITLE is DERIVED from the source of truth
+// (src/lib/paths.ts) instead of hardcoded - drift-gated by
+// construction: a rename flows here automatically. Playwright
+// transpiles the TS import; paths.ts is pure data (no browser
+// globals at module load), so the e2e runner boundary is clean.
+import { ALL_PATHS } from "../src/lib/paths";
 
 // The fix-3 highlight guard waits for the roll to cross the full
 // 8-bar form at real-time playback (~1 measure/bar). 90s covers the
@@ -34,7 +47,7 @@ import { test, expect, type Page } from "@playwright/test";
 test.setTimeout(90_000);
 
 /** ALL_PATHS[0] - the active path on a fresh boot (index 0). */
-const FIRST_PATH_TITLE = "Path I: The Resolution (II-V-I)";
+const FIRST_PATH_TITLE = ALL_PATHS[0].title;
 /** 8-bar form: the LAST roll column's x (EtudePianoRoll: bar * 8 slots * 10px). */
 const LAST_BAR_X = 7 * 8 * 10;
 
@@ -60,6 +73,18 @@ async function generatePop8(page: Page): Promise<string> {
   });
   const status = page.locator("#etude-composer-status");
   await expect(status).toContainText("Loaded:", { timeout: 5_000 });
+
+  // FIX ROUND (TESTER HIGH, TD-035 gate leg): while the ETUDE path is
+  // active, the Co-compose region MUST be absent - its accept handler
+  // writes FOUR steps per click (legacy 4-steps/bar shape) and would
+  // silently rewrite four one-step-per-bar etude bars (D41 MUST-FIX).
+  // Mutation-discriminative: delete the gate at App.tsx (~2179) and
+  // this region appears. Test 2's positive control pins the opposite
+  // mutation (blanket removal).
+  await expect(
+    page.getByRole("region", { name: "Co-composition suggestion" }),
+  ).toHaveCount(0);
+
   return (await status.innerText()).trim();
 }
 
@@ -98,6 +123,18 @@ test("composer journey: generate -> active + playing -> highlight crosses the fo
     .poll(async () => await bar.getAttribute("x"), { timeout: 45_000 })
     .toBe(String(LAST_BAR_X));
   expect(x0).not.toBe(String(LAST_BAR_X)); // really moved
+
+  // FIX ROUND (REVIEWER M2, playing half): Escape stops PLAIN
+  // playback. The old Escape branch read the raw isPlayingAuto state
+  // from a STALE closure (the keydown effect deps are the path
+  // lengths only - the generate above re-ran it with false), so
+  // Escape was a no-op here; routing through requestPlayState (live
+  // refs) makes it work. Discriminative: revert the fix and Pause
+  // stays.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Start practice" })).toBeVisible({
+    timeout: 5_000,
+  });
 
   // The single debounced writer lands the etude params in the URL.
   const url = await waitForEtudeUrl(page);
@@ -163,6 +200,14 @@ test("fresh-browser deep link: etude PREPENDED but NOT activated, active-path id
   const header = page.getByRole("region", { name: "Practice loop" });
   await expect(header.getByText(FIRST_PATH_TITLE)).toBeVisible({ timeout: 10_000 });
 
+  // FIX ROUND (TESTER HIGH) POSITIVE CONTROL for the TD-035 gate leg
+  // in generatePop8: with the first BUILT-IN (curated) path active,
+  // the Co-compose region is PRESENT - the gate is etude-path-
+  // specific, so "fixing" it by blanket-removing the panel fails.
+  await expect(
+    page.getByRole("region", { name: "Co-composition suggestion" }),
+  ).toBeVisible({ timeout: 10_000 });
+
   // Prepend WITHOUT activating (asserted on the practice surface,
   // BEFORE any tab switch): settle past the lazy-chunk window, then
   // the roll - gated on the ACTIVE path === etude path - must be
@@ -176,4 +221,39 @@ test("fresh-browser deep link: etude PREPENDED but NOT activated, active-path id
   await expect(page.getByText(mintTitle).first()).toBeVisible({ timeout: 5_000 });
 
   await fresh.close();
+});
+
+test("Escape cancels an active count-in pre-roll (fix round, REVIEWER M2)", async ({
+  page,
+}) => {
+  // Guards the Escape stop branch now routed through requestPlayState:
+  // the OLD raw branch checked isPlayingAuto - FALSE throughout the
+  // pre-roll by construction (the gate holds the transport) - so
+  // Escape was a no-op and the countdown kept running into playback,
+  // contradicting the gate contract ("a stop must never leave a
+  // countdown running"). Pre-fix this fails at the toBeHidden below
+  // (the overlay lives out its full 4-beat pre-roll at the 60 BPM
+  // fresh-boot default, then releases into Pause).
+  await page.goto("/");
+  const header = page.getByRole("region", { name: "Practice loop" });
+  await expect(header).toBeVisible({ timeout: 10_000 });
+
+  // Arm a 1-bar count-in through the Click-settings popover (same
+  // harness as e2e/count-in.spec.ts).
+  await page.getByRole("button", { name: "Click settings" }).click();
+  await page.getByRole("button", { name: "Count in 1 bar" }).click();
+  await page.keyboard.press("Escape"); // closes the popover (count-in NOT yet running)
+
+  await page.getByRole("button", { name: "Start practice" }).click();
+  const overlay = page.locator('[data-testid="countin-overlay"]');
+  await expect(overlay).toBeVisible({ timeout: 2_000 });
+
+  // THE ESCAPE: the countdown must DIE...
+  await page.keyboard.press("Escape");
+  await expect(overlay).toBeHidden({ timeout: 2_000 });
+
+  // ...and playback must NEVER start behind it (the pre-roll would
+  // otherwise release into Pause ~3 s later).
+  await expect(page.getByRole("button", { name: "Pause practice" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Start practice" })).toBeVisible();
 });

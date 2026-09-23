@@ -81,6 +81,32 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Practice mechanics + annotation surfaces (PRD-001 Phase 3 slice 3)**
+  -- metronome upgrades: an INDEPENDENT click volume (dedicated
+  metronome gain -> compressor bus in `src/lib/audio.ts`, so the
+  playback-volume slider cannot touch the click; recordings no longer
+  contain the click by design), three click syntheses (beep = the
+  current sound verbatim / click / shaker), beat-relative subdivision
+  1/2/3/4 (triplets ride WebAudio scheduling beside the immutable
+  16th grid), per-beat accents (meter-aware chips, 4/6/7/11/16), and
+  a 0/1/2-bar COUNT-IN: a pre-roll gate (`requestPlayState` in App)
+  upstream of the transport, so the countdown fires before ANY
+  playback starts and the measure-tick contract is structurally
+  unbreakable; visible "4.. 3.. 2.. 1.." overlay (aria-live). All
+  prefs persist via a corruption-safe `synesthesia_metronomeConfig`
+  registry key, and the latent metronomeOn read-with-no-write bug is
+  fixed. Legacy-equivalence proof: an exhaustive per-meter oracle
+  (T1) mirrors the frozen `tests/rhythm.test.ts` spy - the default
+  config reproduces the old click pattern bit-identically. Etude
+  pedagogy surfaces: margin-note chips + an "About this etude" panel
+  over the shipped engine annotations (REQ-PED-4 etude portion) with
+  a Notes on/off toggle (REQ-PED-7) and a right-slide ConceptDrawer
+  on the ModalShell focus-trap precedent (REQ-PED-5). Print: a global
+  `@media print` block + `print-area`/`print-hide` classes and a
+  WYSIWYG Print button in the etude views (REQ-ETU-32). TD-035
+  must-fix: the Co-compose panel is gated off one-step-per-bar etude
+  paths (one accept used to rewrite FOUR etude bars). New browser
+  leg: `e2e/count-in.spec.ts`. Design: `docs/PHASE-3-SLICE3.md`.
 - **Etude Composer UI wiring (PRD-001 Phase 3 slice 2)** -- the slice 1
   engine is now user-facing. New "Etude Composer" section on the Etude
   surface (after the practice rail): style/key/mode/difficulty/bars/

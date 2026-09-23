@@ -573,6 +573,14 @@ const PerformStage: React.FC<{
   activeStepIndex, setActiveStepIndex,
   optimizedStepsNotes, behavioralMarkers, onPlayChord, onStopChord, onCommitVoicing,
 }) => {
+  // TD-035 DOCUMENTED (D41): the /4 bar math below is the legacy 4-
+  // steps-per-bar path model. On one-step-per-bar etude paths the
+  // currentBar label lags 4x and the shift-click range-set UI feeds
+  // the F3 loop-math window (the sacred onMeasureStart handler uses
+  // the SAME bar->step model). A label-only fix here would CREATE an
+  // inconsistency with that handler - the pair must be fixed
+  // together in the transport follow-up (F3 USER-DECISION). Not
+  // touched in slice 3. See docs/PHASE-3-SLICE3.md D41.
   const totalBars = Math.ceil(path.steps.length / 4);
   const currentBar = Math.floor(activeStepIndex / 4) + 1;
   const [advancedOpen, setAdvancedOpen] = useState(false);

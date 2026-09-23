@@ -44,6 +44,7 @@ import {
   DEFAULT_ETUDE_CONSTRAINTS,
   generateEtudeFor,
 } from "../lib/etudeEngine";
+import type { Annotation } from "../../engine/pedagogy/types";
 
 afterEach(() => {
   cleanup();
@@ -142,5 +143,143 @@ describe("EtudeViews", () => {
       abcjsState.fail = false;
       warnSpy.mockRestore();
     }
+  });
+});
+
+// ---------- T8 (PRD-001 Phase 3 Slice 3, D37/D40) ------------------------
+//
+// Annotation display surfaces: margin chips (bar prefixes, active-bar
+// highlight, concept -> drawer), the Notes toggle (REQ-PED-7), the
+// About panel (full list + "What is <title>?" triggers), and the
+// print hooks (print-area on the section, print-hide on the toolbar,
+// Print button present - window.print is NEVER asserted, jsdom has
+// no print).
+
+describe("EtudeViews annotations (T8)", () => {
+  const ANN_CHORD: Annotation = {
+    version: 1,
+    id: "ann-t8-chord",
+    target: { kind: "chord", bar: 2 },
+    label: "ii-V-I start",
+    text: "The ii chord opens the turnaround here.",
+    conceptId: "ii-v-i",
+    confidence: 1,
+  };
+  const ANN_PROG: Annotation = {
+    version: 1,
+    id: "ann-t8-prog",
+    target: { kind: "progression", fromBar: 2, toBar: 4 },
+    label: "Turnaround",
+    text: "Bars 3-5 cycle back to the tonic.",
+    conceptId: "cadence",
+    confidence: 1,
+  };
+  const ANN_MEL: Annotation = {
+    version: 1,
+    id: "ann-t8-mel",
+    target: { kind: "melody" },
+    label: "Guide tones",
+    text: "The melody leans on chord sevenths.",
+    conceptId: null,
+    confidence: null,
+  };
+  const WITH_ANN = {
+    ...MINI,
+    annotations: [ANN_CHORD, ANN_PROG, ANN_MEL],
+  };
+
+  const renderAnn = (activeBar: number | null = null) =>
+    render(
+      <EtudeViews
+        etude={WITH_ANN}
+        pathId="etu-ann"
+        transposeShift={0}
+        activeBar={activeBar}
+      />,
+    );
+
+  it("chips render with bar prefixes; null-concept renders as static text", () => {
+    renderAnn();
+    const chordChip = screen.getByTestId("annotation-chip-ann-t8-chord");
+    expect(chordChip.textContent).toContain("[m3]");
+    expect(chordChip.tagName).toBe("BUTTON");
+    expect(
+      screen.getByTestId("annotation-chip-ann-t8-prog").textContent,
+    ).toContain("[m3-5]");
+    // melody target -> "melody" prefix, STATIC (no dead click target).
+    const mel = screen.getByTestId("annotation-static-ann-t8-mel");
+    expect(mel.textContent).toContain("[melody]");
+    expect(mel.tagName).toBe("SPAN");
+  });
+
+  it("active-bar chip gets the brand-border highlight (live by construction)", () => {
+    renderAnn(2); // bar 2 is covered by the chord + progression chips
+    const cls = screen
+      .getByTestId("annotation-chip-ann-t8-chord")
+      .getAttribute("class");
+    expect(cls).toContain("border-[color:var(--color-brand)]");
+    // Bar 7 is outside every annotation: no highlight.
+    cleanup();
+    renderAnn(7);
+    expect(
+      screen
+        .getByTestId("annotation-chip-ann-t8-chord")
+        .getAttribute("class"),
+    ).not.toContain("border-[color:var(--color-brand)]");
+  });
+
+  it("chip click opens the ConceptDrawer (REQ-PED-5)", () => {
+    renderAnn();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByTestId("annotation-chip-ann-t8-chord"));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("The ii-V-I Progression");
+    // Escape (ModalShell) closes it.
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Notes toggle (aria-pressed, default ON) hides chips + About (REQ-PED-7)", () => {
+    renderAnn();
+    const notesBtn = screen.getByRole("button", { name: "Notes" });
+    expect(notesBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("About this etude")).toBeTruthy();
+    fireEvent.click(notesBtn);
+    expect(notesBtn.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByTestId("annotation-chip-ann-t8-chord")).toBeNull();
+    expect(screen.queryByText("About this etude")).toBeNull();
+    fireEvent.click(notesBtn);
+    expect(screen.getByTestId("annotation-chip-ann-t8-chord")).toBeTruthy();
+  });
+
+  it("About details lists every annotation text + concept triggers", () => {
+    renderAnn();
+    fireEvent.click(screen.getByText("About this etude")); // open
+    expect(screen.getByText("The ii chord opens the turnaround here.")).toBeTruthy();
+    expect(screen.getByText("Bars 3-5 cycle back to the tonic.")).toBeTruthy();
+    expect(screen.getByText("The melody leans on chord sevenths.")).toBeTruthy();
+    // Title echo line: style . key mode . bars . difficulty . seed.
+    expect(
+      screen.getByText(new RegExp(`seed ${WITH_ANN.seed}`)),
+    ).toBeTruthy();
+    // ConceptId-bearing entries get a "What is <title>?" trigger
+    // (ANN_PROG -> the "cadence" concept, titled "Cadences").
+    fireEvent.click(
+      screen.getByRole("button", { name: "What is Cadences?" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("Cadences");
+    // Related navigation works from the About-opened drawer too.
+    expect(dialog.textContent).toContain("ii-V-I");
+  });
+
+  it("print hooks: section carries print-area; toolbar is print-hide; Print button present", () => {
+    const { container } = renderAnn();
+    const section = container.querySelector("section.print-area");
+    expect(section).toBeTruthy();
+    const printBtn = screen.getByRole("button", { name: "Print" });
+    // The Print affordance lives in the print-hidden toolbar row.
+    expect(printBtn.closest(".print-hide")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Notes" }).closest(".print-hide")).toBeTruthy();
   });
 });

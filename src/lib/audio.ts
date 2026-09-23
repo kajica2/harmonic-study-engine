@@ -7,6 +7,7 @@ import {
   soundfontAvailable,
 } from "./soundfont";
 import { K, storageGet, storageSet } from "./storage";
+import type { MetronomePreset } from "./metronomePatterns";
 
 /**
  * Whether to route notes through FluidR3 soundfont samples instead
@@ -79,6 +80,18 @@ class AudioEngine {
   private melodyBus: GainNode | null = null;
   private reverb: ConvolverNode | null = null;
   private warmth: WaveShaperNode | null = null;
+  // PRD-001 Phase 3 Slice 3 (D33): the metronome bus. The click
+  // leaves masterGain and enters the master compressor through its
+  // OWN gain node, so the playback-volume slider cannot touch it
+  // (REQ-PRAC-2) while the safety limiter + destination path stay
+  // shared. Recording consequence (documented, accepted): the
+  // AudioRecorder taps masterGain, so practice recordings no longer
+  // contain the click - the click is a monitoring signal.
+  private compressor: DynamicsCompressorNode | null = null;
+  private metronomeGain: GainNode | null = null;
+  private metronomeVolume = 0.8; // matches DEFAULT_METRONOME_CONFIG.volume 80
+  private metronomePreset: MetronomePreset = "beep";
+  private metronomeNoise: AudioBuffer | null = null;
   private currentInstrument: InstrumentType = "epiano";
   private targetVolume: number = 0.5;
   /** When true, the synth melody is silenced so the user can play
@@ -92,8 +105,11 @@ class AudioEngine {
    * Returns the audio node the synth melody voices should connect
    * to. Pre-init fallback to masterGain keeps the type safe in
    * tests that run without an AudioContext. The playalong toggle
-   * multiplies this gain to 0; backing-track voices (metronome,
-   * drum kit, etc.) bypass it and connect directly to masterGain.
+   * multiplies this gain to 0; backing-track voices bypass it -
+   * the metronome click rides the DEDICATED metronomeGain ->
+   * compressor bus (REQ-PRAC-2, D33), and BackingEngine's drum /
+   * bass / piano voices connect through the engine's own master
+   * bus, NOT masterGain (fix round: stale comment corrected).
    */
   private melodyOutputBus(): AudioNode | null {
     return this.melodyBus ?? this.masterGain;
@@ -195,12 +211,20 @@ class AudioEngine {
       this.melodyBus.connect(this.warmth);
       this.melodyBus.connect(this.masterGain);
 
-      const compressor = this.ctx.createDynamicsCompressor();
-      compressor.threshold.value = -30;
-      compressor.knee.value = 10;
-      compressor.ratio.value = 8;
-      compressor.attack.value = 0.01;
-      compressor.release.value = 0.25;
+      // Stored as a FIELD (D33): the metronome bus terminates here so
+      // the click keeps the safety limiter even though it bypasses
+      // the volume-scaled masterGain.
+      this.compressor = this.ctx.createDynamicsCompressor();
+      this.compressor.threshold.value = -30;
+      this.compressor.knee.value = 10;
+      this.compressor.ratio.value = 8;
+      this.compressor.attack.value = 0.01;
+      this.compressor.release.value = 0.25;
+
+      // Dedicated metronome gain -> compressor (REQ-PRAC-2, D33).
+      this.metronomeGain = this.ctx.createGain();
+      this.metronomeGain.gain.value = this.metronomeVolume;
+      this.metronomeGain.connect(this.compressor);
 
       this.reverb = this.ctx.createConvolver();
       this.reverb.buffer = createReverbImpulse(this.ctx, 3.0, 4.0); // 3 second plush reverb
@@ -209,13 +233,13 @@ class AudioEngine {
       reverbLevel.gain.value = 0.5; // 50% wet reverb mix
 
       // Wire master through compressor
-      this.masterGain.connect(compressor);
+      this.masterGain.connect(this.compressor);
 
       // Dry routing
-      compressor.connect(this.ctx.destination);
+      this.compressor.connect(this.ctx.destination);
 
       // Wet routing
-      compressor.connect(this.reverb);
+      this.compressor.connect(this.reverb);
       this.reverb.connect(reverbLevel);
       reverbLevel.connect(this.ctx.destination);
     }
@@ -529,24 +553,120 @@ class AudioEngine {
     }
   }
 
+  /**
+   * Independent click-bus volume, 0..1 (D33). Rides the same
+   * setTargetAtTime smoothing as setVolume. Stored even when the ctx
+   * is not up yet so init() can apply it lazily.
+   */
+  setMetronomeVolume(v01: number) {
+    const v = Number.isFinite(v01) ? Math.min(1, Math.max(0, v01)) : 0.8;
+    this.metronomeVolume = v;
+    if (this.metronomeGain && this.ctx) {
+      this.metronomeGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  getMetronomeVolume(): number {
+    return this.metronomeVolume;
+  }
+
+  /** Click synthesis preset (D33). Engine-internal STATE - the
+   *  frozen playMetronomeClick(high) signature never grows args (F1). */
+  setMetronomePreset(p: MetronomePreset) {
+    this.metronomePreset = p;
+  }
+
+  /**
+   * The metronome click. UNCHANGED single-arg public contract (F1:
+   * the frozen tests/rhythm.test.ts spy pins playMetronomeClick(true)
+   * with EXACTLY one argument). Synthesis depends on the preset:
+   *   beep    - the CURRENT sound verbatim (sine 800/400, 0.1 s)
+   *   click   - square 1000/600, 0.03 s decay, gain 0.3 (dry stick)
+   *   shaker  - 0.05 s white-noise burst through a bandpass
+   *             (6 kHz high / 4 kHz low), 0.06 s decay
+   * Routes to the dedicated metronome bus (D33); the
+   * `?? masterGain` fallback keeps pre-init click behavior intact.
+   */
   playMetronomeClick(high: boolean) {
     if (!this.ctx || !this.masterGain) return;
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+    this.synthMetronomeClick(this.ctx.currentTime, high);
+  }
 
+  /**
+   * Same synthesis as playMetronomeClick, fired at
+   * ctx.currentTime + delaySec (WebAudio sample-accurate). Used ONLY
+   * by the triplet path (D34) - the legacy-equivalent default config
+   * never calls it, so the frozen spy pin is safe.
+   */
+  scheduleMetronomeClick(high: boolean, delaySec: number) {
+    if (!this.ctx || !this.masterGain) return;
+    const d = Number.isFinite(delaySec) && delaySec > 0 ? delaySec : 0;
+    this.synthMetronomeClick(this.ctx.currentTime + d, high);
+  }
+
+  /** Lazily-built 0.05 s white-noise buffer for the shaker preset. */
+  private metronomeNoiseBuffer(): AudioBuffer | null {
+    if (!this.ctx) return null;
+    if (!this.metronomeNoise) {
+      const length = Math.max(1, Math.floor(this.ctx.sampleRate * 0.05));
+      const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i += 1) data[i] = Math.random() * 2 - 1;
+      this.metronomeNoise = buffer;
+    }
+    return this.metronomeNoise;
+  }
+
+  private synthMetronomeClick(when: number, high: boolean) {
+    const ctx = this.ctx;
+    if (!ctx || !this.masterGain) return;
+    const dest: AudioNode = this.metronomeGain ?? this.masterGain;
+
+    if (this.metronomePreset === "shaker") {
+      const noise = this.metronomeNoiseBuffer();
+      if (!noise) return;
+      const src = ctx.createBufferSource();
+      src.buffer = noise;
+      const band = ctx.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.setValueAtTime(high ? 6000 : 4000, when);
+      band.Q.value = 1;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.4, when);
+      gain.gain.exponentialRampToValueAtTime(0.01, when + 0.06);
+      src.connect(band);
+      band.connect(gain);
+      gain.connect(dest);
+      src.start(when);
+      src.stop(when + 0.06);
+      return;
+    }
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    if (this.metronomePreset === "click") {
+      osc.type = "square";
+      osc.frequency.setValueAtTime(high ? 1000 : 600, when);
+      gain.gain.setValueAtTime(0.3, when);
+      gain.gain.exponentialRampToValueAtTime(0.01, when + 0.03);
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(when);
+      osc.stop(when + 0.03);
+      return;
+    }
+
+    // "beep" (default): the CURRENT sound verbatim - only the
+    // destination moved to the metronome bus (D33).
     osc.type = "sine";
-    osc.frequency.setValueAtTime(high ? 800 : 400, now);
-    osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.1);
-
-    gain.gain.setValueAtTime(0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-
+    osc.frequency.setValueAtTime(high ? 800 : 400, when);
+    osc.frequency.exponentialRampToValueAtTime(0.01, when + 0.1);
+    gain.gain.setValueAtTime(0.5, when);
+    gain.gain.exponentialRampToValueAtTime(0.01, when + 0.1);
     osc.connect(gain);
-    gain.connect(this.masterGain);
-
-    osc.start(now);
-    osc.stop(now + 0.1);
+    gain.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.1);
   }
 
 

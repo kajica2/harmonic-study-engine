@@ -16,8 +16,11 @@ point, and the two coexist.
 User requirements traced here: REQ-ETU-1 (controls), REQ-ETU-2
 (constraints), REQ-ETU-3 (URL persistence), REQ-ETU-4 (regenerate /
 randomize), REQ-ETU-15 (determinism), REQ-ETU-20/21 (roll + staff),
-REQ-ETU-31 (MusicXML melody). Design authority:
-`docs/PHASE-3-SLICE2.md`.
+REQ-ETU-31 (MusicXML melody), plus the slice-3 surfaces over the
+views: REQ-PED-4 (etude annotation display) / REQ-PED-5 / REQ-PED-7
+(margin notes + concept drawer) and REQ-ETU-32 (print). Design
+authority: `docs/PHASE-3-SLICE2.md` (slice 2) and
+`docs/PHASE-3-SLICE3.md` (slice 3 surfaces).
 
 ## The core controls
 
@@ -81,11 +84,15 @@ Generate and Randomize both go through the same accept path
   `etu-etu-<hash>`) and **prepended to the Paths list as the active
   path**. It is deduped by id, so generating the same seed twice does
   not clutter the list.
-- Playback, looping, section ranges, the metronome, key-cycle,
-  WAV / MIDI export: everything works on it exactly like a curated
-  path, because it flows through the existing chain. The backing
-  chords sound; the generated **melody does not play yet** -- in this
-  slice it is notation + piano roll only (see "Not yet").
+- Playback, whole-path looping, the metronome (including the slice-3
+  click-settings popover and count-in -- `docs/PRACTICE-MECHANICS.md`),
+  key-cycle, WAV / MIDI export: everything works on it exactly like
+  a curated path, because it flows through the existing chain. The
+  one exception is **section loop ranges** (shift+click start/end
+  bars), which are unreliable on generated etudes -- see the caveat
+  under "Not yet". The backing chords sound; the generated **melody
+  does not play yet** -- in this slice it is notation + piano roll
+  only (see "Not yet").
 - Accept **resets transposition**: global offset to 0, per-exercise
   offset to 0, key-cycle disengaged -- the same reset that generate /
   persona-switch / import perform (Phase 2 convention).
@@ -121,6 +128,16 @@ instantly (the result is held in memory).
   follows the current sounding transpose (global + per-exercise) for
   the melody notes, while chord symbols stay in concert key, matching
   the rest of the app.
+
+Below the tabs, slice 3 added the annotation surfaces: a **Notes**
+toggle (on by default) that shows or hides both the **margin-note
+chip strip** (one chip per bar-anchored annotation -- `[m3-4] ii-V-I`
+style; the chip covering the bar you are playing is highlighted) and
+the **"About this etude"** fold (the full annotation list with its
+text). Chips and About entries that resolve to a pedagogy concept
+open the **Concept drawer**; the rest are plain text. The section
+also gained a **Print** button (browser print of the active tab plus
+visible annotations). Details: `docs/PRACTICE-MECHANICS.md`.
 
 ## MusicXML download
 
@@ -202,18 +219,31 @@ Full map in `docs/MODES.md`:
 - There is deliberately **no `G` shortcut** for Generate in this slice
   (the PRD lists one; the button + URL are the shipped affordances).
 
-## Not yet (slice 3 and follow-ups)
+## Not yet (follow-ups)
 
+- **Section loop ranges are unreliable on generated etudes.** The
+  sub-range loop math (start/end bars set via shift+click) assumes
+  four steps per bar, while an etude practice path carries ONE step
+  per bar -- so a range lands on the wrong window instead of the
+  bars you picked. Whole-path looping is unaffected. This predates
+  slice 3 and is an open product decision (F3 / D41 in
+  `docs/PHASE-3-SLICE3.md`, tracked in the Phase 3 table of
+  `FUTURE_PLANNING.md`), not something slice 3 silently fixed.
+  Until it resolves, loop the etude as a whole.
 - **Melody audio**: the generated melody is notation + piano roll
   only. Playback is the chord backing through the existing chain; the
-  tune's melody line does not sound. Wiring it (or a Play-Along mute)
-  is a follow-up candidate.
-- **Annotations / concept drawer**: the engine already annotates each
-  etude truthfully (slice 1), but there is no display surface yet --
-  that is slice 3 (REQ-PED-4/5/7).
+  tune's melody line does not sound. Formally deferred (TD-034):
+  real melody audio needs a step-synced scheduler of its own.
+- **Annotation surfaces shipped for etudes only.** The margin chips,
+  About panel, Notes toggle, and Concept drawer are live (slice 3);
+  the Compose / Explore hosts of REQ-PED-4 remain open, as do
+  right-click-to-open on chord symbols (REQ-PED-6), concept search
+  (REQ-PED-12), and the drawer's "Hear an example" / "Send to
+  Explore" actions (REQ-PED-13). Drawer + print guide:
+  `docs/PRACTICE-MECHANICS.md`.
 - The three deferred advanced constraints (above).
 - No popstate / back-forward handling for URL changes (replaceState
-  only), no print CSS, no metronome presets.
+  only).
 
 ## Where to look
 

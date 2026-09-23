@@ -167,7 +167,11 @@ the loop which near-term work unblocks the strategic plan.
 | MIDI export | SHIPPED | `src/lib/midiExport.ts` covers `asWritten` + `splitTracks`. |
 | MusicXML export | SHIPPED - Phase 3 slice 2, 2026-09-23 (melody voice) | `toMusicXml` gains an additive second part P2 (melody) behind the "MusicXML (with melody)" button - true-form export; chord-only exports stay byte-identical (frozen pins). Carve-out: the melody ships as notation + roll only - melody AUDIO playback is NOT wired (chord backing plays through the existing chain). |
 | URL constraint serialization (shareable etude links, REQ-ETU-3) | SHIPPED - Phase 3 slice 2, 2026-09-23 | `?style=&key=&tmode=&diff=&bars=&tempo=&seed=` (+ advanced keys) via the single debounced replaceState writer; same URL => same etude (round-trip pinned). `tmode` avoids the `mode=` collision with the app-mode selector. Carve-outs: boot read only (no popstate/back-forward, TD-027), no copy-link button. |
-| Practice mechanics (metronome volume/preset/accents/subdivision, count-in, annotation surfaces, print) | NOT STARTED - pending slice 3 | Metronome toggle + section looping already exist (REQ-PRAC-20); slice 3 closes the REQ-PRAC-1/2/10/11 gaps + REQ-PED-4/5/7 surfaces + REQ-ETU-32 print, per `docs/PHASE-3-ETUDE.md`. |
+| Metronome settings (volume / presets / subdivision / accents, REQ-PRAC-1/2) | SHIPPED - Phase 3 slice 3, 2026-09-23 | Click-settings gear popover in `PracticeHeader`: independent click bus (playback volume cannot touch the click; the click left the recording tap by design), 3 syntheses (beep/click/shaker), beat-relative subdivision 1-4 (triplets ride WebAudio scheduling beside the immutable 16th grid), meter-derived accent chips (4/6/7/11/16). All prefs persist (fixes the latent `metronomeOn` read-with-no-write bug). Default config is bit-identical to the legacy click (exhaustive per-meter oracle vs the frozen `tests/rhythm.test.ts` spy). Docs: `docs/PRACTICE-MECHANICS.md`. |
+| Count-in (REQ-PRAC-10/11) | SHIPPED - Phase 3 slice 3, 2026-09-23 | Pre-roll gate (`requestPlayState`) upstream of the transport: the countdown fires before ANY playback starts (grid/backing/chords untouched by construction), visible beats-left overlay (`aria-live`), 0/1/2 bars, second-press cancels, clicks sound even with the Click toggle off (opt-in IS the consent), subdivision deliberately not applied to the pre-roll. e2e leg: `e2e/count-in.spec.ts`. |
+| Annotation surfaces + Concept drawer (REQ-PED-4/5/7) | SHIPPED - Phase 3 slice 3, 2026-09-23 | Margin-note chips + "About this etude" panel + Notes toggle in `EtudeViews`; concept chips open the right-slide `ConceptDrawer` (on `ModalShell`: focus trap/restore, Escape). Carve-outs: REQ-PED-4 ships the ETUDE portion only (Compose/Explore annotation hosts deferred - dirty files); REQ-PED-6 right-click chord -> drawer deferred (D39); REQ-PED-12 search + REQ-PED-13 hear-example / send-to-explore deferred (D38). |
+| Print (REQ-ETU-32) | SHIPPED - Phase 3 slice 3, 2026-09-23 | Global `@media print` block + `print-area`/`print-hide` classes + WYSIWYG Print button in the etude views (active tab + visible annotations; light-token flip, 14 mm margins). Etude views only - other surfaces can opt in later. |
+| Section loop ranges on generated etude paths (F3) | USER-DECISION - open | The sub-range loop math in the transport's measure handler assumes 4 steps/bar; etude paths carry 1 step/bar, so a start/end-bar range lands on the wrong window (whole-path looping unaffected). Pre-existing, not worsened by slice 3; fixing it touches the sacred handler - dedicated transport slice vs ~10-line rail gate fast-follow, per `docs/PHASE-3-SLICE3.md` D41. |
 
 ### PRD Phase 4 - Compose mode
 
@@ -193,9 +197,9 @@ the loop which near-term work unblocks the strategic plan.
 
 | PRD item | Status | Notes |
 |---|---|---|
-| Annotations on every artifact | NOT STARTED | `PathBriefing` is the closest existing thing - curated objectives per path, not per-generated-element. |
+| Annotations on every artifact | SHIPPED | Phase 3 slice 3 - ETUDE portion: margin-note chips + "About this etude" + Notes toggle in `EtudeViews` (annotations on every etude artifact). Compose/Explore annotation hosts deferred (dirty files). |
 | Concept registry (>= 8 concepts) | NOT STARTED | `TERMINOLOGY.md` exists as a glossary; no structured Concept type. |
-| Concept drawer | NOT STARTED | New global component. |
+| Concept drawer | SHIPPED | Phase 3 slice 3: right-slide `ConceptDrawer` on `ModalShell` (REQ-PED-5), opened from etude annotation chips; global hosts + right-click entry deferred (D39). |
 | Ear training sub-mode | NOT STARTED | Quiz module (`src/data/quizzes/`) covers quiz topics; not ear training. |
 | Spaced repetition | NOT STARTED | New. |
 
@@ -204,8 +208,8 @@ the loop which near-term work unblocks the strategic plan.
 | PRD item | Status | Notes |
 |---|---|---|
 | Metronome | SHIPPED | `src/lib/rhythm.ts` + `metronomeEnabled` state; toolbar toggle. |
-| Count-in | PARTIAL | Metronome ticks before playback but no visible "3... 2... 1..." |
-| Section looping | SHIPPED | Loop range picker exists. |
+| Count-in | SHIPPED | Phase 3 slice 3: visible beats-left overlay + pre-roll gate (`requestPlayState`, 0/1/2 bars, second-press/Escape cancels); e2e `e2e/count-in.spec.ts`. |
+| Section looping | SHIPPED | Loop range picker exists (curated paths; etude paths = F3 USER-DECISION - the sub-range math assumes 4 steps/bar). |
 | A/B compare | NOT STARTED | New. |
 | Tempo ramp | NOT STARTED | New. |
 | Latency calibration | NOT STARTED | New. |

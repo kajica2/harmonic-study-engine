@@ -186,3 +186,48 @@ textarea:focus-visible,
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
+
+/* =============================================================================
+   PRD-001 Phase 3 Slice 3: Concept drawer slide-in (D38) + print stylesheet
+   (D40 / REQ-ETU-32). The global stylesheet is the ONLY home for the print
+   rules: LiveScoreDisplay and the view chrome are DIRTY files, and component-
+   scoped Tailwind cannot express "hide the rest of the app" without touching
+   them. The reduced-motion block above already collapses drawer-in.
+   ============================================================================= */
+@keyframes drawer-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.drawer-in {
+  animation: drawer-in var(--dur-base) var(--easing-standard);
+}
+
+/* Print: WYSIWYG of the tagged root (.print-area - the EtudeViews section).
+ * The VISIBILITY pattern (not display:none) avoids fighting the flex/grid
+ * app layout; the sticky header, sidebars, keyboard and IdeaBar vanish
+ * WITHOUT a single component edit. */
+@media print {
+  body { background: #ffffff; }
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    /* Light-token flip in ONE rule: every Tailwind var()-driven class
+     * inside the area re-resolves to print-safe values. The roll's
+     * Okabe-Ito fills (CVD-safe, print-safe) and abcjs's black-on-
+     * transparent SVG both print correctly on white. */
+    --color-bg-1: #ffffff;
+    --color-bg-2: #f4f4f5;
+    --color-text-1: #18181b;
+    --color-text-2: #3f3f46;
+    --color-text-3: #71717a;
+    --color-border: #a1a1aa;
+  }
+  /* In-area controls never belong on paper. */
+  .print-hide { display: none !important; }
+  .print-area svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  @page { margin: 14mm; }
+}

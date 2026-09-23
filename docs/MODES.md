@@ -1,4 +1,4 @@
-# Modes (PRD-001 Phases 1-2)
+# Modes (PRD-001 Phases 1-3)
 
 The Harmonic Study Engine ships in three modes -- Compose, Etude, and
 Explore -- plus a sticky-bottom Idea bar that carries a single
@@ -125,6 +125,11 @@ arbitrary offsets. Turning the cycle off keeps the current
 offset. The advance decision is pure in `src/lib/keyCycle.ts`
 and never marks the session dirty (it is a view transform, not a
 composition edit).
+
+The metronome click settings (volume / sound / subdivision /
+accents) and the count-in pre-roll live in the practice header's
+Click-settings popover -- they ride this same transport on every
+path, etudes included: `docs/PRACTICE-MECHANICS.md`.
 
 ### Keyboard map (changed in Phase 2 -- muscle memory!)
 

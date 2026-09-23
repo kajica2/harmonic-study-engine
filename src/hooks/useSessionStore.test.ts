@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useSessionStore } from "./useSessionStore";
 
@@ -63,5 +63,82 @@ describe("useSessionStore.setHarmonicStep", () => {
     rerender();
     const ref2 = result.current.setHarmonicStep;
     expect(ref1).toBe(ref2);
+  });
+});
+
+// ---------- T5 (PRD-001 Phase 3 Slice 3, D32 + F2) ----------------------
+//
+// The F2 regression: metronomeOn hydrated from localStorage at boot
+// but had NO write path - the toggle silently reset on every reload.
+// These pins make the boot comment true: after a toggle, storage
+// holds the new value; after a config change, the JSON blob round-
+// trips through the corruption-safe normalize.
+
+describe("useSessionStore metronome persistence (D32/F2)", () => {
+  afterEach(() => {
+    localStorage.removeItem("synesthesia_metronomeOn");
+    localStorage.removeItem("synesthesia_metronomeConfig");
+  });
+
+  it("F2 regression: setMetronomeOn(true) writes '1' to storage", () => {
+    const { result } = renderHook(() => useSessionStore());
+    act(() => {
+      result.current.setMetronomeOn(true);
+    });
+    expect(localStorage.getItem("synesthesia_metronomeOn")).toBe("1");
+    act(() => {
+      result.current.setMetronomeOn(false);
+    });
+    expect(localStorage.getItem("synesthesia_metronomeOn")).toBe("0");
+  });
+
+  it("metronomeConfig persists as one normalized JSON blob", () => {
+    const { result } = renderHook(() => useSessionStore());
+    act(() => {
+      result.current.setMetronomeConfig({
+        volume: 55,
+        preset: "shaker",
+        subdivision: 3,
+        accentBeats: [0, 2],
+        countInBars: 1,
+      });
+    });
+    const raw = localStorage.getItem("synesthesia_metronomeConfig");
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw!)).toEqual({
+      volume: 55,
+      preset: "shaker",
+      subdivision: 3,
+      accentBeats: [0, 2],
+      countInBars: 1,
+    });
+  });
+
+  it("corrupt stored config hydrates to normalized defaults", () => {
+    localStorage.setItem(
+      "synesthesia_metronomeConfig",
+      JSON.stringify({
+        volume: "loud",
+        preset: "kazoo",
+        subdivision: 7,
+        accentBeats: "none",
+        countInBars: 99,
+      }),
+    );
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.metronomeConfig).toEqual({
+      volume: 80,
+      preset: "beep",
+      subdivision: 1,
+      accentBeats: [0],
+      countInBars: 0,
+    });
+  });
+
+  it("unparseable JSON hydrates to defaults (no throw at boot)", () => {
+    localStorage.setItem("synesthesia_metronomeConfig", "{not json");
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.metronomeConfig.volume).toBe(80);
+    expect(result.current.metronomeConfig.preset).toBe("beep");
   });
 });

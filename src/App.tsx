@@ -23,7 +23,7 @@ function triadFromRoot(
   return notes;
 }
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, lazy, Suspense, startTransition, type Dispatch, type SetStateAction } from "react";
 import {
   Play,
   Pause,
@@ -52,6 +52,11 @@ import {
 } from "lucide-react";
 import { audioEngine, InstrumentType } from "./lib/audio";
 import { rhythmEngine } from "./lib/rhythm";
+// PRD-001 Phase 3 Slice 3: count-in pre-roll gate (D35) + metronome
+// config sync effects (D32/D33/D34).
+import { useCountIn } from "./hooks/useCountIn";
+import { CountInOverlay } from "./components/CountInOverlay";
+import { beatsPerMeasureFor } from "./lib/metronomePatterns";
 import { playbackClock } from "./lib/playbackClock";
 import { usePlaybackState } from "./hooks/use-playback-state";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
@@ -312,6 +317,8 @@ function AppShell() {
     setLoopEndBar,
     metronomeOn,
     setMetronomeOn,
+    metronomeConfig,
+    setMetronomeConfig,
     scoreDisplayMode,
     setScoreDisplayMode,
     melodyByStep,
@@ -428,6 +435,76 @@ function AppShell() {
   const [isPlayingAuto, setIsPlayingAuto] = useState(false);
   const isPlayingAutoRef = useRef(isPlayingAuto);
   isPlayingAutoRef.current = isPlayingAuto;
+  // PRD-001 Phase 3 Slice 3 (D35): count-in PRE-ROLL GATE, UPSTREAM of
+  // the isPlayingAuto choke-point effect. During the pre-roll
+  // isPlayingAuto stays FALSE, so the grid / backing engine / chord
+  // advance / cycle-12 effects never boot - "plays before ANY playback
+  // starts" (REQ-PRAC-10) holds by construction, and the sacred
+  // onMeasureStart measure-tick contract is structurally unbreakable
+  // from here. The gate is the WHOLE blast radius: every start intent
+  // funnels through requestPlayState instead of setIsPlayingAuto.
+  const countInBeatsPerBar = beatsPerMeasureFor(timeSignature);
+  const countIn = useCountIn({
+    bars: metronomeConfig.countInBars,
+    // FIX ROUND (REVIEWER L3): the hook now DERIVES beats-per-bar and
+    // the ms-per-beat pace from the meter helpers (same beat-unit
+    // source as rhythm.ts), so a 6/8 pre-roll paces at the eighth
+    // beat like the incoming grid. countInBeatsPerBar stays only for
+    // the overlay's bar subline.
+    timeSignature,
+    tempo,
+    onBeat: (_beatsLeft, isDownbeat) => {
+      // Downbeat-high beat pulse through the D33 metronome bus (the
+      // preset + independent volume are honored via engine state).
+      // Subdivision is deliberately NOT applied to the pre-roll: the
+      // count-in exists to establish the TEMPO (D35). Fires even when
+      // metronomeOn is false - opting into bars > 0 IS the consent.
+      audioEngine.playMetronomeClick(isDownbeat);
+    },
+    onComplete: () => {
+      // The gate releases into the EXISTING transport effect: the raw
+      // setter is correct here (the count-in already ran; this IS the
+      // playback start, not an intent to gate).
+      setIsPlayingAuto(true);
+    },
+  });
+  // Refs so requestPlayState keeps a STABLE identity (the memoized
+  // MobileCommandBar / PlaySessionRail must not re-render on every
+  // config tick) while always reading fresh state.
+  const countInRef = useRef(countIn);
+  countInRef.current = countIn;
+  const countInBarsRef = useRef(metronomeConfig.countInBars);
+  countInBarsRef.current = metronomeConfig.countInBars;
+  /**
+   * Same Dispatch<SetStateAction<boolean>> signature as
+   * setIsPlayingAuto, so every consumer prop keeps its type (the
+   * rail's narrower (v: boolean) => void is satisfied by parameter
+   * contravariance). CRITICAL SEMANTICS (D35): a functional updater
+   * resolves against the COMBINED active state (playing OR counting),
+   * NOT isPlayingAuto alone - a second Play press during the pre-roll
+   * resolves to false and CANCELS the count-in instead of restarting
+   * it. Stop paths cancel the pre-roll too (a MIDI/Escape stop must
+   * never leave a countdown running behind it).
+   */
+  const requestPlayState = useCallback<Dispatch<SetStateAction<boolean>>>(
+    (next) => {
+      const ci = countInRef.current;
+      const wasActive = isPlayingAutoRef.current || ci.active;
+      const resolved = typeof next === "function" ? next(wasActive) : next;
+      if (resolved) {
+        if (wasActive) return; // already playing - or counting; never double-start
+        if (countInBarsRef.current > 0 && !rhythmEngine.isRunning) {
+          ci.start();
+        } else {
+          setIsPlayingAuto(true);
+        }
+        return;
+      }
+      if (ci.active) ci.cancel();
+      setIsPlayingAuto(false);
+    },
+    [],
+  );
   // MIDI Clock from DAW: opt-in tempo + transport sync. Off by
   // default so existing users see no behavior change. When on, a
   // MidiClockFollower consumes the window "midiclock" CustomEvent
@@ -473,8 +550,13 @@ function AppShell() {
       setTempo(clamped);
     });
     const offTransport = follower.onTransport((kind) => {
-      if (kind === "stop") setIsPlayingAuto(false);
-      else setIsPlayingAuto(true);
+      // PRD-001 Phase 3 Slice 3 (D35): routed through the count-in
+      // gate. A DAW "start" during idle arms the pre-roll like any
+      // other start intent; a "stop" also CANCELS an in-flight
+      // count-in (the wrapper's false-path is idempotent for plain
+      // playback stops).
+      if (kind === "stop") requestPlayState(false);
+      else requestPlayState(true);
     });
     window.addEventListener("midiclock", handleClock);
     return () => {
@@ -732,9 +814,13 @@ function AppShell() {
     [isLooping],
   );
   const handleCommandCommit = useCallback(() => {
+    // F4 (accepted): recorder.start() fires BEFORE the gate, so with a
+    // count-in armed the take window includes the pre-roll beats. The
+    // note-event recorder captures NOTES, not audio, and the click
+    // left the recording tap anyway (D33) - no audible artifact.
     recorder.start();
-    setIsPlayingAuto(true);
-  }, []);
+    requestPlayState(true);
+  }, [requestPlayState]);
 
   const handleQuizAnswer = useCallback(
     (wasCorrect: boolean, correct: number, total: number) => {
@@ -1056,8 +1142,18 @@ function AppShell() {
           e.preventDefault();
           return;
         }
-        if (isPlayingAuto) {
-          setIsPlayingAuto(false);
+        // FIX ROUND (REVIEWER M2): stop ALWAYS goes through the gate.
+        // The old raw branch was doubly wrong: (a) during a count-in
+        // pre-roll isPlayingAuto is FALSE, so Escape left the
+        // countdown running - contradicting the gate contract above
+        // ("a MIDI/Escape stop must never leave a countdown
+        // running"); (b) isPlayingAuto here is a STALE closure read
+        // (the effect deps are the path lengths only), so Escape
+        // could also no-op during plain playback. requestPlayState
+        // reads the live refs: idempotent for the playing case,
+        // CANCELS the pre-roll otherwise.
+        if (isPlayingAutoRef.current || countInRef.current.active) {
+          requestPlayState(false);
           e.preventDefault();
         }
         return;
@@ -1127,9 +1223,12 @@ function AppShell() {
           return nextInit;
         });
       } else if (e.key === " " || e.code === "Space") {
-        // Space → toggle Auto playback
+        // Space -> toggle Auto playback. Functional form (D35): the
+        // count-in gate resolves the toggle against the COMBINED
+        // playing-or-counting state, so Space during a pre-roll
+        // CANCELS it instead of restarting it.
         e.preventDefault();
-        setIsPlayingAuto((p) => !p);
+        requestPlayState((p) => !p);
       } else if (e.key === "m" || e.key === "M") {
         // M → toggle Play Along (mute synth melody)
         e.preventDefault();
@@ -1344,6 +1443,27 @@ function AppShell() {
   useEffect(() => {
     rhythmEngine.setMetronomeEnabled(metronomeOn);
   }, [metronomeOn]);
+
+  // PRD-001 Phase 3 Slice 3 (D34): the AGENTS.md sync pattern,
+  // extended - subdivision + per-beat accents ride ONE atomic setter
+  // into the rhythm engine (the 16th grid itself never changes;
+  // defaults reproduce the legacy click - T1 oracle).
+  useEffect(() => {
+    rhythmEngine.setMetronomePattern(
+      metronomeConfig.subdivision,
+      metronomeConfig.accentBeats,
+    );
+  }, [metronomeConfig.subdivision, metronomeConfig.accentBeats]);
+  // D33: click volume + preset ride the dedicated metronome bus in
+  // audio.ts (INDEPENDENT of the master-volume effect below -
+  // REQ-PRAC-2). Config flows via engine STATE, never extra
+  // playMetronomeClick args (F1).
+  useEffect(() => {
+    audioEngine.setMetronomeVolume(metronomeConfig.volume / 100);
+  }, [metronomeConfig.volume]);
+  useEffect(() => {
+    audioEngine.setMetronomePreset(metronomeConfig.preset);
+  }, [metronomeConfig.preset]);
 
   // beatType is owned by backingEngine — see the useEffect below that
   // calls backingEngine.setStyle(beatType) when playback starts. The
@@ -1766,8 +1886,8 @@ function AppShell() {
 
       {/* Mobile-only fixed command bar (hidden on md+) */}
       <MobileCommandBar
-        isPlayingAuto={isPlayingAuto}
-        setIsPlayingAuto={setIsPlayingAuto}
+        isPlayingAuto={isPlayingAuto || countIn.active}
+        setIsPlayingAuto={requestPlayState}
         activeStepIndex={activeStepIndex}
         setActiveStepIndex={handleCommandStepIndex}
         pathLength={path.steps.length}
@@ -1779,6 +1899,17 @@ function AppShell() {
         isLooping={isLooping}
         onCommit={handleCommandCommit}
       />
+
+      {/* PRD-001 Phase 3 Slice 3 (D35/REQ-PRAC-11): visible pre-roll
+          countdown ("3.. 2.. 1.."). Mounted iff the count-in is
+          running - the gate guarantees playback has not started. */}
+      {countIn.active && (
+        <CountInOverlay
+          beatsLeft={countIn.beatsLeft}
+          beatsPerBar={countInBeatsPerBar}
+          totalBars={metronomeConfig.countInBars}
+        />
+      )}
 
       <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[color:var(--color-border)] surface-1 flex flex-wrap gap-3 sm:gap-4 justify-between items-center backdrop-blur-xl sticky top-0 z-30">
         <div className="min-w-0 flex items-center gap-3">
@@ -1970,9 +2101,12 @@ function AppShell() {
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
         guideToneTrail={guideTrail.tally}
-        isPlaying={isPlayingAuto}
+        isPlaying={isPlayingAuto || countIn.active}
         onPlayPause={() => {
-          setIsPlayingAuto(!isPlayingAuto);
+          // Functional form (D35): the gate resolves the toggle
+          // against playing-OR-counting, so the header button shows
+          // PAUSE during the pre-roll and pressing it cancels.
+          requestPlayState((p) => !p);
         }}
         tempo={tempo}
         onTempoChange={setTempo}
@@ -1980,6 +2114,8 @@ function AppShell() {
         onLoopToggle={() => setIsLooping(!isLooping)}
         metronomeOn={metronomeOn}
         onMetronomeToggle={() => setMetronomeOn(!metronomeOn)}
+        metronomeConfig={metronomeConfig}
+        onMetronomeConfigChange={setMetronomeConfig}
         backingStyle={beatType}
         onBackingStyleChange={setBeatType}
         volume={volume}
@@ -2046,6 +2182,18 @@ function AppShell() {
             onAccept applies the proposed substitution to the active
             step in the active path via setHarmonicStep. */}
         {(() => {
+          // TD-035 MUST-FIX (D41): handleCoComposeAccept writes FOUR
+          // consecutive steps (activeBar * STEPS_PER_BAR + s) - the
+          // legacy 4-steps-per-bar path shape. Etude paths carry ONE
+          // STEP PER BAR, so a single accept would silently rewrite
+          // FOUR DIFFERENT etude bars. Gating the mount (the same
+          // render-time pattern as the EtudeViews gate, ADR-011)
+          // makes the corrupting handler unreachable; co-compose
+          // editing on generated etudes is a product decision that
+          // needs accept->step semantics revisited first.
+          if (activeEtude && path.id === etudePathId(activeEtude)) {
+            return null;
+          }
           const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
           const seed = (path.id.charCodeAt(0) || 0) ^ ((activeBar + 1) * 0x9e3779b9);
           return (
@@ -2110,8 +2258,12 @@ function AppShell() {
           activePath={path}
           activePathIndex={activePathIndex}
           setActivePathIndex={setActivePathIndex}
-          isPlayingAuto={isPlayingAuto}
-          setIsPlayingAuto={setIsPlayingAuto}
+          isPlayingAuto={isPlayingAuto || countIn.active}
+          // D35: the wrapper satisfies the rail's narrower
+          // (v: boolean) => void prop type by contravariance; the
+          // rail's stop+rewind call becomes a gate-stop (cancels an
+          // in-flight pre-roll too - correct for a STOP button).
+          setIsPlayingAuto={requestPlayState}
           isLooping={isLooping}
           setIsLooping={setIsLooping}
           loopStartBar={loopStartBar}
@@ -3419,11 +3571,31 @@ function AppShell() {
 
                   <ToolGroup label="Transport">
                     <ToolChip
-                      active={isPlayingAuto}
-                      onClick={() => setIsPlayingAuto(!isPlayingAuto)}
-                      title={isPlayingAuto ? "Pause auto-playback" : "Audition the whole path in tempo"}
+                      // FIX ROUND (DOCS M2 / REVIEWER L5): the 4TH
+                      // playing-glyph site the design missed - header,
+                      // MobileCommandBar and the rail already show the
+                      // COMBINED playing-or-counting state; this chip's
+                      // onClick already toggles through the gate, so
+                      // the glyph must match or it lies during the
+                      // pre-roll (shows "Auto" while Pause would
+                      // CANCEL).
+                      active={isPlayingAuto || countIn.active}
+                      onClick={() => requestPlayState((p) => !p)}
+                      title={
+                        isPlayingAuto || countIn.active
+                          ? "Pause auto-playback"
+                          : "Audition the whole path in tempo"
+                      }
                     >
-                      {isPlayingAuto ? <><Pause size={12} /> Pause</> : <><Play size={12} /> Auto</>}
+                      {isPlayingAuto || countIn.active ? (
+                        <>
+                          <Pause size={12} /> Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play size={12} /> Auto
+                        </>
+                      )}
                     </ToolChip>
                     <ToolChip
                       active={audioEngine.melodyMuted}
@@ -3869,6 +4041,15 @@ function AppShell() {
                     Edits write back to useSessionStore.melodyByStep under
                     the key `${pathId}::${barIndex}`. */}
                 {(() => {
+                  // TD-035 DOCUMENT-SAFE (D41): floor(step /
+                  // STEPS_PER_BAR) lags 4x on one-step-per-bar etude
+                  // paths (the label + edit key are mis-keyed). Left
+                  // un-gated ON PURPOSE: melodyByStep has NO audio
+                  // playback consumer (grep-verified - MelodyLane
+                  // display only), so a mis-keyed edit is invisible-
+                  // but-harmless, and the lane doubles as a manual
+                  // sketch pad whose hiding is a product call. See
+                  // the D41 verdict table in docs/PHASE-3-SLICE3.md.
                   const activeBar = Math.floor(activeStepIndex / STEPS_PER_BAR);
                   const stepKey = `${path.id}::${activeBar}`;
                   const stored = melodyByStep[stepKey] ?? [];
