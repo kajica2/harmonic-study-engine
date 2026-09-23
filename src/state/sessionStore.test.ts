@@ -1,9 +1,12 @@
 /**
- * src/state/sessionStore.test.ts - PRD-001 Phase 1 mode slice.
+ * src/state/sessionStore.test.ts - PRD-001 Phase 1 mode slice +
+ * Phase 3 Slice 2 etude slice (T8).
  *
  * Pins the requestMode / resolveDirty state machine, the persist
- * round-trip (mode / globalTranspose / currentIdea survive reload,
- * dirty + pendingModeRequest do NOT), and that the legacy
+ * round-trip (mode / globalTranspose / currentIdea / etudeConstraints
+ * survive reload, dirty + pendingModeRequest do NOT), the acceptEtude
+ * dirty shape (D30 - byte-equal to the handleCoComposeAccept literal),
+ * the v2 -> v3 migration through the REAL runner, and that the legacy
  * `synesthesia_*` keys are never touched.
  *
  * Runs under jsdom per JSDOM_FILES in vitest.config.ts.
@@ -24,6 +27,7 @@ import { useSessionStore as useLegacySessionStore } from "../hooks/useSessionSto
 import { createSessionRunner } from "../../engine/migrations";
 import { K } from "../lib/storage";
 import { ideaFromChord } from "../../engine/core/idea";
+import type { EtudeConstraints } from "../../engine/etude/types";
 
 const STORE_API = useSessionStore.getState;
 
@@ -392,9 +396,12 @@ describe("Phase 2: v1 -> v2 migration through the real runner", () => {
     const out = runner.run({ version: 1, mode: "etude", globalTranspose: 3 });
     expect(out.ok).toBe(true);
     if (out.ok) {
-      expect(out.value.version).toBe(2);
+      // Slice 2 (D23): the chain is now 1->2->3, so a v1 payload lands
+      // at v3 and additionally gains etudeConstraints: null.
+      expect(out.value.version).toBe(3);
       expect(out.value.exerciseTranspose).toBe(0);
       expect(out.value.keyCycleActive).toBe(false);
+      expect(out.value.etudeConstraints).toBeNull();
       expect(out.value.mode).toBe("etude");
       expect(out.value.globalTranspose).toBe(3);
     }
@@ -463,5 +470,114 @@ describe("Phase 2: REQ-TRANS-7 no-bake proof", () => {
     // The cycle is a view transform: the path steps are byte-identical.
     const parsed = JSON.parse(localStorage.getItem(K.paths) as string);
     expect(parsed[0].steps[0].notes).toEqual([60, 64, 67, 71]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 3 Slice 2 (T8): the etude constraints slice (D23/D30).
+// ---------------------------------------------------------------------------
+
+function etudeConstraints(
+  over: Partial<EtudeConstraints> = {},
+): EtudeConstraints {
+  return {
+    version: 1,
+    styleId: "jazz",
+    key: 0,
+    mode: "major",
+    difficulty: 3,
+    bars: 8,
+    tempo: null,
+    seed: 42,
+    harmony: {
+      allowedQualities: null,
+      allowedNumerals: null,
+      startOn: null,
+      endOn: null,
+      requireChromaticism: false,
+    },
+    melody: {
+      maxIntervalSemitones: null,
+      chordTonesOnStrongBeats: false,
+      range: null,
+    },
+    rhythm: { straightRhythmsOnly: false },
+    ...over,
+  };
+}
+
+describe("Phase 3 Slice 2: acceptEtude dirty semantics (D30)", () => {
+  it("acceptEtude writes constraints + the EXACT handleCoComposeAccept dirty shape", () => {
+    const c = etudeConstraints({ seed: 7 });
+    STORE_API().acceptEtude(c);
+    const s = STORE_API();
+    expect(s.etudeConstraints).toEqual(c);
+    // The literal below is grep-identical to App.tsx handleCoComposeAccept's
+    // setState (compose/explore pinned to "none", etude pending accept).
+    expect(s.dirty).toEqual({
+      compose: "none",
+      etude: "etude-pending-accept",
+      explore: "none",
+    });
+  });
+
+  it("setEtudeConstraints never touches dirty (boot-restore path)", () => {
+    const c = etudeConstraints();
+    STORE_API().setEtudeConstraints(c);
+    expect(STORE_API().etudeConstraints).toEqual(c);
+    expect(STORE_API().dirty.etude).toBe("none");
+    STORE_API().setEtudeConstraints(null);
+    expect(STORE_API().etudeConstraints).toBeNull();
+    expect(STORE_API().dirty.etude).toBe("none");
+  });
+
+  it("resetModeSlice zeroes etudeConstraints", () => {
+    STORE_API().acceptEtude(etudeConstraints());
+    STORE_API().resetModeSlice();
+    expect(STORE_API().etudeConstraints).toBeNull();
+    expect(STORE_API().dirty.etude).toBe("none");
+  });
+});
+
+describe("Phase 3 Slice 2: etude persistence round-trip (D23)", () => {
+  it("constraints survive set -> clear-store -> rehydrate; dirty does NOT", async () => {
+    const c = etudeConstraints({ seed: 1234, bars: 16 });
+    STORE_API().acceptEtude(c);
+    // Let zustand persist's write settle.
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as {
+      state: Record<string, unknown>;
+      version: number;
+    };
+    expect(parsed.version).toBe(CURRENT_SESSION_VERSION);
+    expect(parsed.state.etudeConstraints).toEqual(c);
+    // dirty is session-scoped - NOT persisted (ADR-007 re-derives it).
+    expect(parsed.state.dirty).toBeUndefined();
+
+    // Simulate a RELOAD: wipe in-memory state (this also re-writes the
+    // envelope, so restore the captured one), then rehydrate.
+    STORE_API().resetModeSlice();
+    localStorage.setItem(SESSION_STORAGE_KEY, raw as string);
+    expect(STORE_API().etudeConstraints).toBeNull();
+    useSessionStore.persist.rehydrate();
+    expect(STORE_API().etudeConstraints).toEqual(c);
+    // dirty was NOT in the envelope - the fresh default survives.
+    expect(STORE_API().dirty.etude).toBe("none");
+  });
+
+  it("v2 -> v3 migration through the REAL runner seeds etudeConstraints null", () => {
+    const out = createSessionRunner<{
+      version: number;
+      mode?: string;
+      etudeConstraints?: unknown;
+    }>().run({ version: 2, mode: "etude" });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.version).toBe(3);
+      expect(out.value.etudeConstraints).toBeNull();
+      expect(out.value.mode).toBe("etude");
+    }
   });
 });

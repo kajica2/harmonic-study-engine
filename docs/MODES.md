@@ -58,6 +58,13 @@ A bar click in the PlaySessionRail mints an Idea into the Idea bar;
 the Idea bar's `Send to...` dropdown wires Etude as the universal
 landing target.
 
+Phase 3 slice 2 adds the **Etude Composer** to this surface: a
+constraint panel below the practice rail (style / key / tonal mode /
+difficulty / bars / tempo / seed) that generates deterministic
+etudes, loads them into the practice session, and syncs them to
+shareable `?style=...&seed=...` URLs, with piano roll + abcjs staff
+views. User guide: `docs/ETUDE-COMPOSER.md`.
+
 ### Explore
 
 The exploratory workspace. **Phase 1 ships** the empty state only:
@@ -304,9 +311,9 @@ mount).
 
 ```
 key:        hse.session
-version:    CURRENT_SESSION_VERSION = 2
+version:    CURRENT_SESSION_VERSION = 3
 partialize: { mode, globalTranspose, exerciseTranspose,
-              keyCycleActive, currentIdea }
+              keyCycleActive, currentIdea, etudeConstraints }
 ```
 
 The store is the *single* source of truth for Phase 1 mode state
@@ -316,14 +323,15 @@ bridge to `globalTranspose`. The rest of the legacy hook migrates
 slice-by-slice in Phase 1.5 (ADR-004). `dirty` and
 `pendingModeRequest` are explicitly *not* persisted -- they are
 session-scoped Edit state, not cross-reload state. v1 payloads are
-upgraded to v2 (transpose-slice defaults) by the migration runner
-in `engine/migrations/index.ts`.
+upgraded to v2 (transpose-slice defaults) and v2 to v3 (Phase 3
+slice 2's `etudeConstraints`, seeded to `null`) by the migration
+runner in `engine/migrations/index.ts`.
 
 `src/lib/storage.ts` registers the two new keys:
 
 | Key | Storage | Shape |
 |---|---|---|
-| `K.session` (`hse.session`) | zustand persist JSON | mode + transpose slice: `mode`, `globalTranspose`, `exerciseTranspose`, `keyCycleActive`, `currentIdea` |
+| `K.session` (`hse.session`) | zustand persist JSON | mode + transpose slice + etude constraints: `mode`, `globalTranspose`, `exerciseTranspose`, `keyCycleActive`, `currentIdea`, `etudeConstraints` |
 | `K.ideas` (`hse.ideas`) | hand-managed JSON | `Idea[]`, capped at 100 entries (REQ-IDEA-4) |
 
 Both keys are added to `STORAGE_KEYS` with their shape metadata so

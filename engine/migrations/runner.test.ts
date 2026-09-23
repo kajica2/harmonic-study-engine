@@ -259,24 +259,47 @@ describe("createMigrationRunner", () => {
   });
 });
 
-describe("session registry (Phase 2: v1 -> v2)", () => {
-  it("current is version 2 with a contiguous 1->2 chain", () => {
-    expect(CURRENT_SESSION_VERSION).toBe(2);
+describe("session registry (Phase 2 + Slice 2: v1 -> v2 -> v3)", () => {
+  it("current is version 3 with a contiguous 1->2->3 chain", () => {
+    expect(CURRENT_SESSION_VERSION).toBe(3);
     expect(validateMigrationChain(SESSION_MIGRATIONS, CURRENT_SESSION_VERSION)).toBeNull();
-    expect(SESSION_MIGRATIONS.map((m) => [m.from, m.to])).toEqual([[1, 2]]);
+    expect(SESSION_MIGRATIONS.map((m) => [m.from, m.to])).toEqual([[1, 2], [2, 3]]);
   });
 
-  it("createSessionRunner upgrades a v1 payload to v2 with defaults", () => {
+  it("createSessionRunner upgrades a v1 payload to v3 with defaults", () => {
     const out = createSessionRunner<{
       version: number;
       exerciseTranspose?: number;
       keyCycleActive?: boolean;
+      etudeConstraints?: unknown;
     }>().run({ version: 1 });
     expect(out.ok).toBe(true);
     if (out.ok) {
-      expect(out.value.version).toBe(2);
+      expect(out.value.version).toBe(3);
       expect(out.value.exerciseTranspose).toBe(0);
       expect(out.value.keyCycleActive).toBe(false);
+      expect(out.value.etudeConstraints).toBeNull();
+    }
+  });
+
+  it("v2 -> v3 seeds etudeConstraints null and preserves a present value", () => {
+    const bare = createSessionRunner<{
+      version: number;
+      etudeConstraints?: unknown;
+    }>().run({ version: 2, mode: "etude" });
+    expect(bare.ok).toBe(true);
+    if (bare.ok) {
+      expect(bare.value.version).toBe(3);
+      expect(bare.value.etudeConstraints).toBeNull();
+      expect(bare.value.mode).toBe("etude");
+    }
+    const carried = createSessionRunner<{
+      version: number;
+      etudeConstraints?: unknown;
+    }>().run({ version: 2, etudeConstraints: { version: 1, seed: 7 } });
+    expect(carried.ok).toBe(true);
+    if (carried.ok) {
+      expect(carried.value.etudeConstraints).toEqual({ version: 1, seed: 7 });
     }
   });
 });

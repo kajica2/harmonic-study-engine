@@ -236,7 +236,11 @@ describe("feasibilityOf invariant: null => generateEtude NEVER throws (fix round
     expect(throws).toBeGreaterThan(0);
   });
 
-  it("feasible => never throws: 300-seed sweep over a constraint-shape matrix", () => {
+  // REVIEWER MED-002 (fix round): explicit 30s budget. This sweep runs
+  // 20+ feasible shapes x 300 seeds (~7k generations); under full-suite
+  // parallel load it flakes at the 5s default (~1/6 rate). Assertions
+  // are UNCHANGED - only the timeout moved.
+  it("feasible => never throws: 300-seed sweep over a constraint-shape matrix", { timeout: 30_000 }, () => {
     const NUM_SETS: (readonly string[] | null)[] = [
       null,
       ["ii7", "V7", "Imaj7", "bII7"], // bII7 WITHOUT bVII7: the historical lie class - must be WARNED OUT of this sweep (regression test pins the warning)

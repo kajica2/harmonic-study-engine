@@ -149,7 +149,7 @@ const AXIS_PROGRESSION: Concept = {
   title: "Axis and Major-Third Progressions",
   category: "harmony",
   definition:
-    "Harmony that moves by major thirds or tritones instead of fifths - the symmetric axis of Bartok and the Coltrane cycle.",
+    "Harmony that moves by minor or major thirds instead of fifths - the symmetric axis of Bartok and the Coltrane cycle.",
   body:
     "Fifths divide the octave unevenly, which is why functional harmony has a direction. Major thirds and tritones divide it evenly, and symmetric motion feels like floating between key centers rather than walking to one. Bartok's axis system pairs a tonic with the three keys a minor third apart (A - C - Eb - F#): related by symmetry, not by dominant, so the motion is color, not grammar.\n\n" +
     "Dividing the octave by major thirds is the same kind of symmetry, and Coltrane made that one famous: Giant Steps cycles tonic areas by major third (B - G - Eb - B), each new center approached by its own dominant. The ear loses and regains the ground on purpose - three tonics split the octave evenly, so each modulation lands a major third away instead of the fifth the listener expects.\n\n" +

@@ -2,11 +2,14 @@
 
 Phase 3 slice 1 ships the pure generation core for Etude mode:
 `engine/etude/` (constraints, harmony/melody generators, assembly) and
-`engine/pedagogy/` (concept registry, truthfulness annotator). Nothing
-here is user-facing yet: there is no constraint panel, no adapter, no
-staff or piano-roll view, and zero `src/` changes. Slice 2 wires the UI
-(load path: `etudeToSteps` -> `setPaths`); slice 3 adds practice +
-pedagogy surfaces. Requirements trace to PRD-001 section 8.3 (REQ-ETU),
+`engine/pedagogy/` (concept registry, truthfulness annotator). Slice 1
+itself added zero `src/` changes and was not user-facing; slice 2
+(shipped 2026-09-23) wired the UI - the adapter (`src/lib/etudeEngine.ts`
+-> `setPaths`), the `EtudeComposerPanel`, piano roll + abcjs staff
+views, URL constraint serialization, and the MusicXML melody part (user
+guide: `docs/ETUDE-COMPOSER.md`; design: `docs/PHASE-3-SLICE2.md`).
+Slice 3 adds practice + pedagogy surfaces (annotation display,
+metronome, print). Requirements trace to PRD-001 section 8.3 (REQ-ETU),
 section 8.5 (REQ-PED), and the approved design `docs/PHASE-3-ETUDE.md`
 (decisions D16-D21). The Phase 0 foundations this stands on are
 documented in [engine-foundations.md](engine-foundations.md).
@@ -24,8 +27,8 @@ documented in [engine-foundations.md](engine-foundations.md).
 | `engine/pedagogy/annotate.ts` | `annotateEtude`: nine truthful detectors over generated chords/melody. |
 | `engine/etude/*.test.ts`, `engine/pedagogy/*.test.ts` | Colocated node-env tests (invisible to the README drift gate, same precedent as Phase 0). |
 
-No barrel file; consumers deep-import (`src/lib/etudeEngine.ts` in
-slice 2 will import from `engine/etude/assemble` and `engine/etude/types`).
+No barrel file; consumers deep-import (slice 2's `src/lib/etudeEngine.ts`
+imports from `engine/etude/assemble` and `engine/etude/types`).
 
 ## `generateEtude` - the entry point (REQ-ETU-10..15)
 
@@ -197,14 +200,18 @@ declare function etudeToSteps(etude: Etude): readonly EtudeBarStep[]
 `formPeriod.ts`) renders one step as one BAR. Generated etudes sit on
 the audio side: **one step per bar** (an 8-bar etude = 8 steps). The
 type is structurally identical to `HarmonicStep`
-(`{ name, notes, descriptions }`), and the SLICE 2 ADAPTER CASTS it -
-`src/lib/etudeEngine.ts` will feed the array into the existing
-`setPaths`/`padPath`/`detectFormPeriod` pipeline (the engine's
-`notes` are `readonly`, `HarmonicStep.notes` is mutable, so the cast
-is explicit at the boundary); the engine never
-imports `src/` (purity guard). `padPath` cycles the 8 steps to the 96
-minimum and `detectFormPeriod` recovers the true form (pinned by the
-determinism suite). `descriptions` joins that bar's annotations as
+(`{ name, notes, descriptions }`), and the slice 2 adapter crosses the
+boundary with EXPLICIT COPIES, not a cast (D24: the engine's `notes`
+are `readonly`, `HarmonicStep.notes` is mutable) -
+`src/lib/etudeEngine.ts` feeds the array into the existing
+`setPaths`/`detectFormPeriod` pipeline; the engine never
+imports `src/` (purity guard). Padding is WHOLE-CYCLE, deliberately
+NOT `padPath`: `padPath` truncates the final cycle to exactly 96
+steps, which seams a non-divisor form (e.g. 7 bars: 96 % 7 !== 0);
+repeating whole form passes keeps `steps.length % bars === 0`, so the
+live loop is seamless and `detectFormPeriod` recovers the true form
+(pinned by the determinism suite + `src/lib/etudeEngine.test.ts`).
+`descriptions` joins that bar's annotations as
 `"label: text | label: text"`, falling back to `"numeral - name"`.
 
 ## engine/pedagogy - concepts + annotations (REQ-PED-1/2/3/10/11)
@@ -302,17 +309,34 @@ moved 12 -> 21 in the same commit (D20) and the tree now holds exactly
 `engine/pedagogy/*.test.ts`), run in the node env, and are invisible
 to the README drift gate (which counts `it(` only in `tests/`).
 
-## What slice 1 deliberately does NOT include
+## What slice 1 did not include (slice 2/3 status)
 
-- **No UI.** No constraint panel, no piano roll, no staff view, no
-  concept drawer - nothing is user-facing yet (slices 2/3, PRD
-  14). The legacy `src/lib/etude.ts` Etude Assistant is untouched and
-  still the only generation surface users can reach.
-- **No adapter.** `etudeToSteps`'s output is not cast anywhere yet;
-  `src/lib/etudeEngine.ts` arrives in slice 2.
-- **No persistence/URL.** `EtudeConstraints` is the designed REQ-ETU-3
-  URL payload, but no serialization ships yet.
-- **No exports, no playback wiring, no practice mechanics**
-  (metronome/count-in/print = slice 3; MusicXML melody voice = slice 2).
-- **No new npm dependencies** (VexFlow stays out per D16; `tonal`
-  stays out of `engine/`).
+- **No UI (slice 1).** Slice 2 shipped the constraint panel, piano
+  roll, and staff view; the concept drawer + annotation display remain
+  slice 3. The legacy `src/lib/etude.ts` Etude Assistant was untouched
+  and still coexists with the new panel (D22).
+- **No adapter (slice 1).** `src/lib/etudeEngine.ts` shipped in slice
+  2: memoized non-throwing generation + the copy-not-cast,
+  whole-cycle-padded `Etude -> HarmonicPath` conversion (D24).
+- **No persistence/URL (slice 1).** `src/lib/etudeUrl.ts` shipped in
+  slice 2 (`tmode` carries the tonal mode; `mode` stays the app-mode
+  selector's param), session store v2 -> v3.
+- **No exports, no playback wiring, no practice mechanics (slice 1).**
+  Slice 2: loaded etudes play through the existing chain unchanged
+  (REQ-ETU-22/23/24/30 closed by inheritance) and MusicXML gained the
+  additive melody part (REQ-ETU-31). The etude MELODY itself is still
+  notation + roll only - melody audio is not wired. Metronome
+  presets / count-in / print = slice 3.
+- **No new npm dependencies** (unchanged; VexFlow stays out per D16,
+  `tonal` stays out of `engine/`).
+
+## Consumed by (slice 2)
+
+Generation flows through exactly one adapter: `src/lib/etudeEngine.ts`
+(defaults, memoized `generateEtudeFor`, `etudeToHarmonicPath`), which
+feeds `EtudeComposerPanel` + the roll/staff views and the load
+pipeline in `src/App.tsx` (`handleEtudeAccept`). The panel calls
+`validateEtudeConstraints` + `feasibilityOf` directly for Generate
+gating (D29) - never `generateEtude` itself. User-facing guide:
+`docs/ETUDE-COMPOSER.md`; design: `docs/PHASE-3-SLICE2.md`. The
+purity rule holds: `engine/` still imports nothing from `src/`.

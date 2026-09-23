@@ -81,6 +81,28 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Etude Composer UI wiring (PRD-001 Phase 3 slice 2)** -- the slice 1
+  engine is now user-facing. New "Etude Composer" section on the Etude
+  surface (after the practice rail): style/key/mode/difficulty/bars/
+  tempo/seed controls + a collapsible Advanced row (start-on / end-on
+  numerals, required chromaticism, straight rhythms, chord tones on
+  strong beats, max melody interval). Generate loads a deterministic
+  etude through the existing playback chain (loop, transpose,
+  key-cycle, WAV/MIDI export all work unchanged); Randomize rolls a
+  fresh uint32 seed. Same URL => same etude: constraints serialize
+  into the address bar (`style`, `key`, `tmode`, `diff`, `bars`,
+  `tempo`, `seed` + advanced keys) via the single debounced URL
+  writer, restore on boot without dirtying, and warn-and-drop on
+  malformed params. Accepting marks the Etude session dirty like any
+  composer edit (mode-switch prompt), session store v2 -> v3. Two new
+  read-out views for the loaded etude: a static SVG piano roll
+  (colorblind-safe Okabe-Ito palette with shape redundancy +
+  screen-reader summary) and an abcjs staff view (pure ABC builder
+  with bar-crossing ties, lazy so abcjs stays code-split). MusicXML
+  export gains an additive melody second part ("MusicXML (with
+  melody)" button; chord-only exports are byte-identical to before).
+  The legacy Etude Assistant in the Generator Lab fold coexists
+  untouched. Design: `docs/PHASE-3-SLICE2.md`.
 - **Batch MIDI variations export** — `src/lib/midiBatchExport.ts`
   packs N paths × M variations (as written, transpose, split bass /
   upper voices, melody-only, rhythm-only, closed / open voicing)

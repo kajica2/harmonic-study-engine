@@ -12,12 +12,13 @@
  */
 
 import { HarmonicPath } from "./paths";
+import type { EtudeNote } from "../../engine/etude/types";
 
 // ---------------------------------------------------------------------------
 // MusicXML 4.0 export
 // ---------------------------------------------------------------------------
 
-interface MusicXmlOptions {
+export interface MusicXmlOptions {
   /** Title for the <work> element */
   title?: string;
   /** Composer (artist) */
@@ -30,6 +31,13 @@ interface MusicXmlOptions {
   beatsPerMeasure?: number;
   /** Steps per measure (default 1 — one chord per bar) */
   stepsPerMeasure?: number;
+  /** PRD-001 Phase 3 Slice 2 (D27): optional etude melody grid
+   *  (absolute eighth-note slots, 8 per 4/4 bar). When absent the
+   *  output is BYTE-IDENTICAL to the chord-only export (frozen
+   *  tests/scoreExport.test.ts pins). When present, an additive
+   *  second part <part id="P2"> carries the melody; P1 is untouched.
+   *  Notes crossing a barline split into tied segments. */
+  melody?: readonly EtudeNote[];
 }
 
 /** Encode a numeric MIDI to a musicXML pitch string e.g. 60 → C4, 61 → D♭4 */
@@ -65,12 +73,136 @@ function escapeXml(s: string): string {
 }
 
 /**
+ * Split a melody grid into per-bar note segments (D27). A note whose
+ * durationSlots crosses the barline yields consecutive segments: the
+ * first carries tie "start", middle segments carry stop+start, the
+ * last carries stop. Rests are NOT generated here - the measure
+ * builder fills gaps.
+ */
+interface MelodySegment {
+  readonly slot: number; // absolute start slot of this segment
+  readonly len: number; // divisions (1 division = one eighth)
+  readonly midi: number;
+  readonly tieStart: boolean;
+  readonly tieStop: boolean;
+}
+
+function splitMelodySegments(melody: readonly EtudeNote[]): MelodySegment[] {
+  const sorted = [...melody].sort((a, b) => a.slot - b.slot);
+  const segs: MelodySegment[] = [];
+  for (const n of sorted) {
+    let cur = n.slot;
+    let remaining = Math.max(1, n.durationSlots);
+    let first = true;
+    while (remaining > 0) {
+      const barEnd = (Math.floor(cur / 8) + 1) * 8;
+      const len = Math.min(remaining, barEnd - cur);
+      segs.push({
+        slot: cur,
+        len,
+        midi: n.midi,
+        tieStop: !first,
+        tieStart: remaining - len > 0,
+      });
+      cur += len;
+      remaining -= len;
+      first = false;
+    }
+  }
+  return segs;
+}
+
+/** Build the additive <part id="P2"> melody part (D27). divisions=2
+ *  => one eighth = 1 division; every measure sums to exactly 8
+ *  divisions (gaps filled with rests). */
+function buildMelodyPartXml(
+  melody: readonly EtudeNote[],
+  transpose: number,
+  beatsPerMeasure: number,
+  tempo: number,
+): string {
+  const segs = splitMelodySegments(melody);
+  const lastSlot = segs.reduce((mx, s) => Math.max(mx, s.slot + s.len), 0);
+  const bars = Math.max(1, Math.ceil(lastSlot / 8));
+
+  const measures: string[] = [];
+  for (let bar = 0; bar < bars; bar++) {
+    const barStart = bar * 8;
+    const barEnd = barStart + 8;
+    const barSegs = segs.filter((s) => s.slot >= barStart && s.slot < barEnd);
+    let cursor = barStart;
+    const noteXml = barSegs
+      .map((s) => {
+        let xml = "";
+        if (s.slot > cursor) {
+          xml += `
+        <note>
+          <rest/>
+          <duration>${s.slot - cursor}</duration>
+          <voice>1</voice>
+        </note>`;
+        }
+        cursor = s.slot + s.len;
+        const ties =
+          (s.tieStart ? `
+        <tie type="start"/>` : "") +
+          (s.tieStop ? `
+        <tie type="stop"/>` : "");
+        const notations =
+          s.tieStart || s.tieStop
+            ? `
+        <notations>${s.tieStop ? `<tied type="stop"/>` : ""}${s.tieStart ? `<tied type="start"/>` : ""}</notations>`
+            : "";
+        xml += `
+        <note>
+          <pitch>${midiToXmlPitch(s.midi, transpose)}</pitch>
+          <duration>${s.len}</duration>${ties}
+        <voice>1</voice>${notations}
+        </note>`;
+        return xml;
+      })
+      .join("");
+    // Gap after the last segment (or a fully empty bar): one trailing
+    // rest closes the measure at exactly 8 divisions.
+    const trailing =
+      cursor < barEnd
+        ? `
+        <note>
+          <rest/>
+          <duration>${barEnd - cursor}</duration>
+          <voice>1</voice>
+        </note>`
+        : "";
+    measures.push(`
+    <measure number="${bar + 1}">${noteXml}${trailing}
+    </measure>`);
+  }
+
+  return `
+  <part id="P2">
+    <measure number="0">
+      <attributes>
+        <divisions>2</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>${beatsPerMeasure}</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome></direction-type></direction>
+    </measure>${measures.join("")}
+  </part>`;
+}
+
+/**
  * Render a HarmonicPath to a MusicXML 4.0 string.
  *
  * Layout: chord-per-bar in 4/4 at the given tempo. Each bar's pitches
  * are written as a <chord/> (no <note/> durations; the audience just
  * sees the chord per measure). Chords include step.name as a harmony
  * element so Finale/Sibelius/MuseScore will display a chord symbol.
+ *
+ * When `opts.melody` is present (D27) an ADDITIVE second part P2 is
+ * appended; without it the output is byte-identical to the historical
+ * single-part export.
  */
 export function toMusicXml(
   path: HarmonicPath,
@@ -83,6 +215,7 @@ export function toMusicXml(
     transpose = 0,
     beatsPerMeasure = 4,
     stepsPerMeasure = 1,
+    melody,
   } = opts;
   const stepCount = path.steps.length;
   if (stepCount === 0) throw new Error("Cannot export empty path");
@@ -121,6 +254,19 @@ export function toMusicXml(
     measureNumber++;
   }
 
+  // D27: strictly additive. With no melody (undefined OR empty grid)
+  // both fragments are empty strings and the template below renders
+  // byte-identically to the historical export (pinned by
+  // tests/scoreExport.test.ts + the T4 golden).
+  const melodyNotes: readonly EtudeNote[] | undefined =
+    melody !== undefined && melody.length > 0 ? melody : undefined;
+  const p2ScorePart = melodyNotes
+    ? `\n    <score-part id="P2"><part-name>Melody</part-name></score-part>`
+    : "";
+  const p2Part = melodyNotes
+    ? buildMelodyPartXml(melodyNotes, transpose, beatsPerMeasure, tempo)
+    : "";
+
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="4.0">
@@ -131,7 +277,7 @@ export function toMusicXml(
     <creator type="composer">${escapeXml(composer)}</creator>
   </identification>
   <part-list>
-    <score-part id="P1"><part-name>Music</part-name></score-part>
+    <score-part id="P1"><part-name>Music</part-name></score-part>${p2ScorePart}
   </part-list>
   <part id="P1">
     <measure number="0">
@@ -143,7 +289,7 @@ export function toMusicXml(
       </attributes>
       <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${tempo}</per-minute></metronome></direction-type></direction>
     </measure>${measures.join("")}
-  </part>
+  </part>${p2Part}
 </score-partwise>`;
 }
 

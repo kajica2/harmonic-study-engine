@@ -89,9 +89,9 @@ describe("truthful positives: each pattern fires when present", () => {
     expect(conceptsOf(iii)).not.toContain("ii-v-i");
     const iv = run([Dm7(0), G7(1), chord(2, "IV", 5, "maj", [53, 57, 60])]);
     expect(conceptsOf(iv)).not.toContain("ii-v-i");
-    // A major-quality chord on the tonic ROOT but wrong degree label is
-    // still not enough without the ii/V prefix resolving - and the
-    // reverse: right prefix, tonic-quality chord a whole step off.
+    // Right ii-V prefix, but the "resolution" is a dom7-quality II7 a
+    // whole step ABOVE the tonic (root pc 2 in C) - not the tonic
+    // family, so adjacency alone must not fire ii-v-i.
     const biiTarget = run([Dm7(0), G7(1), chord(2, "II7", 2, "dom7", [50, 54, 57, 60])]);
     expect(conceptsOf(biiTarget)).not.toContain("ii-v-i");
   });

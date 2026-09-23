@@ -12,13 +12,14 @@
  * `globalTranspose` here (single source of truth).
  *
  * Persistence: `partialize` keeps `mode`, `globalTranspose`,
- * `currentIdea`, `exerciseTranspose`, `keyCycleActive` in
- * localStorage. `dirty` + `pendingModeRequest` are session-scoped
- * (per-mode Edit state, not cross-reload state).
+ * `currentIdea`, `exerciseTranspose`, `keyCycleActive`,
+ * `etudeConstraints` in localStorage. `dirty` + `pendingModeRequest`
+ * are session-scoped (per-mode Edit state, not cross-reload state).
  *
  * Migration: zustand persist's `migrate` callback delegates to the
  * engine's `createSessionRunner`. v1 -> v2 (Phase 2) appends the
- * transpose-slice defaults; CURRENT_SESSION_VERSION = 2 and the
+ * transpose-slice defaults; v2 -> v3 (Phase 3 Slice 2, D23) appends
+ * `etudeConstraints: null`. CURRENT_SESSION_VERSION = 3 and the
  * persist envelope version mirrors it (ADR-004).
  */
 
@@ -30,6 +31,7 @@ import {
 } from "../../engine/migrations";
 import type { Idea } from "../../engine/core/idea";
 import { advanceKeyCycle as nextInCycleRotation } from "../../engine/core/spelling";
+import type { EtudeConstraints } from "../../engine/etude/types";
 import { K } from "../lib/storage";
 
 /** The 3 modes a user can explicitly pick. `null` = legacy / first-run. */
@@ -47,9 +49,10 @@ export interface DirtyMap {
 
 export const SESSION_STORAGE_KEY = K.session;
 /** v2 (PRD-001 Phase 2): adds exerciseTranspose + keyCycleActive.
+ *  v3 (PRD-001 Phase 3 Slice 2, D23): adds etudeConstraints.
  *  Keep in lockstep with engine/migrations CURRENT_SESSION_VERSION;
  *  the persist envelope version mirrors this value (ADR-004). */
-export const CURRENT_SESSION_VERSION = 2;
+export const CURRENT_SESSION_VERSION = 3;
 
 const sessionRunner: MigrationRunner<unknown> = createSessionRunner();
 
@@ -96,7 +99,22 @@ interface ModeSlice {
   resetModeSlice: () => void;
 }
 
-export type SessionState = ModeSlice;
+/** PRD-001 Phase 3 Slice 2 (D23): the etude constraints slice. The
+ *  COMMITTED constraint set is cross-reload session state (persisted,
+ *  exactly like globalTranspose). The panel DRAFT lives in component
+ *  state (transient, PRD 10.4) and the Etude RESULT is a pure
+ *  derivation of constraints (REQ-ETU-15) - neither belongs here. */
+interface EtudeSlice {
+  etudeConstraints: EtudeConstraints | null;
+  setEtudeConstraints: (c: EtudeConstraints | null) => void;
+  /** User-initiated Generate / Randomize-seed (D30): writes the
+   *  constraints AND the exact handleCoComposeAccept dirty shape in
+   *  ONE action (ADR-007). Never called on boot restore, never by the
+   *  memoized compute. */
+  acceptEtude: (c: EtudeConstraints) => void;
+}
+
+export type SessionState = ModeSlice & EtudeSlice;
 
 export const useSessionStore = create<SessionState>()(
   persist(
@@ -106,6 +124,7 @@ export const useSessionStore = create<SessionState>()(
       exerciseTranspose: 0,
       keyCycleActive: false,
       currentIdea: null,
+      etudeConstraints: null,
       dirty: { compose: "none", etude: "none", explore: "none" },
       pendingModeRequest: null,
       setMode: (m) => set({ mode: m }),
@@ -154,6 +173,23 @@ export const useSessionStore = create<SessionState>()(
       },
       setKeyCycleActive: (b) => {
         set({ keyCycleActive: b });
+      },
+      setEtudeConstraints: (c) => {
+        set({ etudeConstraints: c });
+      },
+      acceptEtude: (c) => {
+        // D30: the dirty literal is the EXACT shape of App's
+        // handleCoComposeAccept (compose/explore stay "none"; only
+        // the Etude surface can be dirty). A generated etude is
+        // unsaved work - the mode-switch prompt must fire (ADR-007).
+        set({
+          etudeConstraints: c,
+          dirty: {
+            compose: "none",
+            etude: "etude-pending-accept",
+            explore: "none",
+          },
+        });
       },
       setCurrentIdea: (i) => set({ currentIdea: i }),
       saveCurrentIdea: () => {
@@ -206,6 +242,7 @@ export const useSessionStore = create<SessionState>()(
           exerciseTranspose: 0,
           keyCycleActive: false,
           currentIdea: null,
+          etudeConstraints: null,
           dirty: { compose: "none", etude: "none", explore: "none" },
           pendingModeRequest: null,
         }),
@@ -231,6 +268,7 @@ export const useSessionStore = create<SessionState>()(
         exerciseTranspose: s.exerciseTranspose,
         keyCycleActive: s.keyCycleActive,
         currentIdea: s.currentIdea,
+        etudeConstraints: s.etudeConstraints,
       }),
     },
   ),

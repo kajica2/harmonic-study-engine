@@ -117,6 +117,12 @@ import { InlineErrorPill } from "./components/InlineStatus";
 const LiveScoreDisplay = lazy(() =>
   import("./components/LiveScoreDisplay").then((m) => ({ default: m.LiveScoreDisplay })),
 );
+// PRD-001 Phase 3 Slice 2 (D22/D26): the etude roll/staff views are
+// lazy too - the staff tab pulls abcjs through EtudeViews, so the
+// whole notation stack stays out of the eager chunk until opened.
+const EtudeViews = lazy(() =>
+  import("./components/EtudeViews").then((m) => ({ default: m.EtudeViews })),
+);
 import { MelodyLane } from "./components/MelodyLane";
 import { MelodyToolbar } from "./components/MelodyToolbar";
 import { PlaySessionRail } from "./components/PlaySessionRail";
@@ -165,6 +171,25 @@ import { DirtyPromptModal } from "./components/DirtyPromptModal";
 import { useSessionStore as useNewSessionStore, resolveBootTranspose, SESSION_STORAGE_KEY } from "./state/sessionStore";
 import { ideaFromChord, isIdea } from "../engine/core/idea";
 import { isModeShortcutModifierKey, classifyTransposeKey } from "./hooks/useKeyDown";
+// PRD-001 Phase 3 Slice 2: etude composer panel + engine adapter +
+// URL constraint serialization (D22/D24/D28).
+import { EtudeComposerPanel } from "./components/EtudeComposerPanel";
+import {
+  etudeActiveBarFor,
+  etudePathId,
+  etudeToHarmonicPath,
+  generateEtudeFor,
+  planEtudeRestore,
+} from "./lib/etudeEngine";
+import {
+  hasEtudeParams,
+  parseEtudeParams,
+  serializeEtudeConstraints,
+} from "./lib/etudeUrl";
+// TESTER GAP-1 (fix round): the URL-writer subscription predicate,
+// extracted to a pure + tested module.
+import { shouldScheduleUrlWrite } from "./lib/urlSyncPredicate";
+import type { Etude, EtudeConstraints } from "../engine/etude/types";
 
 // downloadText moved to src/lib/download.ts (extracted by main)
 
@@ -343,6 +368,14 @@ function AppShell() {
   const storeModeForGate = useNewSessionStore((s) => s.mode);
   const showExerciseTranspose =
     storeModeForGate === null || storeModeForGate === "etude";
+
+  // PRD-001 Phase 3 Slice 2 (D23): COMMITTED etude constraints live in
+  // the zustand store (persisted + URL-synced via the single writer).
+  // The loaded Etude RESULT is React state only: it is a pure
+  // derivation of the constraints (REQ-ETU-15), so persisting it would
+  // be redundant state; views consume it via props.
+  const etudeConstraints = useNewSessionStore((s) => s.etudeConstraints);
+  const [activeEtude, setActiveEtude] = useState<Etude | null>(null);
 
   // PRD-001 Phase 2 (D13): the 5 path generate/import/persona-switch
   // reset sites all zero the exercise offset AND disengage the cycle.
@@ -1125,7 +1158,14 @@ function AppShell() {
   //     back stack on ephemeral tweaks).
   // Phase 1 ships only mode + transpose here. `path` and `idea`
   // arrive in later phases.
+  // MED-NEW-001 (slice 2 re-review): StrictMode double-invokes effects in
+  // dev; the ref survives the remount, so this one-shot guard keeps the
+  // boot read + etude prepend exactly-once (an unguarded second pass
+  // queues the index shift twice and strands activePathIndex out of range).
+  const bootDoneRef = useRef(false);
   useEffect(() => {
+    if (bootDoneRef.current) return;
+    bootDoneRef.current = true;
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
@@ -1181,6 +1221,52 @@ function AppShell() {
         console.warn("[App] ?idea= payload was malformed; ignoring");
       }
     }
+    // PRD-001 Phase 3 Slice 2 (D28): etude constraint params. URL >
+    // persisted (this effect runs after rehydration; the debounced
+    // writer lands the merged value back into the URL). Malformed or
+    // partial etude params warn-and-drop exactly like ?idea= - the
+    // persisted slice survives. BOOT RESTORE NEVER DIRTIES (D30):
+    // setEtudeConstraints, NOT acceptEtude; and it must not stomp the
+    // restored session's active path / transposes - a fresh-browser
+    // deep link only PREPENDS the path (deduped by id).
+    const etudeParsed = parseEtudeParams(params);
+    if (etudeParsed) {
+      useNewSessionStore.getState().setEtudeConstraints(etudeParsed);
+    } else if (hasEtudeParams(params)) {
+      // eslint-disable-next-line no-console
+      console.warn("[App] ?etude params malformed; ignoring");
+    }
+    const resolvedEtude =
+      etudeParsed ?? useNewSessionStore.getState().etudeConstraints;
+    if (resolvedEtude) {
+      // generateEtudeFor validates + memoizes: sub-ms regen, null for
+      // a corrupt persisted value (never throws, REQ-NFR-5).
+      const restored = generateEtudeFor(resolvedEtude);
+      if (restored) {
+        setActiveEtude(restored);
+        const pid = etudePathId(restored);
+        // REVIEWER HIGH-001 (fix round): prepending shifts every
+        // existing index by +1. Without the compensating shift the
+        // persisted activePathIndex silently points at a DIFFERENT
+        // path (no-stomp violation), and on a fresh browser (index 0)
+        // the prepend ACTIVATES the etude - contrary to "prepend
+        // WITHOUT activating" (D28). planEtudeRestore is pure +
+        // tested (src/lib/etudeEngine.test.ts); the bootDoneRef one-shot
+        // guard (MED-NEW-001) makes the effect run once with the
+        // synchronously-hydrated `paths`, so the plan and the updater's
+        // `prev` are the same snapshot (the inner `some` stays as a
+        // dedupe double-guard).
+        const plan = planEtudeRestore(paths, pid);
+        if (plan.prepend) {
+          setPaths((prev) =>
+            prev.some((p) => p.id === pid)
+              ? prev
+              : [{ ...etudeToHarmonicPath(restored), name: restored.title }, ...prev],
+          );
+          setActivePathIndex((i) => i + plan.indexShift);
+        }
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1193,12 +1279,26 @@ function AppShell() {
       if (state.mode) params.set("mode", state.mode);
       else params.delete("mode");
       params.set("transpose", String(state.globalTranspose));
+      // PRD-001 Phase 3 Slice 2 (D28): etude constraint keys ride THIS
+      // writer - a second debounced read-modify-write effect on
+      // location.search would race it (lost-update). null values
+      // delete their key (compact URLs).
+      for (const [k, v] of Object.entries(
+        serializeEtudeConstraints(state.etudeConstraints),
+      )) {
+        if (v === null) params.delete(k);
+        else params.set(k, v);
+      }
       const search = params.toString();
       const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
     };
     const unsub = useNewSessionStore.subscribe((s, prev) => {
-      if (s.mode !== prev.mode || s.globalTranspose !== prev.globalTranspose) {
+      // TESTER GAP-1 (fix round): the three-term predicate lives in
+      // src/lib/urlSyncPredicate.ts (pure + tested both directions -
+      // an etudeConstraints change fires, unrelated store state
+      // does not). Dropping a term there now fails CI.
+      if (shouldScheduleUrlWrite(prev, s)) {
         if (timer !== null) window.clearTimeout(timer);
         timer = window.setTimeout(write, 200);
       }
@@ -1467,6 +1567,57 @@ function AppShell() {
       resetTransposeSlice();
     }
   };
+
+  // PRD-001 Phase 3 Slice 2 (D31): the deterministic Etude Composer
+  // accept. Same load template as handleGenerateEtude's sync branch
+  // (the SIXTH reset site, identical sequence) + dedupe-by-id so
+  // re-rolling the SAME seed is a no-op on the list. generateEtudeFor
+  // NEVER throws (D24) - infeasible drafts are gated in the panel
+  // (D29) and null-guarded here as the last resort. Playback, loop,
+  // transpose, key-cycle, WAV/MIDI export: zero work - the loaded
+  // path flows through the existing chain (REQ-ETU-22/23/24/30).
+  const handleEtudeAccept = useCallback(
+    (constraints: EtudeConstraints, _origin: "generate" | "reroll") => {
+      const etude = generateEtudeFor(constraints);
+      if (!etude) return;
+      const newPath = etudeToHarmonicPath(etude);
+      setPaths([
+        { ...newPath, name: newPath.title },
+        ...paths.filter((p) => p.id !== newPath.id),
+      ]);
+      setActivePathIndex(0);
+      setActiveStepIndex(0);
+      setTransposeShift(0);
+      resetTransposeSlice();
+      setActiveEtude(etude);
+      // Store + dirty (D30, exact handleCoComposeAccept shape) + the
+      // URL via the single debounced writer (D28).
+      useNewSessionStore.getState().acceptEtude(constraints);
+    },
+    [paths, setPaths, setActivePathIndex, setActiveStepIndex, setTransposeShift, resetTransposeSlice],
+  );
+
+  // D27: "MusicXML (with melody)" exports the TRUE FORM - one pass of
+  // the etude's bars, not the padded practice loop - so P1 (chords)
+  // and P2 (melody) line up bar-for-bar in MuseScore.
+  const handleEtudeMusicXmlDownload = useCallback(() => {
+    if (!activeEtude) return;
+    const pid = etudePathId(activeEtude);
+    const loaded = paths.find((p) => p.id === pid);
+    if (!loaded) return;
+    const formPath: HarmonicPath = {
+      ...loaded,
+      steps: loaded.steps.slice(0, activeEtude.bars),
+    };
+    const xml = toMusicXml(formPath, {
+      title: activeEtude.title,
+      composer: "harmonic-study-engine",
+      tempo: activeEtude.tempo,
+      transpose: soundingShift,
+      melody: activeEtude.melody,
+    });
+    downloadText(`${pid}.musicxml`, xml, "application/vnd.recordare.musicxml+xml");
+  }, [activeEtude, paths, soundingShift]);
 
   const handleSelectPersona = (pId: string) => {
     setSelectedPersonaId(pId);
@@ -2169,6 +2320,23 @@ function AppShell() {
             const newPath = { ...path, steps: newSteps };
             setPaths(paths.map((pp, i) => (i === activePathIndex ? newPath : pp)));
           }}
+        />
+
+        {/* PRD-001 Phase 3 Slice 2 (D22): deterministic Etude Composer,
+            full-width AppMain section after the rail. The legacy Etude
+            Assistant in the Generator Lab fold COEXISTS untouched -
+            this is the constraint-driven P0 entry point (REQ-ETU-1/2/4). */}
+        <EtudeComposerPanel
+          committed={etudeConstraints}
+          loadedTitle={
+            activeEtude && path.id === etudePathId(activeEtude)
+              ? `${activeEtude.title} (seed ${activeEtude.seed})`
+              : null
+          }
+          onAccept={handleEtudeAccept}
+          onDownloadMusicXml={
+            activeEtude ? handleEtudeMusicXmlDownload : undefined
+          }
         />
 
         {/* Performance mastery log — recent takes (roadmap option G).
@@ -3663,6 +3831,37 @@ function AppShell() {
               <span><span className="inline-block w-3 h-3 mr-1 border" style={{ background: "transparent", borderColor: "#E67E22" }} />✕ tension</span>
               <span><span className="inline-block w-3 h-0.5 align-middle mr-1" style={{ background: "#E67E22" }} />─ line (passing)</span>
             </div>
+
+            {/* PRD-001 Phase 3 Slice 2 (D22/D25/D26): etude roll + staff
+                views in the right column, above the live score. Render-
+                time gate only (ADR-011 live gate): visible while the
+                ACTIVE path is the loaded etude; selecting any other
+                path hides them, re-selecting brings them back from
+                memory (activeEtude). Lazy: abcjs stays code-split. */}
+            {activeEtude && path.id === etudePathId(activeEtude) && (
+              <Suspense fallback={null}>
+                <EtudeViews
+                  etude={activeEtude}
+                  pathId={path.id}
+                  transposeShift={soundingShift}
+                  // DOCS-CATCH (fix round): etude practice paths carry
+                  // ONE STEP PER BAR (slice-1 finding 4), so the legacy
+                  // floor(step / STEPS_PER_BAR) mapping advances the
+                  // highlight at 1/4 speed and falls out of range after
+                  // the first third of the padded loop. The render gate
+                  // above (path.id === etudePathId) is what
+                  // distinguishes the etude path from legacy paths -
+                  // inside it, etudeActiveBarFor maps the step index to
+                  // the form-relative bar (step % bars, wrapping over
+                  // whole passes). Legacy paths never reach this JSX.
+                  // (The other floor(step / STEPS_PER_BAR) sites in App
+                  // - co-compose, live score, melody lane - are outside
+                  // this fix's scope; their etude-path bar semantics
+                  // are a known follow-up, not silently "fixed" here.)
+                  activeBar={etudeActiveBarFor(activeEtude, activeStepIndex)}
+                />
+              </Suspense>
+            )}
 
             {showLiveScore && (
               <div className="w-full mt-2">
