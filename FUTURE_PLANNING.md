@@ -177,12 +177,12 @@ the loop which near-term work unblocks the strategic plan.
 
 | PRD item | Status | Notes |
 |---|---|---|
-| MIDI upload + parse | PARTIAL | `ImportExportModal` reads `.mid` files but does not retain them as a Compose session. |
-| Track role classification | PARTIAL | `midiExport.buildSplitTracks` does a lowest-note-per-step heuristic; no formal classifier. |
-| Key / melody / chord analysis | PARTIAL | `analyzeChord` exists for individual chords; no key/melody inference over a file. |
+| MIDI upload + parse | SHIPPED (parse, engine) - Phase 4 slice 1, 2026-09-23 | `engine/compose/` + the `src/lib/composeMidi.ts` adapter: SMF 0/1/2 parse -> tick-native `NormalizedProject` (30MB cap pre-parse, meter/tempo-map aware, never-throwing `Outcome`). Carve-outs: NOT user-facing until slice 2 (no upload UI today). Pre-slice-1 row was FALSE (C1): `ImportExportModal` does NOT read `.mid` - it is a text-only (.txt/.json/.irealb) importer for the etude catalog; the parse pipeline was 100% greenfield. Docs: `docs/engine-compose.md`. |
+| Track role classification | SHIPPED (engine) - Phase 4 slice 1, 2026-09-23 | `classifyRoles` (`engine/compose/roles.ts`): deterministic feature-scored melody/bass/harmony/percussion/unknown + confidence (REQ-COMP-4). The old row ("no formal classifier", only the `midiExport.buildSplitTracks` lowest-note heuristic) predates it. NOT user-facing until slice 2. |
+| Key / melody / chord analysis | SHIPPED (engine) - Phase 4 slice 1, 2026-09-23 | `detectKey` (hand-rolled Krumhansl-Schmuckler, top-3 candidates + atonal chromatic fallback), `extractMelody` (confident role track, else top-line synthesis), `inferChords` (tick-aligned grid, calibrated confidence + top-3 alternatives) behind `analyzeProject`. Carve-outs: accuracy proven on the SEEDED SYNTHETIC corpus only (key top-1 24/24, chord roots 768/768 - idealized diatonic material; real-world MIDI unproven, RK2 open); `@tonejs/midi`'s encoder does NOT round-trip key signatures (upstream bug) - flagged for the slice 4 export. |
 | Editable analysis card | NOT STARTED | No Compose surface today. |
 | Accompaniment generation | NOT STARTED | `backingEngine` plays existing style tracks but does not generate accompaniment to a user's melody. |
-| WAV export | SHIPPED (limited) | `Tone.Offline` exists in `src/lib/`; used for test fixtures, not user export. |
+| WAV export | SHIPPED (limited) - premise corrected (C2) | The old note was FALSE: `Tone.Offline` does not exist (zero `Tone.` imports in src/; tone is a @magenta/music transitive). Offline WAV DOES ship user-facing via raw `OfflineAudioContext` + hand-rolled `encodeWav` in `src/lib/loopWav.ts` (backing-track loop render - not Compose). Compose full-mix WAV (REQ-COMP-41) is Phase 4 slice 4. |
 | Privacy statement on upload | NOT STARTED | Required by REQ-IO-70 before any upload surface ships. |
 
 ### PRD Phase 5 - Explore mode

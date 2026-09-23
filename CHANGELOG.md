@@ -81,6 +81,40 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Compose parse + analysis engine + golden corpus (PRD-001 Phase 4
+  slice 1)** -- a zero-UI engine slice that unblocks the Compose mode.
+  Imported songs get a new tick-native `NormalizedProject` model (D45:
+  NOT `HarmonicPath`, which cannot carry ticks/tempo-map/meter and would
+  truncate a 5-min file via `padPath`). New `engine/compose/`:
+  `normalize.ts` (the single SMF-quirk choke point over a plain
+  `MidiJsonLike` DTO - sorts notes, drops/clamps out-of-range, defaults
+  tempo/meter with warnings, `noNotes`/`unsupported`/`tooLarge` error
+  arms), `tempo.ts` (piecewise tick<->seconds + meter-aware
+  `barBoundaries` + the 4-min `defaultWindow`), `roles.ts` (feature-scored
+  track-role classifier), `key.ts` (hand-rolled Krumhansl-Schmuckler with
+  ranked candidates + correlations + the atonal->chromatic fallback,
+  REQ-COMP-52), `melody.ts` (top-line extraction with eighth-note
+  hysteresis, REQ-COMP-11), `harmony.ts` (per-region chord inference with
+  calibrated confidence + top-3 alternatives, REQ-COMP-12/23),
+  `types.ts` (discriminated-union `Outcome` - analyzers never throw,
+  REQ-COMP-15/NFR-5), and `index.ts` (`analyzeProject` pipeline + the
+  public surface). `engine/core/chords.ts` extracts the shared quality /
+  spelling tables out of `engine/etude/harmony.ts` (which re-exports them
+  - etude tests byte-green, D47). The only `@tonejs/midi` import in
+  shipped app code is the new `src/lib/composeMidi.ts` adapter (30MB
+  cap, SHA-256 F9-guarded, never throws; the two src tests and the dev
+  bench load the package too). Golden corpus (`corpus.test.ts`) is
+  synthetic + seeded:
+  24-key KS accuracy (top-1 24/24, top-3 24/24 on the synthetic set) +
+  block-chord root match 768/768 + hand-built edge DTOs (percussion-only,
+  pitch-bend, format 2, >5-min truncation). `scripts/compose-perf.ts`
+  benches p50/p95 vs the 500ms PRD target (local ~46/69ms for 30k notes);
+  the honest CI budget (<1500ms) is pinned in
+  `src/lib/composeMidi.perf.test.ts`. Engine purity floor 21 -> 29 (D56).
+  Deviations from the design are documented in the completion report
+  (the SMF denominator is already converted by `@tonejs/midi`; the
+  encoder's key-signature round-trip is broken upstream). Design:
+  `docs/PHASE-4-COMPOSE.md`.
 - **Practice mechanics + annotation surfaces (PRD-001 Phase 3 slice 3)**
   -- metronome upgrades: an INDEPENDENT click volume (dedicated
   metronome gain -> compressor bus in `src/lib/audio.ts`, so the

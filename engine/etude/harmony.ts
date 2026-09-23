@@ -25,7 +25,18 @@
 import type { Rng } from "../core/rng";
 import type { StyleProfile } from "../styles/types";
 import { scaleProbability } from "../styles/difficulty";
-import { spellTonic } from "../core/spelling";
+// D47 (Phase 4 S1): the chord quality tables + display spelling were
+// EXTRACTED to engine/core/chords.ts so Compose and Etude share ONE
+// source of truth. Import the two we use locally and re-export all four
+// so harmony.test.ts + every existing importer keep their "./harmony"
+// paths and the exact same function references (zero behavior change).
+import { QUALITY_INTERVALS, spellChordName } from "../core/chords";
+export {
+  QUALITY_INTERVALS,
+  NAME_SUFFIX,
+  keyUsesFlats,
+  spellChordName,
+} from "../core/chords";
 import type { EtudeChord, EtudeConstraints, EtudeMode } from "./types";
 
 /** D21 realization: everything a caller needs to sound one token. */
@@ -57,39 +68,11 @@ const ROMAN_TO_DEGREE: Readonly<Record<string, number>> = {
   i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7,
 };
 
-const QUALITY_INTERVALS: Readonly<Record<string, readonly number[]>> = {
-  maj: [0, 4, 7],
-  min: [0, 3, 7],
-  dim: [0, 3, 6],
-  dim7: [0, 3, 6, 9],
-  halfdim: [0, 3, 6, 10],
-  maj7: [0, 4, 7, 11],
-  m7: [0, 3, 7, 10],
-  dom7: [0, 4, 7, 10],
-  alt: [0, 4, 7, 10, 20], // dom7 + b13 (D21)
-  sus4: [0, 5, 7, 10], // 7sus4: root, 4th, 5th, b7
-  maj6: [0, 4, 7, 9],
-  min6: [0, 3, 7, 9],
-  majadd9: [0, 4, 7, 14], // add9 = quality + 14 semitones (D21)
-  minadd9: [0, 3, 7, 14],
-  maj9: [0, 4, 7, 11, 14],
-  dom9: [0, 4, 7, 10, 14],
-  min9: [0, 3, 7, 10, 14],
-};
-
 /** qualitySymbol -> token used in HarmonyConstraints.allowedQualities. */
 const QUALITY_TOKEN: Readonly<Record<string, string>> = {
   maj: "maj", min: "min", dim: "dim", dim7: "dim7", halfdim: "m7b5",
   maj7: "maj7", m7: "m7", dom7: "7", alt: "7alt", sus4: "sus4",
   maj6: "6", min6: "m6", majadd9: "majadd9", minadd9: "minadd9",
-  maj9: "maj9", dom9: "9", min9: "m9",
-};
-
-/** qualitySymbol -> chord-name suffix (ASCII, no glyphs). */
-const NAME_SUFFIX: Readonly<Record<string, string>> = {
-  maj: "", min: "m", dim: "dim", dim7: "dim7", halfdim: "m7b5",
-  maj7: "maj7", m7: "m7", dom7: "7", alt: "7alt", sus4: "sus4",
-  maj6: "6", min6: "m6", majadd9: "add9", minadd9: "madd9",
   maj9: "maj9", dom9: "9", min9: "m9",
 };
 
@@ -173,37 +156,6 @@ export function parseNumeral(
     qualitySymbol,
     intervals,
   };
-}
-
-const FLAT_NAMES: readonly string[] = [
-  "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B",
-];
-const SHARP_NAMES: readonly string[] = [
-  "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-];
-
-/** D11 spelling rules for chord roots: the spelled tonic's accidental
- *  wins; natural tonics fall to key-signature family (major sharp
- *  side: G D A E B; minor sharp side: E B; everything else, including
- *  the C/A ties, goes flat). */
-function keyUsesFlats(keyTonicPc: number, mode: EtudeMode): boolean {
-  const tonic = spellTonic(keyTonicPc, mode, "");
-  if (tonic.includes("b")) return true;
-  if (tonic.includes("#")) return false;
-  if (mode === "major") return !["G", "D", "A", "E", "B"].includes(tonic);
-  return !["E", "B"].includes(tonic);
-}
-
-/** Display name for a realized chord: "Dm7", "Abmaj9", "G7alt". */
-export function spellChordName(
-  rootPc: number,
-  qualitySymbol: string,
-  keyTonicPc: number,
-  mode: EtudeMode,
-): string {
-  const names = keyUsesFlats(keyTonicPc, mode) ? FLAT_NAMES : SHARP_NAMES;
-  const root = names[((rootPc % 12) + 12) % 12];
-  return root + (NAME_SUFFIX[qualitySymbol] ?? qualitySymbol);
 }
 
 /** Does one generated token survive the user's harmony filter? */
