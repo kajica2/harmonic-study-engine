@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { ComposeSurface } from "./ComposeSurface";
 import { useSessionStore } from "../state/sessionStore";
 import { analyzeFixture, buildMidiBytes, makeMidiFile } from "./composeFixtures";
@@ -421,5 +421,102 @@ describe("REQ-IO-71: zero network calls", () => {
     fireEvent.change(tempo, { target: { value: "100" } });
     fireEvent.keyDown(tempo, { key: "Enter" });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 3 (test plan 12): the AccompanimentPanel host.
+// THE PINNED STRINGS ABOVE ARE UNTOUCHED - the ModeGate suite runs
+// UNEDITED as part of the S3 gate (RK-S3-7).
+// ---------------------------------------------------------------------------
+
+describe("Phase 4 Slice 3: accompaniment panel host", () => {
+  it("panel is NOT in the empty state, IS in the loaded state", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    expect(screen.queryByTestId("accompaniment-panel")).toBeNull();
+    await uploadToLoaded("song.mid");
+    expect(screen.getByTestId("accompaniment-panel")).toBeTruthy();
+  });
+
+  it("Generate -> result flows to the overlay roll (layer testids) + meta line", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    fireEvent.click(screen.getByTestId("accomp-generate"));
+    await waitFor(() => expect(screen.getByTestId("accomp-meta")).toBeTruthy());
+    const meta = screen.getByTestId("accomp-meta").textContent ?? "";
+    expect(meta).toContain("jazz");
+    expect(meta).toContain("seed 42");
+    expect(screen.getByTestId("accompaniment-roll")).toBeTruthy();
+    expect(screen.getByTestId("roll-layer-bass")).toBeTruthy();
+    expect(screen.getByTestId("roll-layer-chords")).toBeTruthy();
+    // The default roles exclude pad -> no pad layer.
+    expect(document.querySelector('[data-testid="roll-layer-pad"]')).toBeNull();
+  });
+
+  it("request edits persist via setComposeRequest (density + seed)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    fireEvent.change(screen.getByTestId("accomp-density"), { target: { value: "5" } });
+    fireEvent.change(screen.getByTestId("accomp-seed"), { target: { value: "777" } });
+    await waitFor(() => expect(STORE().composeSession?.request?.density).toBe(5));
+    expect(STORE().composeSession?.request?.seed).toBe(777);
+    // Request changes NEVER touch the undo stacks (D59/D73).
+    expect(STORE().composeUndo.length).toBe(0);
+  });
+
+  it("chart edit after generate -> staleness chip (fingerprint mismatch, zero auto-regenerate)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    fireEvent.click(screen.getByTestId("accomp-generate"));
+    await waitFor(() => expect(screen.getByTestId("accomp-meta")).toBeTruthy());
+    expect(screen.queryByTestId("accomp-stale")).toBeNull();
+    // Edit a chord cell through the real popover path (S2 machinery).
+    fireEvent.click(screen.getByTestId("chord-cell-0-0"));
+    fireEvent.change(screen.getByTestId("chord-symbol-input"), { target: { value: "Ab" } });
+    fireEvent.keyDown(screen.getByTestId("chord-symbol-input"), { key: "Enter" });
+    await waitFor(() => expect(screen.getByTestId("accomp-stale")).toBeTruthy());
+    // Still ZERO auto-regenerate: the meta line keeps the old seed/count.
+    expect(screen.getByTestId("accomp-meta").textContent).toContain("seed 42");
+  });
+
+  it("generate error arm -> the existing banner channel (invalid persisted request)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    act(() => {
+      STORE().setComposeRequest({
+        version: 1,
+        styleId: "jazz",
+        roles: ["chords"],
+        density: 9, // invalid: plan returns the unsupported arm
+        seed: 1,
+      });
+    });
+    fireEvent.click(screen.getByTestId("accomp-generate"));
+    await waitFor(() => expect(screen.getByTestId("compose-error")).toBeTruthy());
+    expect(screen.getByTestId("compose-error").textContent).toContain("density");
+    expect(STORE().composeAccompaniment).toBeNull();
+  });
+
+  it("preview click in jsdom: render throws (no OfflineAudioContext) -> state returns to idle (honest failure path)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    fireEvent.click(screen.getByTestId("accomp-generate"));
+    await waitFor(() =>
+      expect((screen.getByTestId("accomp-preview") as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("accomp-preview"));
+    await waitFor(() =>
+      expect(screen.getByTestId("accomp-preview").getAttribute("data-preview")).toBe("idle"),
+    );
+  });
+
+  it("unmount stops the preview player (no leak across mode switches, PHASE-3-03)", async () => {
+    const { unmount } = render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    fireEvent.click(screen.getByTestId("accomp-generate"));
+    await waitFor(() => expect(screen.getByTestId("accomp-meta")).toBeTruthy());
+    unmount();
+    // Idempotent stop on an already-idle singleton must not throw.
+    expect(screen.queryByTestId("accompaniment-panel")).toBeNull();
   });
 });

@@ -59,11 +59,38 @@ export function rollSummary(notes: readonly NormalizedNote[], ppq: number): stri
   return `melody: ${notes.length} notes, range ${midiLabel(lo)} to ${midiLabel(hi)}, span ${quarters} quarter notes`;
 }
 
+/** Deterministic serialized summary of the overlay layers (e2e legs
+ *  2/3: seed-change differs, reload-same-seed is BYTE-identical).
+ *  Fixed field order + toFixed(4) velocity = stable string. */
+export function serializeLayers(layers: readonly RollLayer[]): string {
+  return layers
+    .flatMap((l) =>
+      l.notes.map(
+        (n) =>
+          `${l.label}:${n.tick}:${n.midi}:${n.durationTicks}:${n.velocity.toFixed(4)}`,
+      ),
+    )
+    .join(";");
+}
+
+export interface RollLayer {
+  /** Layer id -> data-testid "roll-layer-<label>" (e2e D76). */
+  readonly label: string;
+  readonly notes: readonly NormalizedNote[];
+  readonly color: string;
+}
+
 export interface ComposePianoRollProps {
   project: NormalizedProject;
   melody: MelodyResult;
   window: AnalysisWindow;
   truncated: boolean;
+  /** PRD-001 Phase 4 Slice 3 (D76): optional accompaniment overlay
+   *  layers. UNDEFINED -> byte-identical S2 behavior (its test pins
+   *  keep passing); DEFINED -> per-layer rect groups reusing the
+   *  existing x/y mapping + an sr-only serialized summary (the e2e
+   *  determinism-across-reload string). */
+  layers?: readonly RollLayer[];
 }
 
 export function ComposePianoRoll({
@@ -71,21 +98,30 @@ export function ComposePianoRoll({
   melody,
   window,
   truncated,
+  layers,
 }: ComposePianoRollProps): React.ReactElement {
   const notes = melody.notes;
   const ppq = project.ppq > 0 ? project.ppq : 480;
   const xOf = (tick: number): number => (tick / ppq) * PX_PER_QUARTER;
 
   // Semitone rows over the note range padded 1 (60..72 fallback when
-  // empty - the EtudePianoRoll precedent).
+  // empty - the EtudePianoRoll precedent). With layers defined the
+  // band widens to cover them (bass sits far below a melody line).
   let lo = 60;
   let hi = 72;
-  if (notes.length > 0) {
+  const hasRange = notes.length > 0 || (layers ?? []).some((l) => l.notes.length > 0);
+  if (hasRange) {
     lo = Infinity;
     hi = -Infinity;
     for (const n of notes) {
       if (n.midi < lo) lo = n.midi;
       if (n.midi > hi) hi = n.midi;
+    }
+    for (const layer of layers ?? []) {
+      for (const n of layer.notes) {
+        if (n.midi < lo) lo = n.midi;
+        if (n.midi > hi) hi = n.midi;
+      }
     }
   }
   lo -= 1;
@@ -169,9 +205,33 @@ export function ComposePianoRoll({
               fillOpacity={0.35 + 0.65 * n.velocity}
             />
           ))}
+
+          {/* Accompaniment overlay layers (S3): per-layer <g> with
+             testids for the e2e legs; SAME x/y mapping as melody. */}
+          {(layers ?? []).map((layer) => (
+            <g key={`layer-${layer.label}`} data-testid={`roll-layer-${layer.label}`}>
+              {layer.notes.map((n, i) => (
+                <rect
+                  key={`layer-${layer.label}-${i}`}
+                  data-kind="layer-note"
+                  x={xOf(n.tick) + 0.5}
+                  y={yOf(n.midi) + 0.5}
+                  width={Math.max(1, (n.durationTicks / ppq) * PX_PER_QUARTER - 1)}
+                  height={ROW_H - 1}
+                  fill={layer.color}
+                  fillOpacity={0.35 + 0.65 * n.velocity}
+                />
+              ))}
+            </g>
+          ))}
         </svg>
       </div>
       <p className="sr-only">{summary}</p>
+      {layers !== undefined && (
+        <p className="sr-only" data-testid="roll-serialize">
+          {serializeLayers(layers)}
+        </p>
+      )}
       {truncated && (
         <p
           className="t-small text-[color:var(--color-text-3)]"

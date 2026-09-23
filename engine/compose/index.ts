@@ -157,3 +157,22 @@ export { classifyRoles, ROLE_WEIGHTS, ROLE_THRESHOLDS } from "./roles";
 export { detectKey, pcProfile, pearson, KK_MAJOR, KK_MINOR, KEY_THRESHOLDS } from "./key";
 export { extractMelody } from "./melody";
 export { segmentGrid, inferChords, reinferBar, HARMONY_WEIGHTS } from "./harmony";
+// PRD-001 Phase 4 Slice 3 (D75): the accompaniment surface.
+export {
+  allPatterns,
+  bassPattern,
+  chordPattern,
+  tiledHits,
+  PATTERN_VELOCITY,
+  PAD_PATTERN_ID,
+} from "./patterns";
+export { voiceSequence, toneMap, TONE_MAP, blockTriadMap, firstVoicing, greedyVoicing } from "./voicing";
+export { resolveBassPitches, countBassDraws } from "./bass";
+export {
+  planAccompaniment,
+  realizePlan,
+  generateAccompaniment,
+  gridFingerprint,
+  cellGeometry,
+  swingOnsets,
+} from "./accompany";

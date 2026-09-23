@@ -81,6 +81,64 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Accompaniment generation + pattern library + preview (PRD-001
+  Phase 4 slice 3, D66..D76)** -- the chart gets a voice. `engine/
+  compose/patterns.ts` AUTHORS the PRD's missing "Pattern Library
+  reference" verbatim from the design doc: 14 entries (8 chord + 6
+  bass patterns) with per-beat hit masks, explicit THINNING RANKS
+  (density filters AFTER pitching - "thins, never reshapes" is
+  structural: the density-d note set is an exact-tuple subset of
+  d+1, property-pinned across styles x densities x grids), feel
+  affinities (integrity-pinned against every shipped profile), and
+  the meter-tiling table (4/4 identity, 3/4 truncate, 5/4 tile,
+  6/8 = 3 beats, 7/8 clamped tail). `engine/compose/voicing.ts`:
+  clean-room SEQUENTIAL voice-lead (tone map with the alt/maj9
+  drop-5th rule, greedy nearest-pc top-down with spreadBias tie-
+  break teeth, 5 style shapes, rootless gated on the bass role; the
+  D47 equivalence pin vs the frozen `theory.applyVoiceLeading` lives
+  in `src/lib/composeVoicingEquivalence.test.ts`). `engine/compose/
+  bass.ts`: seeded per-idiom resolvers (walking approach sets -
+  chromatic/diatonic, keyless degradation, slash-bass honoring,
+  rests consume zero draws). `engine/compose/accompany.ts`:
+  plan/realize split - ALL rng draws at plan time (documented
+  draw-order contract), the D70 swing map as the FIRST real consumer
+  of swingRatio/gridDivisions (0.5 identity; 0.64 @ ppq480/gd4 ->
+  154 pinned), TD-043 per-bar variable-length cell tiling, register
+  containment, and D74 annotations computed from REALIZED pitches
+  only (a "walking" claim only when the realized bass IS walking;
+  +2 curated concepts: walking-bass, comping). Determinism: 162-case
+  matrix x2 byte-equality; purity floor 29 -> 33. UI:
+  `AccompanimentPanel` in the loaded state (roles/style/density/
+  register/transpose/seed + Randomize REQ-COMP-36, staleness chip
+  via `gridFingerprint`, annotation chips -> ConceptDrawer), the
+  piano roll gains optional accompaniment overlay layers
+  (`roll-layer-*` groups), and the store persists the REQUEST inside
+  the v4 payload WITHOUT a v5 (optional field, default-at-read;
+  result stays in-memory). PREVIEW (D72 - the ONE explicit parent-
+  intent re-slice: the quick-audition pulled from S4's plan into S3;
+  the mixer/transport/export stay S4): render-and-play via
+  OfflineAudioContext (loopWav
+  precedent - no transport, no mixer, accompaniment-only, 90s cap)
+  through the SHARED recipe `src/lib/composeVoices.ts` that S4's
+  player/export absorb unchanged; singleton player state machine
+  (idle -> rendering -> playing -> idle) pinned in a new 5-leg e2e
+  spec incl. determinism-across-reload. HONESTY: the e2e pins the
+  preview STATE MACHINE, not its audio output; musicality (RK6) is
+  human-gated and the MANUAL LISTEN CHECK is OPEN - no verdict
+  recorded yet. Zero edits to App.tsx,
+  ModeGate, audio.ts, the transport stack, or tests/.
+  FIX ROUND (reviewer/tester): density-thinning denominator now counts
+  SOUNDING cells only (a rests grid at density 5 no longer falsely
+  claims "thinned" - mutation-proven pin); the D74 #5 quartal-fallback
+  annotation branch ships (progression-level, hand-built-plan pins);
+  the rest-stream-identity pins are made DISCRIMINATIVE (rest before a
+  drawing cell + rng-position equality; draw-on-rest mutations verified
+  RED at both bass and voicing level); rootless double-guard pinned
+  per-guard via realizePlan fixtures; play->play re-play pin added
+  (fake-AudioContext: first source stopped+disconnected, one context
+  ever); D66/D68/D69 declaration errata in
+  `docs/PHASE-4-S3-ACCOMPANIMENT.md`; fingerprint bassPc blind spot ->
+  TD-044.
 - **Compose upload UI + analysis review (PRD-001 Phase 4 slice 2)** --
   the Compose mode becomes a real surface. `ComposeSurface` grows from
   the Phase 1 stub (all three pinned strings survive verbatim: the

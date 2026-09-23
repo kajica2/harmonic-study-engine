@@ -48,9 +48,11 @@ const ENGINE = "engine";
  *  harmony/melody/assemble + pedagogy types/concepts/annotate) per
  *  D20; Phase 4 Slice 1 adds core/chords + compose/{types,normalize,
  *  tempo,roles,key,melody,harmony,index} per D56 (analyzeProject needs
- *  a home and cannot live in types.ts - cycle). Raise this only
- *  alongside real files. */
-const MIN_SCANNED_FILES = 29;
+ *  a home and cannot live in types.ts - cycle); Phase 4 Slice 3 adds
+ *  compose/{patterns,voicing,bass,accompany} per D75 (29 -> 33,
+ *  pre-authorized by the parent ladder). Raise this only alongside
+ *  real files. */
+const MIN_SCANNED_FILES = 33;
 
 const BANNED: readonly RegExp[] = [
   /\bMath\.random\b/, // no paren: calls AND aliasing

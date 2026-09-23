@@ -852,3 +852,180 @@ describe("Phase 4 Slice 2: analyzeFull recompute + v3->v4 (D57/REQ-COMP-53)", ()
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 3 (D73): accompaniment request persisted into the
+// v4 payload WITHOUT v5; result IN-MEMORY only; request outside undo scope.
+// ---------------------------------------------------------------------------
+
+describe("Phase 4 Slice 3: accompaniment request + result (D73)", () => {
+  beforeEach(() => {
+    STORE_API().clearCompose();
+  });
+
+  const REQUEST = {
+    version: 1,
+    styleId: "jazz",
+    roles: ["bass", "chords"],
+    density: 3,
+    seed: 42,
+  } as const;
+
+  it("fresh state: composeAccompaniment null; request absent (optional field)", () => {
+    const s = STORE_API();
+    expect(s.composeAccompaniment).toBeNull();
+    expect(s.composeSession?.request ?? null).toBeNull(); // default at read
+  });
+
+  it("setComposeRequest persists INSIDE composeSession and does NOT touch undo (D59 scope)", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: "h" });
+    STORE_API().patchComposeOverrides({ ...EMPTY_OVERRIDES, tempoBpm: 100 });
+    const undoBefore = STORE_API().composeUndo.length;
+    const redoBefore = STORE_API().composeRedo.length;
+    STORE_API().setComposeRequest(REQUEST);
+    const s = STORE_API();
+    expect(s.composeSession?.request).toEqual(REQUEST);
+    expect(s.composeUndo.length).toBe(undoBefore); // UNCHANGED
+    expect(s.composeRedo.length).toBe(redoBefore); // UNCHANGED
+    // Undo still works over overrides only.
+    s.undoCompose();
+    expect(STORE_API().composeSession?.overrides.tempoBpm).toBeNull();
+    expect(STORE_API().composeSession?.request).toEqual(REQUEST); // survives undo
+  });
+
+  it("setComposeRequest is a no-op without a session (taste needs a home)", () => {
+    STORE_API().setComposeRequest(REQUEST);
+    expect(STORE_API().composeSession).toBeNull();
+  });
+
+  it("partialize: request rides INSIDE the persisted composeSession; the RESULT never persists", async () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: "h" });
+    STORE_API().setComposeRequest(REQUEST);
+    STORE_API().setComposeAccompaniment({
+      version: 1,
+      generated: { bass: [], chords: [], pad: [] },
+      meta: {
+        version: 1,
+        styleId: "jazz",
+        density: 3,
+        seed: 42,
+        roles: ["bass", "chords"],
+        patternIds: { bass: "walking", chords: "freddieGreen", pad: "sustain" },
+        voicingStyle: "drop2",
+        swingRatioApplied: 0.64,
+        gridDivisions: 2,
+        registersUsed: { bass: [28, 48], chords: [48, 72], pad: [60, 84] },
+        transpose: 0,
+        noteCounts: { bass: 0, chords: 0, pad: 0 },
+        rootlessCount: 0,
+        quartalFallbackCount: 0,
+        unknownQualityCount: 0,
+        bars: 0,
+        endTick: 0,
+        gridFingerprint: "x",
+      },
+      annotations: [],
+    });
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY) as string;
+    const parsed = JSON.parse(raw) as { state: Record<string, unknown>; version: number };
+    expect(parsed.version).toBe(4); // NO v5 (D73)
+    const session = parsed.state.composeSession as Record<string, unknown>;
+    expect(session.request).toEqual(REQUEST); // persisted with the session
+    expect(parsed.state.composeAccompaniment).toBeUndefined(); // result excluded
+  });
+
+  it("OLD v4 payloads WITHOUT the request field hydrate with default-at-read (NO migration)", () => {
+    // Hand-built pre-S3 payload: version 4, composeSession WITHOUT
+    // `request`. The read site (`session.request ?? null`) is the
+    // migration - CURRENT_SESSION_VERSION stays 4.
+    const legacy = {
+      state: {
+        mode: "compose",
+        globalTranspose: 0,
+        exerciseTranspose: 0,
+        keyCycleActive: false,
+        currentIdea: null,
+        etudeConstraints: null,
+        composeSession: {
+          fileName: "old.mid",
+          fileHash: null,
+          overrides: EMPTY_OVERRIDES,
+          analyzeFull: false,
+        },
+      },
+      version: 4,
+    };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(legacy));
+    useSessionStore.persist.rehydrate();
+    const s = STORE_API();
+    expect(CURRENT_SESSION_VERSION).toBe(4);
+    expect(s.composeSession?.fileName).toBe("old.mid");
+    expect(s.composeSession?.request ?? null).toBeNull(); // default at read
+    expect(s.composeAccompaniment).toBeNull();
+  });
+
+  it("setComposeFile KEEPS the persisted request (taste survives file swaps) and NULLS the result", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "a.mid", fileHash: "h" });
+    STORE_API().setComposeRequest(REQUEST);
+    STORE_API().setComposeAccompaniment({
+      version: 1,
+      generated: { bass: [], chords: [], pad: [] },
+      meta: {
+        version: 1,
+        styleId: "jazz",
+        density: 3,
+        seed: 42,
+        roles: ["bass", "chords"],
+        patternIds: { bass: "walking", chords: "freddieGreen", pad: "sustain" },
+        voicingStyle: "drop2",
+        swingRatioApplied: 0.64,
+        gridDivisions: 2,
+        registersUsed: { bass: [28, 48], chords: [48, 72], pad: [60, 84] },
+        transpose: 0,
+        noteCounts: { bass: 0, chords: 0, pad: 0 },
+        rootlessCount: 0,
+        quartalFallbackCount: 0,
+        unknownQualityCount: 0,
+        bars: 0,
+        endTick: 0,
+        gridFingerprint: "x",
+      },
+      annotations: [],
+    });
+    const q = fixtureProject();
+    STORE_API().setComposeFile(q, fixtureAnalysis(q), { fileName: "b.mid", fileHash: "h2" });
+    const s = STORE_API();
+    expect(s.composeSession?.fileName).toBe("b.mid");
+    expect(s.composeSession?.request).toEqual(REQUEST); // KEPT
+    expect(s.composeAccompaniment).toBeNull(); // NULLed (grid-derived)
+  });
+
+  it("clearCompose resets BOTH request (with the session) and result", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: null });
+    STORE_API().setComposeRequest(REQUEST);
+    STORE_API().clearCompose();
+    const s = STORE_API();
+    expect(s.composeSession).toBeNull();
+    expect(s.composeAccompaniment).toBeNull();
+  });
+
+  it("reload simulation: request survives rehydration, result does not exist (D73)", async () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "keep.mid", fileHash: "h" });
+    STORE_API().setComposeRequest(REQUEST);
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY) as string;
+    STORE_API().clearCompose();
+    localStorage.setItem(SESSION_STORAGE_KEY, raw);
+    useSessionStore.persist.rehydrate();
+    const s = STORE_API();
+    expect(s.composeSession?.request).toEqual(REQUEST); // restored
+    expect(s.composeAccompaniment).toBeNull(); // never was persisted
+    // Generation stays EXPLICIT: rehydration never invents a result.
+  });
+});

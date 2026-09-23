@@ -14,6 +14,7 @@
 
 import type { Versioned } from "../core/versioned";
 import type { Annotation } from "../pedagogy/types";
+import type { MidiRange, StyleId, VoicingStyle } from "../styles/types";
 
 /** REQ-COMP-15 / NFR-5. Analyzers return outcomes; they never throw. */
 export type AnalysisErrorCode =
@@ -198,6 +199,129 @@ export interface ComposeAnalysis extends Versioned {
   readonly truncated: boolean; // REQ-COMP-53: file longer than window
   readonly percussionOnly: boolean; // REQ-COMP-51
   readonly annotations: readonly Annotation[]; // REQ-PED-1 (truthful only)
+}
+
+/** PRD-001 Phase 4 Slice 3 (D71): the accompaniment request. Persisted
+ *  OPTIONAL field on ComposeSession (D73 - no v5, missing field
+ *  defaults at read). version 1. */
+export type AccompRole = "bass" | "chords" | "pad";
+
+export interface AccompanimentRequest extends Versioned {
+  // version: 1
+  readonly styleId: StyleId;
+  /** Non-empty (validated at plan time - empty -> "unsupported"). */
+  readonly roles: readonly AccompRole[];
+  /** 0..5 (REQ-COMP-35). */
+  readonly density: number;
+  /** uint32 (REQ-COMP-36). */
+  readonly seed: number;
+  /** Octave shifts per role (REQ-COMP-35 P1): multiples of 12. */
+  readonly registerOffsets?: Partial<Record<AccompRole, number>>;
+  /** Semitones, PLAN-time (REQ-TRANS-3 / D50). Originals never move. */
+  readonly transposeAccompaniment?: number;
+}
+
+/** A resolved bass hit pitch + the approach kind the D69 resolver used
+ *  (null when the hit was not a nextApproach token). Recorded for the
+ *  D74 truthfulness rules - annotations read the REALIZED kind. */
+export interface BassHitPitch {
+  readonly midi: number;
+  readonly approach: "chromatic" | "stepwise" | "fifth" | "fallback" | null;
+  /** The next sounding cell's target pc + bar (recorded when an
+   *  approach actually fired - D74 #4 reads these, never re-derives). */
+  readonly approachTargetPc: number | null;
+  readonly approachTargetBar: number | null;
+}
+
+/** PRD 11.1 Plan: the fully-resolved decisions BEFORE tick mapping.
+ *  Exported for two-level testing (plan -> realize), NOT part of the
+ *  shipped result. All rng draws happen at plan time (D67/D68 draw
+ *  order); realizePlan is pure arithmetic. */
+export interface AccompanimentPlan extends Versioned {
+  // version: 1
+  readonly grid: ChordGrid;
+  readonly roles: readonly AccompRole[];
+  readonly ppq: number;
+  readonly key: KeyCandidate | null;
+  readonly styleId: StyleId;
+  readonly voicingStyle: VoicingStyle;
+  readonly patternIds: {
+    readonly bass: string;
+    readonly chords: string;
+    readonly pad: string;
+  };
+  readonly swingRatio: number;
+  readonly gridDivisions: number;
+  readonly density: number;
+  readonly seed: number;
+  /** Post registerOffsets + transpose (D71). */
+  readonly registers: Record<AccompRole, MidiRange>;
+  /** Per bar per slot voicings (null = rest/unknown); [] when the
+   *  role is not selected. FULL density - thinning is post-pitch. */
+  readonly voicings: {
+    readonly chords: readonly (readonly (readonly number[] | null)[])[];
+    readonly pad: readonly (readonly (readonly number[] | null)[])[];
+  };
+  /** Per bar per slot bass pitches aligned to the PRE-FILTER tiled hit
+   *  order (D67/D69); [] bars when the bass role is off. */
+  readonly bassPitches: readonly (readonly (readonly BassHitPitch[])[])[];
+  /** Per bar per slot rootless decisions (D68 rule 5). */
+  readonly rootlessFlags: readonly (readonly boolean[])[];
+  /** Close-fallback count from the quartal shape (chords + pad
+   *  passes) - meta.quartalFallbackCount reads this, never re-derives. */
+  readonly quartalFallbackCount: number;
+  /** Rng draws consumed at plan time (draw-order contract, D68). */
+  readonly drawCount: number;
+}
+
+/** GeneratedNote IS a NormalizedNote (structural) + provenance - S4's
+ *  player/export/roll consume WITHOUT re-derivation. */
+export interface GeneratedNote extends NormalizedNote {
+  readonly role: AccompRole;
+  readonly bar: number;
+  readonly slot: number;
+}
+
+export interface AccompanimentMeta extends Versioned {
+  // version: 1
+  readonly styleId: StyleId;
+  readonly density: number;
+  readonly seed: number;
+  readonly roles: readonly AccompRole[];
+  readonly patternIds: {
+    readonly bass: string;
+    readonly chords: string;
+    readonly pad: string;
+  };
+  readonly voicingStyle: VoicingStyle;
+  readonly swingRatioApplied: number;
+  readonly gridDivisions: number;
+  readonly registersUsed: Record<AccompRole, MidiRange>;
+  readonly transpose: number;
+  readonly noteCounts: Record<AccompRole, number>;
+  readonly rootlessCount: number;
+  readonly quartalFallbackCount: number;
+  readonly unknownQualityCount: number;
+  readonly bars: number;
+  readonly endTick: number;
+  /** gridFingerprint(grid) at generation time - staleness (D71). */
+  readonly gridFingerprint: string;
+}
+
+/** DEVIATION FROM PRD 11.1 (flagged in D71): the PRD sketch says
+ *  {original, generated, meta}. We do NOT embed the original project
+ *  (up to 30MB) in the result - the store already owns it and
+ *  gridFingerprint pins identity. "original" is REFERENCE, not FIELD. */
+export interface AccompanimentResult extends Versioned {
+  // version: 1
+  readonly generated: {
+    readonly bass: readonly GeneratedNote[];
+    readonly chords: readonly GeneratedNote[];
+    readonly pad: readonly GeneratedNote[];
+  };
+  readonly meta: AccompanimentMeta;
+  /** REQ-PED-1 ({result, annotations} pattern, D74). */
+  readonly annotations: readonly Annotation[];
 }
 
 /** REQ-COMP-21: every detected value overridable. Sparse by design. */

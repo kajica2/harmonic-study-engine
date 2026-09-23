@@ -36,6 +36,13 @@ export const ROLL_PALETTE = {
   barline: "#71717A", // zinc-500
   strongOutline: "#F4F4F5", // zinc-100
   activeBar: "#FFFFFF",
+  // PRD-001 Phase 4 Slice 3 (D76 file plan): ADDITIVE accompaniment
+  // layer colors from the same Okabe-Ito set (TD-040-safe: constants
+  // only, zero etude behavior change). Slots bass/chords/pad did not
+  // exist; these three complete them without touching existing keys.
+  accompanimentBass: "#E69F00", // orange
+  accompanimentChords: "#56B4E9", // sky blue
+  accompanimentPad: "#CC79A7", // reddish purple
 } as const;
 
 const SLOT_W = 10;

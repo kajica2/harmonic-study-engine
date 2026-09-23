@@ -1,10 +1,12 @@
-# Compose Mode (PRD-001 Phase 4, Slice 2)
+# Compose Mode (PRD-001 Phase 4, Slices 2-3)
 
 Compose is the MIDI-file workspace. Drop in a `.mid` file and the app
 reads it, analyzes it, and hands back an editable chart: the detected
 key, tempo, meter, melody line, and a chord for every bar -- each one
 yours to correct. Phase 4 slice 2 made this real for the first time;
-before it, Compose was an empty-state stub.
+before it, Compose was an empty-state stub. Slice 3 added the
+accompaniment: the chart can now generate a style-aware backing
+(bass / chords / pad) you can audition.
 
 Everything happens in your browser. The file is parsed locally and
 the analysis runs locally -- nothing is uploaded anywhere. The
@@ -15,11 +17,14 @@ Open Compose with the tab or the `1` key.
 
 User requirements traced here: REQ-COMP-1 (upload), REQ-COMP-5
 (melody preview, melody-only carve), REQ-COMP-6 (pitch-bend warning),
-REQ-COMP-20..24 (editable analysis + undo), REQ-COMP-50..53 (edge
-cases + windowing), REQ-PED-4/5 (annotations + concept drawer,
-Compose host), REQ-IO-51/70/71. Design authority:
-`docs/PHASE-4-S2-ANALYSIS-UI.md` (D57..D65); engine internals:
-`docs/engine-compose.md`.
+REQ-COMP-20..24 (editable analysis + undo), REQ-COMP-30..36
+(accompaniment: roles, voicing, patterns, density, seed),
+REQ-COMP-50..53 (edge cases + windowing), REQ-PED-4/5 (annotations +
+concept drawer, Compose host), REQ-TRANS-3 (accompaniment-only
+transpose), REQ-IO-51/70/71. Design authority:
+`docs/PHASE-4-S2-ANALYSIS-UI.md` (D57..D65) +
+`docs/PHASE-4-S3-ACCOMPANIMENT.md` (D66..D76); engine internals:
+`docs/engine-compose.md`; pattern content: `docs/PATTERN-LIBRARY.md`.
 
 ## Uploading your file
 
@@ -149,7 +154,7 @@ Next to the file name and duration:
 
 | Field | Editing | What it actually does |
 |---|---|---|
-| Tempo | type a BPM, Enter/blur to commit | RECORDED for the future playback/export (slice 4) -- nothing sounds yet, and the field's tooltip says so |
+| Tempo | type a BPM, Enter/blur to commit | RECORDED for the full playback/export (slice 4). The accompaniment preview runs on the file's OWN tempo map, not this override - the preview's tooltip says so |
 | Meter | type e.g. `6/4` | re-runs the whole analysis on the new bar grid AND clears your chord edits (bar alignment changes make them unsafe) -- both in one step, so ONE undo restores the cells and the meter together |
 | Key | see the confidence section | drives chord spelling + the inference |
 | Melody track | pick a track (or "Auto (top line)") | re-extracts the melody from that track's REAL notes -- the roll below genuinely changes, it is not a relabel |
@@ -219,20 +224,50 @@ span, where the melody came from, the key reading. Chips that map
 to a taught concept open the same **Concept drawer** the Etude
 surface uses; the ii-V-I chip also highlights the exact bars it
 covers. Chips without a concept (provenance notes) are plain text,
-not dead click targets.
+not dead click targets. After you generate, the accompaniment panel
+adds its own chips (the realized patterns, walking approaches,
+rootless/drop-2 voicings) - and those claims are computed from the
+notes that actually sounded, never from what the pattern could
+have done (a thinned walking line says so).
 
 ## Not yet -- what Compose does NOT do today
 
-- **No audio playback.** Nothing sounds from the analysis; slice 4
-  owns the Compose transport. (The global `Space` key still belongs
-  to Etude playback -- a known wart, not a Compose feature.)
-- **No accompaniment generation.** The chart is the input for
-  slice 3's style-driven backing, which does not exist yet.
-- **No export, no URL sharing of an analysis.** Saving the chart,
-  MIDI/WAV export, and shareable analysis URLs are slice 4 (URL
-  serialization is a stretch goal).
+- **No playback of YOUR file.** Your original tracks never sound --
+  the Compose transport and mixer (per-group volume/solo) are slice
+  4. The only audio so far is the accompaniment preview below; the
+  global `Space` key still belongs to Etude playback -- a known
+  wart, not a Compose feature.
+- **Accompaniment generation + preview (slice 3, live).** Under the
+  analysis card, the AccompanimentPanel generates a style-aware
+  backing over the MERGED chart: pick a style (Jazz/Pop/Classical),
+  one or more roles (bass / chords / pad), a density 0..5 (thins
+  detail, never reshapes - the same notes at every level, just
+  fewer), per-role register (low/standard/high), an
+  accompaniment-only transpose, and a seed. Same seed + same chart =
+  byte-identical output, across regenerate AND reload (the request
+  survives reload; press Generate again - it never auto-fires).
+  [Randomize] rolls a new seed. The panel states whether a key
+  context is active: with one, walking-bass approaches may move
+  diatonically; without one they stay chromatic. The generated
+  layers render on an overlay piano roll under the chart, and
+  [Preview (accompaniment)] renders offline and plays it - the
+  first 1:30 on longer charts, labeled - no transport, no mixing
+  with your original tracks yet (that is slice 4). Honest limits
+  printed in the UI: the tempo OVERRIDE is not applied to the
+  preview until the mixer (the project tempo map is), and a "chart
+  changed since generation - regenerate" chip appears the moment
+  you edit a cell after generating.
+- **No export, no mixer, no chart-paste.** Saving the chart,
+  MIDI/WAV export, shareable analysis URLs, the mixer
+  (per-group volume/solo, original-track playback), and
+  chord-chart paste are all slice 4 (URL serialization is a
+  stretch goal).
 - **No piano-roll editing and one melody line only.** The roll is a
   preview; the multi-track editor is Phase 8.
+- **The accompaniment's musicality is not yet human-verified.**
+  Structure and determinism are test-pinned, but the manual listen
+  check (the only real bar for "does it sound idiomatic") is still
+  open - your ears are the gate (PRD Appendix F).
 - **Detection accuracy on real-world files is still an open
   question.** The engine scores perfectly on its synthetic test
   corpus, which proves the wiring, not the world. That is exactly
@@ -240,7 +275,8 @@ not dead click targets.
 
 ## Where to look
 
-- Design: `docs/PHASE-4-S2-ANALYSIS-UI.md` (D57..D65)
+- Design: `docs/PHASE-4-S2-ANALYSIS-UI.md` (D57..D65); accompaniment:
+  `docs/PHASE-4-S3-ACCOMPANIMENT.md` (D66..D76)
 - Engine internals: `docs/engine-compose.md`
 - Surface (three states + upload pipeline + undo keyboard):
   `src/components/ComposeSurface.tsx`
@@ -251,4 +287,9 @@ not dead click targets.
   grammar: `src/lib/chordInput.ts`
 - Melody preview: `src/components/ComposePianoRoll.tsx`
 - Parse pipeline: `src/lib/composeMidi.ts` -> `engine/compose/`
+- Accompaniment panel: `src/components/AccompanimentPanel.tsx`;
+  pattern data: `engine/compose/patterns.ts` (musician-facing
+  reference: `docs/PATTERN-LIBRARY.md`); pipeline:
+  `engine/compose/accompany.ts`; preview:
+  `src/lib/composePreview.ts` + `src/lib/composeVoices.ts`
 - Session persistence (v4): `src/state/sessionStore.ts`

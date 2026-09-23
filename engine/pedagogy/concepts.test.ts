@@ -2,7 +2,9 @@
  * engine/pedagogy/concepts.test.ts - PRD-001 Phase 3 Slice 1 (test
  * plan 5, D17 review bar).
  *
- * Pins the 8-concept registry: REQ-PED-10 coverage, REQ-PED-11 shape
+ * Pins the concept registry (8 PRD-required + the 2 accompaniment
+ * concepts added by Phase 4 Slice 3, D74): REQ-PED-10 coverage,
+ * REQ-PED-11 shape
  * (all fields non-empty, kebab ids, category enum, definition <= 160
  * chars), ASCII-only prose, related ids resolve, exampleNumerals parse
  * in the D21 grammar (both modes), JSON round-trip.
@@ -20,13 +22,16 @@ const KEBAB_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 // printable ASCII + newline (paragraph separators); nothing else.
 const ASCII_RE = /^[\x20-\x7E\n]*$/;
 
+// D74 (Phase 4 Slice 3): walking-bass + comping appended - additive,
+// registry-legal (there is NO count pin; this list is the order pin).
 const EXPECTED_IDS = [
   "ii-v-i", "tritone-sub", "secondary-dominant", "modal-interchange",
   "voice-leading", "drop-2", "cadence", "axis-progression",
+  "walking-bass", "comping",
 ];
 
 describe("REQ-PED-10 registry coverage", () => {
-  it("ships exactly the 8 required concepts, in PRD order", () => {
+  it("ships the 8 PRD concepts + the 2 S3 accompaniment concepts, in registry order", () => {
     expect([...CONCEPT_IDS]).toEqual(EXPECTED_IDS);
     expect(allConcepts().map((c) => c.id)).toEqual(EXPECTED_IDS);
   });

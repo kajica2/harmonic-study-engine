@@ -130,3 +130,76 @@ describe("ComposePianoRoll", () => {
     expect(screen.getAllByTestId("roll-barline").length).toBeGreaterThanOrEqual(8);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 3 (test plan 13): the optional accompaniment
+// layers. undefined -> byte-identical S2 behavior (the pins above run
+// UNEDITED); defined -> per-layer testids + rect counts + serialize.
+// ---------------------------------------------------------------------------
+
+describe("S3 layers prop", () => {
+  function renderWithLayers(notes: readonly NormalizedNote[], layerNotes: readonly NormalizedNote[]) {
+    const melody: MelodyResult = { sourceTrackIndex: 0, synthesized: false, notes };
+    return render(
+      <ComposePianoRoll
+        project={EMPTY_PROJECT}
+        melody={melody}
+        window={{ fromTick: 0, toTick: 7680 }}
+        truncated={false}
+        layers={[
+          { label: "bass", notes: layerNotes, color: "#E69F00" },
+          { label: "chords", notes: layerNotes.slice(0, 2), color: "#56B4E9" },
+        ]}
+      />,
+    );
+  }
+
+  it("layers undefined: NO roll-layer-* testids, NO roll-serialize (S2 pins above stay green)", () => {
+    renderRoll([note(60, 0, 480)]);
+    expect(document.querySelector('[data-testid^="roll-layer-"]')).toBeNull();
+    expect(screen.queryByTestId("roll-serialize")).toBeNull();
+  });
+
+  it("layers defined: per-layer groups with exact rect counts", () => {
+    renderWithLayers(
+      [note(72, 0, 480)],
+      [note(36, 0, 480), note(43, 480, 480), note(45, 960, 480)],
+    );
+    expect(screen.getByTestId("roll-layer-bass").querySelectorAll("rect")).toHaveLength(3);
+    expect(screen.getByTestId("roll-layer-chords").querySelectorAll("rect")).toHaveLength(2);
+    // melody rects are UNCHANGED in count (overlay, not replacement).
+    expect(screen.getAllByTestId("note-rect")).toHaveLength(1);
+  });
+
+  it("layers widen the semitone band (bass at 36 renders inside the SVG)", () => {
+    const { container } = renderWithLayers([note(72, 0, 480)], [note(36, 0, 480)]);
+    const svg = screen.getByTestId("compose-roll-svg");
+    const height = Number(svg.getAttribute("height"));
+    // band must cover 36..72 padded: (73 - 35 + 1) * 6 = 234
+    expect(height).toBeGreaterThanOrEqual((73 - 35 + 1) * 6);
+    const rect = screen.getByTestId("roll-layer-bass").querySelector("rect");
+    expect(rect).not.toBeNull();
+    const y = Number(rect!.getAttribute("y"));
+    expect(y).toBeGreaterThan(0);
+    expect(y + 6).toBeLessThanOrEqual(height);
+    void container;
+  });
+
+  it("serializeLayers: deterministic string, byte-stable across renders", () => {
+    const layers = [
+      { label: "bass", notes: [note(36, 0, 480, 0.95)], color: "#E69F00" },
+      { label: "chords", notes: [note(60, 0, 240, 0.92)], color: "#56B4E9" },
+    ];
+    render(
+      <ComposePianoRoll
+        project={EMPTY_PROJECT}
+        melody={{ sourceTrackIndex: 0, synthesized: false, notes: [] }}
+        window={{ fromTick: 0, toTick: 7680 }}
+        truncated={false}
+        layers={layers}
+      />,
+    );
+    const el = screen.getByTestId("roll-serialize");
+    expect(el.textContent).toBe("bass:0:36:480:0.9500;chords:0:60:240:0.9200");
+  });
+});

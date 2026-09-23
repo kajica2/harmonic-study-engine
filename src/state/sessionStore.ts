@@ -35,6 +35,8 @@ import {
 import { analyzeProject } from "../../engine/compose";
 import {
   EMPTY_OVERRIDES,
+  type AccompanimentRequest,
+  type AccompanimentResult,
   type AnalysisOverrides,
   type ComposeAnalysis,
   type NormalizedProject,
@@ -143,6 +145,11 @@ export interface ComposeSession {
   overrides: AnalysisOverrides;
   /** REQ-COMP-53 window choice (default 4 min vs full file). */
   analyzeFull: boolean;
+  /** PRD-001 Phase 4 Slice 3 (D73): the accompaniment request is an
+   *  OPTIONAL persisted field - NO v5, NO migration. Old payloads
+   *  default at read via `session.request ?? null`. Style/seed are
+   *  taste, not file state: setComposeFile KEEPS them. */
+  request?: AccompanimentRequest | null;
 }
 
 /** Undo stack cap (D59): whole-map snapshots, oldest dropped first. */
@@ -165,6 +172,11 @@ interface ComposeSlice {
   composeSession: ComposeSession | null;
   composeProject: NormalizedProject | null;
   composeAnalysis: ComposeAnalysis | null;
+  /** D73: the accompaniment RESULT is in-memory ONLY (excluded by
+   *  partialize): deterministic from (grid, request, seed), so
+   *  persisting it would cache a pure function - and it references
+   *  ticks of a project we refuse to persist. */
+  composeAccompaniment: AccompanimentResult | null;
   /** D59 snapshot stacks (in-memory; never persisted). */
   composeUndo: AnalysisOverrides[];
   composeRedo: AnalysisOverrides[];
@@ -187,6 +199,12 @@ interface ComposeSlice {
   /** REQ-COMP-53: recompute composeAnalysis on the in-memory project
    *  (deterministic, no clock/rng - legal in-store). */
   setComposeAnalyzeFull: (b: boolean) => void;
+  /** D73: persist the accompaniment request (or null). Does NOT touch
+   *  the undo stacks - D59 scope is ANALYSIS OVERRIDES only;
+   *  regeneration is instant and the seed is user-owned. */
+  setComposeRequest: (req: AccompanimentRequest | null) => void;
+  /** D73: in-memory result slot (never persisted). */
+  setComposeAccompaniment: (r: AccompanimentResult | null) => void;
   /** The "start over" reset - compose's OWN clear; resetModeSlice is
    *  deliberately NOT widened (sessionStore pins its shape). */
   clearCompose: () => void;
@@ -206,6 +224,7 @@ export const useSessionStore = create<SessionState>()(
       composeSession: null,
       composeProject: null,
       composeAnalysis: null,
+      composeAccompaniment: null,
       composeUndo: [],
       composeRedo: [],
       dirty: { compose: "none", etude: "none", explore: "none" },
@@ -278,6 +297,7 @@ export const useSessionStore = create<SessionState>()(
       // pure setters; the only computation is re-running
       // analyzeProject (deterministic, no clock/rng - legal in-store).
       setComposeFile: (project, analysis, meta, restore) => {
+        const s0 = get();
         const overrides = restore === undefined ? EMPTY_OVERRIDES : restore.overrides;
         const analyzeFull = restore === undefined ? false : restore.analyzeFull;
         let finalAnalysis = analysis;
@@ -295,7 +315,13 @@ export const useSessionStore = create<SessionState>()(
             fileHash: meta.fileHash,
             overrides,
             analyzeFull,
+            // D73: style/seed are taste, not file state - the
+            // persisted request SURVIVES a file swap (same reasoning
+            // as etudeConstraints surviving mode switches).
+            request: s0.composeSession?.request ?? null,
           },
+          // D73: the result is grid-derived - a new file invalidates it.
+          composeAccompaniment: null,
           composeUndo: [],
           composeRedo: [],
         });
@@ -344,11 +370,23 @@ export const useSessionStore = create<SessionState>()(
           composeSession: { ...s.composeSession, analyzeFull: b },
         });
       },
+      setComposeRequest: (req) => {
+        const s = get();
+        // Persisted INSIDE the v4 composeSession record (D73: optional
+        // field, no v5). No-op without a session (the panel only
+        // renders loaded; taste needs a home).
+        if (s.composeSession === null) return;
+        set({ composeSession: { ...s.composeSession, request: req } });
+      },
+      setComposeAccompaniment: (r) => {
+        set({ composeAccompaniment: r });
+      },
       clearCompose: () => {
         set({
           composeSession: null,
           composeProject: null,
           composeAnalysis: null,
+          composeAccompaniment: null,
           composeUndo: [],
           composeRedo: [],
         });

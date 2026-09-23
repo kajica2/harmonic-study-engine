@@ -35,6 +35,8 @@ export const CONCEPT_IDS: readonly string[] = [
   "drop-2",
   "cadence",
   "axis-progression",
+  "walking-bass",
+  "comping",
 ];
 
 const II_V_I: Concept = {
@@ -165,6 +167,38 @@ const AXIS_PROGRESSION: Concept = {
   exampleNumerals: ["Imaj7", "III7", "bVI", "bII7"],
 };
 
+const WALKING_BASS: Concept = {
+  version: 1,
+  id: "walking-bass",
+  title: "Walking Bass",
+  category: "rhythm",
+  definition:
+    "The jazz foundation: a mostly-stepwise four-notes-per-bar bass line that outlines each chord and walks between them with approach notes.",
+  body:
+    "A walking bass line is the engine of a traditional jazz rhythm section. Four quarter notes to the bar in 4/4: land on the root, state a chord tone or two (third, fifth, seventh), then walk to the next chord by step. Because it never stops moving, the line itself is a melody - it tells the harmony forward and locks the pulse for everyone soloing over it.\n\n" +
+    "The connective tissue is the approach note: the last quarter before a chord change targets a note a step away from the next root, usually chromatic from below (the classic F# before G) or a diatonic step. Good walkers mix chord tones with these approaches so the line sounds inevitable rather than mechanical, and they keep the motion smooth by choosing the octave nearest where they are standing.\n\n" +
+    "Practice it the way pianists practice voicings: take a ii-V-I and walk it up and down the register, roots only first, then add thirds and fifths, then approach notes. When you hear a recording where the bass seems to sing - Ray Brown, Paul Chambers, Ron Carter - you are hearing a walking line: steady quarters, chord tones on the strong beats, stepwise approaches in front of every change.",
+  references: null,
+  related: ["voice-leading", "ii-v-i"],
+  exampleNumerals: ["ii7", "V7", "Imaj7"],
+};
+
+const COMPING: Concept = {
+  version: 1,
+  id: "comping",
+  title: "Comping",
+  category: "rhythm",
+  definition:
+    "Accompanying a soloist with short, syncopated chord statements - complementary rhythm and harmony that supports without stepping on the line.",
+  body:
+    "Comping - short for complementing - is what piano and guitar do behind a soloist: not a strummed blanket of chords, but punctuated statements that answer the melody. The rhythm of the comps is part of the message: Freddie Green's four quarter stabs to the bar in the Count Basie band, the dotted Charleston figure (downbeat plus off-beat) that animates a ballad, the off-beat stab that pushes a soloist's phrase forward.\n\n" +
+    "Because the bass already covers the root, comping voicings are often rootless: thirds, sevenths, and color tones stacked in the middle register, leaving the low end to the bassist and the top open for the solo line. The fewer notes, the more each one counts - a good comp lands on the beat the soloist is thinking about.\n\n" +
+    "Dynamics decide comping more than notes do. Play every chord at the same level and you are a metronome with harmony; vary the density - a bar of sustained pads, then two quick stabs - and you are conversing. When the accompaniment track in this app thins from full detail down to anchor hits, that is the same lever: the pattern data never changes shape, it just says less.",
+  references: null,
+  related: ["voice-leading", "drop-2", "ii-v-i"],
+  exampleNumerals: ["ii7", "V7", "Imaj7"],
+};
+
 const REGISTRY: ReadonlyMap<string, Concept> = new Map<string, Concept>(
   [
     II_V_I,
@@ -175,6 +209,8 @@ const REGISTRY: ReadonlyMap<string, Concept> = new Map<string, Concept>(
     DROP_2,
     CADENCE,
     AXIS_PROGRESSION,
+    WALKING_BASS,
+    COMPING,
   ].map((c) => [c.id, c]),
 );
 

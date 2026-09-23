@@ -1,4 +1,4 @@
-# Compose Engine (PRD-001 Phase 4, Slices 1-2)
+# Compose Engine (PRD-001 Phase 4, Slices 1-3)
 
 Phase 4 slice 1 ships the pure parse+analysis core for Compose mode:
 `engine/compose/` (normalize, tempo map, roles, key, melody, harmony
@@ -9,13 +9,17 @@ wires the upload surface + analysis review on top of it (user guide:
 `docs/COMPOSE-MODE.md`; design: `docs/PHASE-4-S2-ANALYSIS-UI.md`,
 D57..D65) and adds the two engine changes documented below: the
 `blendKeyEvidence` key-confidence blend (D58, additive in `key.ts`)
-and the `mergeGrid` slot-append fix (D60, `types.ts`). Requirements
-trace to PRD-001 section 8.2 (REQ-COMP) and section 8.5 (REQ-PED-1,
-analyzer annotations); the approved design is `docs/PHASE-4-COMPOSE.md`
-(D45-D56 - read its ERRATA section alongside this doc; six design
-premises were falsified during implementation). Foundations:
-[engine-foundations.md](engine-foundations.md); the sibling Etude
-engine: [engine-etude.md](engine-etude.md).
+and the `mergeGrid` slot-append fix (D60, `types.ts`). Slice 3 adds
+the accompaniment engine - pattern library, voice-lead, bass
+resolvers, plan/realize pipeline + offline preview (design:
+`docs/PHASE-4-S3-ACCOMPANIMENT.md`, D66..D76; the S3 section is at
+the end of this doc; pattern content: `docs/PATTERN-LIBRARY.md`).
+Requirements trace to PRD-001 section 8.2 (REQ-COMP) and section 8.5
+(REQ-PED-1, analyzer annotations); the approved design is
+`docs/PHASE-4-COMPOSE.md` (D45-D56 - read its ERRATA section alongside
+this doc; six design premises were falsified during implementation).
+Foundations: [engine-foundations.md](engine-foundations.md); the
+sibling Etude engine: [engine-etude.md](engine-etude.md).
 
 ## Layout
 
@@ -28,9 +32,15 @@ engine: [engine-etude.md](engine-etude.md).
 | `engine/compose/key.ts` | `detectKey` - hand-rolled Krumhansl-Schmuckler (Krumhansl-Klinger 1982 profiles), ranked candidates (REQ-COMP-10/52) + `blendKeyEvidence` / `KEY_BLEND_WEIGHTS` (D58, slice 2). |
 | `engine/compose/melody.ts` | `extractMelody` - role track when confident, else top-line synthesis with eighth-note hysteresis (REQ-COMP-11). |
 | `engine/compose/harmony.ts` | `segmentGrid` + `inferChords` + `reinferBar` - per-region chord inference, calibrated confidence + top-3 alternatives (REQ-COMP-12/13/23). |
+| `engine/compose/patterns.ts` | S3 (D66): THE PATTERN LIBRARY - 14 authored entries (8 chord + 6 bass) with hits/ranks/accents/feel affinities + the meter-tiling helper. Content reference: `docs/PATTERN-LIBRARY.md`. |
+| `engine/compose/voicing.ts` | S3 (D68): clean-room SEQUENTIAL voice-lead - tone map, 5 style shapes, rootless draws, register containment. |
+| `engine/compose/bass.ts` | S3 (D69): bass pitch resolvers - chord tones by proximity, seeded walking approaches, slash-bass honoring. |
+| `engine/compose/accompany.ts` | S3 (D70/D71): the accompaniment pipeline - `planAccompaniment` (all rng draws) -> `realizePlan` (pure arithmetic: thinning, swing map, annotations) -> `generateAccompaniment`; `gridFingerprint`. |
 | `engine/compose/index.ts` | `analyzeProject` (the pipeline) + the public surface S2/S3/S4 import. |
 | `engine/core/chords.ts` | D47 extraction: `QUALITY_INTERVALS` (17 qualities) + `NAME_SUFFIX` + `spellChordName`/`keyUsesFlats`; `engine/etude/harmony.ts` re-exports them (same-reference identity pinned by `chords.test.ts`). |
 | `src/lib/composeMidi.ts` | The ONLY `@tonejs/midi` import in app code (the two src tests + the dev bench also load the package): `readMidiFile` (30MB cap -> parse -> normalize), `parseMidiBytes`, F9-guarded `sha256Hex`. |
+| `src/lib/composeVoices.ts` | S3 (D72 seam): `VOICE_RECIPES` + `scheduleComposeNote` - the per-role voice recipe S4's realtime player and WAV export absorb unchanged. |
+| `src/lib/composePreview.ts` | S3 (D72): render-and-play preview - OfflineAudioContext render (90s cap), singleton play/stop player (idle -> rendering -> playing -> idle). |
 | `engine/compose/*.test.ts`, `engine/core/chords.test.ts` | Colocated node-env tests (invisible to the README drift gate, same precedent as Phase 0/3). |
 | `src/lib/composeMidi.test.ts` + `.perf.test.ts` | Byte round-trip through the real package + the CI perf budget pin. |
 | `scripts/compose-perf.ts` | Local p50/p95 bench (`npx tsx`), manual gate - not a CI step. |
@@ -193,8 +203,9 @@ unsatisfiable through the merge. Out-of-range slot patches now
 APPEND (ascending slot order, gaps filled with `restCell()`);
 in-range behavior is byte-identical (regression-pinned in
 `types.test.ts`). `ChordGrid.slotsPerBar` stays the NOMINAL default
-- renderers and S3's assemble read `region.slots.length` per bar, so
-variable-length bars were already representable in the data model.
+- renderers and S3's accompaniment realizer read `region.slots.length`
+  per bar (`accompany.ts` `cellGeometry`), so variable-length bars
+  were already representable in the data model.
 
 ## The chord-symbol grammar boundary (D61, slice 2)
 
@@ -288,30 +299,128 @@ prose). The design's claims that differed are itemized in
 - **No UI** - SUPERSEDED by slice 2: drop zone, three-state surface,
   analysis card, chord popover, tick-native roll, store v4 (D48/D57).
   User guide: `docs/COMPOSE-MODE.md`.
-- **No audio** - nothing plays; Compose owns its own transport in
-  slice 4 (D50); `rhythmEngine`/`backingEngine`/`playbackClock`
-  untouched (still true after slice 2).
+- **No audio** - SUPERSEDED in part by slice 3: the accompaniment
+  PREVIEW sounds (OfflineAudioContext render-and-play,
+  accompaniment-only, 90s cap). Still true: no transport, no mixer,
+  no original-track playback (S4, D50);
+  `rhythmEngine`/`backingEngine`/`playbackClock` untouched.
 - **No export** - the MIDI/WAV/chart-paste surface is slice 4 (the
   keySig finding above is its entrance requirement).
-- **No accompaniment** - `voicing`/`patterns`/`bass`/`assemble` are
-  slice 3; the grid + `core/chords` tables are ready for them.
+- **No accompaniment** - SUPERSEDED by slice 3: the pattern library,
+  voice-lead engine, bass resolvers and `accompany.ts` pipeline are
+  live (see the S3 section below).
 - **No new npm deps, no Web Worker yet** (D54: only if the harness
   fails), no `tests/` or dirty-component edits; engine purity floor
-  21 -> 29 (D56; the floor is a MINIMUM - the tree now holds 30
-  non-test sources with `index.ts` as the 9th slice-1 file). Slice 2
-  kept the floor: two existing-file engine edits, zero new engine
-  files.
+  21 -> 29 (D56; the floor is a MINIMUM - the tree held 30 non-test
+  sources after slice 1, 34 after slice 3's four new files, and the
+  floor is now 33). Slice 2 kept the floor: two existing-file engine
+  edits, zero new engine files.
 
-## Consumed by (slice 2 shipped, S3/S4 next)
+## Consumed by (slices 2-3 shipped, S4 next)
 
 S2's pipeline is live: `file -> readMidiFile -> analyzeProject ->
 store`, the card renders `mergeAnalysis(analysis, overrides)` +
 `blendKeyEvidence`, and the popover uses `confidenceTier` +
 `reinferBar` + the `chordInput` grammar. S3's
 `generateAccompaniment` takes exactly the `ChordGrid` this ships
-(per-bar variable-length slots included, D60); S4's player/export
-import the SAME `tempo.ts` functions (one tempo-map truth) and
+(per-bar variable-length slots included, D60) and its preview maps
+ticks -> seconds through the same `tempo.ts` functions; S4's
+player/export import those SAME functions (one tempo-map truth) and
 consume the record-only `tempoBpm`/`timeSignature` overrides.
 Everything above is verified against the shipped code; design
 authority remains `docs/PHASE-4-COMPOSE.md` + its ERRATA +
-`docs/PHASE-4-S2-ANALYSIS-UI.md`.
+`docs/PHASE-4-S2-ANALYSIS-UI.md` + `docs/PHASE-4-S3-ACCOMPANIMENT.md`.
+
+
+## Phase 4 Slice 3: accompaniment generation (D66..D76, shipped)
+
+Design authority: `docs/PHASE-4-S3-ACCOMPANIMENT.md`. Four new engine
+sources, flat in `engine/compose/` (D75; purity floor 29 -> 33, tree
+scan 34):
+
+### patterns.ts - THE PATTERN LIBRARY (D66)
+
+The PRD defers Appendix C's pattern CONTENT to a "Pattern Library
+reference" that does not exist; D66 AUTHORS it and the data is
+transcribed verbatim: 14 entries (8 chord: freddieGreen, charleston,
+block, pulse, offbeat, lazy, sustain, alberti; 6 bass: walking,
+twoFeel, rootFifth, eighthPulse, shuffleBoogie, drone) with per-beat
+hits (beat/step/span/RANK/accent), feel affinities (integrity-pinned
+against every shipped profile's defaultFeel), labels, and the meter
+tiling rule (`tiledHits`: a hit at authored beat b fires at
+b + k*repeat < cellBeats; 3/4 truncates, 5/4 tiles, 6/8 = 3 beats,
+7/8 clamps the tail; span -1 sustains to the cell end and fires ONCE
+per cell - a self-overlapping drone re-fire would violate the
+monophonic-bass invariant). Velocity is DATA
+(`PATTERN_VELOCITY`, indexed by accent) - no rng in velocity. The
+pad role's pattern is FIXED to `sustain` (`PAD_PATTERN_ID`), and
+several patterns CAP below density 5 (freddieGreen at 2) - extra
+density is a documented no-op, never a silent lie. Musician-facing
+content reference: `docs/PATTERN-LIBRARY.md`.
+
+### voicing.ts - sequential voice-lead (D68)
+
+Clean-room (the etude realizes chords INDEPENDENTLY; REQ-COMP-31
+needs prev-chord state). Tone map (3-4 pcs/quality; the 5-tone
+qualities alt/maj9/dom9/min9 DROP the 5th; alt's b13 folds 20 -> 8),
+first-chord root position anchored at
+`regLo + round(spreadBias * (regHi - regLo - span))`, greedy
+nearest-pc per voice TOP-DOWN (tie-break flips with spreadBias),
+post-rest re-anchor, `inversionAwareness: false` re-anchors EVERY
+chord (pop parallel), five shapes (close/drop2/quartal/spread/block;
+the drop2 permutation is the etude's one-line formula, cross-
+referenced), rootless gated on `allowRootless` (bass role) AND
+tones >= 4 AND rate > 0. DRAW-ORDER CONTRACT (pinned by the
+determinism matrix): chords pass -> pad pass (no draws) -> bass pass.
+The D47 equivalence pin lives in
+`src/lib/composeVoicingEquivalence.test.ts` (close/full/aware surface
+only; the bass-semantics divergence is documented there).
+
+### bass.ts - seeded resolvers (D69)
+
+Tokens (root/third/fifth/seventh/b7/nextApproach) resolve per hit;
+slash bassPc honors the "root" token; octave = nearest to the
+previous bass pitch clamped into register; walking's approach picks
+via `rng.pick` over the VALID set (chromatic below/above + diatonic
+step below when a key exists; register/unreachable members excluded;
+empty -> nearest chord tone; end-of-grid -> fifth). Rest cells
+consume NOTHING from the stream (identity-pinned).
+
+### accompany.ts - plan/realize/generate (D70/D71)
+
+`planAccompaniment` (ALL draws, FULL density) -> `realizePlan` (pure
+arithmetic: rank filtering AFTER pitching - the D67 subset property;
+TD-043 per-bar `region.slots.length` cell tiling; the D70 swing map -
+first real consumer of swingRatio/gridDivisions, pinned at 0.5
+identity and 0.64/ppq480/gd4 -> 154; register containment; D74
+annotations computed from REALIZED pitches only - per-role pattern
+lines with the thinning fact computed from data, rootless only when
+the flag is set AND the realized pitches exclude the root AND the
+bass role is on, drop-2 only when the permutation actually applied,
+approach notes labeled from the RECORDED kind of hits that FIRED,
+and the "walking" concept claim standing only when every sounding
+bar realized >= 3 distinct pitches).
+`generateAccompaniment` = plan + realize + meta (`gridFingerprint`
+staleness pin; the PRD 11.1 "original" field is DEVIATED - the result
+never embeds the 30MB project). Outcome arms: empty roles ->
+"unsupported"; all-rest grid -> ok + honest annotation; bug guard ->
+"internal", never throws. Request validation (all "unsupported"):
+roles non-empty/unique, density integer 0..5, seed uint32, transpose
+integer -24..24, register offsets octave multiples of 12 within
+-24..24, and no register may leave MIDI 0..127 after offsets.
+`gridFingerprint` serializes each cell as `bar:rootPc.qualitySymbol`
+(rests AND unknown qualities both serialize as "rest" - what the
+generator actually hears), joined per bar; the panel's staleness
+chip is `meta.gridFingerprint !== gridFingerprint(currentGrid)`,
+pure and zero-auto-regenerate.
+
+Determinism: 3 styles x 6 densities x 3 seeds x 3 role-sets generated
+twice -> JSON byte-equality (162-case matrix in accompany.test.ts).
+
+### src seam (D72/D73)
+
+`src/lib/composeVoices.ts` (VOICE_RECIPES + scheduleComposeNote - the
+recipe S4's player/export absorb unchanged) + `src/lib/composePreview.ts` (OfflineAudioContext render-and-play, 90s cap,
+singleton player: idle -> rendering -> playing -> idle). Store: the
+request is an OPTIONAL field inside the v4 `composeSession` (NO v5 -
+missing fields default at read); the result is in-memory only.

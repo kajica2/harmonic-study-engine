@@ -13,9 +13,12 @@ import {
   EMPTY_OVERRIDES,
   restCell,
 } from "./types";
+import { generateAccompaniment, gridFingerprint } from "./accompany";
 import type {
+  AccompanimentRequest,
   AnalysisOverrides,
   ChordCell,
+  ChordGrid,
   ComposeAnalysis,
   KeyCandidate,
 } from "./types";
@@ -241,5 +244,67 @@ describe("mergeGrid slot append (D60)", () => {
       chordCells: { "9:0": cell(0, "maj", "C", 1) },
     });
     expect(merged.grid.bars.length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 3 (D71): accompaniment model types + fingerprint.
+// ---------------------------------------------------------------------------
+
+describe("Phase 4 Slice 3: accompaniment type literals (D71)", () => {
+  it("request/plan/result/meta all ship version 1 (type-level pin via values)", () => {
+    const request: AccompanimentRequest = {
+      version: 1,
+      styleId: "jazz",
+      roles: ["bass", "chords"],
+      density: 3,
+      seed: 42,
+    };
+    expect(request.version).toBe(1);
+    expect(request.roles).toEqual(["bass", "chords"]);
+    // Optional fields stay optional at the type level (REQ-COMP-35 P1).
+    const full: AccompanimentRequest = {
+      ...request,
+      registerOffsets: { chords: -12 },
+      transposeAccompaniment: 2,
+    };
+    expect(full.version).toBe(1);
+    const out = generateAccompaniment(
+      full,
+      { slotsPerBar: 1, bars: [{ bar: 0, startTick: 0, endTick: 1920, slots: [cell(2, "m7", "Dm7", 1)] }] },
+      480,
+      null,
+    );
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.version).toBe(1);
+      expect(out.value.meta.version).toBe(1);
+      expect(out.value.meta.transpose).toBe(2);
+      // register = base + offset(-12) + transpose(+2) (post both, D71)
+      expect(out.value.meta.registersUsed.chords).toEqual([38, 62]);
+    }
+  });
+
+  it("gridFingerprint: stable, cell-sensitive, rest-aware (staleness pin)", () => {
+    const grid: ChordGrid = {
+      slotsPerBar: 1,
+      bars: [
+        { bar: 0, startTick: 0, endTick: 1920, slots: [cell(2, "m7", "Dm7", 1)] },
+        { bar: 1, startTick: 1920, endTick: 3840, slots: [cell(7, "dom7", "G7", 1)] },
+      ],
+    };
+    const fp = gridFingerprint(grid);
+    expect(gridFingerprint(grid)).toBe(fp); // stable
+    const edited: ChordGrid = {
+      slotsPerBar: 1,
+      bars: [grid.bars[0], { ...grid.bars[1], slots: [cell(9, "dom7", "A7", 1)] }],
+    };
+    expect(gridFingerprint(edited)).not.toBe(fp); // one cell edit changes it
+    const rested: ChordGrid = {
+      slotsPerBar: 1,
+      bars: [grid.bars[0], { ...grid.bars[1], slots: [restCell()] }],
+    };
+    expect(gridFingerprint(rested)).not.toBe(fp);
+    expect(gridFingerprint(rested)).toContain("rest");
   });
 });

@@ -33,16 +33,29 @@ import { SynesthesiaCanvas } from "./SynesthesiaCanvas";
 import { SynesthesiaProvider } from "./SynesthesiaProvider";
 import { UploadDropZone } from "./UploadDropZone";
 import { AnalysisCard } from "./AnalysisCard";
+import { AccompanimentPanel } from "./AccompanimentPanel";
+import { ComposePianoRoll, type RollLayer } from "./ComposePianoRoll";
+import { ROLL_PALETTE } from "./EtudePianoRoll";
 import { useSessionStore } from "../state/sessionStore";
+import {
+  composePreviewPlayer,
+  previewIsCapped,
+  renderAccompaniment,
+  type PreviewState,
+} from "../lib/composePreview";
 import { readMidiFile, sha256Hex, type ReadableMidiFile } from "../lib/composeMidi";
-import { analyzeProject } from "../../engine/compose";
+import { analyzeProject, generateAccompaniment } from "../../engine/compose";
 import { blendKeyEvidence } from "../../engine/compose/key";
 import { extractMelody } from "../../engine/compose/melody";
+import { getStyleProfile } from "../../engine/styles";
 import {
   EMPTY_OVERRIDES,
   mergeAnalysis,
+  type AccompanimentRequest,
+  type AccompRole,
   type AnalysisError,
   type AnalysisOverrides,
+  type KeyCandidate,
   type NormalizedProject,
 } from "../../engine/compose/types";
 
@@ -62,6 +75,18 @@ function bannerCopy(error: AnalysisError): string {
 function isMidiName(name: string): boolean {
   return /\.(mid|midi)$/i.test(name);
 }
+
+/** D73: the accompaniment request defaults when the persisted session
+ *  carries none (old v4 payloads default at read - NO v5). Style/seed
+ *  are taste; the defaults match the e2e leg-1 contract (jazz,
+ *  bass+chords, profile densityDefault, seed 42). */
+export const DEFAULT_ACCOMPANIMENT_REQUEST: AccompanimentRequest = Object.freeze({
+  version: 1,
+  styleId: "jazz",
+  roles: Object.freeze(["bass", "chords"]) as readonly AccompRole[],
+  density: getStyleProfile("jazz").rhythm.densityDefault,
+  seed: 42,
+});
 
 /** App.tsx's isTyping guard, replicated VERBATIM (D59) so native
  *  field undo is untouched and the popover input never double-fires. */
@@ -83,15 +108,19 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
   const composeSession = useSessionStore((s) => s.composeSession);
   const composeProject = useSessionStore((s) => s.composeProject);
   const composeAnalysis = useSessionStore((s) => s.composeAnalysis);
+  const accompResult = useSessionStore((s) => s.composeAccompaniment);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AnalysisError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [mismatch, setMismatch] = useState<{ fileName: string; file: File } | null>(null);
   const [recentSymbols, setRecentSymbols] = useState<readonly string[]>([]);
+  const [previewState, setPreviewState] = useState<PreviewState>("idle");
 
   const overrides: AnalysisOverrides = composeSession?.overrides ?? EMPTY_OVERRIDES;
   const analyzeFull = composeSession?.analyzeFull ?? false;
+  // D73 default-at-read: missing persisted request -> the defaults.
+  const accompRequest: AccompanimentRequest = composeSession?.request ?? DEFAULT_ACCOMPANIMENT_REQUEST;
   const loaded = composeProject !== null && composeAnalysis !== null && composeSession !== null;
   const prompt = !loaded && composeSession !== null;
 
@@ -154,6 +183,76 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
     () => (effectiveAnalysis === null ? null : blendKeyEvidence(effectiveAnalysis)),
     [effectiveAnalysis],
   );
+
+  // --- PRD-001 Phase 4 Slice 3 (D71/D72): accompaniment wiring -----
+  // The generator gets the MERGED key truth; a chromatic-fallback
+  // analysis passes NO key (D69 keyless degradation is honest).
+  const accompKey: KeyCandidate | null =
+    merged !== null && !merged.key.chromaticFallback && merged.key.candidates.length > 0
+      ? merged.key.candidates[0]
+      : null;
+
+  const handleGenerate = (): void => {
+    if (merged === null || effectiveProject === null) return;
+    const outcome = generateAccompaniment(
+      accompRequest,
+      merged.grid,
+      effectiveProject.ppq,
+      accompKey,
+    );
+    if (!outcome.ok) {
+      setError(outcome.error); // existing banner channel (D63 arms)
+      return;
+    }
+    setError(null);
+    useSessionStore.getState().setComposeAccompaniment(outcome.value);
+  };
+
+  const handlePreview = (): void => {
+    if (accompResult === null || effectiveProject === null) return;
+    if (previewState === "playing") {
+      composePreviewPlayer.stop();
+      return;
+    }
+    if (previewState === "rendering") return;
+    composePreviewPlayer.markRendering();
+    void renderAccompaniment(accompResult, effectiveProject)
+      .then((buf) => composePreviewPlayer.play(buf))
+      .catch(() => composePreviewPlayer.cancel());
+  };
+
+  // Preview lifecycle (PHASE-2-01 live gate + PHASE-3-03 StrictMode):
+  // subscribe to the SINGLETON player (double-mount cannot leak a
+  // second AudioContext); unmount / mode-switch (this surface
+  // unmounting) stops + releases. stop() is idempotent.
+  useEffect(() => {
+    const unsubscribe = composePreviewPlayer.subscribe(setPreviewState);
+    return () => {
+      unsubscribe();
+      composePreviewPlayer.stop();
+    };
+  }, []);
+  // Re-generate while playing -> stop the stale audition (no-op on
+  // mount, idempotent by design).
+  useEffect(() => {
+    composePreviewPlayer.stop();
+  }, [accompResult]);
+
+  const accompLayers: readonly RollLayer[] | undefined =
+    accompResult === null
+      ? undefined
+      : (["bass", "chords", "pad"] as const)
+          .filter((role) => accompResult.meta.roles.includes(role))
+          .map((role) => ({
+            label: role,
+            notes: accompResult.generated[role],
+            color:
+              role === "bass"
+                ? ROLL_PALETTE.accompanimentBass
+                : role === "chords"
+                  ? ROLL_PALETTE.accompanimentChords
+                  : ROLL_PALETTE.accompanimentPad,
+          }));
   const inferredCandidate =
     effectiveAnalysis !== null && effectiveAnalysis.key.candidates.length > 0
       ? effectiveAnalysis.key.candidates[0]
@@ -320,6 +419,37 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
                 recentSymbols={recentSymbols}
                 onSymbolApplied={noteSymbol}
               />
+              <div className="mt-4">
+                <AccompanimentPanel
+                  grid={merged.grid}
+                  ppq={effectiveProject.ppq}
+                  keyCandidate={accompKey}
+                  request={accompRequest}
+                  result={accompResult}
+                  busy={previewState === "rendering"}
+                  previewState={previewState}
+                  previewCapped={
+                    accompResult !== null && previewIsCapped(accompResult, effectiveProject)
+                  }
+                  onPatchRequest={(r) => useSessionStore.getState().setComposeRequest(r)}
+                  onGenerate={handleGenerate}
+                  onPreview={handlePreview}
+                />
+                {accompResult !== null && (
+                  <div className="mt-3" data-testid="accompaniment-roll">
+                    <p className="t-label mb-1 text-[color:var(--color-text-3)]">
+                      Generated accompaniment - overlay roll (melody + generated layers)
+                    </p>
+                    <ComposePianoRoll
+                      project={effectiveProject}
+                      melody={merged.melody}
+                      window={merged.window}
+                      truncated={merged.truncated}
+                      layers={accompLayers}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <>
