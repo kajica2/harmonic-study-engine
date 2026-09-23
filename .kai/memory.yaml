@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-23T03:00:00Z"
-total_pipeline_runs: 7
+last_updated: "2026-09-23T03:15:00Z"
+total_pipeline_runs: 8
 
 flags:
   has_conventions: true
@@ -61,3 +61,9 @@ active_prevention_rules:
   - id: "PHASE-1-02"
     when: "Shipping an affordance (button, chip, action) the design calls for"
     action: "Wire it on day 1 - either functional or a visible disabled placeholder with an honest title/tooltip explaining what is missing. A `disabled` button with no onClick and no discoverability hint is a regression: review failed it twice in one phase. Phase 1 specific: the IdeaBar `+` button - disabled with title='No chord yet' when no activeStep."
+  - id: "PHASE-2-01"
+    when: "Implementing any component that picks UI from store/session state (gates, routers, conditional surfaces)"
+    action: "Subscribe to the state - mount-time-only resolution makes switching cosmetic (the Phase 1 ModeGate bug shipped past review+tests this way). URL/boot-time inputs read ONCE; live state drives live render. Regression tests MUST mutate state AFTER mount and assert the UI switched; mount-with-preseeded-state tests cannot catch this class."
+  - id: "PHASE-2-02"
+    when: "Taking intake snapshots for mutation/revert safety (W2-002)"
+    action: "Snapshot folders are per-ROUND, never reused across rounds - /tmp/phase-2-snapshots/ went STALE mid-session (Phase 1 baseline) and restoring from it would have destroyed Phase 2 work. Fresh copies to a new dated folder before each round's first edit; never restore from a folder you did not create this round."
