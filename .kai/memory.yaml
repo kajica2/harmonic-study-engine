@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-23T19:50:00Z"
-total_pipeline_runs: 13
+last_updated: "2026-09-23T22:10:00Z"
+total_pipeline_runs: 14
 
 flags:
   has_conventions: true
