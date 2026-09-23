@@ -13,13 +13,16 @@
  *
  * Persistence: `partialize` keeps `mode`, `globalTranspose`,
  * `currentIdea`, `exerciseTranspose`, `keyCycleActive`,
- * `etudeConstraints` in localStorage. `dirty` + `pendingModeRequest`
- * are session-scoped (per-mode Edit state, not cross-reload state).
+ * `etudeConstraints`, `composeSession` in localStorage. `dirty` +
+ * `pendingModeRequest` are session-scoped (per-mode Edit state, not
+ * cross-reload state). The compose PROJECT + analysis + undo stacks
+ * (up to 30MB) are IN-MEMORY only - never localStorage (D57).
  *
  * Migration: zustand persist's `migrate` callback delegates to the
  * engine's `createSessionRunner`. v1 -> v2 (Phase 2) appends the
  * transpose-slice defaults; v2 -> v3 (Phase 3 Slice 2, D23) appends
- * `etudeConstraints: null`. CURRENT_SESSION_VERSION = 3 and the
+ * `etudeConstraints: null`; v3 -> v4 (Phase 4 Slice 2, D57) appends
+ * `composeSession: null`. CURRENT_SESSION_VERSION = 4 and the
  * persist envelope version mirrors it (ADR-004).
  */
 
@@ -29,6 +32,13 @@ import {
   createSessionRunner,
   type MigrationRunner,
 } from "../../engine/migrations";
+import { analyzeProject } from "../../engine/compose";
+import {
+  EMPTY_OVERRIDES,
+  type AnalysisOverrides,
+  type ComposeAnalysis,
+  type NormalizedProject,
+} from "../../engine/compose/types";
 import type { Idea } from "../../engine/core/idea";
 import { advanceKeyCycle as nextInCycleRotation } from "../../engine/core/spelling";
 import type { EtudeConstraints } from "../../engine/etude/types";
@@ -50,9 +60,10 @@ export interface DirtyMap {
 export const SESSION_STORAGE_KEY = K.session;
 /** v2 (PRD-001 Phase 2): adds exerciseTranspose + keyCycleActive.
  *  v3 (PRD-001 Phase 3 Slice 2, D23): adds etudeConstraints.
+ *  v4 (PRD-001 Phase 4 Slice 2, D57): adds composeSession.
  *  Keep in lockstep with engine/migrations CURRENT_SESSION_VERSION;
  *  the persist envelope version mirrors this value (ADR-004). */
-export const CURRENT_SESSION_VERSION = 3;
+export const CURRENT_SESSION_VERSION = 4;
 
 const sessionRunner: MigrationRunner<unknown> = createSessionRunner();
 
@@ -114,7 +125,74 @@ interface EtudeSlice {
   acceptEtude: (c: EtudeConstraints) => void;
 }
 
-export type SessionState = ModeSlice & EtudeSlice;
+/** PRD-001 Phase 4 Slice 2 (D57): the compose session slice.
+ *
+ *  PERSISTED (partialize keeps `composeSession` - small by
+ *  construction: fileName + hash + sparse overrides + window flag).
+ *  The 30MB NormalizedProject, its ComposeAnalysis and the undo
+ *  stacks live IN-MEMORY in this same store: a reload with
+ *  `composeSession` present but `composeProject === null` renders the
+ *  re-upload prompt (D62), and mode switches never lose work (F8).
+ *  S3/S4 fields (request/mixer) widen ComposeSession later WITHOUT a
+ *  v5 - missing persisted fields default at read. */
+export interface ComposeSession {
+  fileName: string;
+  /** F9: null = "hash unavailable" (insecure ctx / jsdom). */
+  fileHash: string | null;
+  /** Sparse; chord cells + key/tempo/meter/melody (REQ-COMP-21). */
+  overrides: AnalysisOverrides;
+  /** REQ-COMP-53 window choice (default 4 min vs full file). */
+  analyzeFull: boolean;
+}
+
+/** Undo stack cap (D59): whole-map snapshots, oldest dropped first. */
+export const COMPOSE_UNDO_CAP = 32;
+
+/** File identity + hash captured at upload (setComposeFile meta). */
+export interface ComposeFileMeta {
+  readonly fileName: string;
+  readonly fileHash: string | null;
+}
+
+/** Hash-gated restore payload (D62): applied ONLY when the re-uploaded
+ *  file's hash matches the persisted composeSession.fileHash. */
+export interface ComposeRestore {
+  readonly overrides: AnalysisOverrides;
+  readonly analyzeFull: boolean;
+}
+
+interface ComposeSlice {
+  composeSession: ComposeSession | null;
+  composeProject: NormalizedProject | null;
+  composeAnalysis: ComposeAnalysis | null;
+  /** D59 snapshot stacks (in-memory; never persisted). */
+  composeUndo: AnalysisOverrides[];
+  composeRedo: AnalysisOverrides[];
+  /** Load a parsed project + its analysis. Resets overrides to
+   *  EMPTY_OVERRIDES, both stacks, analyzeFull -> false - UNLESS a
+   *  hash-verified `restore` is supplied by the surface (D62: match
+   *  -> restore overrides + analyze; the stacks still reset, undo
+   *  never crosses files - RK-S2-5). */
+  setComposeFile: (
+    project: NormalizedProject,
+    analysis: ComposeAnalysis,
+    meta: ComposeFileMeta,
+    restore?: ComposeRestore,
+  ) => void;
+  /** The ONLY compose write path (REQ-COMP-21/24): pushes the
+   *  PREVIOUS overrides onto undo (cap 32, shift-oldest), clears redo. */
+  patchComposeOverrides: (next: AnalysisOverrides) => void;
+  undoCompose: () => void;
+  redoCompose: () => void;
+  /** REQ-COMP-53: recompute composeAnalysis on the in-memory project
+   *  (deterministic, no clock/rng - legal in-store). */
+  setComposeAnalyzeFull: (b: boolean) => void;
+  /** The "start over" reset - compose's OWN clear; resetModeSlice is
+   *  deliberately NOT widened (sessionStore pins its shape). */
+  clearCompose: () => void;
+}
+
+export type SessionState = ModeSlice & EtudeSlice & ComposeSlice;
 
 export const useSessionStore = create<SessionState>()(
   persist(
@@ -125,6 +203,11 @@ export const useSessionStore = create<SessionState>()(
       keyCycleActive: false,
       currentIdea: null,
       etudeConstraints: null,
+      composeSession: null,
+      composeProject: null,
+      composeAnalysis: null,
+      composeUndo: [],
+      composeRedo: [],
       dirty: { compose: "none", etude: "none", explore: "none" },
       pendingModeRequest: null,
       setMode: (m) => set({ mode: m }),
@@ -189,6 +272,85 @@ export const useSessionStore = create<SessionState>()(
             etude: "etude-pending-accept",
             explore: "none",
           },
+        });
+      },
+      // --- PRD-001 Phase 4 Slice 2 (D57): compose slice actions. All
+      // pure setters; the only computation is re-running
+      // analyzeProject (deterministic, no clock/rng - legal in-store).
+      setComposeFile: (project, analysis, meta, restore) => {
+        const overrides = restore === undefined ? EMPTY_OVERRIDES : restore.overrides;
+        const analyzeFull = restore === undefined ? false : restore.analyzeFull;
+        let finalAnalysis = analysis;
+        if (analyzeFull) {
+          const full = analyzeProject(project, {
+            window: { fromTick: 0, toTick: project.endTick },
+          });
+          if (full.ok) finalAnalysis = full.value;
+        }
+        set({
+          composeProject: project,
+          composeAnalysis: finalAnalysis,
+          composeSession: {
+            fileName: meta.fileName,
+            fileHash: meta.fileHash,
+            overrides,
+            analyzeFull,
+          },
+          composeUndo: [],
+          composeRedo: [],
+        });
+      },
+      patchComposeOverrides: (next) => {
+        const s = get();
+        if (s.composeSession === null) return;
+        // D59: snapshot-per-commit, whole-map (sparse + tiny).
+        const undo = s.composeUndo.concat(s.composeSession.overrides);
+        if (undo.length > COMPOSE_UNDO_CAP) undo.shift();
+        set({
+          composeUndo: undo,
+          composeRedo: [],
+          composeSession: { ...s.composeSession, overrides: next },
+        });
+      },
+      undoCompose: () => {
+        const s = get();
+        if (s.composeSession === null || s.composeUndo.length === 0) return;
+        const prev = s.composeUndo[s.composeUndo.length - 1];
+        set({
+          composeUndo: s.composeUndo.slice(0, -1),
+          composeRedo: s.composeRedo.concat(s.composeSession.overrides),
+          composeSession: { ...s.composeSession, overrides: prev },
+        });
+      },
+      redoCompose: () => {
+        const s = get();
+        if (s.composeSession === null || s.composeRedo.length === 0) return;
+        const next = s.composeRedo[s.composeRedo.length - 1];
+        set({
+          composeRedo: s.composeRedo.slice(0, -1),
+          composeUndo: s.composeUndo.concat(s.composeSession.overrides),
+          composeSession: { ...s.composeSession, overrides: next },
+        });
+      },
+      setComposeAnalyzeFull: (b) => {
+        const s = get();
+        if (s.composeSession === null || s.composeProject === null) return;
+        const project = s.composeProject;
+        const outcome = b
+          ? analyzeProject(project, { window: { fromTick: 0, toTick: project.endTick } })
+          : analyzeProject(project);
+        set({
+          composeAnalysis: outcome.ok ? outcome.value : s.composeAnalysis,
+          composeSession: { ...s.composeSession, analyzeFull: b },
+        });
+      },
+      clearCompose: () => {
+        set({
+          composeSession: null,
+          composeProject: null,
+          composeAnalysis: null,
+          composeUndo: [],
+          composeRedo: [],
         });
       },
       setCurrentIdea: (i) => set({ currentIdea: i }),
@@ -269,6 +431,9 @@ export const useSessionStore = create<SessionState>()(
         keyCycleActive: s.keyCycleActive,
         currentIdea: s.currentIdea,
         etudeConstraints: s.etudeConstraints,
+        // D57: ONLY the small persisted compose record. The 30MB
+        // project, its analysis and the undo stacks are in-memory.
+        composeSession: s.composeSession,
       }),
     },
   ),

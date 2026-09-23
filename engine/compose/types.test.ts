@@ -151,3 +151,95 @@ describe("EMPTY_OVERRIDES round-trip", () => {
     expect(Object.isFrozen(EMPTY_OVERRIDES.chordCells)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 2 (D60): mergeGrid APPENDS out-of-range slot
+// patches - the REQ-COMP-23 split-bar flow must be satisfiable through
+// the merge. In-range behavior stays byte-identical (regression pins).
+// ---------------------------------------------------------------------------
+
+describe("mergeGrid slot append (D60)", () => {
+  /** 2-bar, 1-slot grid: bar0 = C, bar1 = G7. */
+  function singleSlotAnalysis(): ComposeAnalysis {
+    return {
+      ...sampleAnalysis(),
+      grid: {
+        slotsPerBar: 1,
+        bars: [
+          { bar: 0, startTick: 0, endTick: 1920, slots: [cell(0, "maj", "C", 0.9)] },
+          { bar: 1, startTick: 1920, endTick: 3840, slots: [cell(7, "dom7", "G7", 0.7)] },
+        ],
+      },
+    };
+  }
+
+  it("split flow end-to-end at the merge level: write 'b:0' + 'b:1' -> bar b has 2 cells", () => {
+    const a = singleSlotAnalysis();
+    const split0 = cell(0, "maj", "C", 1);
+    const split1 = cell(7, "dom7", "G7", 1);
+    const merged = mergeAnalysis(a, {
+      ...EMPTY_OVERRIDES,
+      chordCells: { "0:0": split0, "0:1": split1 },
+    });
+    expect(merged.grid.bars[0].slots.length).toBe(2);
+    expect(merged.grid.bars[0].slots[0]).toEqual(split0);
+    expect(merged.grid.bars[0].slots[1]).toEqual(split1);
+    // Untouched bar keeps its single slot.
+    expect(merged.grid.bars[1].slots.length).toBe(1);
+    // slotsPerBar stays the NOMINAL default (renderers read per-bar).
+    expect(merged.grid.slotsPerBar).toBe(1);
+  });
+
+  it("out-of-range patch on an unsplit bar appends", () => {
+    const a = singleSlotAnalysis();
+    const extra = cell(5, "maj", "F", 1);
+    const merged = mergeAnalysis(a, { ...EMPTY_OVERRIDES, chordCells: { "1:1": extra } });
+    expect(merged.grid.bars[1].slots.length).toBe(2);
+    expect(merged.grid.bars[1].slots[0].name).toBe("G7"); // original survives
+    expect(merged.grid.bars[1].slots[1]).toEqual(extra);
+  });
+
+  it("multiple out-of-range slots land ascending with gap fill = restCell()", () => {
+    const a = singleSlotAnalysis();
+    const at3 = cell(10, "min", "Bm", 1);
+    const at2 = cell(2, "min", "Dm", 1);
+    const merged = mergeAnalysis(a, {
+      ...EMPTY_OVERRIDES,
+      chordCells: { "0:3": at3, "0:2": at2 }, // insertion order reversed on purpose
+    });
+    const slots = merged.grid.bars[0].slots;
+    expect(slots.length).toBe(4);
+    expect(slots[0].name).toBe("C"); // in-range original
+    expect(slots[1].isRest).toBe(true); // gap filled
+    expect(slots[2]).toEqual(at2); // ascending by slot index
+    expect(slots[3]).toEqual(at3);
+  });
+
+  it("IN-RANGE behavior is byte-identical (regression: no length change, no reordering)", () => {
+    const a = singleSlotAnalysis();
+    const patch = { "0:0": cell(5, "maj", "F", 1) };
+    const merged = mergeAnalysis(a, { ...EMPTY_OVERRIDES, chordCells: patch });
+    expect(merged.grid.bars[0].slots.length).toBe(1);
+    expect(merged.grid.bars[0].slots[0].name).toBe("F");
+    expect(merged.grid.bars[1].slots.length).toBe(1);
+    expect(merged.grid.bars[1].slots[0].name).toBe("G7");
+  });
+
+  it("null out-of-range patch appends a rest; frozen input never mutates", () => {
+    const a = deepFreeze(singleSlotAnalysis());
+    const before = JSON.stringify(a);
+    const merged = mergeAnalysis(a, { ...EMPTY_OVERRIDES, chordCells: { "0:1": null } });
+    expect(JSON.stringify(a)).toBe(before);
+    expect(merged.grid.bars[0].slots.length).toBe(2);
+    expect(merged.grid.bars[0].slots[1].isRest).toBe(true);
+  });
+
+  it("patches for bars the grid does not contain stay dropped (no phantom bars)", () => {
+    const a = singleSlotAnalysis();
+    const merged = mergeAnalysis(a, {
+      ...EMPTY_OVERRIDES,
+      chordCells: { "9:0": cell(0, "maj", "C", 1) },
+    });
+    expect(merged.grid.bars.length).toBe(2);
+  });
+});

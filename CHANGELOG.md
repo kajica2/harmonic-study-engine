@@ -81,6 +81,46 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Compose upload UI + analysis review (PRD-001 Phase 4 slice 2)** --
+  the Compose mode becomes a real surface. `ComposeSurface` grows from
+  the Phase 1 stub (all three pinned strings survive verbatim: the
+  heading, the import/export button, the privacy aside) into a
+  three-state surface: empty (drop zone + browse, `UploadDropZone`),
+  re-upload PROMPT (hash-gated restore per REQ-IO-51: match restores
+  overrides, mismatch refuses with use-anyway/Cancel, an unavailable
+  hash DROPS edits with a visible notice -- never silently re-applied),
+  and loaded (`AnalysisCard`: every detected value overridable --
+  key/tempo/meter/melody-track/chord cells -- REQ-COMP-20/21). THE
+  HONESTY ITEM (D58): new pure `blendKeyEvidence` in
+  `engine/compose/key.ts` weighs declared key signature x functional
+  grid evidence (diatonic mass + cadence) x KS correlation into five
+  agreement states; property-pinned H1 (correlation ALONE never
+  auto-accepts -- the adversarial-jazz guard: ks 0.83 + functional
+  0.25 lands in highlight) and H2 (declared-vs-inferred conflict always
+  banners with a declared-default radio + Other escape);
+  `KEY_BLEND_WEIGHTS` exported for corpus re-tuning that cannot loosen
+  the properties. The chord-cell popover (`ChordCellPopover` + new pure
+  `src/lib/chordInput.ts` symbol grammar that REJECTS what the grid
+  cannot hold, e.g. "C13") gives autocomplete, top-3 alternatives,
+  delete, and split-bar-in-two (D60: the one sanctioned engine fix --
+  `mergeGrid` now APPENDS out-of-range slot patches, making the
+  REQ-COMP-23 flow satisfiable; in-range merge byte-identical). Store
+  v3 -> v4 (D57): `composeSession` {fileName, fileHash, overrides,
+  analyzeFull} persists; the 30MB project + analysis + snapshot undo
+  stacks (cap 32, REQ-COMP-24 via a surface-local Cmd/Ctrl+Z listener
+  replicating App's isTyping guard -- zero App.tsx edits) stay
+  in-memory; S3/S4 fields will widen the payload WITHOUT a v5.
+  Tick-native `ComposePianoRoll` (ROLL_PALETTE import only, TD-040
+  safe) with the TD-041 gap-absorption honesty caption. Every shipped
+  signal lands on exactly one banner (D62): percussion-only, atonal,
+  >4-min truncation + analyze-full (REQ-COMP-53), pitch-bend 12-TET
+  warning (REQ-COMP-6), normalize parse notes. REQ-PED-4/5: analysis
+  annotations under the chart open the ConceptDrawer (key-prop host
+  pattern). e2e: fixture generated IN-SPEC via @tonejs/midi +
+  setInputFiles (no committed binary) -- upload -> override -> reload
+  prompt -> restore -> browser undo/redo. Zero new npm deps, zero new
+  engine files (purity floor 29 unchanged), zero network calls
+  (REQ-IO-71). Design: `docs/PHASE-4-S2-ANALYSIS-UI.md` (D57..D65).
 - **Compose parse + analysis engine + golden corpus (PRD-001 Phase 4
   slice 1)** -- a zero-UI engine slice that unblocks the Compose mode.
   Imported songs get a new tick-native `NormalizedProject` model (D45:

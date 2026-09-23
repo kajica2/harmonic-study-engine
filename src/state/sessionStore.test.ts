@@ -1,13 +1,17 @@
 /**
  * src/state/sessionStore.test.ts - PRD-001 Phase 1 mode slice +
- * Phase 3 Slice 2 etude slice (T8).
+ * Phase 3 Slice 2 etude slice (T8) + Phase 4 Slice 2 compose slice
+ * (D57).
  *
  * Pins the requestMode / resolveDirty state machine, the persist
  * round-trip (mode / globalTranspose / currentIdea / etudeConstraints
  * survive reload, dirty + pendingModeRequest do NOT), the acceptEtude
  * dirty shape (D30 - byte-equal to the handleCoComposeAccept literal),
- * the v2 -> v3 migration through the REAL runner, and that the legacy
- * `synesthesia_*` keys are never touched.
+ * the v2 -> v3 -> v4 migration through the REAL runner, and that the
+ * legacy `synesthesia_*` keys are never touched. The Phase 4 block
+ * pins the compose slice: partialize EXCLUDES the 30MB project +
+ * analysis + undo stacks, the snapshot-undo semantics (cap 32), and
+ * the analyzeFull recompute.
  *
  * Runs under jsdom per JSDOM_FILES in vitest.config.ts.
  */
@@ -18,6 +22,7 @@ import {
   useSessionStore,
   SESSION_STORAGE_KEY,
   CURRENT_SESSION_VERSION,
+  COMPOSE_UNDO_CAP,
   isMode,
   MODES,
   resolveEffectiveMode,
@@ -25,6 +30,13 @@ import {
 } from "./sessionStore";
 import { useSessionStore as useLegacySessionStore } from "../hooks/useSessionStore";
 import { createSessionRunner } from "../../engine/migrations";
+import { analyzeProject } from "../../engine/compose";
+import {
+  EMPTY_OVERRIDES,
+  type AnalysisOverrides,
+  type NormalizedNote,
+  type NormalizedProject,
+} from "../../engine/compose/types";
 import { K } from "../lib/storage";
 import { ideaFromChord } from "../../engine/core/idea";
 import type { EtudeConstraints } from "../../engine/etude/types";
@@ -396,12 +408,14 @@ describe("Phase 2: v1 -> v2 migration through the real runner", () => {
     const out = runner.run({ version: 1, mode: "etude", globalTranspose: 3 });
     expect(out.ok).toBe(true);
     if (out.ok) {
-      // Slice 2 (D23): the chain is now 1->2->3, so a v1 payload lands
-      // at v3 and additionally gains etudeConstraints: null.
-      expect(out.value.version).toBe(3);
+      // Phase 4 Slice 2 (D57): the chain is now 1->2->3->4, so a v1
+      // payload lands at v4 and additionally gains composeSession:
+      // null.
+      expect(out.value.version).toBe(4);
       expect(out.value.exerciseTranspose).toBe(0);
       expect(out.value.keyCycleActive).toBe(false);
       expect(out.value.etudeConstraints).toBeNull();
+      expect(out.value.composeSession).toBeNull();
       expect(out.value.mode).toBe("etude");
       expect(out.value.globalTranspose).toBe(3);
     }
@@ -567,7 +581,7 @@ describe("Phase 3 Slice 2: etude persistence round-trip (D23)", () => {
     expect(STORE_API().dirty.etude).toBe("none");
   });
 
-  it("v2 -> v3 migration through the REAL runner seeds etudeConstraints null", () => {
+  it("v2 -> v3 -> v4 migration through the REAL runner seeds etudeConstraints null", () => {
     const out = createSessionRunner<{
       version: number;
       mode?: string;
@@ -575,9 +589,266 @@ describe("Phase 3 Slice 2: etude persistence round-trip (D23)", () => {
     }>().run({ version: 2, mode: "etude" });
     expect(out.ok).toBe(true);
     if (out.ok) {
-      expect(out.value.version).toBe(3);
+      // Phase 4 Slice 2 (D57): the chain continues to v4 (the runner
+      // always lands at CURRENT_SESSION_VERSION).
+      expect(out.value.version).toBe(4);
       expect(out.value.etudeConstraints).toBeNull();
       expect(out.value.mode).toBe("etude");
+    }
+  });
+});
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 2 (D57): the compose session slice.
+// ---------------------------------------------------------------------------
+
+/** Small pure fixture project (no DOM, no audio). `farNote` pushes
+ *  endTick past the 4-minute default window (230400 ticks at 120 BPM
+ *  ppq 480) so `truncated` flips on the analyzeFull recompute. */
+function fixtureProject(opts: { farNote?: boolean } = {}): NormalizedProject {
+  const notes: NormalizedNote[] = [];
+  const prog = [60, 64, 67, 65, 69, 72, 67, 71, 74];
+  let tick = 0;
+  for (let i = 0; i < 27; i++) {
+    notes.push({ midi: prog[i % 9], tick, durationTicks: 240, velocity: 0.8 });
+    tick += 240;
+  }
+  let endTick = tick;
+  if (opts.farNote === true) {
+    notes.push({ midi: 60, tick: 300000, durationTicks: 240, velocity: 0.8 });
+    endTick = 300240;
+  }
+  return {
+    version: 1,
+    format: 1,
+    ppq: 480,
+    name: "fx",
+    fileName: "fx.mid",
+    tempos: [{ tick: 0, bpm: 120 }],
+    timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
+    keySignatures: [],
+    tracks: [
+      {
+        index: 0,
+        name: "fx",
+        channel: 0,
+        program: 0,
+        isPercussion: false,
+        notes,
+        endTick,
+        usesPitchBend: false,
+      },
+    ],
+    endTick,
+    durationSec: (endTick / 480) * 0.5,
+    warnings: [],
+  };
+}
+
+function fixtureAnalysis(project: NormalizedProject) {
+  const out = analyzeProject(project);
+  if (!out.ok) {
+    throw new Error(`fixture analysis failed: ${out.error.code}`);
+  }
+  return out.value;
+}
+
+describe("Phase 4 Slice 2: compose slice defaults + clearCompose", () => {
+  beforeEach(() => {
+    STORE_API().clearCompose();
+  });
+
+  it("fresh compose state: session/project/analysis null, stacks empty", () => {
+    const s = STORE_API();
+    expect(s.composeSession).toBeNull();
+    expect(s.composeProject).toBeNull();
+    expect(s.composeAnalysis).toBeNull();
+    expect(s.composeUndo).toEqual([]);
+    expect(s.composeRedo).toEqual([]);
+  });
+
+  it("resetModeSlice does NOT widen to compose (D57: compose owns clearCompose)", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: null });
+    STORE_API().resetModeSlice();
+    expect(STORE_API().composeSession?.fileName).toBe("fx.mid");
+    STORE_API().clearCompose();
+    expect(STORE_API().composeSession).toBeNull();
+    expect(STORE_API().composeProject).toBeNull();
+  });
+});
+
+describe("Phase 4 Slice 2: setComposeFile + patch/undo/redo (D57/D59)", () => {
+  beforeEach(() => {
+    STORE_API().clearCompose();
+  });
+
+  it("setComposeFile resets overrides, both stacks and analyzeFull", () => {
+    const p = fixtureProject();
+    const a = fixtureAnalysis(p);
+    STORE_API().setComposeFile(p, a, { fileName: "fx.mid", fileHash: "h1" });
+    STORE_API().patchComposeOverrides({ ...EMPTY_OVERRIDES, tempoBpm: 100 });
+    expect(STORE_API().composeUndo.length).toBe(1);
+    STORE_API().setComposeFile(p, a, { fileName: "second.mid", fileHash: "h2" });
+    const s = STORE_API();
+    expect(s.composeSession?.overrides).toEqual(EMPTY_OVERRIDES);
+    expect(s.composeSession?.analyzeFull).toBe(false);
+    expect(s.composeUndo).toEqual([]);
+    expect(s.composeRedo).toEqual([]);
+    expect(s.composeSession?.fileName).toBe("second.mid");
+  });
+
+  it("patchComposeOverrides pushes PREVIOUS onto undo and clears redo", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: null });
+    const v1: AnalysisOverrides = { ...EMPTY_OVERRIDES, tempoBpm: 100 };
+    const v2: AnalysisOverrides = { ...EMPTY_OVERRIDES, tempoBpm: 110 };
+    STORE_API().patchComposeOverrides(v1);
+    STORE_API().patchComposeOverrides(v2);
+    let s = STORE_API();
+    expect(s.composeSession?.overrides).toEqual(v2);
+    expect(s.composeUndo.length).toBe(2);
+    expect(s.composeUndo[0]).toEqual(EMPTY_OVERRIDES); // pre-v1 snapshot
+    expect(s.composeUndo[1]).toEqual(v1);
+    s.undoCompose();
+    s = STORE_API();
+    expect(s.composeSession?.overrides).toEqual(v1);
+    expect(s.composeRedo.length).toBe(1);
+    // A fresh patch after undo clears the redo branch.
+    s.patchComposeOverrides({ ...EMPTY_OVERRIDES, tempoBpm: 120 });
+    expect(STORE_API().composeRedo).toEqual([]);
+  });
+
+  it("undo/redo swap whole-map snapshots; empty stacks are no-ops", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: null });
+    STORE_API().undoCompose(); // empty: no-op, no throw
+    expect(STORE_API().composeSession?.overrides).toEqual(EMPTY_OVERRIDES);
+    const v1: AnalysisOverrides = { ...EMPTY_OVERRIDES, tempoBpm: 90 };
+    STORE_API().patchComposeOverrides(v1);
+    STORE_API().undoCompose();
+    expect(STORE_API().composeSession?.overrides).toEqual(EMPTY_OVERRIDES);
+    STORE_API().redoCompose();
+    expect(STORE_API().composeSession?.overrides).toEqual(v1);
+  });
+
+  it("undo stack caps at 32 and shifts the oldest (D59)", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: null });
+    for (let i = 0; i < 40; i++) {
+      STORE_API().patchComposeOverrides({ ...EMPTY_OVERRIDES, tempoBpm: 100 + i });
+    }
+    const s = STORE_API();
+    expect(s.composeUndo.length).toBe(COMPOSE_UNDO_CAP);
+    // 40 pushes of [EMPTY, 100..138]; the 8 oldest dropped -> head is
+    // the snapshot taken before patch 8 (tempoBpm 107).
+    expect(s.composeUndo[0].tempoBpm).toBe(107);
+    expect(s.composeSession?.overrides.tempoBpm).toBe(139);
+  });
+
+  it("patchComposeOverrides is a no-op when no compose file is loaded", () => {
+    STORE_API().patchComposeOverrides({ ...EMPTY_OVERRIDES, tempoBpm: 120 });
+    expect(STORE_API().composeSession).toBeNull();
+    expect(STORE_API().composeUndo).toEqual([]);
+  });
+});
+
+describe("Phase 4 Slice 2: persistence boundary (D57 - the 30MB project NEVER hits localStorage)", () => {
+  beforeEach(() => {
+    STORE_API().clearCompose();
+  });
+
+  it("partialize persists composeSession but EXCLUDES project/analysis/stacks", async () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: "abc" });
+    STORE_API().patchComposeOverrides({ ...EMPTY_OVERRIDES, tempoBpm: 126 });
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as {
+      state: Record<string, unknown>;
+      version: number;
+    };
+    expect(CURRENT_SESSION_VERSION).toBe(4);
+    expect(parsed.version).toBe(CURRENT_SESSION_VERSION);
+    const session = parsed.state.composeSession as Record<string, unknown>;
+    expect(session.fileName).toBe("fx.mid");
+    expect(session.fileHash).toBe("abc");
+    expect((session.overrides as Record<string, unknown>).tempoBpm).toBe(126);
+    expect(session.analyzeFull).toBe(false);
+    expect(parsed.state.composeProject).toBeUndefined();
+    expect(parsed.state.composeAnalysis).toBeUndefined();
+    expect(parsed.state.composeUndo).toBeUndefined();
+    expect(parsed.state.composeRedo).toBeUndefined();
+  });
+
+  it("reload simulation: session rehydrates, project stays null (prompt state, D62)", async () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "keep.mid", fileHash: "h" });
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY) as string;
+    STORE_API().clearCompose();
+    localStorage.setItem(SESSION_STORAGE_KEY, raw);
+    useSessionStore.persist.rehydrate();
+    const s = STORE_API();
+    expect(s.composeSession?.fileName).toBe("keep.mid");
+    expect(s.composeProject).toBeNull();
+  });
+});
+
+describe("Phase 4 Slice 2: analyzeFull recompute + v3->v4 (D57/REQ-COMP-53)", () => {
+  beforeEach(() => {
+    STORE_API().clearCompose();
+  });
+
+  it("setComposeAnalyzeFull(true) recomputes over the full window; (false) restores the default", () => {
+    const p = fixtureProject({ farNote: true });
+    const a = fixtureAnalysis(p);
+    expect(a.truncated).toBe(true);
+    STORE_API().setComposeFile(p, a, { fileName: "long.mid", fileHash: null });
+    STORE_API().setComposeAnalyzeFull(true);
+    let s = STORE_API();
+    expect(s.composeSession?.analyzeFull).toBe(true);
+    expect(s.composeAnalysis?.truncated).toBe(false);
+    expect(s.composeAnalysis?.window.toTick).toBe(p.endTick);
+    STORE_API().setComposeAnalyzeFull(false);
+    s = STORE_API();
+    expect(s.composeSession?.analyzeFull).toBe(false);
+    expect(s.composeAnalysis?.truncated).toBe(true);
+  });
+
+  it("setComposeFile with restore.analyzeFull re-runs the full-window analysis", () => {
+    const p = fixtureProject({ farNote: true });
+    const a = fixtureAnalysis(p);
+    const overrides: AnalysisOverrides = { ...EMPTY_OVERRIDES, tempoBpm: 128 };
+    STORE_API().setComposeFile(
+      p,
+      a,
+      { fileName: "long.mid", fileHash: "h" },
+      { overrides, analyzeFull: true },
+    );
+    const s = STORE_API();
+    expect(s.composeSession?.overrides).toEqual(overrides);
+    expect(s.composeSession?.analyzeFull).toBe(true);
+    expect(s.composeAnalysis?.truncated).toBe(false);
+    expect(s.composeUndo).toEqual([]); // undo NEVER crosses files (RK-S2-5)
+  });
+
+  it("setComposeAnalyzeFull is a no-op without a loaded project", () => {
+    STORE_API().setComposeAnalyzeFull(true);
+    expect(STORE_API().composeSession).toBeNull();
+  });
+
+  it("v3 -> v4 through the REAL runner appends composeSession null (persisted-shape pin)", () => {
+    const out = createSessionRunner<{
+      version: number;
+      composeSession?: unknown;
+      mode?: string;
+    }>().run({ version: 3, mode: "compose" });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.version).toBe(4);
+      expect(out.value.composeSession).toBeNull();
+      expect(out.value.mode).toBe("compose");
     }
   });
 });

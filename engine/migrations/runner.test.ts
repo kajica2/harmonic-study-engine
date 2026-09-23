@@ -259,38 +259,42 @@ describe("createMigrationRunner", () => {
   });
 });
 
-describe("session registry (Phase 2 + Slice 2: v1 -> v2 -> v3)", () => {
-  it("current is version 3 with a contiguous 1->2->3 chain", () => {
-    expect(CURRENT_SESSION_VERSION).toBe(3);
+describe("session registry (Phase 2 + P3S2 + P4S2: v1 -> v2 -> v3 -> v4)", () => {
+  it("current is version 4 with a contiguous 1->2->3->4 chain", () => {
+    expect(CURRENT_SESSION_VERSION).toBe(4);
     expect(validateMigrationChain(SESSION_MIGRATIONS, CURRENT_SESSION_VERSION)).toBeNull();
-    expect(SESSION_MIGRATIONS.map((m) => [m.from, m.to])).toEqual([[1, 2], [2, 3]]);
+    expect(SESSION_MIGRATIONS.map((m) => [m.from, m.to])).toEqual([[1, 2], [2, 3], [3, 4]]);
   });
 
-  it("createSessionRunner upgrades a v1 payload to v3 with defaults", () => {
+  it("createSessionRunner upgrades a v1 payload to v4 with defaults", () => {
     const out = createSessionRunner<{
       version: number;
       exerciseTranspose?: number;
       keyCycleActive?: boolean;
       etudeConstraints?: unknown;
+      composeSession?: unknown;
     }>().run({ version: 1 });
     expect(out.ok).toBe(true);
     if (out.ok) {
-      expect(out.value.version).toBe(3);
+      expect(out.value.version).toBe(4);
       expect(out.value.exerciseTranspose).toBe(0);
       expect(out.value.keyCycleActive).toBe(false);
       expect(out.value.etudeConstraints).toBeNull();
+      expect(out.value.composeSession).toBeNull();
     }
   });
 
-  it("v2 -> v3 seeds etudeConstraints null and preserves a present value", () => {
+  it("v2 -> v3 -> v4 seeds etudeConstraints + composeSession null and preserves present values", () => {
     const bare = createSessionRunner<{
       version: number;
       etudeConstraints?: unknown;
+      composeSession?: unknown;
     }>().run({ version: 2, mode: "etude" });
     expect(bare.ok).toBe(true);
     if (bare.ok) {
-      expect(bare.value.version).toBe(3);
+      expect(bare.value.version).toBe(4);
       expect(bare.value.etudeConstraints).toBeNull();
+      expect(bare.value.composeSession).toBeNull();
       expect(bare.value.mode).toBe("etude");
     }
     const carried = createSessionRunner<{
@@ -300,6 +304,36 @@ describe("session registry (Phase 2 + Slice 2: v1 -> v2 -> v3)", () => {
     expect(carried.ok).toBe(true);
     if (carried.ok) {
       expect(carried.value.etudeConstraints).toEqual({ version: 1, seed: 7 });
+    }
+  });
+
+  it("v3 -> v4 appends composeSession null and preserves every v3 field verbatim", () => {
+    const out = createSessionRunner<{
+      version: number;
+      mode?: string;
+      etudeConstraints?: unknown;
+      composeSession?: unknown;
+    }>().run({
+      version: 3,
+      mode: "compose",
+      globalTranspose: 2,
+      etudeConstraints: { version: 1, seed: 9 },
+    });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.version).toBe(4);
+      expect(out.value.composeSession).toBeNull();
+      expect(out.value.mode).toBe("compose");
+      expect(out.value.etudeConstraints).toEqual({ version: 1, seed: 9 });
+    }
+    // A present composeSession survives untouched (copy-on-write).
+    const carried = createSessionRunner<{
+      version: number;
+      composeSession?: unknown;
+    }>().run({ version: 3, composeSession: { fileName: "a.mid", fileHash: null } });
+    expect(carried.ok).toBe(true);
+    if (carried.ok) {
+      expect(carried.value.composeSession).toEqual({ fileName: "a.mid", fileHash: null });
     }
   });
 });

@@ -1,14 +1,17 @@
-# Compose Engine (PRD-001 Phase 4, Slice 1)
+# Compose Engine (PRD-001 Phase 4, Slices 1-2)
 
 Phase 4 slice 1 ships the pure parse+analysis core for Compose mode:
 `engine/compose/` (normalize, tempo map, roles, key, melody, harmony
 inference, the `analyzeProject` pipeline), `engine/core/chords.ts`
 (shared chord tables extracted from the Etude generator), and the
-single `@tonejs/midi` adapter (`src/lib/composeMidi.ts`). Slice 1 is
-ZERO UI: nothing here is reachable from the app today - slice 2 ships
-the upload surface + analysis card. Requirements trace to PRD-001
-section 8.2 (REQ-COMP) and section 8.5 (REQ-PED-1, analyzer
-annotations); the approved design is `docs/PHASE-4-COMPOSE.md`
+single `@tonejs/midi` adapter (`src/lib/composeMidi.ts`). Slice 2
+wires the upload surface + analysis review on top of it (user guide:
+`docs/COMPOSE-MODE.md`; design: `docs/PHASE-4-S2-ANALYSIS-UI.md`,
+D57..D65) and adds the two engine changes documented below: the
+`blendKeyEvidence` key-confidence blend (D58, additive in `key.ts`)
+and the `mergeGrid` slot-append fix (D60, `types.ts`). Requirements
+trace to PRD-001 section 8.2 (REQ-COMP) and section 8.5 (REQ-PED-1,
+analyzer annotations); the approved design is `docs/PHASE-4-COMPOSE.md`
 (D45-D56 - read its ERRATA section alongside this doc; six design
 premises were falsified during implementation). Foundations:
 [engine-foundations.md](engine-foundations.md); the sibling Etude
@@ -22,7 +25,7 @@ engine: [engine-etude.md](engine-etude.md).
 | `engine/compose/normalize.ts` | `normalizeMidiJson(json, fileName)` - the single SMF-quirk choke point; validation, defaults, warnings; never throws. |
 | `engine/compose/tempo.ts` | Tempo-map math: `ticksPerBar`, `barBoundaries` (meter-change-aware, tick-derived), piecewise `ticksToSeconds`/`secondsToTicks`, `defaultWindow` (4 min). |
 | `engine/compose/roles.ts` | `classifyRoles` - deterministic feature-scored track roles (REQ-COMP-4). |
-| `engine/compose/key.ts` | `detectKey` - hand-rolled Krumhansl-Schmuckler (Krumhansl-Klinger 1982 profiles), ranked candidates (REQ-COMP-10/52). |
+| `engine/compose/key.ts` | `detectKey` - hand-rolled Krumhansl-Schmuckler (Krumhansl-Klinger 1982 profiles), ranked candidates (REQ-COMP-10/52) + `blendKeyEvidence` / `KEY_BLEND_WEIGHTS` (D58, slice 2). |
 | `engine/compose/melody.ts` | `extractMelody` - role track when confident, else top-line synthesis with eighth-note hysteresis (REQ-COMP-11). |
 | `engine/compose/harmony.ts` | `segmentGrid` + `inferChords` + `reinferBar` - per-region chord inference, calibrated confidence + top-3 alternatives (REQ-COMP-12/13/23). |
 | `engine/compose/index.ts` | `analyzeProject` (the pipeline) + the public surface S2/S3/S4 import. |
@@ -130,6 +133,83 @@ region) halves it. Key confidence is the Pearson r of the pitch-class
 profile against the Krumhansl-Klinger template. Role confidence is the
 winning feature score (percussion short-circuits at 0.99).
 
+## `blendKeyEvidence` - the D58 key-confidence blend (slice 2)
+
+`engine/compose/key.ts` gains ONE exported function (additive; zero
+new engine files, purity floor unchanged):
+
+```ts
+declare function blendKeyEvidence(a: ComposeAnalysis): KeyBlend;
+// KeyBlend = { agreement, conflictKind, selected, blended, functional, reason }
+```
+
+Krumhansl-Schmuckler correlation is NOT a calibrated probability
+(~18.3% top-1 on adversarial jazz), so `confidenceTier(candidates[0]
+.correlation)` ALONE would happily auto-accept a 0.85 false-fire.
+The blend weighs three sources: the DECLARED SMF key signature
+(composers' intent), FUNCTIONAL fit of the analysis's own chord grid
+(diatonic mass + cadence), and the KS correlation. The result is
+five agreement states with a fixed blend per state:
+
+| `agreement` | condition | `blended` |
+|---|---|---|
+| `agree` | declared && !fallback && declared == candidates[0] | `agreeBase + agreeKs*ks + agreeFunctional*functional` |
+| `inferred-only` | !declared && !fallback | `ks * (inferredBase + inferredFunctional*functional)` |
+| `declared-only` | declared && fallback | `KEY_BLEND_WEIGHTS.declaredOnly` (0.65) |
+| `conflict` | declared && !fallback && declared != top | `KEY_BLEND_WEIGHTS.conflict` (0.60) |
+| `none` | !declared && fallback | 0 |
+
+`conflictKind` (`relative` / `parallel` / `other`) classifies the
+disagreement for the banner copy. `selected` is what the card shows:
+declared wins on conflict/declared-only, the inferred top candidate
+otherwise.
+
+**H1/H2 are ENGINE CONTRACTS, not UI preferences** - property-pinned
+over grid x ks batteries in `key.test.ts`, and re-tuning
+`KEY_BLEND_WEIGHTS` (the named, exported tuning surface) must never
+loosen them:
+
+- **H1**: KS correlation ALONE never auto-accepts. `auto` is
+  reachable only via `agree` or `inferred-only`, and in
+  inferred-only only when BOTH ks > 0.80 AND functional > 0.55
+  (the adversarial-jazz guard).
+- **H2**: `conflict` always yields the fixed highlight blend + the
+  `conflictKind` the banner/radio UI must render (default selection
+  = declared). A silent pick of either value is a spec violation.
+
+The fixed constants sit below the 0.80 auto boundary BY DESIGN; the
+UI re-clamps H1 defensively (`AnalysisCard`), but the guarantee
+holds in the engine alone. The blend is pure over the analysis's own
+grid + key result - it never mutates and reads nothing outside its
+argument.
+
+## `mergeGrid` slot append (D60, slice 2)
+
+The one sanctioned engine BEHAVIOR fix. Slice 1's `mergeGrid` mapped
+patches over `region.slots` positionally, so a `"bar:1"` patch on a
+1-slot bar was SILENTLY DROPPED - making the REQ-COMP-23 "split bar
+in two" flow (`reinferBar(..., 2)` then write `"bar:0"` + `"bar:1"`)
+unsatisfiable through the merge. Out-of-range slot patches now
+APPEND (ascending slot order, gaps filled with `restCell()`);
+in-range behavior is byte-identical (regression-pinned in
+`types.test.ts`). `ChordGrid.slotsPerBar` stays the NOMINAL default
+- renderers and S3's assemble read `region.slots.length` per bar, so
+variable-length bars were already representable in the data model.
+
+## The chord-symbol grammar boundary (D61, slice 2)
+
+`src/lib/chordInput.ts` (pure, node-tested) is the popover's
+validator: typed symbol -> `(rootPc, qualitySymbol, bassPc)` and
+back, reverse-mapped from `NAME_SUFFIX` + documented aliases,
+REJECTING anything a `ChordCell` cannot express ("C13", "C7#9",
+out-of-template slash basses). The boundary is deliberate: the
+ENGINE cannot validate UI input (it knows `QUALITY_INTERVALS`, not
+typable strings), and `src/lib/ireal.ts` `parseChordToMidi` is NOT
+the validator (lossy one-way to MIDI pitches, accepts symbols the
+grid cannot hold). `spellChordName`/`NAME_SUFFIX` in
+`engine/core/chords.ts` stay the single source of truth for
+spelling; chordInput consumes them.
+
 ## The synthetic golden corpus - and its honest limit
 
 `corpus.test.ts` (the RK1 mitigation) builds 24 seeded synthetic songs
@@ -203,14 +283,14 @@ prose). The design's claims that differed are itemized in
    percussion and warns on multi-track format-0 DTOs (both pinned) -
    correct behavior regardless of parser version drift.
 
-## What slice 1 does NOT include
+## What slice 1 did NOT include (and when it landed)
 
-- **No UI** - no drop zone, no analysis card, no chord popover
-  (`ComposeSurface` is still the Phase 1 stub; slice 2 owns all of it,
-  plus the store v4 migration, D48).
+- **No UI** - SUPERSEDED by slice 2: drop zone, three-state surface,
+  analysis card, chord popover, tick-native roll, store v4 (D48/D57).
+  User guide: `docs/COMPOSE-MODE.md`.
 - **No audio** - nothing plays; Compose owns its own transport in
   slice 4 (D50); `rhythmEngine`/`backingEngine`/`playbackClock`
-  untouched.
+  untouched (still true after slice 2).
 - **No export** - the MIDI/WAV/chart-paste surface is slice 4 (the
   keySig finding above is its entrance requirement).
 - **No accompaniment** - `voicing`/`patterns`/`bass`/`assemble` are
@@ -218,14 +298,20 @@ prose). The design's claims that differed are itemized in
 - **No new npm deps, no Web Worker yet** (D54: only if the harness
   fails), no `tests/` or dirty-component edits; engine purity floor
   21 -> 29 (D56; the floor is a MINIMUM - the tree now holds 30
-  non-test sources with `index.ts` as the 9th slice-1 file).
+  non-test sources with `index.ts` as the 9th slice-1 file). Slice 2
+  kept the floor: two existing-file engine edits, zero new engine
+  files.
 
-## Consumed by (slice 2+)
+## Consumed by (slice 2 shipped, S3/S4 next)
 
-S2's drop zone is `file -> readMidiFile -> analyzeProject -> store`;
-the card renders `mergeAnalysis(analysis, overrides)` and uses
-`confidenceTier` + `reinferBar` + `chordQualities()`; S3's
-`generateAccompaniment` takes exactly the `ChordGrid` this ships; S4's
-player/export import the SAME `tempo.ts` functions (one tempo-map
-truth). Everything above is verified against the shipped code; design
-authority remains `docs/PHASE-4-COMPOSE.md` + its ERRATA.
+S2's pipeline is live: `file -> readMidiFile -> analyzeProject ->
+store`, the card renders `mergeAnalysis(analysis, overrides)` +
+`blendKeyEvidence`, and the popover uses `confidenceTier` +
+`reinferBar` + the `chordInput` grammar. S3's
+`generateAccompaniment` takes exactly the `ChordGrid` this ships
+(per-bar variable-length slots included, D60); S4's player/export
+import the SAME `tempo.ts` functions (one tempo-map truth) and
+consume the record-only `tempoBpm`/`timeSignature` overrides.
+Everything above is verified against the shipped code; design
+authority remains `docs/PHASE-4-COMPOSE.md` + its ERRATA +
+`docs/PHASE-4-S2-ANALYSIS-UI.md`.

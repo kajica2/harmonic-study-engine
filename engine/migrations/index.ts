@@ -3,17 +3,18 @@
  * Baseline v1 (Phase 0/1): empty chain. Phase 2 (D10) appends the
  * v1 -> v2 step that seeds the transpose-slice defaults
  * (exerciseTranspose + keyCycleActive). Phase 3 Slice 2 (D23) appends
- * the v2 -> v3 step that seeds `etudeConstraints: null`, and bumps
- * CURRENT_SESSION_VERSION. The chain must stay contiguous 1 -> 2 -> 3
- * (validateMigrationChain). This version mirrors
- * src/state/sessionStore.ts CURRENT_SESSION_VERSION; the zustand
- * persist envelope carries the same number (ADR-004).
+ * the v2 -> v3 step that seeds `etudeConstraints: null`. Phase 4
+ * Slice 2 (D57) appends the v3 -> v4 step that seeds
+ * `composeSession: null` and bumps CURRENT_SESSION_VERSION. The chain
+ * must stay contiguous 1 -> 2 -> 3 -> 4 (validateMigrationChain). This
+ * version mirrors src/state/sessionStore.ts CURRENT_SESSION_VERSION;
+ * the zustand persist envelope carries the same number (ADR-004).
  */
 
 import type { DataMigration, MigrationRunner } from "./types";
 import { createMigrationRunner } from "./runner";
 
-export const CURRENT_SESSION_VERSION = 3;
+export const CURRENT_SESSION_VERSION = 4;
 
 /** v1 -> v2: add the transpose slice with defaults. Copy-on-write,
  *  never mutates, and tolerates a payload with no fields at all
@@ -62,9 +63,32 @@ export const sessionV2ToV3: DataMigration = {
   },
 };
 
+/** v3 -> v4 (PRD-001 Phase 4 Slice 2, D57): add the compose session
+ *  slice with a null default. Same copy-on-write shape as the prior
+ *  steps; an existing composeSession value (however produced) is
+ *  preserved verbatim - the store owns its shape. The 30MB project +
+ *  undo stacks are IN-MEMORY only (partialize excludes them), so the
+ *  persisted payload stays small by construction. */
+export const sessionV3ToV4: DataMigration = {
+  from: 3,
+  to: 4,
+  up: (data: unknown): unknown => {
+    const base =
+      typeof data === "object" && data !== null && !Array.isArray(data)
+        ? (data as Record<string, unknown>)
+        : {};
+    return {
+      ...base,
+      composeSession: "composeSession" in base ? base.composeSession : null,
+      version: 4,
+    };
+  },
+};
+
 export const SESSION_MIGRATIONS: readonly DataMigration[] = [
   sessionV1ToV2,
   sessionV2ToV3,
+  sessionV3ToV4,
 ];
 
 export function createSessionRunner<T = unknown>(): MigrationRunner<T> {

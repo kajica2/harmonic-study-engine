@@ -30,11 +30,15 @@
 
 import type {
   AnalysisWindow,
+  ChordCell,
+  ComposeAnalysis,
   KeyCandidate,
   KeyResult,
   NormalizedNote,
   NormalizedProject,
+  ProjectKeySignature,
 } from "./types";
+import { spellTonic } from "../core/spelling";
 
 /** Krumhansl-Klinger 1982 major profile (semitones above tonic). */
 export const KK_MAJOR: readonly number[] = [
@@ -160,5 +164,236 @@ export function detectKey(project: NormalizedProject, window: AnalysisWindow): K
     candidates,
     declared: project.keySignatures.length > 0 ? project.keySignatures[0] : null,
     chromaticFallback,
+  };
+}
+
+/* --------------------------------------------------------------------- *
+ * D58 (PRD-001 Phase 4 Slice 2): THE HONESTY BLEND.
+ *
+ * Krumhansl-Schmuckler correlation is NOT a calibrated probability: the
+ * fix-round evidence is KS top-1 accuracy of ~18.3% on adversarial jazz,
+ * so confidenceTier(candidates[0].correlation) ALONE would happily
+ * auto-accept a 0.85 false-fire. blendKeyEvidence weighs THREE
+ * independent evidence sources:
+ *
+ *   declared   - the file's own SMF key signature (composers' intent),
+ *   functional - how well the inferred chord grid actually fits the
+ *                candidate key (diatonic mass + cadence),
+ *   ks         - the raw correlation above.
+ *
+ * Two UNIVERSAL properties hold by construction (property-pinned in
+ * key.test.ts - tuning KEY_BLEND_WEIGHTS must never loosen them):
+ *
+ *   H1: KS correlation ALONE NEVER auto-accepts. A tier of "auto" is
+ *       reachable only in the "agree" or "inferred-only" states, and in
+ *       inferred-only it needs BOTH strong correlation AND real
+ *       functional evidence (the adversarial-jazz guard: ks 0.83 with
+ *       functional 0.25 blends to ~0.55 = highlight, never auto).
+ *   H2: a declared-vs-inferred CONFLICT always yields a fixed
+ *       highlight-tier blend + the conflictKind the banner/radio UI
+ *       must render (default selection = declared). A silent pick of
+ *       either value is a spec violation.
+ *
+ * The fixed constants (declaredOnly 0.65, conflict 0.60, none 0) sit
+ * below the 0.80 auto boundary BY DESIGN - see the property tests.
+ * --------------------------------------------------------------------- */
+
+/** Five-way declared-vs-inferred agreement state (D58). */
+export type KeyAgreement =
+  | "agree"
+  | "conflict"
+  | "declared-only"
+  | "inferred-only"
+  | "none";
+
+/** null unless agreement === "conflict". */
+export type ConflictKind = "relative" | "parallel" | "other" | null;
+
+export interface KeyBlend {
+  readonly agreement: KeyAgreement;
+  readonly conflictKind: ConflictKind;
+  /** What the card shows as current (composers' intent wins when the
+   *  file declares a key - the shipped key.ts header rule). */
+  readonly selected: KeyCandidate;
+  /** 0..1 - feeds confidenceTier. */
+  readonly blended: number;
+  /** 0..1 (exposed for the tooltip honesty). */
+  readonly functional: number;
+  /** ASCII, UI-safe one-liner. */
+  readonly reason: string;
+}
+
+/** Blend constants (named + test-pinned). Re-tune via RK-S2-2 corpus
+ *  data WITHOUT touching the H1/H2 property tests - those pin the
+ *  RELATIONS, not the numbers. */
+export const KEY_BLEND_WEIGHTS = {
+  agreeBase: 0.6,
+  agreeKs: 0.25,
+  agreeFunctional: 0.15,
+  inferredBase: 0.55,
+  inferredFunctional: 0.45,
+  declaredOnly: 0.65,
+  conflict: 0.6,
+  functionalMass: 0.7,
+  functionalCadence: 0.3,
+  minCellsForMass: 4,
+} as const;
+
+const BLEND_MAJOR_SCALE: readonly number[] = [0, 2, 4, 5, 7, 9, 11];
+const BLEND_MINOR_SCALE: readonly number[] = [0, 2, 3, 5, 7, 8, 10];
+const CADENCE_RESOLUTIONS: ReadonlySet<string> = new Set(["maj", "maj7", "m7"]);
+
+function clamp01(x: number): number {
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+
+function scalePcsOf(cand: KeyCandidate): ReadonlySet<number> {
+  const scale = cand.mode === "major" ? BLEND_MAJOR_SCALE : BLEND_MINOR_SCALE;
+  return new Set(scale.map((o) => mod12(cand.tonicPc + o)));
+}
+
+function gridCells(a: ComposeAnalysis): readonly ChordCell[] {
+  const out: ChordCell[] = [];
+  for (const region of a.grid.bars) {
+    for (const cell of region.slots) out.push(cell);
+  }
+  return out;
+}
+
+/** Fraction of non-rest cells whose root sits in the selected scale.
+ *  0 when fewer than minCellsForMass non-rest cells (too little to
+ *  judge - never reward an empty grid). */
+function diatonicMassOf(selected: KeyCandidate, cells: readonly ChordCell[]): number {
+  const nonRest = cells.filter((c) => !c.isRest);
+  if (nonRest.length < KEY_BLEND_WEIGHTS.minCellsForMass) return 0;
+  const scale = scalePcsOf(selected);
+  let inScale = 0;
+  for (const c of nonRest) if (scale.has(mod12(c.rootPc))) inScale++;
+  return inScale / nonRest.length;
+}
+
+/** 1: an ii-V-I annotation exists OR a direct V->I adjacency (a
+ *  dom7/alt cell rooted tonic+7 immediately followed - rests
+ *  transparent - by a cell rooted tonic with quality maj/maj7/m7).
+ *  0.5: a tonic+7 dominant exists with no resolution. Else 0. */
+function cadenceEvidence(a: ComposeAnalysis, selected: KeyCandidate): number {
+  if (a.annotations.some((x) => x.conceptId === "ii-v-i")) return 1;
+  const domPc = mod12(selected.tonicPc + 7);
+  const nonRest = gridCells(a).filter((c) => !c.isRest);
+  let sawUnresolved = false;
+  for (let i = 0; i < nonRest.length; i++) {
+    const c = nonRest[i];
+    if (c.rootPc !== domPc) continue;
+    if (c.qualitySymbol !== "dom7" && c.qualitySymbol !== "alt") continue;
+    const nxt = nonRest[i + 1];
+    if (
+      nxt !== undefined &&
+      nxt.rootPc === selected.tonicPc &&
+      CADENCE_RESOLUTIONS.has(nxt.qualitySymbol)
+    ) {
+      return 1;
+    }
+    sawUnresolved = true;
+  }
+  return sawUnresolved ? 0.5 : 0;
+}
+
+function conflictKindOf(declared: ProjectKeySignature, top: KeyCandidate): ConflictKind {
+  if (declared.tonicPc === top.tonicPc && declared.mode !== top.mode) return "parallel";
+  if (declared.mode !== top.mode) {
+    const delta = mod12(top.tonicPc - declared.tonicPc);
+    if (delta === 9 || delta === 3) return "relative";
+  }
+  return "other";
+}
+
+function keyName(cand: KeyCandidate): string {
+  return `${spellTonic(cand.tonicPc, cand.mode, "")} ${cand.mode}`;
+}
+
+/** The D58 blend. Pure over the analysis's OWN grid + key result -
+ *  never mutates, never reads anything outside `a`. */
+export function blendKeyEvidence(a: ComposeAnalysis): KeyBlend {
+  const W = KEY_BLEND_WEIGHTS;
+  const top: KeyCandidate = a.key.candidates[0] ?? { tonicPc: 0, mode: "major", correlation: 0 };
+  const ks = clamp01(top.correlation); // negative r -> 0
+  const declared = a.key.declared;
+  const fallback = a.key.chromaticFallback;
+
+  let agreement: KeyAgreement;
+  if (declared !== null && !fallback) {
+    agreement =
+      declared.tonicPc === top.tonicPc && declared.mode === top.mode ? "agree" : "conflict";
+  } else if (declared !== null) {
+    agreement = "declared-only";
+  } else if (!fallback) {
+    agreement = "inferred-only";
+  } else {
+    agreement = "none";
+  }
+
+  const declaredCandidate: KeyCandidate | null =
+    declared === null
+      ? null
+      : { tonicPc: declared.tonicPc, mode: declared.mode, correlation: 1 };
+
+  // H2 default selection: composers' intent (declared) wins on
+  // conflict + declared-only; the inferred top candidate wins on
+  // agree/inferred-only; "none" keeps candidates[0] as a placeholder
+  // behind the forced manual input.
+  const selected: KeyCandidate =
+    (agreement === "declared-only" || agreement === "conflict") && declaredCandidate !== null
+      ? declaredCandidate
+      : top;
+
+  const conflictKind: ConflictKind =
+    agreement === "conflict" && declared !== null ? conflictKindOf(declared, top) : null;
+
+  const cells = gridCells(a);
+  const mass = diatonicMassOf(selected, cells);
+  const cadence = cadenceEvidence(a, selected);
+  const functional = clamp01(W.functionalMass * mass + W.functionalCadence * cadence);
+  const fitPct = Math.round(functional * 100);
+
+  let blended: number;
+  let reason: string;
+  switch (agreement) {
+    case "agree":
+      blended = W.agreeBase + W.agreeKs * ks + W.agreeFunctional * functional;
+      reason = `Key signature and notes agree on ${keyName(selected)} (correlation r=${ks.toFixed(
+        2,
+      )}, functional fit ${fitPct}%).`;
+      break;
+    case "inferred-only":
+      blended = ks * (W.inferredBase + W.inferredFunctional * functional);
+      reason = `Detected ${keyName(selected)} from note content (correlation r=${ks.toFixed(
+        2,
+      )}, functional fit ${fitPct}%).`;
+      break;
+    case "declared-only":
+      blended = W.declaredOnly;
+      reason = `Key ${keyName(
+        selected,
+      )} comes from the file's key signature; the note content gave no tonal evidence.`;
+      break;
+    case "conflict":
+      blended = W.conflict;
+      reason = `The file declares ${keyName(selected)}; the notes suggest ${keyName(top)} (${
+        conflictKind ?? "other"
+      } relation).`;
+      break;
+    default:
+      blended = 0;
+      reason = "No clear key detected - enter the key and chords manually.";
+      break;
+  }
+
+  return {
+    agreement,
+    conflictKind,
+    selected,
+    blended: clamp01(blended),
+    functional,
+    reason,
   };
 }

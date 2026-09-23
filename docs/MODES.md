@@ -7,11 +7,13 @@ app and is always one click away. Every mode's primary output is
 packageable as an `Idea`, so a chord you discover in Etude can become
 the seed of a Compose upload or an Explore preset. Phase 1 wires the
 shell: the selector, the per-mode dirty prompt, and the Idea bar.
-The deep feature surface for Compose (analysis card, accompaniment
-generation, export) and Explore (reharmonize / substitute / expand)
-arrives in Phases 4 and 5. Phase 2 adds the transposition layer on
-the Etude surface -- two offset rows, a sounding-key badge, and a
-cycle-all-12 practice loop (see Transposition below).
+Compose's upload + editable analysis card shipped in Phase 4 slice 2
+(`docs/COMPOSE-MODE.md`); the rest of the deep feature surface for
+Compose (accompaniment generation, export) and Explore (reharmonize
+/ substitute / expand) arrives in later phases. Phase 2 adds the
+transposition layer on the Etude surface -- two offset rows, a
+sounding-key badge, and a cycle-all-12 practice loop (see
+Transposition below).
 
 Requirements traced here come from PRD-001 sections 6.1 (mode
 selector chrome), 8.1 (REQ-MODE-1..7, REQ-IDEA-1..4, REQ-TRANS-1..7),
@@ -28,23 +30,26 @@ exploratory idea (Explore) -- and the rest of the app bends around
 that output. Switching modes keeps the audio engine and the global
 transpose live; what changes is the main panel and the toolbar. The
 app launches in Etude today (the same surface as before the mode
-selector existed), and switching to Compose or Explore reveals an
-empty-state stub for that mode.
+selector existed); Compose became a real workspace in Phase 4 slice
+2 (`docs/COMPOSE-MODE.md`), and Explore is still an empty-state stub
+for that mode.
 
 ## The three modes
 
 ### Compose
 
-The MIDI-file workspace. Drop in a `.mid` file and the app analyzes
-key, melody, and chord chart; Phase 4 wires the editable analysis
-card and the style-driven accompaniment generator. **Phase 1 ships**
-the empty state only: a faded `SynesthesiaCanvas` thumbnail (the same
-component Etude uses, drawn at 30% opacity), the drop-zone copy
-"Drop a .mid file to get started.", an "Open import / export" CTA
-that opens the existing import modal, and a privacy `<aside>`
-saying "All processing happens in your browser. Your MIDI file never
-leaves this tab." (REQ-IO-70). No MIDI parser, no analysis card, no
-accompaniment yet.
+The MIDI-file workspace -- and since Phase 4 slice 2 (2026-09-23) it
+is a real surface, not a stub. Drop in (or browse to) a `.mid` file
+and the app analyzes key, tempo, meter, melody, and a per-bar chord
+chart, all editable with confidence tiers that tell you exactly how
+much the app trusts each answer. Your edits survive reloads (the
+file itself does not -- it never leaves the tab, and nothing that
+big goes into storage). Full user guide:
+**`docs/COMPOSE-MODE.md`**. Accompaniment generation (slice 3) and
+audio playback / export (slice 4) are still to come; the Phase 1
+empty-state copy ("Drop a .mid file to get started.", the
+import/export CTA, the privacy aside) survives verbatim as the
+upload state.
 
 The Composer surface lives at `src/components/ComposeSurface.tsx`.
 
@@ -316,9 +321,10 @@ mount).
 
 ```
 key:        hse.session
-version:    CURRENT_SESSION_VERSION = 3
+version:    CURRENT_SESSION_VERSION = 4
 partialize: { mode, globalTranspose, exerciseTranspose,
-              keyCycleActive, currentIdea, etudeConstraints }
+              keyCycleActive, currentIdea, etudeConstraints,
+              composeSession }
 ```
 
 The store is the *single* source of truth for Phase 1 mode state
@@ -328,15 +334,18 @@ bridge to `globalTranspose`. The rest of the legacy hook migrates
 slice-by-slice in Phase 1.5 (ADR-004). `dirty` and
 `pendingModeRequest` are explicitly *not* persisted -- they are
 session-scoped Edit state, not cross-reload state. v1 payloads are
-upgraded to v2 (transpose-slice defaults) and v2 to v3 (Phase 3
-slice 2's `etudeConstraints`, seeded to `null`) by the migration
-runner in `engine/migrations/index.ts`.
+upgraded to v2 (transpose-slice defaults), v2 to v3 (Phase 3 slice
+2's `etudeConstraints`, seeded to `null`), and v3 to v4 (Phase 4
+slice 2's `composeSession`, seeded to `null` - the small persisted
+record behind the Compose re-upload prompt; the parsed project
+itself is in-memory only) by the migration runner in
+`engine/migrations/index.ts`.
 
 `src/lib/storage.ts` registers the two new keys:
 
 | Key | Storage | Shape |
 |---|---|---|
-| `K.session` (`hse.session`) | zustand persist JSON | mode + transpose slice + etude constraints: `mode`, `globalTranspose`, `exerciseTranspose`, `keyCycleActive`, `currentIdea`, `etudeConstraints` |
+| `K.session` (`hse.session`) | zustand persist JSON | mode + transpose slice + etude constraints + compose session: `mode`, `globalTranspose`, `exerciseTranspose`, `keyCycleActive`, `currentIdea`, `etudeConstraints`, `composeSession` |
 | `K.ideas` (`hse.ideas`) | hand-managed JSON | `Idea[]`, capped at 100 entries (REQ-IDEA-4) |
 
 Both keys are added to `STORAGE_KEYS` with their shape metadata so

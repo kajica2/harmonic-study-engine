@@ -254,7 +254,8 @@ function sameKey(a: KeyCandidate, b: KeyCandidate): boolean {
  * Merged here (fields the ComposeAnalysis itself carries):
  *   - key: an override becomes the default selection (candidates[0]).
  *   - roles: per-track role overrides (confidence -> 1, manual = certain).
- *   - grid: chord-cell overrides ("bar:slot"; null -> rest).
+ *   - grid: chord-cell overrides ("bar:slot"; null -> rest; a slot
+ *     beyond the bar's length APPENDS - D60, the split-bar flow).
  *   - melody: the selected source track index (note RE-extraction needs
  *     the project and is S2's job; the merged view records the choice).
  *
@@ -331,6 +332,41 @@ function mergeGrid(
       changed = true;
       return next;
     });
+    // D60 (PRD-001 Phase 4 Slice 2): out-of-range slot patches APPEND
+    // instead of being silently dropped - the REQ-COMP-23 "split bar
+    // in two" flow (reinferBar(..., 2) then write "bar:0" + "bar:1")
+    // is otherwise unsatisfiable through the merge. Multiple
+    // out-of-range slots land in ascending index order with gaps
+    // filled by restCell(). In-range behavior is byte-identical to
+    // the shipped merge (regression-pinned by types.test.ts).
+    // slotsPerBar stays the NOMINAL default: renderers + S3's
+    // assemble already read region.slots.length per bar, so
+    // variable-length bars are representable in the shipped model.
+    if (patch.size > 0) {
+      const extras: { slot: number; cell: ChordCell }[] = [];
+      for (const [key, cell] of patch) {
+        const sep = key.indexOf(":");
+        if (sep < 0) continue;
+        const bar = Number(key.slice(0, sep));
+        const slot = Number(key.slice(sep + 1));
+        if (bar === region.bar && Number.isInteger(slot) && slot >= region.slots.length) {
+          extras.push({ slot, cell });
+        }
+      }
+      if (extras.length > 0) {
+        extras.sort((a, b) => a.slot - b.slot);
+        let cursor = region.slots.length;
+        for (const e of extras) {
+          while (cursor < e.slot) {
+            slots.push(restCell());
+            cursor++;
+          }
+          slots.push(e.cell);
+          cursor++;
+        }
+        changed = true;
+      }
+    }
     return changed ? { ...region, slots } : region;
   });
   return { slotsPerBar: grid.slotsPerBar, bars };
