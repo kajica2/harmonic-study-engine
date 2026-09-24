@@ -424,9 +424,9 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
                     } catch {}
                   }}
                   aria-pressed={clefLayout === c}
-                  className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors active:scale-95 ${
+                  className={`px-2.5 py-1 text-xs font-mono rounded-md transition-colors ${
                     clefLayout === c
-                      ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)]"
+                      ? "bg-purple-700 text-white"
                       : "text-neutral-400 hover:text-neutral-200"
                   }`}
                   title={
@@ -447,9 +447,9 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
           <button
             onClick={() => setShowChords(!showChords)}
             aria-pressed={showChords}
-            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-mono rounded-lg transition-colors active:scale-95 ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-mono rounded-lg transition-colors ${
               showChords
-                ? "bg-[color:var(--color-brand)] text-[color:var(--color-text-inverse)] border border-[color:var(--color-brand-strong)]"
+                ? "bg-purple-700 text-white border border-purple-600"
                 : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:text-neutral-200 hover:bg-neutral-700"
             }`}
           >
@@ -499,7 +499,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
                 value={zoomScale}
                 aria-label="Score zoom scale"
                 onChange={(e) => setZoomScale(parseFloat(e.target.value))}
-                className="w-20 accent-[color:var(--color-brand)] cursor-pointer text-[color:var(--color-brand-strong)] bg-neutral-700"
+                className="w-20 accent-purple-500 cursor-pointer text-purple-500 bg-neutral-700"
               />
               <span className="text-xs text-neutral-300 font-mono w-8 text-right">
                 {zoomScale.toFixed(1)}x

@@ -74,9 +74,9 @@ export const FormPlanner: React.FC<FormPlannerProps> = ({
               type="button"
               title={`${section.id} — ${section.length} bars${section.cadence ? ` (${section.cadence})` : ""}`}
               onClick={() => onBarClick?.(startBar)}
-              className={`h-7 rounded text-[11px] font-mono flex items-center justify-center transition-colors active:scale-95 border ${
+              className={`h-7 rounded text-[11px] font-mono flex items-center justify-center transition-colors border ${
                 activeBar != null && activeBar >= startBar && activeBar < startBar + section.length
-                  ? "bg-[color:var(--color-brand)]/50 border-[color:var(--color-brand)] text-[color:var(--color-brand-strong)]"
+                  ? "bg-purple-700/50 border-purple-500 text-purple-100"
                   : "bg-neutral-800/60 border-neutral-700 text-neutral-300 hover:bg-neutral-700/60"
               }`}
               style={{ width: `${widthPct}%` }}

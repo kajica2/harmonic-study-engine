@@ -88,7 +88,7 @@ export function PracticeSetBrowser({ sets, recentSessions, onStart, onMutate }: 
         <h3 className="text-sm font-semibold text-neutral-300">Practice Sets</h3>
         <button
           onClick={() => setEditingSet(null)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[color:var(--color-brand-muted)]/30 hover:bg-[color:var(--color-brand-muted)]/40 text-[color:var(--color-brand-strong)] border border-[color:var(--color-brand)]/30 transition-colors active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-900/30 hover:bg-purple-800/40 text-purple-300 border border-purple-500/30 transition-colors"
         >
           <Plus size={12} />
           New Set
@@ -99,11 +99,11 @@ export function PracticeSetBrowser({ sets, recentSessions, onStart, onMutate }: 
       <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
         <button
           onClick={() => setSelectedTag(null)}
-            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors active:scale-95 ${
-              selectedTag === null
-                ? "bg-[color:var(--color-brand-muted)]/30 text-[color:var(--color-brand-strong)] border border-[color:var(--color-brand)]/30"
-                : "bg-white/5 text-neutral-400 border border-white/10 hover:bg-white/10"
-            }`}
+          className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+            selectedTag === null
+              ? "bg-purple-900/30 text-purple-300 border border-purple-500/30"
+              : "bg-white/5 text-neutral-400 border border-white/10 hover:bg-white/10"
+          }`}
         >
           All
         </button>
@@ -111,9 +111,9 @@ export function PracticeSetBrowser({ sets, recentSessions, onStart, onMutate }: 
           <button
             key={tag}
             onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors active:scale-95 ${
+            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
               selectedTag === tag
-                ? "bg-[color:var(--color-brand-muted)]/30 text-[color:var(--color-brand-strong)] border border-[color:var(--color-brand)]/30"
+                ? "bg-purple-900/30 text-purple-300 border border-purple-500/30"
                 : "bg-white/5 text-neutral-400 border border-white/10 hover:bg-white/10"
             }`}
           >

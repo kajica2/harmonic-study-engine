@@ -293,7 +293,7 @@ export const ChordInspector: React.FC<Props> = (props) => {
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => onAudition("block", liveNotes)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-strong)] text-[color:var(--color-text-inverse)] text-xs font-mono active:scale-95 transition-all"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono"
                 >
                   <Play size={12} /> Chord only
                 </button>
@@ -569,7 +569,7 @@ const Pill: React.FC<{ children: React.ReactNode; highlight?: boolean }> = ({ ch
 const TransformBtn: React.FC<{ label: string; hint: string; onClick: () => void }> = ({ label, hint, onClick }) => (
   <button
     onClick={onClick}
-    className="text-left rounded-lg border border-white/10 bg-neutral-800 hover:border-[color:var(--color-brand)]/60 hover:bg-[color:var(--color-brand-muted)]/30 px-2.5 py-1.5 transition active:scale-[0.98]"
+    className="text-left rounded-lg border border-white/10 bg-neutral-800 hover:border-purple-500/60 hover:bg-purple-900/30 px-2.5 py-1.5 transition"
   title={hint}
   >
     <div className="text-xs font-bold text-neutral-100">{label}</div>

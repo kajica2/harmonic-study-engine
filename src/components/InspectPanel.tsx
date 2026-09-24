@@ -84,7 +84,7 @@ export const InspectPanel: React.FC<Props> = ({
   return (
     <div className="bg-[color:var(--color-bg-1)] border border-[color:var(--color-border)] rounded-[var(--radius-lg)] p-3 mt-3">
       <div className="flex flex-wrap items-center gap-2 mb-2">
-        <GitCompareArrows size={14} className="text-[color:var(--color-brand-strong)]" />
+        <GitCompareArrows size={14} className="text-purple-400" />
         <span className="text-xs uppercase tracking-widest text-neutral-400 font-bold">
           Inspect · bar {Math.floor(activeStepIndex / 4) + 1} · step {activeStepIndex + 1}
         </span>
@@ -122,18 +122,18 @@ export const InspectPanel: React.FC<Props> = ({
                 onStopChord(prevNotes);
                 onPlayChord(c.notes);
               }}
-              className={`text-left rounded-lg p-2 border transition active:scale-[0.98] flex items-start gap-2 ${
+              className={`text-left rounded-lg p-2 border transition flex items-start gap-2 ${
                 isActive
-                  ? "border-[color:var(--color-brand)] bg-[color:var(--color-brand)]/30"
+                  ? "border-purple-500 bg-purple-700/30"
                   : showCompare
                   ? "border-emerald-500/40 bg-emerald-700/10"
-                  : "border-white/10 bg-white/5 hover:border-[color:var(--color-brand)]/40"
+                  : "border-white/10 bg-white/5 hover:border-purple-500/40"
               }`}
               title={`Preview the ${c.label.toLowerCase()} voicing in isolation`}
             >
               <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold ${isActive ? "text-[color:var(--color-brand-strong)]" : "text-neutral-200"}`}>
+                  <span className={`text-xs font-bold ${isActive ? "text-purple-200" : "text-neutral-200"}`}>
                     {c.label}
                   </span>
                   {c.kind === "original" && (
@@ -157,12 +157,12 @@ export const InspectPanel: React.FC<Props> = ({
               {/* Per-voicing play icon — visually says "tap to hear only this voicing" */}
               <span
                 aria-label={`Play ${c.label} voicing`}
-                className="self-center px-2 py-1 rounded bg-[color:var(--color-brand-muted)]/40 text-[color:var(--color-brand-strong)] hover:bg-[color:var(--color-brand-muted)]/60"
+                className="self-center px-2 py-1 rounded bg-purple-700/40 text-purple-200 hover:bg-purple-700/60"
               >
                 <Play size={12} />
               </span>
               {isActive && (
-                <span className="text-[10px] font-mono text-[color:var(--color-brand-strong)] self-center">active</span>
+                <span className="text-[10px] font-mono text-purple-400 self-center">active</span>
               )}
             </button>
           );
@@ -181,7 +181,7 @@ export const InspectPanel: React.FC<Props> = ({
         </button>
         <button
           onClick={audition}
-          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-strong)] text-[color:var(--color-text-inverse)] active:scale-95 transition-all"
+          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-mono bg-purple-600 hover:bg-purple-500 text-white"
           title="Replay the currently selected voicing in isolation"
         >
           <Play size={12} /> Preview voicing
