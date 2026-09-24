@@ -40,7 +40,7 @@ export const MelodyToolbar: React.FC<MelodyToolbarProps> = ({
         disabled={disabled}
         title="Suggest a melody for the active bar (genre-neutral Markov chain)"
         aria-label="Suggest melody"
-        className="flex items-center gap-1 px-2 py-1 text-[11px] font-mono rounded border border-purple-800/60 bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-1 px-2 py-1 text-[11px] font-mono rounded border border-[color:var(--color-brand)]/60 bg-[color:var(--color-brand-muted)]/40 hover:bg-[color:var(--color-brand-muted)]/60 text-[color:var(--color-brand-strong)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
       >
         <Sparkles size={11} aria-hidden="true" />
         Suggest

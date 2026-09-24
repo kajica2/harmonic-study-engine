@@ -46,8 +46,8 @@ describe("FormPlanner", () => {
     // Bar 10 is in section A (idx 1, bars 8-15) since each section is 8 bars.
     render(<FormPlanner plan={PLAN} activeBar={10} />);
     const blocks = screen.getAllByRole("listitem");
-    expect(blocks[1].className).toContain("bg-purple-700/50");
-    expect(blocks[0].className).not.toContain("bg-purple-700/50");
+    expect(blocks[1].className).toContain("bg-[color:var(--color-brand)]/50");
+    expect(blocks[0].className).not.toContain("bg-[color:var(--color-brand)]/50");
   });
 
   it("calls onBarClick with the section's start bar", () => {

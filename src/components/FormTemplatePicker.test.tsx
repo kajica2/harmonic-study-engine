@@ -25,7 +25,7 @@ describe("FormTemplatePicker", () => {
     // The text node is inside the button; query the button by aria-label
     const aabaBtn = screen.getByRole("button", { name: /AABA/i });
     expect(aabaBtn.getAttribute("aria-pressed")).toBe("true");
-    expect(aabaBtn.className).toContain("bg-purple-900/40");
+    expect(aabaBtn.className).toContain("bg-[color:var(--color-brand-muted)]/40");
   });
 
   it("inactive cards have aria-pressed=false", () => {
