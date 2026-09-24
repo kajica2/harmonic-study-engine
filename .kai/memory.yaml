@@ -79,3 +79,10 @@ active_prevention_rules:
   - id: "PHASE-3-04"
     when: "Wiring a new consumer to index math over generated data"
     action: "Re-derive the units convention (steps vs bars) from the PRODUCER, never inherit formulas from a spec doc that may contradict its own audit findings - the docs agent caught the activeBar divide-by-4 bug that code review missed because docs read the code line-by-line."
+
+  - id: "PHASE-4-01"
+    when: "A debounced/async writer feeds state that a boot reader consumes (URL sync, persistence restore)"
+    action: "Flush the writer synchronously on pagehide AND make the boot reader merge field-wise (URL wins only for PRESENT keys under shared identity), never wholesale-restore. A stale debounced write will otherwise clobber fresher persisted state - HIGH-001 flaked e2e ~50-70% before this rule."
+  - id: "PHASE-4-02"
+    when: "An async render .then arm can resolve after content-change, stop(), or unmount (phantom/ghost audio)"
+    action: "Capture a generation token at render start; .then arms check token identity + guard .catch. Pin with flip-then-resolve tests (markRendering -> change content -> resolve -> playMix NOT called). Same shape as S3 handlePreview - check both arms."
