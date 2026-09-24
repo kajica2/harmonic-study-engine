@@ -84,13 +84,16 @@ Generate and Randomize both go through the same accept path
   `etu-etu-<hash>`) and **prepended to the Paths list as the active
   path**. It is deduped by id, so generating the same seed twice does
   not clutter the list.
-- Playback, whole-path looping, the metronome (including the slice-3
+- Playback, whole-path looping, **section loop ranges** (shift+click
+  start/end bars), the metronome (including the slice-3
   click-settings popover and count-in -- `docs/PRACTICE-MECHANICS.md`),
   key-cycle, WAV / MIDI export: everything works on it exactly like
-  a curated path, because it flows through the existing chain. The
-  one exception is **section loop ranges** (shift+click start/end
-  bars), which are unreliable on generated etudes -- see the caveat
-  under "Not yet". The backing chords sound; the generated **melody
+  a curated path, because it flows through the existing chain.
+  Section loops are honest on etude paths: F3 (Phase 7 S1, D110 --
+  the former open product decision, now CLOSED) made the transport
+  1 step = 1 bar with form-relative windows, and an etude practice
+  path carries ONE step per bar -- so a 4-bar selection plays those
+  4 bars. The backing chords sound; the generated **melody
   does not play yet** -- in this slice it is notation + piano roll
   only (see "Not yet").
 - Accept **resets transposition**: global offset to 0, per-exercise
@@ -221,15 +224,6 @@ Full map in `docs/MODES.md`:
 
 ## Not yet (follow-ups)
 
-- **Section loop ranges are unreliable on generated etudes.** The
-  sub-range loop math (start/end bars set via shift+click) assumes
-  four steps per bar, while an etude practice path carries ONE step
-  per bar -- so a range lands on the wrong window instead of the
-  bars you picked. Whole-path looping is unaffected. This predates
-  slice 3 and is an open product decision (F3 / D41 in
-  `docs/PHASE-3-SLICE3.md`, tracked in the Phase 3 table of
-  `FUTURE_PLANNING.md`), not something slice 3 silently fixed.
-  Until it resolves, loop the etude as a whole.
 - **Melody audio**: the generated melody is notation + piano roll
   only. Playback is the chord backing through the existing chain; the
   tune's melody line does not sound. Formally deferred (TD-034):

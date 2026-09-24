@@ -5,8 +5,10 @@ import {
 } from "./sheetMusicExport";
 import type { HarmonicPath } from "./paths";
 
-// Minimal fixture path: 8 steps (2 bars at STEPS_PER_BAR=4), C major
-// triad repeated. Mirrors how the engine builds practice paths.
+// Minimal fixture path: 8 steps = 8 BARS of audio truth (F3, D110:
+// 1 step = 1 bar; the old "2 bars at STEPS_PER_BAR=4" reading was the
+// retired labeling fiction). C x4 then G x4 - no smaller repeating
+// period, so detectFormPeriod returns 8.
 const FIXTURE_PATH: HarmonicPath = {
   id: "test-path",
   title: "Test C Major",
@@ -35,16 +37,22 @@ vi.mock("svg2pdf.js", () => ({
 vi.mock("jspdf", () => {
   // A class (not an arrow factory) so `new jsPDF()` is legal — mocks
   // that return arrow functions are not constructible under vitest 5.
+  // F3: the mock also RECORDS cover-page text() calls so the
+  // Bars/Active-bar pins below can assert honest form-relative
+  // numbers. The recorder rides the mocked module's exports.
+  const textCalls: string[][] = [];
   class MockJsPDF {
     setFont(): void {}
     setFontSize(): void {}
-    text(): void {}
+    text(...args: unknown[]): void {
+      textCalls.push(args.map((a) => String(a)));
+    }
     addPage(): void {}
     output(): Blob {
       return new Blob(["fake pdf"], { type: "application/pdf" });
     }
   }
-  return { default: MockJsPDF };
+  return { default: MockJsPDF, __textCalls: textCalls };
 });
 
 // jsdom doesn't ship URL.createObjectURL/revokeObjectURL — polyfill
@@ -96,9 +104,28 @@ describe("sheetMusicExport", () => {
       path: FIXTURE_PATH,
       instrument: "C",
       composerName: "Test",
-      activeStepIndex: 4, // bar 2
+      activeStepIndex: 4, // bar 5 (F3: 1 step = 1 bar)
     });
     expect(blob).toBeInstanceOf(Blob);
+  });
+
+  it("F3 (D110): cover page counts TRUE form bars, not steps/4", async () => {
+    const { exportSheetMusicPDF } = await import("./sheetMusicExport");
+    await exportSheetMusicPDF({
+      path: FIXTURE_PATH,
+      instrument: "C",
+      composerName: "Test",
+      activeStepIndex: 4,
+    });
+    const { __textCalls } = (await import("jspdf")) as unknown as {
+      __textCalls: string[][];
+    };
+    const texts = __textCalls.map((c) => c[0]);
+    // 8 steps, no smaller repeating period -> 8 honest form bars.
+    // The legacy math printed "Bars: 2" (ceil(8/4)) and
+    // "Active bar: 2" (floor(4/4)+1) - both wrong vs the audio.
+    expect(texts).toContain("Bars: 8");
+    expect(texts).toContain("Active bar: 5");
   });
 
   it("downloadSheetMusicPDF generates a slug filename", () => {

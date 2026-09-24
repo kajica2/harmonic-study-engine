@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   currentBarNumber,
+  formatBarReadout,
   formatChordReadout,
   formatGuideToneTally,
   formatStepEyebrow,
@@ -55,6 +56,30 @@ describe("formatChordReadout", () => {
     const p = makePath(Array(16).fill(0));
     // No time sig arg -> uses DEFAULT_TIME_SIG (4/4).
     expect(formatChordReadout(p, 0, "Cmaj7")).toBe("Bar 1/4 — Cmaj7");
+  });
+});
+
+describe("formatBarReadout (F3, D110/D112 - the honest form-relative law)", () => {
+  it("renders 1-based form bar / formLen at step 0", () => {
+    expect(formatBarReadout(16, 0, "Cmaj7")).toBe("Bar 1/16 — Cmaj7");
+  });
+
+  it("1 step = 1 bar: step 4 is bar 5, NOT bar 2 (the legacy /4)", () => {
+    expect(formatBarReadout(16, 4, "Fmaj7")).toBe("Bar 5/16 — Fmaj7");
+  });
+
+  it("wraps form-relative across padded repeats", () => {
+    // 96-step padded track of a 16-bar form: step 20 -> bar 5.
+    expect(formatBarReadout(16, 20, "Cmaj7")).toBe("Bar 5/16 — Cmaj7");
+    expect(formatBarReadout(16, 16, "Cmaj7")).toBe("Bar 1/16 — Cmaj7");
+  });
+
+  it("degenerate form lengths still show one bar", () => {
+    expect(formatBarReadout(0, 0, "Cmaj7")).toBe("Bar 1/1 — Cmaj7");
+  });
+
+  it("substitutes em-dash when the chord name is empty", () => {
+    expect(formatBarReadout(8, 2, "")).toBe("Bar 3/8 — —");
   });
 });
 

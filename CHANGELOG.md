@@ -426,6 +426,25 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **Section loops now play the bars you select (F3 transport honesty,
+  PRD-001 Phase 7 slice 1).** The loop-window math inside the measure
+  handler assumed the retired 4-steps-per-bar labeling; a 4-bar section
+  selection played 16 bars. Windows are now form-relative and 1:1
+  (bar = step), so a 4-bar selection plays exactly 4 bars - on curated
+  AND generated etude paths (closes the ETUDE-COMPOSER "unreliable"
+  carve-out). The bar strip and Position line show TRUE form bars (a
+  32-bar standard renders 32 cells, not 24); the redundant "Step"
+  segment is gone and the progress bar keeps tracking padded steps
+  (title explains). Loop ranges saved by older builds re-point once
+  under the corrected mapping. The practice clock phase-locks to the
+  transport via a per-bar reanchor (compound-meter durations honest:
+  6/8 no longer 2x), the runner tab advances one bar per bar (was 4x
+  fast), the WAV tile duration label is form-once + meter-aware
+  (matches the actual file, TD-019), and sheet-music PDF counts true
+  form bars. Frozen tests/ pins untouched; a new e2e leg
+  (practice-loop-window) is discriminative by construction - the
+  legacy math physically cannot pass it.
+
 - **Etude generation engine (PRD-001 Phase 3 slice 1)** -- pure
   TypeScript core, NOT yet user-facing (the constraint panel, adapter,
   and staff / piano-roll views are slice 2; practice + pedagogy

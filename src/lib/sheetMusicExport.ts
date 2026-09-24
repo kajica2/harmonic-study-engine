@@ -29,6 +29,9 @@ import { buildLeadSheetAbc } from "./leadSheet";
 import type { HarmonicPath } from "./paths";
 import type { InstrumentPitch } from "./scoreGenerator";
 import abcjs from "abcjs";
+// F3 (D110, blast-table #15): the cover page counts TRUE form bars.
+import { detectFormPeriod } from "./formPeriod";
+import { barOfStep, totalFormBars } from "../../engine/practice/windows";
 
 export interface SheetMusicExportArgs {
   /** The path to render. */
@@ -113,12 +116,15 @@ export async function exportSheetMusicPDF(
   if (path.key) {
     doc.text(`Key: ${path.key}`, 40, 150);
   }
-  doc.text(`Bars: ${Math.floor(path.steps.length / 4)}`, 40, 170);
+  // F3 (#15): 1 step = 1 bar of audio truth; the cover shows the
+  // FORM (padded repeats of the same bars are not extra bars).
+  const formLen = totalFormBars(detectFormPeriod(path.steps));
+  doc.text(`Bars: ${formLen}`, 40, 170);
   if (path.feel) {
     doc.text(`Feel: ${path.feel}`, 40, 190);
   }
   if (activeStepIndex !== undefined) {
-    doc.text(`Active bar: ${Math.floor(activeStepIndex / 4) + 1}`, 40, 210);
+    doc.text(`Active bar: ${barOfStep(activeStepIndex, formLen) + 1}`, 40, 210);
   }
 
   // Footer with timestamp + sheet music page count placeholder.

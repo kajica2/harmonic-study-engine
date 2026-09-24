@@ -175,6 +175,9 @@ import { IdeaBar } from "./components/IdeaBar";
 import { DirtyPromptModal } from "./components/DirtyPromptModal";
 import { useSessionStore as useNewSessionStore, resolveBootTranspose, SESSION_STORAGE_KEY } from "./state/sessionStore";
 import { ideaFromChord, isIdea } from "../engine/core/idea";
+// PRD-001 Phase 7 S1 (F3, D110): the pure bar<->step law for the
+// form-relative 1:1 loop windows.
+import { totalFormBars, windowStepRange } from "../engine/practice/windows";
 import { isModeShortcutModifierKey, classifyTransposeKey } from "./hooks/useKeyDown";
 // PRD-001 Phase 3 Slice 2: etude composer panel + engine adapter +
 // URL constraint serialization (D22/D24/D28).
@@ -1567,12 +1570,18 @@ function AppShell() {
       const useLoop = isLoopingRef.current && loopStartBar !== null;
       let next: number;
       if (useLoop) {
-        const totalBars = Math.ceil(path.steps.length / 4);
-        const fromStep = loopStartBar! * 4;
-        // Inclusive end bar; +1 because we want the wrap to land on
-        // the start of (loopEndBar + 1).
-        const toStep =
-          (Math.min(loopEndBar ?? totalBars - 1, totalBars - 1) + 1) * 4;
+        // F3 (D110): audio truth is 1 step = 1 bar (see
+        // docs/PHASE-7-PRACTICE.md section 1.1). Bars are
+        // form-relative; within the first pass the map is the
+        // identity. formLen comes from detectFormPeriod (same value
+        // the cycle-12 predicate uses). The legacy *4 was the
+        // labeling fiction; clamp/normalize lives in
+        // engine/practice/windows.ts.
+        const totalBars = totalFormBars(formLen);
+        const { fromStep, toStep } = windowStepRange(
+          { fromBar: loopStartBar!, toBar: loopEndBar ?? totalBars - 1 },
+          formLen,
+        );
         if (prev + 1 >= toStep) next = fromStep;
         else if (prev < fromStep) next = fromStep;
         else next = prev + 1;
@@ -1587,6 +1596,10 @@ function AppShell() {
       }
       activeStepIndexRef.current = next;
       setActiveStepIndex(next);
+      // F3 (D113): phase-anchor the visual rAF clock to the audio
+      // grid. One line, inside the existing handler, fires exactly
+      // once per bar - the transport owns step truth.
+      playbackClock.reanchor(next);
       // Cycle-all-12: advance iff the next index completes a form
       // pass (suppressed under a sub-range loop). The store dispatch
       // is QUEUED (microtask) so it never runs inside a React state
@@ -1687,7 +1700,11 @@ function AppShell() {
         void backingEngine.scheduleAhead(
           path.steps,
           stepIdx + 1,
-          Math.floor(stepIdx / 4),
+          // F3 (#16, KEEP-COSMETIC): barInLoop is a DEAD parameter
+          // (backingEngine.ts accepts it, never reads). Pass stepIdx
+          // - the legacy floor(stepIdx/4) was the window fiction.
+          // secPerBar stays 4/4-correct; compound fix rides TD-038.
+          stepIdx,
           startSec,
           secPerBar,
         );
@@ -2188,6 +2205,10 @@ function AppShell() {
       <PracticeHeader
         path={path}
         activeStepIndex={activeStepIndex}
+        // F3 (D112): the honest form-relative bar readout consumes
+        // formLen directly (additive prop; the frozen-pinned legacy
+        // helpers stay exported-unused in practiceHeader.ts).
+        formLen={formLen}
         chordName={transposeChordName(step.name ?? "", soundingShift)}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
@@ -2341,6 +2362,13 @@ function AppShell() {
         {/* Play Session Rail — guided workflow */}
         <PlaySessionRail
           paths={paths}
+          // F3 (D110): ONE derived bar unit for every user-facing bar
+          // number - formLen is computed once here (the same value
+          // the cycle-12 predicate uses), never recomputed per
+          // component. timeSignature feeds the TD-019 honest WAV
+          // duration label (meter-aware barSeconds).
+          formLen={formLen}
+          timeSignature={timeSignature}
           prependPath={(path) => {
             // Idempotent: don't prepend a duplicate.
             if (paths.some((x) => x.id === path.id)) return;
@@ -3718,7 +3746,8 @@ function AppShell() {
                       title={
                         isLooping
                           ? loopStartBar !== null
-                            ? `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / 4) - 1) + 1} — click to stop`
+                            ? // F3 (#2): form bars, not ceil(steps/4).
+                              `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1} — click to stop`
                             : "Looping whole path — click to stop"
                           : "Loop playback"
                       }
@@ -3726,7 +3755,7 @@ function AppShell() {
                     >
                       {isLooping
                         ? loopStartBar !== null
-                          ? `↻ Bars ${loopStartBar + 1}–${(loopEndBar ?? Math.ceil(path.steps.length / 4) - 1) + 1}`
+                          ? `↻ Bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1}`
                           : "↻ Loop"
                         : "○ Loop"}
                     </ToolChip>
@@ -4213,6 +4242,8 @@ function AppShell() {
                   activeStepIndex={activeStepIndex}
                   transposeShift={soundingShift}
                   tempo={tempo}
+                  // F3 (D110): the score window is 4 TRUE form bars.
+                  formLen={formLen}
                 />
               </Suspense>
               </div>

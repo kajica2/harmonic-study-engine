@@ -404,19 +404,21 @@ export function deriveBehavioralMarkers(
   persona: Persona | undefined,
 ): BehavioralMarker[] {
   const palette = persona?.colorPalette ?? ["#D4A857", "#8B6914", "#C9A227", "#5A5A5A"];
-  const totalBars = Math.ceil(path.steps.length / 4);
+  // F3 (D110, blast-table #9): ONE marker per STEP - 1 step = 1 bar of
+  // audio truth. The legacy ceil(n/4) grouping via slice(b*4, b*4+4)
+  // encoded the retired 1-step-per-BEAT labeling; the marker array
+  // MUST align 1:1 with the strip cells (rail indexes
+  // markers[barIdx], barIdx < formLen <= steps.length) or every cell
+  // mislabels. bass/pcs now come from steps[b] alone.
   const out: BehavioralMarker[] = [];
   let prevBarBass: number | null = null;
   let prevBarPcs: Set<number> | null = null;
-  for (let b = 0; b < totalBars; b++) {
-    const barSteps = path.steps.slice(b * 4, b * 4 + 4);
-    const bassNotes = barSteps
-      .map((s) => (s.notes.length ? Math.min(...s.notes) : null))
-      .filter((n): n is number => n !== null);
-    const bass = bassNotes.length ? bassNotes[0] : null;
+  for (let b = 0; b < path.steps.length; b++) {
+    const step = path.steps[b];
+    const bass = step && step.notes.length ? Math.min(...step.notes) : null;
     const bassFrozen = bass !== null && bass === prevBarBass;
     const pcs = new Set<number>();
-    for (const s of barSteps) for (const n of s.notes) pcs.add(n % 12);
+    if (step) for (const n of step.notes) pcs.add(n % 12);
     let isMotifTransformation = false;
     if (prevBarPcs !== null) {
       // Transformation = either same root set with new voicing, or a

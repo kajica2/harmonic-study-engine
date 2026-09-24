@@ -16,17 +16,16 @@ import {
 } from "./guideTones";
 import type { HarmonicPath, HarmonicStep } from "./paths";
 
-/** Build a path of N bars where bar i has the given chord notes. */
+/** Build a path of N bars where bar i has the given chord notes.
+ *  F3 (D110): 1 step = 1 bar - one step per authored bar. */
 function pathFromBars(bars: number[][]): HarmonicPath {
   const steps: HarmonicStep[] = [];
   for (const barNotes of bars) {
-    for (let beat = 0; beat < 4; beat++) {
-      steps.push({
-        name: `bar-${steps.length / 4}`,
-        notes: barNotes,
-        descriptions: "",
-      });
-    }
+    steps.push({
+      name: `bar-${steps.length}`,
+      notes: barNotes,
+      descriptions: "",
+    });
   }
   return {
     id: "test",
@@ -49,7 +48,7 @@ const Cmaj9 = [48, 52, 55, 59, 62]; // C E G B D — has 3rd, 7th, and 9th
 const Ebmaj7 = [51, 55, 58, 62]; // Eb G Bb D — 3rd=G (4), 7th=D (11)
 
 describe("gtTargetsForPath", () => {
-  it("returns one entry per bar (4 steps = 1 bar)", () => {
+  it("returns one entry per STEP (F3: 1 step = 1 bar)", () => {
     const path = pathFromBars([[48, 52, 55], [48, 52, 55]]); // 2 bars
     expect(gtTargetsForPath(path)).toHaveLength(2);
   });
@@ -156,15 +155,15 @@ describe("gtTargetsForPath", () => {
     expect(t.targets).toEqual([]);
   });
 
-  it("uses the first step of each bar (matches formatChordReadout convention)", () => {
-    // Bar 0 = Dm7 (guide tones), Bar 1 = Cmaj7 then changes to Ebmaj7
-    // at the 3rd beat. The bar's target reflects Dm7 only — the
-    // mid-bar chord change isn't a separate target slot. This is
-    // intentional: one target per bar, aligned to the bar readout.
+  it("classifies EVERY step on its own (F3: no more first-step-wins)", () => {
+    // The legacy model took ONE target per 4 steps (the first step's
+    // chord "won" the bar). F3 (D110) retires that: every step is its
+    // own bar, so a mid-"bar" change now gets its own slot. Steps:
+    // Dm7, Dm7, C5, Dm7, Cmaj7, Cmaj7, Ebmaj7, Cmaj7.
     const steps: HarmonicStep[] = [
       { name: "Dm7-a", notes: Dm7, descriptions: "" },
       { name: "Dm7-b", notes: Dm7, descriptions: "" },
-      { name: "Dm7-c", notes: Dm7, descriptions: "" },
+      { name: "C5-c", notes: C5, descriptions: "" },
       { name: "Dm7-d", notes: Dm7, descriptions: "" },
       { name: "Cmaj7-a", notes: Cmaj7, descriptions: "" },
       { name: "Cmaj7-b", notes: Cmaj7, descriptions: "" },
@@ -178,8 +177,11 @@ describe("gtTargetsForPath", () => {
       steps,
     };
     const targets = gtTargetsForPath(path);
+    expect(targets).toHaveLength(8);
     expect(targets[0]?.targets).toEqual(["3rd", "7th"]); // Dm7
-    expect(targets[1]?.targets).toEqual(["3rd", "7th"]); // Cmaj7 (first step)
+    expect(targets[2]?.hasGuideTone).toBe(false); // C5 - its own slot
+    expect(targets[2]?.targets).toEqual([]);
+    expect(targets[6]?.targets).toEqual(["3rd", "7th"]); // Ebmaj7
   });
 });
 

@@ -128,6 +128,25 @@ take window includes the pre-roll beats. The recorder captures
 note events, not audio, and the click left the recording tap anyway
 -- no artifact in your recording.
 
+## Section loop (F3 transport truth)
+
+The transport fires once per BAR and advances exactly one path step
+per firing, so **1 step = 1 bar of audio** for every path and every
+meter. F3 (Phase 7 S1, D110 in `docs/PHASE-7-PRACTICE.md`) made every
+user-facing bar number honest to that truth:
+
+- Shift-click bars 5 and 8 in the bar strip and the loop plays bars
+  5-8 -- four bars, not the sixteen the legacy `* 4` math played.
+- The strip and Position line show TRUE form bars (a 32-bar standard
+  padded to 96 steps renders 32 cells, not 24; the progress bar still
+  tracks the padded step position).
+- Etude section loops work (the "Not yet" carve-out above is closed;
+  ADR-016's open F3 decision is resolved).
+- Loop ranges saved by builds BEFORE F3 refer to different bars under
+  the corrected mapping -- re-pick once after updating.
+- The click is unaffected by window selection: metronome truth lives
+  in `rhythmEngine.playStep`, which no window math ever gates.
+
 ## Print
 
 The etude views section has a **Print** button (browser print, no
@@ -188,18 +207,13 @@ path exists for future registry entries.
 - **Annotation surfaces on Compose / Explore**: only the Etude
   portion of REQ-PED-4 ships; the other hosts wait for their
   surfaces to land.
-- **Section loop ranges on generated etudes are unreliable** -- the
-  start/end-bar loop math assumes four steps per bar while etude
-  paths carry one step per bar, so a range loops the wrong window
-  (whole-path looping is fine). Open product decision; see
-  `docs/ETUDE-COMPOSER.md` ("Not yet") and the Phase 3 table in
-  `FUTURE_PLANNING.md`.
 - **Etude melody audio**: the generated melody is notation + roll
   only; playback is the chord backing (TD-034, formally deferred).
 
 ## Where to look
 
-- Design: `docs/PHASE-3-SLICE3.md` (D32-D44)
+- Design: `docs/PHASE-3-SLICE3.md` (D32-D44); F3 transport truth:
+  `docs/PHASE-7-PRACTICE.md` (D110-D113)
 - Popover UI: `src/components/MetronomeControls.tsx`; gear button +
   popover host: `src/components/PracticeHeader.tsx`
 - Click math (pure): `src/lib/metronomePatterns.ts` -- the
@@ -208,6 +222,9 @@ path exists for future registry entries.
   (`metronomeGain -> compressor`, presets, `scheduleMetronomeClick`)
 - Grid consumer: `src/lib/rhythm.ts` (`setMetronomePattern`; the
   16th grid itself is untouched)
+- Bar<->step law (pure, F3): `engine/practice/windows.ts`
+  (`barOfStep`, `windowStepRange`, `clampWindow`); design authority
+  `docs/PHASE-7-PRACTICE.md` (D110-D113)
 - Count-in: sequence `src/lib/countIn.ts`, timer
   `src/hooks/useCountIn.ts`, visible overlay
   `src/components/CountInOverlay.tsx`, gate `requestPlayState` in

@@ -293,14 +293,17 @@ describe("deriveBehavioralMarkers", () => {
     };
   }
 
-  it("returns one marker per bar", () => {
+  it("returns one marker per step (F3, D110: 1 step = 1 bar)", () => {
     const path = makePath([
       { name: "C", notes: [60] },
       { name: "C", notes: [60] },
       { name: "C", notes: [60] },
       { name: "C", notes: [60] },
     ]);
-    expect(deriveBehavioralMarkers(path, undefined)).toHaveLength(1);
+    // The legacy ceil(n/4) grouping returned 1 for four steps; the
+    // honest per-step law returns one marker per STEP so the rail's
+    // markers[barIdx] aligns with the strip cells.
+    expect(deriveBehavioralMarkers(path, undefined)).toHaveLength(4);
   });
 
   it("first bar is never a transformation (no prior bar to compare)", () => {
@@ -318,8 +321,11 @@ describe("deriveBehavioralMarkers", () => {
     expect(markers[0].isMotifTransformation).toBe(false);
   });
 
-  it("detects frozenBass when bass carries unchanged across bars", () => {
-    // 8 steps = 2 bars. Bar 0 bass=48, bar 1 bass=48 → frozen.
+  it("detects frozenBass when bass carries unchanged across steps (F3: steps are bars)", () => {
+    // 8 steps = 8 bars (1:1). Step 0 bass=48, step 1 bass=48 -> frozen.
+    // The legacy model compared 4-step GROUPS; the honest law compares
+    // consecutive STEPS (test plan: "frozenBass compares consecutive
+    // STEPS not 4-step groups").
     const path = makePath([
       { name: "Cm", notes: [48, 51, 55] },
       { name: "Cm", notes: [48, 51, 55] },
@@ -334,9 +340,11 @@ describe("deriveBehavioralMarkers", () => {
     expect(markers[1].bassFrozen).toBe(true);
   });
 
-  it("detects motif transformation when bar re-voices prior content", () => {
-    // Bar 0: Cmaj7 [60,64,67,71]. Bar 1: C7 [60,64,67,70] — 3 shared pcs,
-    // 1 new (Bb). Should mark as transformation.
+  it("detects motif transformation when a step re-voices prior content", () => {
+    // Steps 0-3: Cmaj7 [60,64,67,71]. Steps 4-7: C7 [60,64,67,70] -
+    // 3 shared pcs, 1 new (Bb). F3: markers are per step, so the
+    // transformation lands at the FIRST differing step (index 4),
+    // not at the old 4-step "bar 1".
     const path = makePath([
       { name: "Cmaj7", notes: [60, 64, 67, 71] },
       { name: "Cmaj7", notes: [60, 64, 67, 71] },
@@ -348,7 +356,7 @@ describe("deriveBehavioralMarkers", () => {
       { name: "C7", notes: [60, 64, 67, 70] },
     ]);
     const markers = deriveBehavioralMarkers(path, undefined);
-    expect(markers[1].isMotifTransformation).toBe(true);
+    expect(markers[4].isMotifTransformation).toBe(true);
   });
 
   it("cycles accentHex from persona.colorPalette across bars", () => {
@@ -384,7 +392,7 @@ describe("deriveBehavioralMarkers", () => {
     expect(markers[0].accentHex).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 
-  it("sets motifRepeat=true on every bar when path.sliceAndRepeat is true", () => {
+  it("sets motifRepeat=true on every step when path.sliceAndRepeat is true", () => {
     const path: any = {
       steps: [
         { name: "C", notes: [60, 64, 67] },
@@ -399,7 +407,8 @@ describe("deriveBehavioralMarkers", () => {
       sliceAndRepeat: true,
     };
     const markers = deriveBehavioralMarkers(path, undefined);
-    expect(markers).toHaveLength(2);
+    // F3: one marker per STEP (was ceil(n/4) = 2 "bars").
+    expect(markers).toHaveLength(8);
     expect(markers[0].motifRepeat).toBe(true);
     expect(markers[1].motifRepeat).toBe(true);
     expect(markers[0].hint).toContain("◷");

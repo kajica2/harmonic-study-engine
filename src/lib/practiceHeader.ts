@@ -10,6 +10,8 @@ import { stepsPerBar } from "./loopWav";
 import { transitionsMissed, type GuideToneTrail } from "./guideToneTrail";
 import type { HarmonicPath } from "./paths";
 import type { TimeSignature } from "./rhythm";
+// F3 (D110): the ONE honest bar<->step law.
+import { barOfStep, totalFormBars } from "../../engine/practice/windows";
 
 /**
  * Default time signature — used when the active step has no
@@ -19,7 +21,37 @@ import type { TimeSignature } from "./rhythm";
 const DEFAULT_TIME_SIG: TimeSignature = "4/4";
 
 /**
+ * F3 (D112): the honest, form-relative bar readout. 1 path step =
+ * 1 bar of audio truth; bars are form-relative (formLen =
+ * detectFormPeriod(path.steps), computed once in App and passed
+ * down). Replaces formatChordReadout in PracticeHeader WITHOUT
+ * touching it: the legacy helpers below stay exported because the
+ * FROZEN tests/practiceHeader.test.ts pins them (D112 -
+ * exported-but-dead, removal is TD-050 when the tests/ freeze
+ * lifts). The frozen tests never import this function.
+ *
+ * Example outputs:
+ *   "Bar 5/32 — Eb/F (F9sus)"   (32-bar form, step 4)
+ *   "Bar 1/16 — Cmaj7"          (step 16 wraps to the form head)
+ */
+export function formatBarReadout(
+  formLen: number,
+  activeStepIndex: number,
+  chordName: string,
+): string {
+  const total = totalFormBars(formLen);
+  const current = barOfStep(activeStepIndex, total) + 1;
+  return `Bar ${current}/${total} — ${chordName || "—"}`;
+}
+
+/**
  * Render the bar-and-chord readout that appears in the PracticeHeader.
+ *
+ * LEGACY (D112, F3): 1-step-per-BEAT bar math. DEAD IN THE APP -
+ * PracticeHeader switched to formatBarReadout (the honest form-
+ * relative law). Kept exported ONLY because the frozen
+ * tests/practiceHeader.test.ts pins this exact behavior; removal is
+ * TD-050. Do not adopt for new call sites.
  *
  * Example outputs:
  *   "Bar 2/14 — Eb/F (F9sus)"
@@ -51,6 +83,10 @@ export function formatChordReadout(
  * Compute the bar number (1-based) for the active step.
  * Exposed so the PracticeHeader can render a thin progress indicator
  * without re-deriving the same math.
+ *
+ * LEGACY (D112, F3): dead in the app - frozen-pinned by
+ * tests/practiceHeader.test.ts, kept exported for the pin; removal
+ * is TD-050. New call sites use formatBarReadout.
  */
 export function currentBarNumber(
   path: HarmonicPath | undefined,

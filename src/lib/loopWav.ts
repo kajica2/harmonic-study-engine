@@ -262,6 +262,30 @@ export function barSeconds(tempo: number, meter: string): number {
 }
 
 /**
+ * TD-019 + Phase 7 S1 fix-round (LOW-3/GAP-e): the honest
+ * expected-duration LABEL for a one-form WAV render, as a pure
+ * function of (formLen, tempo, meter). The renderer outputs
+ * formLen * barSeconds of content (renderPathToWav detects the form
+ * period itself); the CommitStage label must agree - the legacy
+ * steps*(60/tempo)*4 over-predicted ~3x on padded paths and was
+ * meter-blind. Extracted from PlaySessionRail so the math is
+ * unit-pinned (4/4 + 6/8) instead of trapped in JSX. (The render's
+ * +1.25s release tail is deliberately NOT in the label - the "~"
+ * absorbs it, same as before the extraction.)
+ *
+ * Rounding: one decimal, half-up via Math.round(x*10)/10; integral
+ * values render without a trailing ".0" (Number -> String).
+ */
+export function formatLoopDurationLabel(
+  formLen: number,
+  tempo: number,
+  meter: string,
+): string {
+  const sec = Math.round(formLen * barSeconds(tempo, meter) * 10) / 10;
+  return `~${sec}s`;
+}
+
+/**
  * Render shapes for the loop WAV export.
  *  - block:           every chord as one block (sustained for the full bar).
  *  - arp:             every chord broken into a sweeping arpeggio.

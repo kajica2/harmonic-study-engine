@@ -8,7 +8,9 @@ import { midiToName, analyzeChord, type BehavioralMarker } from "../lib/theory";
 import { applyFilter, EMPTY_FILTER, type PathFilterState } from "../lib/pathFilters";
 import { PathFilterBar } from "./PathFilterBar";
 import { NOTE_NAMES } from "../lib/theory";
-import { RenderMode } from "../lib/loopWav";
+import { RenderMode, formatLoopDurationLabel } from "../lib/loopWav";
+// F3 (D110): the rail consumes the ONE honest bar<->step law.
+import { barOfStep, totalFormBars } from "../../engine/practice/windows";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { InspectPanel } from "./InspectPanel";
@@ -31,6 +33,12 @@ type Stage = "choose" | "perform" | "commit" | "masterclass";
 
 interface RailProps {
   paths: HarmonicPath[];
+  /** F3 (D110): detectFormPeriod(activePath.steps) - computed ONCE
+   *  in App and passed down; the single bar unit for strip cells,
+   *  the Position line, loop ranges and the guide-tone row. */
+  formLen: number;
+  /** TD-019: meter for the honest WAV-duration label (barSeconds). */
+  timeSignature: string;
   /** Prepend a path to the user's paths list (used by the masterclass
    *  picker when the user picks a study song that's not in their list). */
   prependPath: (path: HarmonicPath) => void;
@@ -185,6 +193,7 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
       {stage === "perform" && (
         <PerformStage
           path={p.activePath}
+          formLen={p.formLen}
           isPlayingAuto={p.isPlayingAuto}
           setIsPlayingAuto={p.setIsPlayingAuto}
           isLooping={p.isLooping}
@@ -211,7 +220,8 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
       )}
       {stage === "commit" && (
         <CommitStage
-          path={p.activePath}
+          formLen={p.formLen}
+          meter={p.timeSignature}
           onCommit={p.onCommit}
           onExportMidi={p.onExportMidi}
           onExportWav={p.onExportWav}
@@ -540,6 +550,8 @@ const ChooseStage: React.FC<{
 
 const PerformStage: React.FC<{
   path: HarmonicPath;
+  /** F3 (D110): form-relative bar unit, computed once in App. */
+  formLen: number;
   isPlayingAuto: boolean;
   setIsPlayingAuto: (v: boolean) => void;
   isLooping: boolean;
@@ -564,6 +576,7 @@ const PerformStage: React.FC<{
   onCommitVoicing: (stepIndex: number, notes: number[]) => void;
 }> = ({
   path,
+  formLen,
   isPlayingAuto, setIsPlayingAuto,
   isLooping, setIsLooping,
   loopStartBar = null, loopEndBar = null, setLoopBar,
@@ -573,24 +586,25 @@ const PerformStage: React.FC<{
   activeStepIndex, setActiveStepIndex,
   optimizedStepsNotes, behavioralMarkers, onPlayChord, onStopChord, onCommitVoicing,
 }) => {
-  // TD-035 DOCUMENTED (D41): the /4 bar math below is the legacy 4-
-  // steps-per-bar path model. On one-step-per-bar etude paths the
-  // currentBar label lags 4x and the shift-click range-set UI feeds
-  // the F3 loop-math window (the sacred onMeasureStart handler uses
-  // the SAME bar->step model). A label-only fix here would CREATE an
-  // inconsistency with that handler - the pair must be fixed
-  // together in the transport follow-up (F3 USER-DECISION). Not
-  // touched in slice 3. See docs/PHASE-3-SLICE3.md D41.
-  const totalBars = Math.ceil(path.steps.length / 4);
-  const currentBar = Math.floor(activeStepIndex / 4) + 1;
+  // F3 (D110): bars are FORM-relative and 1:1 with steps (1 step = 1
+  // bar of audio truth). The legacy ceil(steps/4) + floor(step/4) pair
+  // (the TD-035/D41 "fix them together" comment block) is replaced by
+  // the single windows.ts law; formLen arrives as a prop from App.
+  const totalBars = totalFormBars(formLen);
+  const currentBar = barOfStep(activeStepIndex, formLen) + 1;
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Path-level guide-tone coverage map (raw canonical chord intent —
-  // first step per bar, not post-voicing sonority). Memoized on path so
-  // transpose/persona/loop changes never recompute it.
+  // one target per STEP now, F3 #8; the strip renders the first form
+  // pass, so the row consumes targets.slice(0, formLen)). Memoized on
+  // path so transpose/persona/loop changes never recompute it.
   const gtTargets = useMemo(() => gtTargetsForPath(path), [path]);
+  const gtTargetsForForm = useMemo(
+    () => gtTargets.slice(0, totalBars),
+    [gtTargets, totalBars],
+  );
   useEffect(() => {
-    if (gtTargets.length !== totalBars) {
+    if (gtTargets.length < totalBars) {
       console.warn(
         `[GtCoverageRow] target/bar mismatch: ${gtTargets.length} targets vs ${totalBars} bars for path ${path.id}`,
       );
@@ -666,11 +680,15 @@ const PerformStage: React.FC<{
         </div>
       )}
 
-      {/* Position / step indicator */}
+      {/* Position / step indicator — F3 (#4): Bar is the honest,
+          form-relative unit (1 step = 1 bar), so the legacy
+          "— Step s+1 / n" segment is dropped (it now duplicates the
+          Bar readout). The progressbar stays STEP-based on purpose:
+          it shows position within the full padded track. */}
       <div className="flex items-center gap-2 mb-3">
         <span className="text-xs font-mono text-neutral-400">Position</span>
         <span className="text-xs font-mono text-neutral-200">
-          Bar {currentBar} / {totalBars} — Step {activeStepIndex + 1} / {path.steps.length}
+          Bar {currentBar} / {totalBars}
         </span>
         {/* Progress bar */}
         <div
@@ -680,6 +698,7 @@ const PerformStage: React.FC<{
           aria-valuemin={0}
           aria-valuemax={path.steps.length}
           aria-valuenow={activeStepIndex + 1}
+          title={`Step ${activeStepIndex + 1} of ${path.steps.length} in the padded track (the ${totalBars}-bar form repeats ${Math.floor(path.steps.length / totalBars) || 1}x)`}
         >
           <div
             className="h-full bg-purple-500/70 transition-all duration-150"
@@ -716,7 +735,8 @@ const PerformStage: React.FC<{
       <div className="overflow-x-auto pb-2">
         <div className="flex items-stretch gap-1">
           {Array.from({ length: totalBars }).map((_, barIdx) => {
-                  const stepIdx = barIdx * 4;
+                  // F3 (#5): 1:1 - form bar b IS step b (first pass).
+                  const stepIdx = barIdx;
                   const chordName = path.steps[stepIdx]?.name ?? "";
                   const isActiveBar = currentBar === barIdx + 1;
                   // Build a one-line voicing preview for the active bar from the
@@ -831,9 +851,9 @@ const PerformStage: React.FC<{
                     proposal — circle (Tonic), triangle (Dominant), square
                     (Subdominant), paired with a letter so it's not color-only. */}
                 {(() => {
-                  // Use the bar's first step's notes for the function.
-                  const fn = path.steps[barIdx * 4]?.notes?.length
-                    ? analyzeChord(path.steps[barIdx * 4].notes).function
+                  // Use the bar's step notes for the function (F3: 1:1).
+                  const fn = path.steps[stepIdx]?.notes?.length
+                    ? analyzeChord(path.steps[stepIdx].notes).function
                     : "color";
                   if (fn === "tonic")
                     return <span className="text-[8px] font-mono text-neutral-400 flex items-center gap-0.5" title="Tonic — I" aria-label="Tonic">○<sub>T</sub></span>;
@@ -880,7 +900,7 @@ const PerformStage: React.FC<{
         })}
         </div>
         <GtCoverageRow
-          targets={gtTargets}
+          targets={gtTargetsForForm}
           loopStartBar={loopStartBar}
           loopEndBar={loopEndBar}
           currentBar={currentBar}
@@ -907,7 +927,12 @@ const PerformStage: React.FC<{
 };
 
 const CommitStage: React.FC<{
-  path: HarmonicPath;
+  /** F3 (D110, LOW-3): the form length computed ONCE in App
+   *  (detectFormPeriod(activePath.steps)) - passed down, never
+   *  recomputed here. */
+  formLen: number;
+  /** TD-019: meter for the honest WAV-duration label (barSeconds). */
+  meter: string;
   onCommit: () => void;
   onExportMidi: () => void;
   onExportWav: () => void;
@@ -921,15 +946,20 @@ const CommitStage: React.FC<{
   wavExportStatus?: string | null;
   onDismissWavExportError?: () => void;
 }> = ({
-  path,
+  formLen,
+  meter,
   onCommit, onExportMidi, onExportWav, isExportingWav,
   onOpenLeadSheet, onOpenInspector,
   tempo, wavMode, setWavMode,
   wavExportError, wavExportStatus, onDismissWavExportError,
 }) => {
-  // Compute expected duration so the user can verify the WAV will match
-  // the live loop length before exporting.
-  const expectedSec = Math.round(path.steps.length * (60 / tempo) * 4 * 10) / 10;
+  // TD-019 + fix-round LOW-3/GAP-e: honest expected duration from
+  // the PASSED formLen (no inline detectFormPeriod recompute). The
+  // math lives in loopWav.formatLoopDurationLabel - unit-pinned
+  // (4/4 + 6/8) next to barSeconds(), the same source the renderer
+  // uses. The legacy steps*(60/tempo)*4 over-predicted ~3x on padded
+  // paths and was meter-blind.
+  const loopDurLabel = formatLoopDurationLabel(formLen, tempo, meter);
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
       <button
@@ -946,7 +976,7 @@ const CommitStage: React.FC<{
             <FileDown size={20} className="text-cyan-400" />
             <div className="font-bold text-sm">{isExportingWav ? "Rendering WAV…" : "Export WAV"}</div>
             <div className="text-xs text-neutral-400">
-              Loop at {tempo} BPM · ~{expectedSec}s · browser-side render
+              Loop at {tempo} BPM · {meter} · {loopDurLabel} · browser-side render
             </div>
           </div>
           <select

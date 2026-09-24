@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play, Pause, Repeat, Drum, Settings2 } from "lucide-react";
 import {
-  formatChordReadout,
+  formatBarReadout,
   formatGuideToneTally,
   formatStepEyebrow,
   formatTempo,
@@ -44,6 +44,9 @@ import {
 interface PracticeHeaderProps {
   path: HarmonicPath;
   activeStepIndex: number;
+  /** F3 (D110/D112): detectFormPeriod(path.steps) from App - the
+   *  honest form-relative bar total for the readout. */
+  formLen: number;
   /** Display name of the chord (already transposed by caller). */
   chordName: string;
   timeSignature: TimeSignature;
@@ -110,6 +113,7 @@ const BACKING_STYLE_LABELS: Record<BackingStyle, string> = {
 export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   path,
   activeStepIndex,
+  formLen,
   chordName,
   timeSignature,
   chordNotes,
@@ -131,12 +135,10 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   scoreDisplayMode,
   onScoreDisplayModeChange,
 }) => {
-  const readout = formatChordReadout(
-    path,
-    activeStepIndex,
-    chordName,
-    timeSignature,
-  );
+  // F3 (D112): the honest form-relative readout. The legacy
+  // formatChordReadout stays exported-but-dead in practiceHeader.ts
+  // (frozen tests/practiceHeader.test.ts pins it - TD-050).
+  const readout = formatBarReadout(formLen, activeStepIndex, chordName);
   const eyebrow = formatStepEyebrow(path, activeStepIndex);
   const guideToneLabel = guideToneTrail
     ? formatGuideToneTally(guideToneTrail)

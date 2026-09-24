@@ -46,10 +46,21 @@ export interface HarmonicPath {
 // ---------------------------------------------------------------------------
 // Path length policy
 // ---------------------------------------------------------------------------
-// Each HarmonicStep is one BEAT (1/4 of a bar in 4/4). So
-// `path.steps.length / 4` is the bar count. We require every path to be
-// between MIN_PATH_BARS and MAX_PATH_BARS bars long, padded/trimmed at
-// module-load by `padPath()` below.
+// F3 TRUTH (D110, docs/PHASE-7-PRACTICE.md 1.1): the transport fires
+// onMeasureStart once per BAR and advances exactly one step per
+// firing - 1 HarmonicStep = 1 BAR of rendered audio, for every path
+// and every meter (formPeriod.ts states the same audio truth). The
+// old "each step is one BEAT" labeling was a fiction the loop math
+// inherited; it is RETIRED.
+//
+// The constants below are a LEGACY STEP-COUNT POLICY (D111), not bar
+// truth: MIN/MAX_PATH_BARS gate the PADDED STEP COUNT (bars x
+// STEPS_PER_BAR steps) that padPath() enforces at module load.
+// STEPS_PER_BAR stays (=4): padPath policy, the composer seeds
+// (TD-049 data-side), sliced persona visuals and the melody-lane
+// authoring surfaces (TD-035 remainder) all consume it. User-facing
+// BAR numbers are form-relative and 1:1 with steps - see
+// engine/practice/windows.ts. NO renames, NO behavior change here.
 
 export const STEPS_PER_BAR = 4;
 export const MIN_PATH_BARS = 24;

@@ -7,7 +7,10 @@ import { useTick } from "../lib/useTick";
 import { transposeChordName } from "../lib/theory";
 import { slicePathForRepeat, type BeatCell } from "../lib/sliceAndRepeat";
 import { TimeSignature } from "../lib/rhythm";
+// Sliced persona mode only (frozen helper table, blast-table #20).
 import { stepsPerBar } from "../lib/loopWav";
+// F3 (D110): the score window is measured in TRUE form bars.
+import { barOfStep, totalFormBars } from "../../engine/practice/windows";
 import type { ScoreDisplayMode } from "../lib/displayMode";
 
 
@@ -16,10 +19,13 @@ interface LiveScoreDisplayProps {
   activeStepIndex: number;
   transposeShift: number;
   tempo: number;
-  /** Time signature — used to compute the steps-per-bar ratio for
-   *  the 4-bar context window. Defaults to 4/4 for backward
-   *  compat (the component is also used in places that don't pass
-   *  a signature). */
+  /** F3 (D110): detectFormPeriod(path.steps), computed once in App.
+   *  The 4-bar context window + "now at bar" readout are in form
+   *  bars (1 form bar = 1 step = 1 bar of audio). */
+  formLen: number;
+  /** Time signature — drives the live beat badge ("Beat N of M").
+   *  Kept for backward compat (the component is also used in places
+   *  that don't pass a signature). */
   timeSignature?: TimeSignature;
   /** Display mode (full / zoom). When 'zoom', the score renders
    *  larger and the container gets a brand-colored ring so the
@@ -50,6 +56,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   activeStepIndex,
   transposeShift,
   tempo,
+  formLen,
   timeSignature = "4/4",
   displayMode = "full",
 }) => {
@@ -86,19 +93,27 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   // 1 bar after for context (4 bars total). Computed at render so
   // the JSX can display "Bars X-Y of N".
   //
-  // stepsPerBar used to be a hard-coded 4 — only correct for 4/4.
-  // Now derived from the active time signature via the shared
-  // helper in lib/loopWav. For 6/8 that's 6, for 7/8 it's 7, for
-  // 11/4 it's 11, for tintal it's 16.
-  const stepsPerBarValue = stepsPerBar(timeSignature);
-  const activeBar = Math.floor(activeStepIndex / stepsPerBarValue);
-  const totalBars = Math.ceil((path?.steps.length ?? 0) / stepsPerBarValue);
+  // F3 (D110, blast-table #10): the NON-sliced window is in TRUE
+  // form bars - 1 form bar = 1 step = 1 bar of audio (bars are
+  // form-relative; within the first pass the step map is the
+  // identity, so bar b slices step b). The sliced persona branch
+  // keeps its legacy 4-steps-per-bar motif grouping UNCHANGED
+  // (already honest for the slice-and-repeat semantic - the motif
+  // IS four steps). Meter-agnostic notation stays TD-038.
+  const isSliced = !!(path as { sliceAndRepeat?: boolean })?.sliceAndRepeat;
+  const spbLegacy = isSliced ? stepsPerBar(timeSignature) : 1;
+  const activeBar = isSliced
+    ? Math.floor(activeStepIndex / spbLegacy)
+    : barOfStep(activeStepIndex, formLen);
+  const totalBars = isSliced
+    ? Math.ceil((path?.steps.length ?? 0) / spbLegacy)
+    : totalFormBars(formLen);
   const windowBarStart = Math.max(0, activeBar - 1);
   const windowBarEnd = Math.min(totalBars, windowBarStart + 4);
-  const windowStepStart = windowBarStart * stepsPerBarValue;
+  const windowStepStart = isSliced ? windowBarStart * spbLegacy : windowBarStart;
   const windowStepEnd = Math.min(
     path?.steps.length ?? 0,
-    windowBarEnd * stepsPerBarValue,
+    isSliced ? windowBarEnd * spbLegacy : windowBarEnd,
   );
   const windowSteps =
     path?.steps.slice(windowStepStart, windowStepEnd) ?? [];
@@ -109,23 +124,36 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   // recurring motif becomes legible — same chord four times per bar
   // when the source data repeats, or per-beat variation when it
   // doesn't. The helper pads short bars with the last step.
-  const isSliced = !!(path as { sliceAndRepeat?: boolean })?.sliceAndRepeat;
   // Per-beat cells for the visible window, flattened. Index = beat
   // offset within the window (0..windowCells.length-1).
+  //
+  // F3: the non-sliced branch routes through the SAME beat-cell
+  // machinery - each window step expands into 4 identical quarter
+  // cells + one barline per step (slicePathForRepeat semantics:
+  // "same chord four times per bar"). Result: the score shows each
+  // bar's chord held a full bar = audio truth, without touching the
+  // abcjs layout code below.
   const windowCells: BeatCell[] = isSliced
     ? slicePathForRepeat(path?.steps ?? [])
         .slice(windowBarStart, windowBarEnd)
         .flat()
-    : [];
+    : windowSteps.flatMap((s) =>
+        [0, 1, 2, 3].map((beat) => ({
+          beat,
+          notes: [...s.notes],
+          chordName: s.name ?? "",
+        })),
+      );
 
-  // In sliced mode each cell IS one beat, so the window is `totalBars`
-  // × 4 cells long. The active-step highlight needs a different
-  // mapping: activeStepIndex / 4 = active bar; active beat = position
-  // within the bar (already encoded in cell.beat).
+  // In both modes each cell IS one beat, so the window is
+  // (windowBarEnd - windowBarStart) x 4 cells long. Sliced keeps the
+  // legacy step-derived mapping (unchanged); non-sliced highlights
+  // the first cell of the active form bar (the whole bar is the
+  // same chord - there is no sub-bar position in step truth).
   const activeCellIndex = isSliced
     ? (activeBar - windowBarStart) * 4 +
-      Math.max(0, activeStepIndex - activeBar * 4)
-    : activeStepIndex - windowStepStart;
+      Math.max(0, activeStepIndex - activeBar * spbLegacy)
+    : (activeBar - windowBarStart) * 4;
 
   useEffect(() => {
     if (!svgRef.current || !path) return;
@@ -137,21 +165,17 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
     abc += `Q:1/4=${tempo}\n`;
     abc += `K:C\n`;
 
-    // In sliced mode, iterate the beat cells (4 per bar); otherwise
-    // iterate the source steps (one per beat already). Same field
-    // shape (`notes` + `name`) so the rest of the rendering logic
-    // is identical.
-    const events: Array<{ notes: number[]; name: string; index: number }> = isSliced
-      ? windowCells.map((c, i) => ({
-          notes: c.notes,
-          name: c.chordName,
-          index: windowBarStart * 4 + i, // global beat index for the | separator
-        }))
-      : windowSteps.map((s, i) => ({
-          notes: s.notes,
-          name: s.name,
-          index: windowStepStart + i,
-        }));
+    // F3: BOTH modes iterate the beat cells (4 per bar) - the
+    // non-sliced branch's windowCells are the quarter-expansion of
+    // each step (same chord four times per bar = audio truth). Same
+    // field shape (`notes` + `name`) so the rest of the rendering
+    // logic is identical.
+    const events: Array<{ notes: number[]; name: string; index: number }> =
+      windowCells.map((c, i) => ({
+        notes: c.notes,
+        name: c.chordName,
+        index: windowBarStart * 4 + i, // global beat index for the | separator
+      }));
 
     if (clefLayout === "grand") {
       abc += `%%score { (T B) }\n`;
@@ -309,10 +333,10 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   useEffect(() => {
     if (!svgRef.current) return;
 
-    // Map global activeStepIndex to local 4-bar-window index. In sliced
-    // mode each cell IS one beat, so the offset is the cell index in
-    // the windowCells array; otherwise it's the step offset.
-    const localStepIndex = isSliced ? activeCellIndex : activeStepIndex - windowStepStart;
+    // F3: both modes are cell-based now - the local index is the
+    // active cell's offset within the window (sliced: step-derived
+    // legacy mapping; non-sliced: first cell of the active form bar).
+    const localStepIndex = activeCellIndex;
 
     // Reset previous highlights.
     const coloredElements = svgRef.current.querySelectorAll('[data-highlighted="true"]');
@@ -518,7 +542,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
         </span>
         {activeStepIndex >= 0 && (
           <span className="text-[color:var(--color-brand-strong)]">
-            ▍ now at bar {Math.floor(activeStepIndex / 4) + 1}
+            ▍ now at bar {activeBar + 1}
           </span>
         )}
       </div>

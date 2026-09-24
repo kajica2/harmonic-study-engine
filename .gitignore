@@ -20,6 +20,8 @@ playwright/.cache/
 
 # Vitest coverage HTML report (default `coverage/` dir from --coverage)
 /coverage/
+# Vitest cache (multi-project mode)
+.vitest/
 
 # Lockfile drift between system Python and the venv (if a dev runs
 # `pip freeze` on either side, the result differs).

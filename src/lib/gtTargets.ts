@@ -18,7 +18,7 @@
  * (slot → role by interval) so the coverage map and the live chip
  * agree on what counts as a guide tone.
  */
-import { STEPS_PER_BAR, type HarmonicPath, type HarmonicStep } from "./paths";
+import { type HarmonicPath, type HarmonicStep } from "./paths";
 import {
   intervalToRole,
   roleToGuideToneTarget,
@@ -27,7 +27,7 @@ import {
 export type GuideToneTargetKind = "3rd" | "7th";
 
 export interface GuideToneTarget {
-  /** 0-based bar index (path-wide, after padPath). */
+  /** 0-based bar index == step index (F3, D110: 1 step = 1 bar). */
   bar: number;
   /** True when the bar's chord voicing contains at least one 3rd or 7th. */
   hasGuideTone: boolean;
@@ -38,22 +38,24 @@ export interface GuideToneTarget {
 /**
  * Build the per-bar guide-tone coverage map for a HarmonicPath.
  *
- * Each bar = STEPS_PER_BAR consecutive steps. The bar's chord
- * voicing is the unique pitch-class set of its first step's notes
- * (matches the convention in formatChordReadout / currentBarNumber
- * — the first step represents the bar).
+ * F3 (D110, blast-table #8): ONE target per STEP over the full step
+ * list - 1 step = 1 bar of audio truth. Consumers that render the
+ * FORM slice to formLen (the rail does: targets.slice(0, formLen),
+ * first pass = form). The legacy STEPS_PER_BAR grouping encoded the
+ * retired 1-step-per-BEAT labeling fiction.
  *
- * Returns one entry per bar. Bars whose first step is empty (the
- * padPath "loop the form" filler can produce empty leading bars in
- * theory) get `hasGuideTone: false` and an empty `targets` array.
+ * Each step's chord voicing is its own unique pitch-class set (the
+ * old "first step represents the bar" convention it cited from
+ * formatChordReadout is itself frozen-pinned dead, D112).
+ *
+ * Steps with empty notes (rests / degenerate data) get
+ * `hasGuideTone: false` and an empty `targets` array.
  */
 export function gtTargetsForPath(path: HarmonicPath): GuideToneTarget[] {
-  const totalBars = Math.ceil(path.steps.length / STEPS_PER_BAR);
   const out: GuideToneTarget[] = [];
-  for (let bar = 0; bar < totalBars; bar++) {
-    const firstStepIdx = bar * STEPS_PER_BAR;
-    const step: HarmonicStep | undefined = path.steps[firstStepIdx];
-    out.push(step ? classifyBarTargets(bar, step) : emptyTarget(bar));
+  for (let step = 0; step < path.steps.length; step++) {
+    const s: HarmonicStep | undefined = path.steps[step];
+    out.push(s ? classifyBarTargets(step, s) : emptyTarget(step));
   }
   return out;
 }
