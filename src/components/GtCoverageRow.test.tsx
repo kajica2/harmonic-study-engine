@@ -2,9 +2,10 @@
  * GtCoverageRow.test.tsx — jsdom tests for the path-level guide-tone
  * coverage map row (FUTURE_PLANNING near-term #3 wiring).
  *
- * AC1: raw parity incl first-step-wins (matches gtTargetsForPath).
+ * AC1: raw parity incl per-step slots (matches gtTargetsForPath, F3).
  * AC2: glyphs ✓ iff hasGuideTone else — (never ✗, never green/red).
- * AC3: cell count == totalBars incl padded-24 + shared-scroller contract.
+ * AC3: cell count == formLen for a padded fixture (F3) + shared
+ *      scroller contract.
  * AC4: a11y roles/labels, zero focusable, no aria-current double-announce.
  * AC5: transpose / key-drift invariance (raw intervals, not key names).
  * AC6: loop range never filters bars (visual band only).
@@ -18,16 +19,16 @@ import { gtTargetsForPath } from "../lib/gtTargets";
 import { padPath } from "../lib/paths";
 import type { HarmonicPath, HarmonicStep } from "../lib/paths";
 
+/** Build a path of N bars where bar i has the given chord notes.
+ *  F3 (D110): 1 step = 1 bar - one step per authored bar. */
 function pathFromBars(bars: number[][]): HarmonicPath {
   const steps: HarmonicStep[] = [];
   for (const barNotes of bars) {
-    for (let beat = 0; beat < 4; beat++) {
-      steps.push({
-        name: `bar-${steps.length / 4}`,
-        notes: barNotes,
-        descriptions: "",
-      });
-    }
+    steps.push({
+      name: `bar-${steps.length}`,
+      notes: barNotes,
+      descriptions: "",
+    });
   }
   return {
     id: "test-gt-row",
@@ -70,10 +71,10 @@ describe("GtCoverageRow AC1 — raw parity incl first-step-wins", () => {
     });
   });
 
-  it("uses the bar first step only (mid-bar changes do not create slots)", () => {
-    // Bar 0 opens on Csus4 (no guide) then moves to Dm7; bar 1 opens on
-    // Dm7 then moves to Csus4. One target per bar, aligned to the first
-    // step — the mid-bar chord is intentionally invisible here.
+  it("classifies every step as its own cell (F3: no first-step-wins)", () => {
+    // The legacy model collapsed 4 steps into one bar and let the
+    // first step "win". F3 (D110): 1 step = 1 bar - every step gets
+    // its own cell, so mid-bar changes ARE visible slots now.
     const steps: HarmonicStep[] = [
       { name: "sus-a", notes: Csus4, descriptions: "" },
       { name: "sus-b", notes: Csus4, descriptions: "" },
@@ -92,13 +93,15 @@ describe("GtCoverageRow AC1 — raw parity incl first-step-wins", () => {
     };
     const targets = gtTargetsForPath(path);
     expect(targets[0]?.hasGuideTone).toBe(false);
-    expect(targets[1]?.hasGuideTone).toBe(true);
+    expect(targets[1]?.hasGuideTone).toBe(false);
+    expect(targets[2]?.hasGuideTone).toBe(true);
     const { container } = render(
       <GtCoverageRow targets={targets} currentBar={1} />,
     );
     const g = glyphs(container);
     expect(g[0]).toContain("—");
-    expect(g[1]).toContain("✓");
+    expect(g[1]).toContain("—");
+    expect(g[2]).toContain("✓");
   });
 });
 
@@ -160,19 +163,24 @@ describe("GtCoverageRow AC3 — count == totalBars incl padded 24 + shared scrol
     ).toBe(3);
   });
 
-  it("covers a padded 24-bar path end to end", () => {
+  it("padded fixture: per-step targets, rendered row is the formLen window (F3)", () => {
+    // F3 (D110/D111): padPath still enforces the STEP-COUNT policy
+    // (24 policy-bars = 96 steps), but targets are per step and the
+    // rail renders ONE CELL PER FORM BAR (targets.slice(0, formLen)).
     const short = pathFromBars([Dm7, G7]);
     const padded = padPath(short);
-    const bars = padded.steps.length / 4;
-    expect(bars).toBe(24);
+    expect(padded.steps.length).toBe(96);
+    expect(padded.steps.length / 4).toBe(24); // legacy policy unit
     const targets = gtTargetsForPath(padded);
-    expect(targets).toHaveLength(24);
+    expect(targets).toHaveLength(96); // one per STEP now
+    const formLen = 2; // Dm7, G7 repeated 48x - detectFormPeriod
     const { container } = render(
-      <GtCoverageRow targets={targets} currentBar={1} />,
+      <GtCoverageRow targets={targets.slice(0, formLen)} currentBar={1} />,
     );
     expect(
       container.querySelectorAll('[role="listitem"]').length,
-    ).toBe(24);
+    ).toBe(formLen);
+    expect(glyphs(container)).toEqual(["✓", "✓"]);
   });
 
   it("delegates scrolling to the parent (no own overflow-x-auto) and mirrors strip metrics", () => {
