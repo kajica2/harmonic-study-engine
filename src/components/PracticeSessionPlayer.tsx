@@ -303,7 +303,7 @@ export function PracticeSessionPlayer({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-4 p-4 rounded-xl border border-purple-500/20 bg-purple-950/20">
+    <div className="flex flex-col gap-4 p-4 rounded-xl border border-[color:var(--color-brand)]/20 bg-[color:var(--color-brand-muted)]/20">
       {/* Header */}
       <div className="flex items-center gap-3">
         <button

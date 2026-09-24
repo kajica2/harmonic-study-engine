@@ -66,9 +66,9 @@ export const FormTemplatePicker: React.FC<FormTemplatePickerProps> = ({
               type="button"
               onClick={() => onPick(t.id)}
               aria-pressed={activeId === t.id}
-              className={`text-left p-2 rounded border transition-colors ${
+              className={`text-left p-2 rounded border transition-colors active:scale-[0.98] ${
                 activeId === t.id
-                  ? "border-purple-600/70 bg-purple-900/40 text-purple-100"
+                  ? "border-[color:var(--color-brand)]/70 bg-[color:var(--color-brand-muted)]/40 text-[color:var(--color-brand-strong)]"
                   : "border-neutral-800 bg-neutral-900/40 text-neutral-300 hover:bg-neutral-800"
               }`}
               title={t.description}

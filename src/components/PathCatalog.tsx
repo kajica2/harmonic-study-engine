@@ -219,7 +219,7 @@ export const PathCatalog = memo(function PathCatalog({
     <div className="flex flex-col gap-3" data-testid="path-catalog">
       <header className="flex items-center justify-between gap-2 px-1">
         <h2 className="text-sm uppercase tracking-widest text-neutral-500 font-semibold flex items-center gap-2">
-          <Filter size={14} className="text-purple-400" aria-hidden="true" />
+          <Filter size={14} className="text-[color:var(--color-brand-strong)]" aria-hidden="true" />
           Path Catalog
           <span className="text-[10px] text-neutral-600 font-mono">
             ({filtered.length}/{paths.length})
@@ -294,9 +294,9 @@ export const PathCatalog = memo(function PathCatalog({
                 onClick={() => toggleRule(r.id)}
                 aria-pressed={active}
                 data-testid={`catalog-rule-${r.id}`}
-                className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider transition-colors active:scale-95 ${
                   active
-                    ? "bg-purple-500/20 text-purple-200 border border-purple-500/40"
+                    ? "bg-[color:var(--color-brand)]/20 text-[color:var(--color-brand-strong)] border border-[color:var(--color-brand)]/40"
                     : "bg-neutral-900/40 text-neutral-500 border border-neutral-800 hover:text-neutral-200"
                 }`}
               >
@@ -404,7 +404,7 @@ export const PathCatalog = memo(function PathCatalog({
                   <button
                     onClick={() => onSelect(p.id)}
                     data-testid={`catalog-open-${p.id}`}
-                    className="px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-wider bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 transition-colors"
+                    className="px-2.5 py-1 rounded-md text-[10px] font-mono uppercase tracking-wider bg-[color:var(--color-brand)]/20 hover:bg-[color:var(--color-brand)]/30 text-[color:var(--color-brand-strong)] border border-[color:var(--color-brand)]/40 transition-colors active:scale-95"
                   >
                     Open
                   </button>

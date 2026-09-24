@@ -55,3 +55,7 @@ Initialized 2026-09-22.
 | TD-046 | compose (S4 deferred) | Stems ZIP (REQ-COMP-42 P2) deferred per parent X10; D77 architecture makes it nearly free later (per-group baked buffers already exist). | P3 | Open |
 | TD-047 | compose (S4 deferred) | /play route (REQ-IO-52 P2) deferred - no router exists, app is single-route. | P4 | Open |
 | TD-048 | app (pre-existing quirk) | Space globally bound to practice playback in ALL modes incl. compose (pre-dates S4); no App key-handler edits per S4 scope. Revisit when compose playback routing is designed. | P4 | Open |
+| TD-EXP-MOD | explore (REQ-EXP-14 deferred) | Modulate (key-change bridge progression) has no pivot-key primitive; stub + deferral test ship, no UI button. Needs key-change analysis discipline before any UI. | P3 | Open |
+| TD-EXP-LITERAL | explore (forbidden-pattern guard) | Send-to-Etude must remain constraints-carry, never literal degree transplant (symbol/numeral grammars disjoint). Guard the seam if card shapes evolve. | P3 | Open |
+| TD-EXP-SLOT | explore (bookkeeping) | Vary/voicelead attempt namespaces must stay per-op (LOW-002 slip fixed); card slot bookkeeping follow-ups ride future op work. | P4 | Open |
+| TD-EXP-MODAL-Q | explore (coverage, deliberate) | Quality-borrow detector on diatonic roots (iv7/III7 coverage cut when modal pools reduced to root-residual-detectable set). New detector = fast-follow. | P3 | Open |

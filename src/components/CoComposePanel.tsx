@@ -46,29 +46,29 @@ export const CoComposePanel = memo(function CoComposePanel({
     <section
       role="region"
       aria-label="Co-composition suggestion"
-      className="rounded-lg border border-purple-700/50 bg-purple-950/20 p-3 flex flex-col gap-2"
+      className="rounded-lg border border-[color:var(--color-brand)]/50 bg-[color:var(--color-brand-muted)]/20 p-3 flex flex-col gap-2"
     >
       <div className="flex items-center gap-2 flex-wrap">
-        <Sparkles size={14} className="text-purple-300" aria-hidden="true" />
-        <span className="text-[10px] font-mono uppercase tracking-wider text-purple-200">
+        <Sparkles size={14} className="text-[color:var(--color-brand-strong)]" aria-hidden="true" />
+        <span className="text-[10px] font-mono uppercase tracking-wider text-[color:var(--color-brand-strong)]">
           What if? · {alt.technique.replace(/_/g, " ")}
         </span>
         {preferred.length > 0 && personaId && (
-          <span className="text-[9px] font-mono text-purple-400/80 bg-purple-900/30 px-1 rounded">
+          <span className="text-[9px] font-mono text-[color:var(--color-brand-strong)]/80 bg-[color:var(--color-brand-muted)]/30 px-1 rounded">
             persona: {preferred.map(t => t.replace(/_/g, " ")).join(", ")}
           </span>
         )}
       </div>
-      <div className="text-[12px] font-mono text-purple-100">
+      <div className="text-[12px] font-mono text-[color:var(--color-brand-strong)]">
         bar {barIndex + 1}: <span className="text-neutral-300">{midiToName(60)}</span> →{" "}
-        <span className="text-purple-200 font-semibold">{formatChord(alt)}</span>
+        <span className="text-[color:var(--color-brand-strong)] font-semibold">{formatChord(alt)}</span>
       </div>
       <p className="text-[11px] text-neutral-300 leading-snug">{alt.explanation}</p>
       {alt.alternative && onAccept && (
         <button
           type="button"
           onClick={() => onAccept(alt)}
-          className="self-start flex items-center gap-1 px-2 py-1 text-[11px] font-mono rounded border border-purple-600/70 bg-purple-900/40 hover:bg-purple-900/60 text-purple-100"
+          className="self-start flex items-center gap-1 px-2 py-1 text-[11px] font-mono rounded border border-[color:var(--color-brand)]/70 bg-[color:var(--color-brand-muted)]/40 hover:bg-[color:var(--color-brand-muted)]/60 text-[color:var(--color-brand-strong)] active:scale-95 transition-all"
         >
           <Check size={11} aria-hidden="true" />
           Accept
