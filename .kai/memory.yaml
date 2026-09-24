@@ -86,3 +86,7 @@ active_prevention_rules:
   - id: "PHASE-4-02"
     when: "An async render .then arm can resolve after content-change, stop(), or unmount (phantom/ghost audio)"
     action: "Capture a generation token at render start; .then arms check token identity + guard .catch. Pin with flip-then-resolve tests (markRendering -> change content -> resolve -> playMix NOT called). Same shape as S3 handlePreview - check both arms."
+
+  - id: "GIT-001"
+    when: "Staging with an explicit hand-written file list (instead of git add -A with excludes)"
+    action: "After git add, run git status and reconcile EVERY remaining M/?? entry against expectations before committing. A partial commit passes local gates (worktree complete) but breaks CI (fresh checkout missing files) - happened on the S4 merge: 9 files unstaged, CI red on missing exports. Prefer staging by directory + explicit excludes for the dirty set."
