@@ -8,8 +8,8 @@
  * host pattern), popover open/close + focus return.
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, within, cleanup } from "@testing-library/react";
 import { AnalysisCard } from "./AnalysisCard";
 import { analyzeFixture } from "./composeFixtures";
 import { blendKeyEvidence } from "../../engine/compose/key";
@@ -59,6 +59,10 @@ function setup(over: {
   render(<AnalysisCard {...props} />);
   return { ...props, onPatch };
 }
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("AnalysisCard header (REQ-COMP-20/21)", () => {
   it("renders fileName + duration + the detected key from the fixture", () => {
@@ -354,5 +358,28 @@ describe("AnalysisCard banners + annotations (REQ-COMP-6/53, PED-4/5)", () => {
     setup();
     expect(screen.getByTestId("privacy-line").textContent).toContain("never leaves this tab");
     expect(screen.getByTestId("start-over").textContent).toBe("Start over");
+  });
+});
+
+describe("AnalysisCard PED-6 no-match fallback (G2)", () => {
+  it("bare chord cell dispatches hse:open-concept-search with prefill and opens NO drawer", () => {
+    const noAnnotations = (a: ComposeAnalysis): ComposeAnalysis => ({ ...a, annotations: [] });
+    setup({ mutateAnalysis: noAnnotations });
+    const seen: CustomEvent<{ prefill: string }>[] = [];
+    const onSearch = (e: Event): void => {
+      seen.push(e as CustomEvent<{ prefill: string }>);
+    };
+    window.addEventListener("hse:open-concept-search", onSearch);
+    try {
+      const cell = screen.getByTestId("chord-cell-0-0");
+      const expectedPrefill = cell.textContent ?? "";
+      expect(expectedPrefill).not.toBe("");
+      fireEvent.contextMenu(cell);
+      expect(seen).toHaveLength(1);
+      expect(seen[0].detail.prefill).toBe(expectedPrefill);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    } finally {
+      window.removeEventListener("hse:open-concept-search", onSearch);
+    }
   });
 });

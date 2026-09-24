@@ -1,7 +1,7 @@
 /**
  * engine/pedagogy/concepts.ts - PRD-001 Phase 3 Slice 1 (D17 / REQ-PED-10/11).
  *
- * The concept registry: 8 hand-curated Concepts, authored in-repo as
+ * The concept registry: 10 hand-curated Concepts, authored in-repo as
  * plain TypeScript data (precedent: engine/styles/profiles/*). No LLM
  * pipeline (D17): the corpus is tiny and canonical, and the prose was
  * harvested from reviewed in-repo sources - the coCompose.ts technique

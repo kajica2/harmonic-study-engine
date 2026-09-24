@@ -81,6 +81,50 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Ear training + SRS + practice log + drawer completion (PRD-001
+  Phase 6, D102..D114)** -- the Etude surface gains a hearing gym.
+  EAR DRILLS (REQ-PED-20/21/22): an "Ear training" SECTION below the
+  composer (not a tab, not a sub-route, no ModeGate edit; attempts
+  never touch dirty): 7 seeded types (interval / chord-quality /
+  chord-inversion / progression / scale / melodic-dictation /
+  harmonic-dictation) x difficulty 1-5 x seed (same inputs = same
+  prompt); the 5 recognition types are 4-option multiple choice with
+  same-pool distractors minus the answer ENHARMONICALLY (Bb never
+  distracts A#); the 2 dictations take note names / MIDI numbers /
+  on-screen piano taps. CHECKER (REQ-PED-23/24, D113): pitch-class
+  grading (Cb counts for B; B for Bb fails; m7b5 == halfdim);
+  partial credit melodic-dictation ONLY (hit fraction + 0.1 contour
+  bonus, correct >= 0.85; every other type exact, partial null);
+  every prompt carries one conceptId and a miss offers
+  "What is <title>?" into the drawer (REQ-PED-25). Q10 SCORING
+  (D108): per-answer Correct/Not quite + the honesty line
+  "12/20 correct (60%) - streak 3" + a per-concept SRS line; NO XP,
+  NO levels, NO badges. SRS (REQ-PED-30/31/32, D114): canonical
+  SM-2 (ease 2.5 start / 1.3 floor, 1 then 6 then interval*ease,
+  grade 5 correct / 2 incorrect) over localStorage `pedagogy.srs`
+  (cap 10, corrupt -> empty) with a due-bias picker (overdue
+  weighted by overdue-days, else longest-unseen). LOG
+  (REQ-PED-40/41/42): one entry per answer to `pedagogy.log`
+  (cap 500: mode/outcome/durationSec/conceptId) with the pure
+  summary derivation (minutes-per-day last 30d UTC, whole-log
+  concept counts, last-20 rolling accuracy with partial = 0.5).
+  HEAR (D105): prompts audition through the EXISTING compose
+  preview singleton via the pure `promptToHearInput` builder
+  (tick offsets, never playNote loops); e2e pins the state
+  machine, not the audio. DRAWER (REQ-PED-6/12/13, D103/D111/
+  D112): header ConceptSearch (App-level host) + footer "Hear an
+  example" (GENERATED exampleNumerals in C, disabled with title
+  when null) + "Send to Explore" (numerals as seed text); PED-6
+  SCOPED to AnalysisCard chord cells (right-click + 500ms
+  long-press + Shift+F10; bare cells prefill global search),
+  rest gated TD-PED-6-REST. STORE: no v5, no migration (SRS/log
+  live outside zustand; prompts/config/drawer-open stay local).
+  Carve-outs: NO on-screen log-summary panel (math ships,
+  rendering is a fast-follow); no MIDI-ear answers (on-screen
+  piano + text only); no `?ear=` deep link. Docs:
+  `docs/EAR-TRAINING.md`; design: `docs/PHASE-6-PEDAGOGY.md`;
+  e2e: `e2e/ear-training.spec.ts` (2 legs); existing 7 specs
+  survive UNEDITED.
 - **Explore mode: seeds + honest transforms + Hear + crossover (PRD-001
   Phase 5, D93..D101)** -- the first user-facing Explore surface (was a
   stub with 3 visual chips + read-only planners). SEEDS (REQ-EXP-1/2):

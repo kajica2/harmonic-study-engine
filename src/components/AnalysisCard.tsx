@@ -28,10 +28,12 @@ import React, { useRef, useState } from "react";
 import { ConceptDrawer } from "./ConceptDrawer";
 import { ChordCellPopover } from "./ChordCellPopover";
 import { ComposePianoRoll } from "./ComposePianoRoll";
+import { useConceptPress } from "./useConceptPress";
 import { parseKey, spellTonic } from "../../engine/core/spelling";
 import { reinferBar } from "../../engine/compose/harmony";
 import { ticksToSeconds } from "../../engine/compose/tempo";
 import { confidenceTier } from "../../engine/compose/types";
+import type { Annotation } from "../../engine/pedagogy/types";
 import type { KeyBlend } from "../../engine/compose/key";
 import type {
   AnalysisOverrides,
@@ -91,6 +93,67 @@ const TIER_TOOLTIP: Record<ConfidenceTier, string> = {
   radio: "pick a candidate",
   manual: "enter manually",
 };
+
+/** PED-6 (D103): nearest annotation concept covering (bar, slot). */
+function nearestAnnotationConcept(
+  annotations: readonly Annotation[],
+  bar: number,
+): string | null {
+  for (const a of annotations) {
+    if (a.conceptId === null) continue;
+    const t = a.target;
+    if (t.kind === "chord" && t.bar === bar) return a.conceptId;
+    if (t.kind === "voicing" && t.bar === bar) return a.conceptId;
+    if (t.kind === "progression" && bar >= t.fromBar && bar <= t.toBar) return a.conceptId;
+  }
+  return null;
+}
+
+/** PED-6 chord-cell button (right-click + long-press + Shift+F10). */
+function ChordCellButton(props: {
+  bar: number;
+  slot: number;
+  cell: ChordCell;
+  tier: ConfidenceTier;
+  tierClass: string;
+  tooltip: string;
+  annotations: readonly Annotation[];
+  onOpenLocal: (id: string) => void;
+  onOpenCell: (bar: number, slot: number, el: HTMLElement) => void;
+}): React.ReactElement {
+  const press = useConceptPress(
+    () => nearestAnnotationConcept(props.annotations, props.bar),
+    (id, fallback) => {
+      if (id !== null) {
+        props.onOpenLocal(id);
+        return;
+      }
+      window.dispatchEvent(
+        new CustomEvent("hse:open-concept-search", { detail: { prefill: fallback } }),
+      );
+    },
+    props.cell.name,
+  );
+  const label = `Chord bar ${props.bar + 1} slot ${props.slot + 1}: ${props.cell.isRest || props.cell.name === "" ? "rest" : props.cell.name}`;
+  return (
+    <button
+      type="button"
+      onClick={(e) => props.onOpenCell(props.bar, props.slot, e.currentTarget)}
+      aria-label={label}
+      title={`${props.tooltip} (right-click for concept)`}
+      className={`min-w-16 rounded border px-2 py-1 text-sm text-[color:var(--color-text-1)] ${props.tierClass}`}
+      data-testid={`chord-cell-${props.bar}-${props.slot}`}
+      data-tier={props.tier}
+      onContextMenu={press.onContextMenu}
+      onTouchStart={press.onTouchStart}
+      onTouchEnd={press.onTouchEnd}
+      onTouchMove={press.onTouchMove}
+      onKeyDown={press.onKeyDown}
+    >
+      {props.cell.isRest || props.cell.name === "" ? "\u00b7" : props.cell.name}
+    </button>
+  );
+}
 
 /** Controlled-until-commit text field: commits on Enter/blur (never
  *  per keystroke - D59), reverts when the parent rejects the value. */
@@ -520,22 +583,20 @@ export function AnalysisCard(props: AnalysisCardProps): React.ReactElement {
                 const open = openCell !== null && openCell.bar === region.bar && openCell.slot === slot;
                 return (
                   <span key={slot} className="relative inline-flex flex-col items-start gap-0.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        triggerRef.current = e.currentTarget;
-                        setOpenCell({ bar: region.bar, slot });
+                    <ChordCellButton
+                      bar={region.bar}
+                      slot={slot}
+                      cell={cell}
+                      tier={tier}
+                      tierClass={TIER_CLASS[tier]}
+                      tooltip={`${TIER_TOOLTIP[tier]}${cell.isRest ? "" : `: ${cell.name} (r=${cell.confidence.toFixed(2)})`}`}
+                      annotations={merged.annotations}
+                      onOpenLocal={setDrawerConceptId}
+                      onOpenCell={(bar, s, el) => {
+                        triggerRef.current = el;
+                        setOpenCell({ bar, slot: s });
                       }}
-                      aria-label={`Chord bar ${region.bar + 1}${
-                        region.slots.length > 1 ? ` slot ${slot + 1}` : ""
-                      }: ${cell.isRest || cell.name === "" ? "rest" : cell.name}`}
-                      title={`${TIER_TOOLTIP[tier]}${cell.isRest ? "" : `: ${cell.name} (r=${cell.confidence.toFixed(2)})`}`}
-                      className={`min-w-16 rounded border px-2 py-1 text-sm text-[color:var(--color-text-1)] ${TIER_CLASS[tier]}`}
-                      data-testid={`chord-cell-${region.bar}-${slot}`}
-                      data-tier={tier}
-                    >
-                      {cell.isRest || cell.name === "" ? "\u00b7" : cell.name}
-                    </button>
+                    />
                     {tier === "radio" && !cell.isRest && cell.alternatives.length > 0 && (
                       <button
                         type="button"

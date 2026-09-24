@@ -179,6 +179,11 @@ import { isModeShortcutModifierKey, classifyTransposeKey } from "./hooks/useKeyD
 // PRD-001 Phase 3 Slice 2: etude composer panel + engine adapter +
 // URL constraint serialization (D22/D24/D28).
 import { EtudeComposerPanel } from "./components/EtudeComposerPanel";
+// PRD-001 Phase 6 (REQ-PED-12/13, D104/D111): ear-training section +
+// global concept search + App-level drawer host (TWO insertions only).
+import { EarTrainingPanel } from "./components/EarTrainingPanel";
+import { ConceptSearch } from "./components/ConceptSearch";
+import { ConceptDrawer } from "./components/ConceptDrawer";
 import {
   etudeActiveBarFor,
   etudePathId,
@@ -390,6 +395,24 @@ function AppShell() {
   // be redundant state; views consume it via props.
   const etudeConstraints = useNewSessionStore((s) => s.etudeConstraints);
   const [activeEtude, setActiveEtude] = useState<Etude | null>(null);
+
+  // PRD-001 Phase 6 (REQ-PED-12, D111): global concept search + App-level
+  // drawer host (transient UI, PRD 10.4). PED-6 fallback opens the search
+  // prefilled via the hse:open-concept-search event (no false claim).
+  const [conceptOpen, setConceptOpen] = useState<string | null>(null);
+  const [conceptQuery, setConceptQuery] = useState("");
+  useEffect(() => {
+    const onPrefill = (e: Event): void => {
+      const detail = (e as CustomEvent<{ prefill?: string }>).detail;
+      if (detail !== undefined && typeof detail.prefill === "string") {
+        setConceptQuery(detail.prefill);
+      }
+    };
+    window.addEventListener("hse:open-concept-search", onPrefill);
+    return () => {
+      window.removeEventListener("hse:open-concept-search", onPrefill);
+    };
+  }, []);
 
   // PRD-001 Phase 2 (D13): the 5 path generate/import/persona-switch
   // reset sites all zero the exercise offset AND disengage the cycle.
@@ -1991,7 +2014,13 @@ function AppShell() {
               `compact=true` is set; the default segmented control is
               the only chrome the user sees here. */}
           <ModeSelector />
+          {/* PRD-001 Phase 6 (REQ-PED-12, D111): global concept search. */}
+          <ConceptSearch value={conceptQuery} onChange={setConceptQuery} onOpen={setConceptOpen} />
         </div>
+
+        {conceptOpen !== null && (
+          <ConceptDrawer key={conceptOpen} conceptId={conceptOpen} onClose={() => setConceptOpen(null)} />
+        )}
 
         <div className="hidden md:flex items-center gap-2 lg:gap-3 t-mono text-[color:var(--color-text-2)]">
           <button
@@ -2552,6 +2581,10 @@ function AppShell() {
             activeEtude ? handleEtudeMusicXmlDownload : undefined
           }
         />
+
+        {/* PRD-001 Phase 6 (D104): ear-training sub-mode SECTION below
+            the composer (not a tab, not a sub-route, no ModeGate edit). */}
+        <EarTrainingPanel />
 
         {/* Performance mastery log — recent takes (roadmap option G).
             Hidden until the first take exists so first paint stays

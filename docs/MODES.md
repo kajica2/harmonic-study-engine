@@ -72,6 +72,20 @@ etudes, loads them into the practice session, and syncs them to
 shareable `?style=...&seed=...` URLs, with piano roll + abcjs staff
 views. User guide: `docs/ETUDE-COMPOSER.md`.
 
+Phase 6 adds the **Ear training** drills to this surface: a
+section below the composer with 7 seeded hearing drills
+(intervals, chord quality, inversions, progressions, scales, and
+melodic + harmonic dictation) over difficulty 1-5, graded by
+pitch class (Cb counts for B) with accuracy + streaks and no XP,
+plus a per-concept SM-2 memory that resurfaces what is due.
+Full user guide: **`docs/EAR-TRAINING.md`**.
+
+The concept drawer is reachable from every mode: the header
+search box opens any of the 10 concepts, each drawer plays a
+generated example in C and sends its numerals to Explore, and
+right-clicking a Compose chord cell opens the linked concept
+(drawer tour in `docs/EAR-TRAINING.md`, "The drawer" section).
+
 ### Explore
 
 The exploratory what-if workspace -- and since Phase 5 (2026-09-24)
@@ -81,7 +95,8 @@ from the fixed list of 12 beside the input) and run honest harmonic
 operations over it: reharmonize a progression, substitute or expand
 a chord, voice-lead the same changes five ways, or vary a melody
 line. Every result is an idea card -- label, technique chip naming
-what was actually computed, rationale with concept-drawer links,
+what was actually computed, rationale with concept-drawer links
+(drawer footer tour: `docs/EAR-TRAINING.md`),
 and a Hear audition -- with Send to Compose (lands as editable
 chart text), Send to Etude (carries key + bar count under the
 honest "Practice in this key" title, never literal chords), and

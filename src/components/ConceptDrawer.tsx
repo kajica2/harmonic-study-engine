@@ -14,15 +14,24 @@
  * below in a later slice.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { ModalShell, useModalLabel } from "./ModalShell";
 import { getConcept } from "../../engine/pedagogy/concepts";
 import type { ConceptCategory } from "../../engine/pedagogy/types";
+import { composePreviewPlayer } from "../lib/composePreview";
+import { hearExampleNumerals } from "../lib/earHear";
+import { ideaToSeedText } from "../../engine/explore/seeds";
+import { useSessionStore } from "../state/sessionStore";
+import { asCanonicalId, makeInstanceId } from "../../engine/core/ids";
 
 export interface ConceptDrawerProps {
   conceptId: string;
   onClose: () => void;
+  /** Optional Hear override (tests); default renders exampleNumerals in C. */
+  onHearExample?: () => void;
+  /** Optional Send override (tests); default carries seed + requests explore. */
+  onSendToExplore?: (seedText: string) => void;
 }
 
 /** Category -> badge color token. The TEXT label is always present
@@ -50,11 +59,24 @@ function splitReference(ref: string): { label: string; url: string } | null {
 export function ConceptDrawer({
   conceptId,
   onClose,
+  onHearExample,
+  onSendToExplore,
 }: ConceptDrawerProps): React.ReactElement | null {
   // `shown` diverges from the prop only via RELATED navigation; the
   // host's key={conceptId} remount resets it (key-prop pattern).
   const [shown, setShown] = useState(conceptId);
   const labelId = useModalLabel("concept-drawer");
+  const [hearState, setHearState] = useState(composePreviewPlayer.getState());
+  useEffect(() => {
+    const unsubscribe = composePreviewPlayer.subscribe(setHearState);
+    setHearState(composePreviewPlayer.getState());
+    return unsubscribe;
+  }, []);
+  useEffect(() => {
+    return () => {
+      composePreviewPlayer.stop();
+    };
+  }, []);
   const concept = getConcept(shown);
   // Registry resolution is test-pinned upstream (concepts.test.ts);
   // this null-guard is purely defensive - render nothing, no noise.
@@ -181,10 +203,76 @@ export function ConceptDrawer({
           </div>
         )}
 
-        {/* REQ-PED-13 FOOTER SLOT (deferred, D38): "Hear an example"
-            (exampleNumerals -> key context -> chord spelling) and
-            "Send to Explore" (Idea pipeline for concept kinds) land
-            here in a later slice. */}
+        {/* REQ-PED-13 footer (Phase 6, D111/D112): Hear an example
+            (generated exampleNumerals in C) + Send to Explore (seed
+            carry, never a literal transplant claim). */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-[color:var(--color-border)] px-5 py-3">
+          <button
+            type="button"
+            disabled={concept.exampleNumerals === null}
+            title={
+              concept.exampleNumerals === null
+                ? "No example available for this concept"
+                : `Hear ${concept.title} in C`
+            }
+            aria-label={`Hear ${concept.title} example`}
+            data-testid="concept-hear"
+            data-preview={hearState}
+            onClick={() => {
+              if (onHearExample) {
+                onHearExample();
+                return;
+              }
+              if (concept.exampleNumerals === null) return;
+              void hearExampleNumerals(concept.exampleNumerals);
+            }}
+            className="rounded border border-[color:var(--color-border)] px-3 py-1 text-sm text-[color:var(--color-text-1)] disabled:opacity-50"
+          >
+            Hear an example
+          </button>
+          <button
+            type="button"
+            aria-label="Send concept to Explore"
+            data-testid="concept-send-explore"
+            onClick={() => {
+              const numerals = concept.exampleNumerals ?? [];
+              const seedText = ideaToSeedText({
+                kind: "progression",
+                chord: null,
+                progression: [...numerals],
+                scale: null,
+                melody: null,
+                seed: null,
+              });
+              if (onSendToExplore) {
+                onSendToExplore(seedText);
+                return;
+              }
+              const nowMs = Date.now();
+              const store = useSessionStore.getState();
+              store.setCurrentIdea({
+                version: 1,
+                id: asCanonicalId(`idea-concept-${concept.id}`),
+                instanceId: makeInstanceId(nowMs, 0),
+                source: "explore",
+                kind: "progression",
+                chord: null,
+                progression: [...numerals],
+                scale: null,
+                melody: null,
+                seed: null,
+                tags: null,
+                createdAt: nowMs,
+              });
+              composePreviewPlayer.stop();
+              store.requestMode("explore");
+              onClose();
+            }}
+            className="rounded border border-[color:var(--color-border)] px-3 py-1 text-sm text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+          >
+            Send to Explore
+          </button>
+        </div>
       </div>
     </ModalShell>
   );

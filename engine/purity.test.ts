@@ -55,9 +55,12 @@ const ENGINE = "engine";
  *  (33 -> 35, tree scans 36); Phase 5 adds explore/{types,seeds,
  *  substitute,reharmonize,expand,vary,voicelead,cards,modulate} per
  *  D101 (35 -> 44, tree scans 45 with the index-file slack).
+ *  Phase 6 adds ear-training/{types,generate,distractors,check} +
+ *  pedagogy/{srs,log} per D102 (44 -> 50, tree scans 51 with the
+ *  index-file slack).
  *  Raise this only alongside
  *  real files. */
-const MIN_SCANNED_FILES = 44;
+const MIN_SCANNED_FILES = 50;
 
 const BANNED: readonly RegExp[] = [
   /\bMath\.random\b/, // no paren: calls AND aliasing

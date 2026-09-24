@@ -68,6 +68,9 @@ export const K = {
   session: "hse.session",
   // Phase 1: named-idea library (capped at 100, REQ-IDEA-4).
   ideas: "hse.ideas",
+  // Phase 6 (REQ-PED-30/40, D107): SRS + practice log OUTSIDE zustand.
+  pedagogySrs: "pedagogy.srs",
+  pedagogyLog: "pedagogy.log",
 } as const;
 
 export type StorageKey = (typeof K)[keyof typeof K];
@@ -132,6 +135,8 @@ export const STORAGE_KEYS: StorageKeyMeta[] = [
   { key: K.pathBriefingDismissed, since: "1", shape: "string[] JSON" },
   { key: K.session, since: "1", shape: "zustand persist JSON (mode slice)" },
   { key: K.ideas, since: "1", shape: "Idea[] JSON (capped at 100, REQ-IDEA-4)" },
+  { key: K.pedagogySrs, since: "1", shape: "Record<string, SrsState> JSON (capped at 10, REQ-PED-30)" },
+  { key: K.pedagogyLog, since: "1", shape: "PracticeEntry[] JSON (capped at 500, REQ-PED-40)" },
 ];
 
 /**
