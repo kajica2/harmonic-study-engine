@@ -240,10 +240,10 @@ describe("result surfaces (D71/D72)", () => {
     expect(onPreview).toHaveBeenCalledTimes(1);
   });
 
-  it("tooltip honesty: tempo override NOT applied (TD-043) + accompaniment only", () => {
+  it("tooltip honesty: EFFECTIVE tempo (D79 closed TD-043) + accompaniment only", () => {
     renderPanel({ result: generate() });
     const title = screen.getByTestId("accomp-preview").getAttribute("title") ?? "";
-    expect(title).toContain("tempo override is NOT applied");
+    expect(title).toContain("effective tempo");
     expect(title).toContain("Accompaniment only");
   });
 });

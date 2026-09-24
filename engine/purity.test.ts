@@ -50,9 +50,11 @@ const ENGINE = "engine";
  *  tempo,roles,key,melody,harmony,index} per D56 (analyzeProject needs
  *  a home and cannot live in types.ts - cycle); Phase 4 Slice 3 adds
  *  compose/{patterns,voicing,bass,accompany} per D75 (29 -> 33,
- *  pre-authorized by the parent ladder). Raise this only alongside
+ *  pre-authorized by the parent ladder); Phase 4 Slice 4 adds
+ *  compose/{chordsym (D82 move-in),chordchart (D83)} per D91
+ *  (33 -> 35, tree scans 36). Raise this only alongside
  *  real files. */
-const MIN_SCANNED_FILES = 33;
+const MIN_SCANNED_FILES = 35;
 
 const BANNED: readonly RegExp[] = [
   /\bMath\.random\b/, // no paren: calls AND aliasing

@@ -29,7 +29,13 @@ function midiToFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
-function encodeWav(samples: Float32Array, sampleRate: number): Blob {
+/**
+ * D81 (S4): EXPORTED for the compose WAV full-mix exporter
+ * (composeExport.ts) - REUSE, not duplication: a second hand-rolled
+ * RIFF writer is a drift liability. Behavior byte-identical (the
+ * `export` keyword is the only change; loopWav's own tests untouched).
+ */
+export function encodeWav(samples: Float32Array, sampleRate: number): Blob {
   const n = samples.length;
   const bytesPerSample = 2;
   const blockAlign = bytesPerSample;

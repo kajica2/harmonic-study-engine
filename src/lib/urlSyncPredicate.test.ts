@@ -17,15 +17,26 @@ import {
 } from "./urlSyncPredicate";
 import { DEFAULT_ETUDE_CONSTRAINTS } from "./etudeEngine";
 import type { EtudeConstraints } from "../../engine/etude/types";
+import { EMPTY_OVERRIDES, MIXER_DEFAULTS } from "../../engine/compose/types";
+import type { ComposeSession } from "../state/sessionStore";
 
 function snap(over: Partial<UrlSyncSnapshot> = {}): UrlSyncSnapshot {
   return {
     mode: "etude",
     globalTranspose: 0,
     etudeConstraints: null,
+    composeSession: null,
     ...over,
   };
 }
+
+const SESSION_A = {
+  fileName: "a.mid",
+  fileHash: null,
+  overrides: EMPTY_OVERRIDES,
+  analyzeFull: false,
+} satisfies ComposeSession;
+const SESSION_B = { ...SESSION_A, fileName: "b.mid" };
 
 const C7: EtudeConstraints = { ...DEFAULT_ETUDE_CONSTRAINTS, seed: 7 };
 const C8: EtudeConstraints = { ...DEFAULT_ETUDE_CONSTRAINTS, seed: 8 };
@@ -49,6 +60,24 @@ describe("shouldScheduleUrlWrite - tracked terms fire (GAP-1)", () => {
     expect(shouldScheduleUrlWrite(snap(), snap({ mode: "compose" }))).toBe(true);
     expect(shouldScheduleUrlWrite(snap(), snap({ mode: null }))).toBe(true);
     expect(shouldScheduleUrlWrite(snap({ mode: null }), snap({ mode: "etude" }))).toBe(true);
+  });
+
+  it("a composeSession change fires in BOTH directions (D86)", () => {
+    expect(shouldScheduleUrlWrite(snap(), snap({ composeSession: SESSION_A }))).toBe(true);
+    expect(shouldScheduleUrlWrite(snap({ composeSession: SESSION_A }), snap())).toBe(true);
+    expect(
+      shouldScheduleUrlWrite(
+        snap({ composeSession: SESSION_A }),
+        snap({ composeSession: SESSION_B }),
+      ),
+    ).toBe(true);
+    // A mixer patch REPLACES the session object -> fires.
+    expect(
+      shouldScheduleUrlWrite(
+        snap({ composeSession: SESSION_A }),
+        snap({ composeSession: { ...SESSION_A, mixer: MIXER_DEFAULTS } }),
+      ),
+    ).toBe(true);
   });
 
   it("globalTranspose changes fire", () => {

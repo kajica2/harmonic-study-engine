@@ -19,6 +19,7 @@
  */
 
 import type { EtudeConstraints } from "../../engine/etude/types";
+import type { ComposeSession } from "../state/sessionStore";
 
 /** The slice of store state the URL writer tracks. The full zustand
  *  state (actions, dirty, pendingModeRequest, ...) is structurally
@@ -27,6 +28,10 @@ export interface UrlSyncSnapshot {
   mode: string | null;
   globalTranspose: number;
   etudeConstraints: EtudeConstraints | null;
+  /** D86 (REQ-IO-50): the compose session rides THIS writer (ADR-015
+   *  single-writer). Reference-compared like etudeConstraints - the
+   *  store replaces, never mutates. */
+  composeSession: ComposeSession | null;
 }
 
 /** True when a store change must be reflected in the URL. */
@@ -37,6 +42,7 @@ export function shouldScheduleUrlWrite(
   return (
     next.mode !== prev.mode ||
     next.globalTranspose !== prev.globalTranspose ||
-    next.etudeConstraints !== prev.etudeConstraints
+    next.etudeConstraints !== prev.etudeConstraints ||
+    next.composeSession !== prev.composeSession
   );
 }

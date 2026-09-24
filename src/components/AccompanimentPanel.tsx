@@ -9,10 +9,11 @@
  * busy reflects the preview RENDER (generation is sync).
  *
  * Honesty surfaces:
- *  - the preview button says "(accompaniment)" - mixing with
- *    originals is S4;
- *  - the tooltip states the tempo OVERRIDE is not applied (TD-043
- *    record-only until S4) + the 90s cap label on longer grids;
+ *  - the preview button says "(accompaniment)" - the full mix lives
+ *    in the S4 mixer below;
+ *  - the tooltip states the EFFECTIVE tempo is used (D79 closed
+ *    TD-043: overrides now bite at the effectiveProject choke point)
+ *    + the 90s cap label on longer grids;
  *  - the staleness chip compares meta.gridFingerprint to the CURRENT
  *    merged grid - zero auto-regenerate (user presses Generate);
  *  - seed semantics tooltip: grid edits shift the stream by design.
@@ -254,8 +255,8 @@ export function AccompanimentPanel({
           disabled={result === null || previewState === "rendering"}
           className="rounded border border-[color:var(--color-border)] px-3 py-1 text-sm text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)] disabled:opacity-40"
           title={
-            "Accompaniment only - mixing with the original tracks comes in the next slice. " +
-            "Uses the project tempo map: the tempo override is NOT applied until the mixer. " +
+            "Accompaniment only - use the mixer below to play the full mix. " +
+            "Uses the effective tempo (overrides applied). " +
             (capped ? "Long chart: preview renders the first 1:30." : "")
           }
           onClick={onPreview}

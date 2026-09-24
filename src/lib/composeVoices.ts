@@ -14,12 +14,24 @@
  *
  * Roles (engine AccompRole): bass = triangle + fast decay; chords =
  * two detuned sines, pluck envelope; pad = filtered saw, slow attack.
+ * S4 (D78/D90) widens the table with the "lead" voice (the original
+ * melody track's recipe) - MixVoice = "lead" | AccompRole; existing
+ * AccompRole callers are unchanged.
+ *
+ * D90 (TD-045a CLOSED): the ADSR event order is computed by the PURE
+ * helper voiceEnvelopeTimes - the release ramp can never be scheduled
+ * before the sustain-hold event (the old inline math could when
+ * durSec + release < attack + decay at fast tempos).
  *
  * Web Audio only (BaseAudioContext - works offline AND realtime); no
  * console outside warn/error paths (none needed here).
  */
 
 import type { AccompRole } from "../../engine/compose/types";
+
+/** S4 (D90): the mixer voices = the generated roles PLUS the original
+ *  group's lead line. AccompRole callers remain valid keys. */
+export type MixVoice = "lead" | AccompRole;
 
 export interface VoiceRecipe {
   readonly oscType: OscillatorType;
@@ -38,7 +50,20 @@ export interface VoiceRecipe {
   readonly peak: number;
 }
 
-export const VOICE_RECIPES: Readonly<Record<AccompRole, VoiceRecipe>> = {
+export const VOICE_RECIPES: Readonly<Record<MixVoice, VoiceRecipe>> = {
+  lead: {
+    // D90: a clear lead line for the original melody tracks (D78) -
+    // sine pair at 3 cents (vs chords' 5), distinct envelope.
+    oscType: "sine",
+    voices: 2,
+    detuneCents: 3,
+    attackSec: 0.01,
+    decaySec: 0.15,
+    sustainLevel: 0.6,
+    releaseSec: 0.1,
+    filterHz: null,
+    peak: 0.35,
+  },
   bass: {
     oscType: "triangle",
     voices: 1,
@@ -78,34 +103,68 @@ export function midiToFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
+/** The five scheduled event times of one ADSR pass (seconds). All
+ *  five are monotone NON-DECREASING by construction (D90 / TD-045a:
+ *  Web Audio requires non-decreasing automation event times; the old
+ *  inline math could order the release ramp BEFORE the sustain hold
+ *  when durSec + releaseSec < attackSec + decaySec, e.g. pad stabs
+ *  at fast tempos). */
+export interface EnvelopeTimes {
+  readonly peakT: number;
+  readonly sustainT: number;
+  readonly holdT: number;
+  readonly endT: number;
+  readonly stopT: number;
+}
+
+/**
+ * Pure envelope math for one note of recipe `r` starting at `start`
+ * with duration `dur`. The clamp (D90):
+ *   endT = max(start + max(0.02, dur), start + attackSec + decaySec)
+ * so the release ramp target (stopT = endT + releaseSec) can never
+ * precede the sustain-hold event.
+ */
+export function voiceEnvelopeTimes(r: VoiceRecipe, start: number, dur: number): EnvelopeTimes {
+  const s = Math.max(0, start);
+  const attack = Math.max(0, r.attackSec);
+  const decay = Math.max(0, r.decaySec);
+  const release = Math.max(0, r.releaseSec);
+  const peakT = s + attack;
+  const sustainT = s + attack + decay;
+  const rawEnd = s + Math.max(0.02, dur);
+  const endT = Math.max(rawEnd, sustainT); // <-- the clamp
+  return { peakT, sustainT, holdT: endT, endT, stopT: endT + release };
+}
+
 /**
  * Schedule ONE voice of the recipe at (whenSec, durSec) with
  * velocity. Pure Web Audio API usage - identical calls in an
  * OfflineAudioContext (S3 preview) or a live AudioContext (S4).
- * Envelope uses exponential ramps (all values kept > 0).
+ * Envelope uses exponential ramps (all values kept > 0); the event
+ * ORDER comes from voiceEnvelopeTimes (D90 - non-decreasing by
+ * construction).
  */
 export function scheduleComposeNote(
   ctx: BaseAudioContext,
   dest: AudioNode,
-  role: AccompRole,
+  voice: MixVoice,
   midi: number,
   whenSec: number,
   durSec: number,
   vel: number,
 ): void {
-  const r = VOICE_RECIPES[role];
+  const r = VOICE_RECIPES[voice];
   const start = Math.max(0, whenSec);
-  const dur = Math.max(0.02, durSec);
   const peak = Math.max(0.002, Math.min(1, vel) * r.peak);
   const sustain = Math.max(0.002, peak * r.sustainLevel);
+  const t = voiceEnvelopeTimes(r, start, durSec);
 
   const env = ctx.createGain();
   env.gain.setValueAtTime(0.0001, start);
-  env.gain.exponentialRampToValueAtTime(peak, start + r.attackSec);
-  env.gain.exponentialRampToValueAtTime(sustain, start + r.attackSec + r.decaySec);
-  const end = start + dur;
-  env.gain.setValueAtTime(sustain, Math.max(end, start + r.attackSec + r.decaySec));
-  env.gain.exponentialRampToValueAtTime(0.0001, end + r.releaseSec);
+  env.gain.exponentialRampToValueAtTime(peak, t.peakT);
+  env.gain.exponentialRampToValueAtTime(sustain, t.sustainT);
+  env.gain.setValueAtTime(sustain, t.holdT);
+  env.gain.exponentialRampToValueAtTime(0.0001, t.stopT);
 
   const tail = env;
   if (r.filterHz !== null) {
@@ -129,6 +188,6 @@ export function scheduleComposeNote(
     }
     osc.connect(tail);
     osc.start(start);
-    osc.stop(end + r.releaseSec + 0.01);
+    osc.stop(t.stopT + 0.01);
   }
 }
