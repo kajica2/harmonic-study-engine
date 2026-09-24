@@ -194,6 +194,13 @@ import {
 // TESTER GAP-1 (fix round): the URL-writer subscription predicate,
 // extracted to a pure + tested module.
 import { shouldScheduleUrlWrite } from "./lib/urlSyncPredicate";
+import {
+  hasComposeParams,
+  parseComposeParams,
+  serializeComposeSession,
+  composeUrlPresence,
+  mergeComposeUrlWithPersisted,
+} from "./lib/composeUrl";
 import type { Etude, EtudeConstraints } from "../engine/etude/types";
 
 // downloadText moved to src/lib/download.ts (extracted by main)
@@ -1335,6 +1342,34 @@ function AppShell() {
       // eslint-disable-next-line no-console
       console.warn("[App] ?etude params malformed; ignoring");
     }
+    // PRD-001 Phase 4 Slice 4 (D86): compose params ride the SAME
+    // boot one-shot. HIGH-001 (S4 fix round): the naive "URL >
+    // persisted" wholesale replace (D28 precedent) LOST fresher
+    // localStorage state whenever the 200ms debounced writer died
+    // before a fast reload (S3 e2e leg-3 flake: seed 43 persisted,
+    // stale 42 in the URL -> 42 restored). Boot now FIELD-WISE MERGES
+    // (composeUrl.mergeComposeUrlWithPersisted): URL wins only for
+    // keys the URL ACTUALLY carries AND only under the identity gate
+    // (same cfile+chash, or both charts); a genuine cross-device
+    // share (empty storage) or a session switch keeps wholesale
+    // URL-wins. A cchart session auto-heals in the surface (pure
+    // rebuild); a cfile session seeds the EXISTING hash-gate prompt
+    // CROSS-DEVICE (REQ-IO-51 - the machinery already shipped; the
+    // URL just carries the identity). Malformed -> warn-and-drop
+    // (?idea=).
+    const composeParsed = parseComposeParams(params);
+    if (composeParsed.session) {
+      useNewSessionStore.getState().restoreComposeSessionFromUrl(
+        mergeComposeUrlWithPersisted(
+          composeParsed.session,
+          composeUrlPresence(params),
+          useNewSessionStore.getState().composeSession,
+        ),
+      );
+    } else if (hasComposeParams(params)) {
+      // eslint-disable-next-line no-console
+      console.warn("[App] ?compose params malformed; ignoring");
+    }
     const resolvedEtude =
       etudeParsed ?? useNewSessionStore.getState().etudeConstraints;
     if (resolvedEtude) {
@@ -1388,6 +1423,17 @@ function AppShell() {
         if (v === null) params.delete(k);
         else params.set(k, v);
       }
+      // PRD-001 Phase 4 Slice 4 (D86): compose keys ride THIS writer
+      // too (ADR-015 - a second debounced writer would race). The
+      // 6000-char governor inside serializeComposeSession wipes the
+      // compose keys (never the practice/etude ones) on overflow;
+      // ComposeSurface shows the honest notice.
+      for (const [k, v] of Object.entries(
+        serializeComposeSession(state.composeSession).record,
+      )) {
+        if (v === null) params.delete(k);
+        else params.set(k, v);
+      }
       const search = params.toString();
       const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
@@ -1402,8 +1448,24 @@ function AppShell() {
         timer = window.setTimeout(write, 200);
       }
     });
+    // HIGH-001 complement (S4 fix round): the 200ms debounce DIES on
+    // reload, so a fast reload's URL carried a STALE compose payload
+    // (the field-wise boot merge in composeUrl.ts is the structural
+    // fix; this flush narrows the stale-URL window to ~ms). pagehide
+    // fires on reload AND tab close in every target browser; the
+    // flush is synchronous (clearTimeout + immediate replaceState),
+    // so the URL matches the store at the unload boundary. No pending
+    // write -> no write (the URL is already current).
+    const flush = () => {
+      if (timer === null) return;
+      window.clearTimeout(timer);
+      timer = null;
+      write();
+    };
+    window.addEventListener("pagehide", flush);
     return () => {
       unsub();
+      window.removeEventListener("pagehide", flush);
       if (timer !== null) window.clearTimeout(timer);
     };
   }, []);

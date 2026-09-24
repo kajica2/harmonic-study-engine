@@ -20,7 +20,8 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import { ComposeSurface } from "./ComposeSurface";
 import { useSessionStore } from "../state/sessionStore";
 import { analyzeFixture, buildMidiBytes, makeMidiFile } from "./composeFixtures";
-import { EMPTY_OVERRIDES } from "../../engine/compose/types";
+import { buildChartSession, parseChordChart } from "../../engine/compose/chordchart";
+import { EMPTY_OVERRIDES, restCell, type AnalysisOverrides, type ComposeAnalysis, type NormalizedProject } from "../../engine/compose/types";
 
 const STORE = useSessionStore.getState;
 
@@ -518,5 +519,204 @@ describe("Phase 4 Slice 3: accompaniment panel host", () => {
     unmount();
     // Idempotent stop on an already-idle singleton must not throw.
     expect(screen.queryByTestId("accompaniment-panel")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 4 (D77/D85, test plan 14): the mixer host. The
+// pinned strings above are UNTOUCHED; the ModeGate suite runs UNEDITED.
+// ---------------------------------------------------------------------------
+
+describe("Phase 4 Slice 4: mixer host (ComposeMixer below AccompanimentPanel)", () => {
+  it("mixer renders in the loaded state, NOT in the empty state", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    expect(screen.queryByTestId("compose-mixer")).toBeNull();
+    await uploadToLoaded("song.mid");
+    expect(screen.getByTestId("compose-mixer")).toBeTruthy();
+    expect(screen.getByTestId("mix-row-original").getAttribute("data-disabled")).toBe("false");
+  });
+
+  it("mute click persists via setComposeMixer and NEVER touches the undo stacks (D85)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    fireEvent.click(screen.getByTestId("mix-mute-bass"));
+    await waitFor(() =>
+      expect(STORE().composeSession?.mixer?.bass.muted).toBe(true),
+    );
+    expect(STORE().composeUndo.length).toBe(0);
+  });
+
+  it("no percussion in the fixture -> plain original row; percussion-only would disclose (D78)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    // The fixture has NO percussion track: no disclosure sub at all.
+    expect(screen.queryByTestId("mix-original-sub")).toBeNull();
+    expect(screen.getByTestId("mix-row-original").getAttribute("data-disabled")).toBe("false");
+  });
+
+  it("Play mix in jsdom: render throws (no OfflineAudioContext) -> state returns to idle (honest failure, S3 pattern)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    fireEvent.click(screen.getByTestId("accomp-generate"));
+    await waitFor(() =>
+      expect((screen.getByTestId("mix-play") as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("mix-play"));
+    await waitFor(() =>
+      expect(screen.getByTestId("mix-play").getAttribute("data-preview")).toBe("idle"),
+    );
+  });
+
+  it("D79: a tempo override flows to effectiveProject (preview + mixer + export inherit)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await uploadToLoaded("song.mid");
+    const tempo = screen.getByTestId("tempo-input");
+    fireEvent.change(tempo, { target: { value: "150" } });
+    fireEvent.keyDown(tempo, { key: "Enter" });
+    await waitFor(() => expect(STORE().composeSession?.overrides.tempoBpm).toBe(150));
+    // The override is TRUE downstream: the roll's time axis consumes
+    // effectiveProject (barlines still == rows after the tempo change).
+    expect(screen.getAllByTestId("roll-barline").length).toBe(
+      screen.getAllByTestId(/^chord-row-/).length,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 4 (D84, test plan 14): chart-paste states.
+// ---------------------------------------------------------------------------
+
+describe("Phase 4 Slice 4: chord-chart paste (REQ-IO-14)", () => {
+  it("empty state: [Paste a chord chart] opens the panel; pinned strings survive", () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    expect(screen.getByText(/Drop a .mid file/i)).toBeTruthy(); // VERBATIM
+    fireEvent.click(screen.getByTestId("paste-chart-button"));
+    expect(screen.getByTestId("chart-paste-panel")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("chart-cancel"));
+    expect(screen.queryByTestId("chart-paste-panel")).toBeNull();
+  });
+
+  it("commit -> chart-loaded: ChartSummaryCard INSTEAD of AnalysisCard + panel + mixer (chart-only row)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    fireEvent.click(screen.getByTestId("paste-chart-button"));
+    fireEvent.change(screen.getByTestId("chart-textarea"), {
+      target: { value: "{key: Bb}\n{tempo: 132}\nBbmaj7 Gm7 Ebmaj7 Ab7" },
+    });
+    fireEvent.click(screen.getByTestId("chart-use"));
+    await waitFor(() => expect(screen.getByTestId("chart-summary-card")).toBeTruthy());
+    expect(screen.queryByTestId("analysis-card")).toBeNull(); // NOT the file card
+    expect(screen.getByTestId("accompaniment-panel")).toBeTruthy();
+    expect(screen.getByTestId("compose-mixer")).toBeTruthy();
+    expect(screen.getByTestId("mix-row-original").getAttribute("data-disabled")).toBe("true");
+    expect(screen.getByTestId("mix-original-sub").textContent).toBe("no file - chart only");
+    expect(STORE().composeSession?.fileName).toBe("Chord chart (pasted)");
+    expect(STORE().composeSession?.fileHash).toBeNull();
+    expect(STORE().composeSession?.chartText).toContain("Bbmaj7");
+    // NO NormalizedProject-from-file: tracks [] (chart-only, D78).
+    expect(STORE().composeProject?.tracks).toEqual([]);
+  });
+
+  it("{style:} directive pre-syncs the request ONCE at commit (suggestion, not lock)", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    fireEvent.click(screen.getByTestId("paste-chart-button"));
+    fireEvent.change(screen.getByTestId("chart-textarea"), {
+      target: { value: "{style: pop}\nC F G Am" },
+    });
+    fireEvent.click(screen.getByTestId("chart-use"));
+    await waitFor(() => expect(screen.getByTestId("chart-summary-card")).toBeTruthy());
+    expect(STORE().composeSession?.request?.styleId).toBe("pop");
+    expect(screen.getByTestId("chart-directives").textContent).toContain("style: pop (suggestion)");
+  });
+
+  it("reload auto-heal: chartText + null project -> rebuilt loaded state, NO re-upload prompt (D84)", async () => {
+    const { project, analysis } = (() => {
+      const chart = parseChordChartFixture("{key: C}\nC Am F G");
+      return chart;
+    })();
+    STORE().setComposeChart("{key: C}\nC Am F G", project, analysis);
+    useSessionStore.setState({ composeProject: null, composeAnalysis: null }); // simulate reload
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("chart-summary-card")).toBeTruthy());
+    expect(screen.queryByTestId("reupload-prompt")).toBeNull(); // charts NEVER prompt
+    expect(STORE().composeProject).not.toBeNull();
+  });
+
+  it("auto-heal preserves persisted chord-cell overrides (restore arm of setComposeChart)", async () => {
+    const { project, analysis } = parseChordChartFixture("C Am F G");
+    STORE().setComposeChart("C Am F G", project, analysis);
+    const patched: AnalysisOverrides = {
+      ...EMPTY_OVERRIDES,
+      chordCells: { "0:0": { ...restCell(), rootPc: 5, qualitySymbol: "maj7", name: "F", isRest: false, confidence: 1, bassPc: null, alternatives: [] } },
+    };
+    STORE().patchComposeOverrides(patched);
+    useSessionStore.setState({ composeProject: null, composeAnalysis: null, composeUndo: [], composeRedo: [] });
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("chart-summary-card")).toBeTruthy());
+    expect(STORE().composeSession?.overrides.chordCells["0:0"]?.rootPc).toBe(5);
+  });
+
+  it("[Edit chart] round trip reopens the panel with the text; [Start over] clears", async () => {
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    fireEvent.click(screen.getByTestId("paste-chart-button"));
+    fireEvent.change(screen.getByTestId("chart-textarea"), { target: { value: "C Am F G" } });
+    fireEvent.click(screen.getByTestId("chart-use"));
+    await waitFor(() => expect(screen.getByTestId("chart-summary-card")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("chart-edit-button"));
+    expect((screen.getByTestId("chart-textarea") as HTMLTextAreaElement).value).toBe("C Am F G");
+    fireEvent.click(screen.getByTestId("chart-cancel"));
+    fireEvent.click(screen.getByTestId("chart-start-over"));
+    await waitFor(() => expect(screen.getByTestId("upload-drop-zone")).toBeTruthy());
+    expect(STORE().composeSession).toBeNull();
+  });
+});
+
+/** Helper: commit-path parse (kept out of the component under test). */
+function parseChordChartFixture(text: string): { project: NormalizedProject; analysis: ComposeAnalysis } {
+  const chart = parseChordChart(text);
+  if (!chart.ok) throw new Error(`fixture chart failed: ${chart.error.message}`);
+  return buildChartSession(chart.value);
+}
+
+// ---------------------------------------------------------------------------
+// TESTER F-3 (S4 fix round): the "Session too large to share via URL"
+// notice RENDER. The governor itself is record-pinned in
+// composeUrl.test.ts (F-2 scope); THESE pins prove the surface says so
+// honestly instead of silently dropping the compose keys.
+// ---------------------------------------------------------------------------
+
+describe("TESTER F-3: oversized-session URL notice (D86/RK-S4-5 governor)", () => {
+  function hugeOverrides(): AnalysisOverrides {
+    return {
+      ...EMPTY_OVERRIDES,
+      chordCells: Object.fromEntries(
+        Array.from({ length: 400 }, (_, i) => [
+          `${i}:0`,
+          { rootPc: 0, qualitySymbol: "maj7", name: "Cmaj7", bassPc: null, confidence: 1, alternatives: [], isRest: false },
+        ]),
+      ),
+    };
+  }
+
+  it("governor tripped -> the honest notice RENDERS with the pinned copy", async () => {
+    const { project, analysis } = parseChordChartFixture("C Am F G");
+    act(() => {
+      STORE().setComposeChart("C Am F G", project, analysis);
+      STORE().patchComposeOverrides(hugeOverrides());
+    });
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("compose-url-notice")).toBeTruthy());
+    expect(screen.getByTestId("compose-url-notice").textContent).toContain(
+      "Session too large to share via URL",
+    );
+  });
+
+  it("normal-size session -> NO notice (the pin is not a blanket)", async () => {
+    const { project, analysis } = parseChordChartFixture("C Am F G");
+    act(() => {
+      STORE().setComposeChart("C Am F G", project, analysis);
+    });
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("chart-summary-card")).toBeTruthy());
+    expect(screen.queryByTestId("compose-url-notice")).toBeNull();
   });
 });

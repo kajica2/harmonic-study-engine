@@ -99,16 +99,25 @@ function intervalName(iv: number): string {
   }
 }
 
-/** gridFingerprint: "bar:rootPc.qualitySymbol" cells joined - pure,
- *  cheap, staleness pin (D71). Rest cells and unknown-quality cells
- *  both serialize as "rest" (what the generator hears). */
+/** gridFingerprint: "bar:rootPc.qualitySymbol[/bassPc]" cells joined -
+ *  pure, cheap, staleness pin (D71). Rest cells and unknown-quality
+ *  cells both serialize as "rest" (what the generator hears).
+ *  D89 (TD-044 CLOSED): bassPc joins the tuple - S4 chart paste makes
+ *  slash-bass cells REACHABLE ("C/E" via the shared grammar), so a
+ *  bassPc-only edit MUST invalidate the staleness chip. The result is
+ *  in-memory-only (D73), so widening the tuple needs NO persisted-
+ *  format migration: old fingerprints die with the reload. */
 export function gridFingerprint(grid: ChordGrid): string {
   return grid.bars
     .map(
       (region) =>
         `${region.bar}:` +
         region.slots
-          .map((c) => (isSounding(c) ? `${c.rootPc}.${c.qualitySymbol}` : "rest"))
+          .map((c) =>
+            isSounding(c)
+              ? `${c.rootPc}.${c.qualitySymbol}${c.bassPc === null ? "" : "/" + c.bassPc}`
+              : "rest",
+          )
           .join(","),
     )
     .join(";");

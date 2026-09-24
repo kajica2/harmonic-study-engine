@@ -424,3 +424,126 @@ recipe S4's player/export absorb unchanged) + `src/lib/composePreview.ts` (Offli
 singleton player: idle -> rendering -> playing -> idle). Store: the
 request is an OPTIONAL field inside the v4 `composeSession` (NO v5 -
 missing fields default at read); the result is in-memory only.
+
+## Phase 4 Slice 4: mixer + export + chord-chart paste + URL (D77..D92, shipped)
+
+### engine/compose/chordsym.ts - the grammar MOVES (D82)
+
+`src/lib/chordInput.ts` was already pure (engine/core/chords +
+compose/types only), so the S4 chart parser's need to reuse THE ONE
+recognizer forced a MOVE, not a copy: `engine/compose/chordsym.ts`
+holds `parseChordSymbol` / `buildCellFromSymbol` /
+`suggestChordSymbols` verbatim; `src/lib/chordInput.ts` is now a
+re-export SHIM (every existing importer compiles untouched). Two
+grammars for one ChordCell contract is exactly the drift the S2
+header warns about - the D61 rule ("REJECT anything the grid cannot
+hold") now also gates the paste path for free. Purity floor 33 -> 35
+(chordsym + chordchart; the tree scans 36).
+
+### engine/compose/chordchart.ts - the CHART GRAMMAR (D83, REQ-IO-10..16)
+
+Pure text -> `ChordChart {directives, grid, bars, warnings}`. The
+grid IS the `ChordGrid` (Phase 5's Explore->Compose handoff needs no
+adapter) and flows UNCHANGED into `generateAccompaniment`.
+
+| Element | Rule | Bad input |
+|---|---|---|
+| `{key: X}` | parseKey; major/minor only | warning + null |
+| `{tempo: N}` | finite number 20..300 | warning + null |
+| `{time: n/d}` | `^(\d{1,2})/(\d)$`, d in {1,2,4,8,16,32}, n 1..16 | warning + null |
+| `{style: s}` | shippedStyleIds() membership | warning + null |
+| unknown `{x:}` | - | warning |
+| body | `\|` stripped, whitespace split, EACH TOKEN = ONE BAR, cap 512 | >512 -> "unsupported: chart too long" |
+| `%` | repeat PREVIOUS bar's cells verbatim | leading `%` -> rest + warning |
+| `-` `0` `r` | restCell() | - |
+| slash rule | parseChordSymbol on the WHOLE token FIRST ("C/E", "G7/B", "C/G" = ONE slash-bass cell); else split on "/" into EXACTLY two sides: both parse -> TWO cells ("C/Am"); one fails -> the parsing side LANDS + warning; 3+ sides -> non-chord. ANY two-cell bar promotes the WHOLE grid to `slotsPerBar: 2` (single-chord bars keep the full bar) | warning, never fatal |
+| non-chord token | restCell() + `bar N: '<tok>' is not a chord symbol` (1-based) | - |
+| non-ASCII token | restCell() + `bar N: non-ASCII token rejected` (the copy never echoes the bad bytes) | - |
+| nothing sounding | - | "unsupported: no chord symbols found" (the ONLY error arm besides the cap) |
+
+RK-S4-4: the "C/G" reading (inversion, NOT two chords) is the
+deterministic consequence of whole-token-first + the D61 chord-tone
+rule. NOTE: the design doc's "Em7/A -> one cell" example is a doc
+erratum - A is not an Em7 chord tone, so the shared grammar rejects
+it whole and the split rule lands TWO cells; the RULE is
+authoritative (pinned in chordchart.test.ts). The editable preview
+(REQ-IO-14) is the user-facing safety valve. On commit the panel
+REGENERATES the chartText from the approved grid (directives
+re-emitted, rests as `-`, two-cell bars joined with "/"), so the
+persisted/URL text re-parses to what the user saw - with ONE
+documented exception: a slash-bass cell INSIDE a two-cell bar joins
+as "C/E/Am", which re-parses as a non-chord token (the "/"-split
+grammar is inherently ambiguous there - the preview is the valve).
+Human-facing grammar: `docs/CHART-FORMAT.md`.
+
+`buildChartSession` constructs the synthetic `NormalizedProject`
+(ppq 480, ONE tempo/meter from directives, tracks [], keySignatures
+from the directive, endTick = bars x ticksPerBar) + `ComposeAnalysis`
+LITERALLY - bypassing normalize/analyze, which fail on zero-note
+input. Mixer, WAV, MIDI and URL never special-case charts.
+
+### Tempo/meter overrides become TRUE (D79, TD-043 closed)
+
+`withTempoOverride` / `withTimeSignatureOverride` (engine/compose/
+tempo.ts, pure, identity-preserving on null) compose at ComposeSurface's
+SINGLE `effectiveProject` choke point - preview, mixer, WAV, MIDI and
+the roll all inherit one truth. The override REPLACES the file's
+tempo map (a fixed practice tempo, documented); no override -> the
+file's map is preserved (both arms pinned by the golden test + e2e).
+
+### Combined MIDI export + the keySig INSERTION (D80, REQ-COMP-40/43)
+
+`src/lib/composeExport.ts` (adapter-land - @tonejs + midi-file): one
+Midi track per ORIGINAL track INCLUDING percussion (export is data,
+not mix - the mixer's D78 drum skip does NOT apply), one per
+generated role (GM 33/0/89, channels = first unused ascending,
+9 reserved-skip), header ppq + tempos + timeSignatures from the
+EFFECTIVE project, originals UNTRANSPOSED, extracted melody NOT a
+track. The @tonejs `encodeKeySignature` is off by +14 (verified
+byte-level) - its path is BYPASSED, never fed: after `toArray()`,
+midi-file's `parseMidi` walks track 0's cumulative deltaTime and
+INSERTS spec-correct `{key, scale}` events, then `writeMidi`. The
+GOLDEN TEST (export -> readMidiFile -> normalize) asserts
+ppq/tempos/timeSignatures/keySignatures EQUALITY + per-track note
+tuples - errata-D6's landmine is now a TESTED pin, not an assumed
+degradation. The 24 canonical (pc, mode) pairs all land in the SMF
+[-7,7] range via spellTonic; out-of-domain names SKIP the event
+(documented degradation; keySig is NOT in REQ-COMP-40's text).
+Filename: `<sanitizedBase>_accomp_<spellTonic>.<ext>`, key segment
+OMITTED on chromaticFallback (never a fake key).
+
+### Mixer architecture C (D77/D78) + WAV (D81)
+
+Per-group BAKED AudioBuffers (4x OfflineAudioContext, one render per
+CONTENT change) played through 4 live GainNodes on the S3 singleton's
+context - knobs are `setTargetAtTime(0.02)` writes, NEVER re-renders;
+sync is sample-accurate by construction (one start instant).
+`computeGroupGains` (pure, table-tested): `level * (muted || (anySolo
+&& !thisSolo) ? 0 : 1)` - MUTE WINS OVER SOLO (a muted+soloed row is
+silent; the design doc's handoff-note "thisSolo wins over muted" is a
+recorded erratum vs its own body formula); `hasOriginal=false` forces
+the original gain to 0. The Original group voices every
+non-percussion track BY ROLE (melody ->
+new "lead" recipe, bass/harmony -> existing recipes, unknown ->
+chords at 0.7x); percussion is SKIPPED with a disclosure label; the
+extracted melody is never re-voiced (no double-line). WAV full mix =
+the same group renders summed at `computeGroupGains` levels,
+peak-normalized (divide by measured peak, CLAMPED to <= 1.0 - never
+amplify), through loopWav's `encodeWav` (REUSED via one added
+`export` keyword - no second RIFF writer). 600s export cap (the 90s
+AUDITION cap does not apply). Stems ZIP stays deferred (TD-046 -
+D77's buffers make it nearly free).
+
+### URL compose keys (D86, REQ-IO-50/51)
+
+`src/lib/composeUrl.ts` (pure): cfile/chash/cchart/creq/covr/canf/
+cmix ride the SINGLE ADR-015 debounced writer (a second writer is
+structurally banned); defaults DELETE their key; a >6000-char
+payload WIPES the compose keys (practice/etude keys survive) and
+ComposeSurface shows the honest "Session too large to share via
+URL." notice. Boot: URL > persisted; cchart auto-heals the chart
+session (pure rebuild, no prompt); cfile+chash seed the EXISTING
+hash-gate prompt CROSS-DEVICE (REQ-IO-51 machinery already shipped).
+`urlSyncPredicate` gained the composeSession term (pin-first).
+/play route deferred (TD-047); compose keyboard routing DECLINED
+(D87) - the pre-existing global-Space quirk is TD-048.

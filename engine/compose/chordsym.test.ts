@@ -1,6 +1,8 @@
 /**
- * src/lib/chordInput.test.ts - PRD-001 Phase 4 Slice 2 (D61, test
- * plan 3). Table-driven BOTH directions: every one of the 17
+ * engine/compose/chordsym.test.ts - PRD-001 Phase 4 Slice 2 (D61,
+ * test plan 3), MOVED with the grammar in D82 (was
+ * src/lib/chordInput.test.ts - same tests, same count, node-env
+ * either way). Table-driven BOTH directions: every one of the 17
  * NAME_SUFFIX spellings + the documented aliases + slash bass must
  * ACCEPT and round-trip to (rootPc, qualitySymbol); anything the
  * ChordCell cannot hold ("C13", "C7#9", ...) must REJECT.
@@ -13,9 +15,9 @@ import {
   parseChordSymbol,
   buildCellFromSymbol,
   suggestChordSymbols,
-} from "./chordInput";
-import { NAME_SUFFIX, QUALITY_INTERVALS } from "../../engine/core/chords";
-import type { KeyCandidate } from "../../engine/compose/types";
+} from "./chordsym";
+import { NAME_SUFFIX, QUALITY_INTERVALS } from "../core/chords";
+import type { KeyCandidate } from "./types";
 
 const C_MAJOR: KeyCandidate = { tonicPc: 0, mode: "major", correlation: 1 };
 const EB_MINOR: KeyCandidate = { tonicPc: 3, mode: "minor", correlation: 1 };

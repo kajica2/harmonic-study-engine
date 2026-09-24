@@ -28,34 +28,55 @@
  * guard replicated verbatim; zero App.tsx edits.
  */
 
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { SynesthesiaCanvas } from "./SynesthesiaCanvas";
 import { SynesthesiaProvider } from "./SynesthesiaProvider";
 import { UploadDropZone } from "./UploadDropZone";
 import { AnalysisCard } from "./AnalysisCard";
 import { AccompanimentPanel } from "./AccompanimentPanel";
+import { ComposeMixer } from "./ComposeMixer";
+import { ChartPastePanel } from "./ChartPastePanel";
 import { ComposePianoRoll, type RollLayer } from "./ComposePianoRoll";
 import { ROLL_PALETTE } from "./EtudePianoRoll";
-import { useSessionStore } from "../state/sessionStore";
+import { useSessionStore, CHART_SESSION_FILE_NAME } from "../state/sessionStore";
 import {
   composePreviewPlayer,
+  computeGroupGains,
+  mapOriginalTracks,
   previewIsCapped,
   renderAccompaniment,
+  renderMixGroups,
+  type MixRenderInput,
   type PreviewState,
 } from "../lib/composePreview";
+import {
+  downloadComposeMidi,
+  exportComposeWav,
+} from "../lib/composeExport";
+import { serializeComposeSession } from "../lib/composeUrl";
 import { readMidiFile, sha256Hex, type ReadableMidiFile } from "../lib/composeMidi";
 import { analyzeProject, generateAccompaniment } from "../../engine/compose";
+import { buildChartSession, parseChordChart, type ChordChart } from "../../engine/compose/chordchart";
+import {
+  withTempoOverride,
+  withTimeSignatureOverride,
+} from "../../engine/compose/tempo";
 import { blendKeyEvidence } from "../../engine/compose/key";
 import { extractMelody } from "../../engine/compose/melody";
 import { getStyleProfile } from "../../engine/styles";
 import {
   EMPTY_OVERRIDES,
   mergeAnalysis,
+  MIXER_DEFAULTS,
   type AccompanimentRequest,
+  type AccompanimentResult,
   type AccompRole,
   type AnalysisError,
   type AnalysisOverrides,
+  type ComposeAnalysis,
   type KeyCandidate,
+  type MixGroup,
+  type MixerState,
   type NormalizedProject,
 } from "../../engine/compose/types";
 
@@ -116,31 +137,39 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
   const [mismatch, setMismatch] = useState<{ fileName: string; file: File } | null>(null);
   const [recentSymbols, setRecentSymbols] = useState<readonly string[]>([]);
   const [previewState, setPreviewState] = useState<PreviewState>("idle");
+  // D84: the chart-paste panel (empty state + [Edit chart] round trip).
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteInitial, setPasteInitial] = useState("");
 
   const overrides: AnalysisOverrides = composeSession?.overrides ?? EMPTY_OVERRIDES;
   const analyzeFull = composeSession?.analyzeFull ?? false;
   // D73 default-at-read: missing persisted request -> the defaults.
   const accompRequest: AccompanimentRequest = composeSession?.request ?? DEFAULT_ACCOMPANIMENT_REQUEST;
   const loaded = composeProject !== null && composeAnalysis !== null && composeSession !== null;
-  const prompt = !loaded && composeSession !== null;
+  // D84: a chart session auto-heals (pure + sub-ms) instead of the
+  // MIDI re-upload prompt - the prompt machinery stays UNTOUCHED for
+  // file sessions.
+  const isChart = loaded && composeSession?.chartText != null;
+  const prompt = !loaded && composeSession !== null && composeSession.chartText == null;
 
   // --- derived truth (memoized; NO engine recompute per render) -----
   // D63: a meter override re-runs the analysis on a patched PROJECT
-  // copy (bar boundaries change); tempo is record-only (no re-run -
-  // the tick grid is tempo-independent).
+  // copy (bar boundaries change); tempo NEVER re-runs the analysis
+  // (the tick grid is tempo-independent).
   // MED-001 (reviewer): the patched project is HOISTED, not built
   // inside the analysis memo and discarded - the SAME effective
-  // project flows to the card and the piano roll, so the roll's
-  // barBoundaries barlines cannot lag the (re-analyzed) chart rows.
+  // project flows to the card, the roll, the preview, the mixer and
+  // the exporters.
+  // D79 (TD-043 CLOSE-OUT): BOTH overrides now land at this single
+  // choke point via the engine's pure helpers - preview, mixer, WAV
+  // and MIDI export all inherit the truth with zero call-site churn.
   const effectiveProject = useMemo<NormalizedProject | null>(() => {
     if (composeProject === null) return null;
-    if (overrides.timeSignature === null) return composeProject;
-    const [num, den] = overrides.timeSignature;
-    return {
-      ...composeProject,
-      timeSignatures: [{ tick: 0, numerator: num, denominator: den }],
-    };
-  }, [composeProject, overrides.timeSignature]);
+    return withTimeSignatureOverride(
+      withTempoOverride(composeProject, overrides.tempoBpm),
+      overrides.timeSignature,
+    );
+  }, [composeProject, overrides.tempoBpm, overrides.timeSignature]);
 
   const effectiveAnalysis = useMemo(() => {
     if (effectiveProject === null || composeAnalysis === null) return null;
@@ -215,10 +244,24 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
       return;
     }
     if (previewState === "rendering") return;
+    // MED-003 (S4 fix round): capture the generation + content
+    // identity - a content change or stop() before the slow offline
+    // render resolves must NEVER play (phantom audio).
+    renderGenRef.current += 1;
+    const gen = renderGenRef.current;
+    const snapResult = accompResult;
+    const snapProject = effectiveProject;
     composePreviewPlayer.markRendering();
     void renderAccompaniment(accompResult, effectiveProject)
-      .then((buf) => composePreviewPlayer.play(buf))
-      .catch(() => composePreviewPlayer.cancel());
+      .then((buf) => {
+        if (gen !== renderGenRef.current) return; // superseded
+        const latest = latestContentRef.current;
+        if (latest.result !== snapResult || latest.project !== snapProject) return; // flipped
+        composePreviewPlayer.play(buf);
+      })
+      .catch(() => {
+        if (gen === renderGenRef.current) composePreviewPlayer.cancel();
+      });
   };
 
   // Preview lifecycle (PHASE-2-01 live gate + PHASE-3-03 StrictMode):
@@ -229,14 +272,178 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
     const unsubscribe = composePreviewPlayer.subscribe(setPreviewState);
     return () => {
       unsubscribe();
+      // MED-003: a resolve AFTER unmount must never touch the player
+      // (post-unmount ghost, up to 90s of audio with no UI to stop it).
+      renderGenRef.current += 1;
       composePreviewPlayer.stop();
     };
   }, []);
   // Re-generate while playing -> stop the stale audition (no-op on
-  // mount, idempotent by design).
+  // mount, idempotent by design). MED-003: the bump kills any render
+  // still in flight from the previous content (its .then goes quiet).
   useEffect(() => {
     composePreviewPlayer.stop();
+    renderGenRef.current += 1;
   }, [accompResult]);
+
+  // --- PRD-001 Phase 4 Slice 4 (D84): chart-paste commit + reload
+  // auto-heal. parse + buildChartSession are PURE + sub-ms; the
+  // one-shot ref keeps StrictMode from re-running the heal (PHASE-3-03).
+  const handleChartCommit = (chartText: string, chart: ChordChart): void => {
+    const { project, analysis } = buildChartSession(chart);
+    const store = useSessionStore.getState();
+    store.setComposeChart(chartText, project, analysis);
+    // D84: the {style:} directive pre-syncs the request ONCE at commit
+    // (a suggestion, not a lock - the panel still owns it after).
+    if (chart.directives.styleId !== null) {
+      const cur = store.composeSession?.request ?? DEFAULT_ACCOMPANIMENT_REQUEST;
+      store.setComposeRequest({
+        ...cur,
+        styleId: chart.directives.styleId,
+        density: getStyleProfile(chart.directives.styleId).rhythm.densityDefault,
+      });
+    }
+    setPasteOpen(false);
+    setPasteInitial("");
+    setError(null);
+  };
+
+  const chartHealRef = useRef(false);
+  useEffect(() => {
+    if (chartHealRef.current) return;
+    const s = useSessionStore.getState();
+    if (s.composeProject !== null || s.composeSession === null) return;
+    const chartText = s.composeSession.chartText;
+    if (chartText == null) return;
+    chartHealRef.current = true;
+    const chart = parseChordChart(chartText);
+    if (!chart.ok) {
+      setError(chart.error); // defensive: persisted text was valid at commit
+      return;
+    }
+    const { project, analysis } = buildChartSession(chart.value);
+    s.setComposeChart(chartText, project, analysis, {
+      // Persisted overrides (chordCells etc.) SURVIVE the rebuild.
+      overrides: s.composeSession.overrides,
+      analyzeFull: false,
+    });
+  }, [composeSession]);
+
+  // --- PRD-001 Phase 4 Slice 4 (D77/D78/D85): the MIXER -------------
+  // Mixer state rides composeSession (per-song taste, D85); default at
+  // read (NO v5). Knobs are LIVE AudioParam writes (applyMix) - the
+  // buffers re-render ONLY on CONTENT change (result/project identity).
+  const mixer: MixerState = composeSession?.mixer ?? MIXER_DEFAULTS;
+  const originalNotes = useMemo(
+    () =>
+      effectiveProject !== null && merged !== null
+        ? mapOriginalTracks(effectiveProject, merged.roles)
+        : [],
+    [effectiveProject, merged],
+  );
+  const hasOriginal = originalNotes.length > 0;
+  const hasPercussion =
+    effectiveProject !== null &&
+    effectiveProject.tracks.some((t) => t.isPercussion && t.notes.length > 0);
+  const mixEndTick = Math.max(
+    effectiveProject?.endTick ?? 0,
+    accompResult?.meta.endTick ?? 0,
+  );
+  const mixInput: MixRenderInput | null =
+    effectiveProject !== null
+      ? { project: effectiveProject, result: accompResult, tracks: originalNotes, endTick: mixEndTick }
+      : null;
+  const canExport = accompResult !== null || originalNotes.length > 0;
+  // D86/RK-S4-5: the writer WIPES the compose keys past the governor;
+  // the surface says so HONESTLY (never silent truncation).
+  const urlTooLarge = useMemo(
+    () => serializeComposeSession(composeSession).tooLarge,
+    [composeSession],
+  );
+  // D77: buffers cached per CONTENT identity (result ref + effective
+  // project ref). Mixer changes NEVER invalidate.
+  const buffersRef = useRef<{
+    readonly result: AccompanimentResult | null;
+    readonly project: NormalizedProject;
+    readonly groups: Partial<Record<MixGroup, AudioBuffer>>;
+  } | null>(null);
+  // MED-003 (S4 fix round): the stale-render guard. A render started,
+  // then content changed (or stop()) before the slow OfflineAudioContext
+  // resolved, must NEVER play (phantom audio) or poison the mix cache -
+  // and a post-unmount resolve must NEVER touch the singleton player
+  // (ghost audio with no UI to stop it). Every render captures its
+  // generation + content identity; the .then arms re-check both before
+  // playing. Generations bump on every new render, on the content-change
+  // stop path below, and on unmount above.
+  const renderGenRef = useRef(0);
+  // Latest content identity, refreshed EVERY render (synchronous - no
+  // effect-vs-resolve task-ordering race: an effect bump could lose to
+  // a resolve task that was already queued).
+  const latestContentRef = useRef<{
+    result: AccompanimentResult | null;
+    project: NormalizedProject | null;
+  }>({ result: null, project: null });
+  latestContentRef.current = { result: accompResult, project: effectiveProject };
+  useEffect(() => {
+    buffersRef.current = null;
+  }, [accompResult, effectiveProject]);
+
+  const handlePlayMix = (): void => {
+    if (mixInput === null) return;
+    if (previewState === "playing") {
+      composePreviewPlayer.stop();
+      return;
+    }
+    if (previewState === "rendering") return;
+    // MED-003: capture generation + identity (same contract as preview).
+    renderGenRef.current += 1;
+    const gen = renderGenRef.current;
+    const snapInput = mixInput;
+    composePreviewPlayer.markRendering();
+    const cached =
+      buffersRef.current !== null &&
+      buffersRef.current.result === mixInput.result &&
+      buffersRef.current.project === mixInput.project
+        ? buffersRef.current.groups
+        : null;
+    const pending = cached !== null ? Promise.resolve(cached) : renderMixGroups(mixInput);
+    void pending
+      .then((groups) => {
+        if (gen !== renderGenRef.current) return; // superseded
+        const latest = latestContentRef.current;
+        if (latest.result !== snapInput.result || latest.project !== snapInput.project) return; // flipped
+        if (cached === null) {
+          buffersRef.current = { result: mixInput.result, project: mixInput.project, groups };
+        }
+        composePreviewPlayer.playMix(groups);
+        composePreviewPlayer.applyMix(computeGroupGains(mixer, hasOriginal));
+      })
+      .catch(() => {
+        if (gen === renderGenRef.current) composePreviewPlayer.cancel();
+      });
+  };
+
+  const handlePatchMixer = (next: MixerState): void => {
+    useSessionStore.getState().setComposeMixer(next);
+    // LIVE: instant AudioParam writes, zero re-render (D77).
+    composePreviewPlayer.applyMix(computeGroupGains(next, hasOriginal));
+  };
+
+  const handleExportMidi = (): void => {
+    if (effectiveProject === null || merged === null) return;
+    downloadComposeMidi(
+      { project: effectiveProject, result: accompResult, roles: merged.roles },
+      accompKey,
+    );
+  };
+
+  const handleExportWav = (): void => {
+    if (mixInput === null) return;
+    void exportComposeWav(mixInput, mixer, hasOriginal, accompKey).catch(() => {
+      // Real failure path (render/encode): warn-only, silent UI.
+      console.warn("[ComposeSurface] WAV export failed");
+    });
+  };
 
   const accompLayers: readonly RollLayer[] | undefined =
     accompResult === null
@@ -406,19 +613,50 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
                   {notice}
                 </p>
               )}
-              <AnalysisCard
-                project={effectiveProject}
-                merged={merged}
-                blend={blend}
-                inferredCandidate={inferredCandidate}
-                overrides={overrides}
-                onPatch={(next) => useSessionStore.getState().patchComposeOverrides(next)}
-                analyzeFull={analyzeFull}
-                onAnalyzeFull={(b) => useSessionStore.getState().setComposeAnalyzeFull(b)}
-                onStartOver={startOver}
-                recentSymbols={recentSymbols}
-                onSymbolApplied={noteSymbol}
-              />
+              {urlTooLarge && (
+                <p
+                  className="mb-3 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-300"
+                  data-testid="compose-url-notice"
+                >
+                  {"Session too large to share via URL."}
+                </p>
+              )}
+              {isChart && pasteOpen ? (
+                // D84 [Edit chart] round trip: the panel REPLACES the
+                // summary card while editing; commit rebuilds the session.
+                <ChartPastePanel
+                  initialText={pasteInitial}
+                  onCommit={handleChartCommit}
+                  onCancel={() => {
+                    setPasteOpen(false);
+                    setPasteInitial("");
+                  }}
+                />
+              ) : isChart ? (
+                <ChartSummaryCard
+                  chartText={composeSession?.chartText ?? ""}
+                  analysis={merged}
+                  onEdit={() => {
+                    setPasteInitial(composeSession?.chartText ?? "");
+                    setPasteOpen(true);
+                  }}
+                  onStartOver={startOver}
+                />
+              ) : (
+                <AnalysisCard
+                  project={effectiveProject}
+                  merged={merged}
+                  blend={blend}
+                  inferredCandidate={inferredCandidate}
+                  overrides={overrides}
+                  onPatch={(next) => useSessionStore.getState().patchComposeOverrides(next)}
+                  analyzeFull={analyzeFull}
+                  onAnalyzeFull={(b) => useSessionStore.getState().setComposeAnalyzeFull(b)}
+                  onStartOver={startOver}
+                  recentSymbols={recentSymbols}
+                  onSymbolApplied={noteSymbol}
+                />
+              )}
               <div className="mt-4">
                 <AccompanimentPanel
                   grid={merged.grid}
@@ -435,6 +673,26 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
                   onGenerate={handleGenerate}
                   onPreview={handlePreview}
                 />
+                <div className="mt-4">
+                  <ComposeMixer
+                    mixer={mixer}
+                    hasOriginal={hasOriginal}
+                    originalLabel={
+                      isChart
+                        ? "no file - chart only"
+                        : hasPercussion
+                          ? "Original (drums not played)"
+                          : ""
+                    }
+                    previewState={previewState}
+                    canExport={canExport}
+                    onPatchMixer={handlePatchMixer}
+                    onPlay={handlePlayMix}
+                    onStop={() => composePreviewPlayer.stop()}
+                    onExportMidi={handleExportMidi}
+                    onExportWav={handleExportWav}
+                  />
+                </div>
                 {accompResult !== null && (
                   <div className="mt-3" data-testid="accompaniment-roll">
                     <p className="t-label mb-1 text-[color:var(--color-text-3)]">
@@ -510,13 +768,40 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
               <div className="w-full max-w-md">
                 <UploadDropZone onFile={(file) => void handleFile(file)} busy={busy} />
               </div>
-              <button
-                type="button"
-                onClick={onOpenImportExport}
-                className="px-4 py-2 rounded-lg bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-strong)] text-[color:var(--color-text-inverse)] text-sm font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400/60"
-              >
-                Open import / export
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={onOpenImportExport}
+                  className="px-4 py-2 rounded-lg bg-[color:var(--color-brand)] hover:bg-[color:var(--color-brand-strong)] text-[color:var(--color-text-inverse)] text-sm font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400/60"
+                >
+                  Open import / export
+                </button>
+                {/* D84 (REQ-IO-14): chart-paste entry - a SECONDARY
+                    button; the three ModeGate-pinned strings above are
+                    VERBATIM (presence pins, additive element legal -
+                    S2 drop-zone precedent). */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasteInitial("");
+                    setPasteOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-[color:var(--color-border)] text-sm text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+                  data-testid="paste-chart-button"
+                >
+                  Paste a chord chart
+                </button>
+              </div>
+              {pasteOpen && (
+                <ChartPastePanel
+                  initialText={pasteInitial}
+                  onCommit={handleChartCommit}
+                  onCancel={() => {
+                    setPasteOpen(false);
+                    setPasteInitial("");
+                  }}
+                />
+              )}
             </>
           )}
         </div>
@@ -529,5 +814,63 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
         leaves this tab.
       </aside>
     </section>
+  );
+};
+
+
+/**
+ * D84: the loaded-chart header (INSTEAD of AnalysisCard - the card's
+ * key-confidence / melody-track UI is meaningless for a pasted
+ * chart). Directives readout + [Edit chart] round trip + [Start over].
+ * The styleId readout is honest: a SUGGESTION applied at commit, the
+ * panel owns it after.
+ */
+const ChartSummaryCard: React.FC<{
+  chartText: string;
+  analysis: Pick<ComposeAnalysis, "key" | "grid">;
+  onEdit: () => void;
+  onStartOver: () => void;
+}> = ({ chartText, analysis, onEdit, onStartOver }) => {
+  const chart = parseChordChart(chartText); // pure + sub-ms (heal already ran)
+  const d = chart.ok ? chart.value.directives : null;
+  const NAMES: readonly string[] = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+  const keySeg = analysis.key.chromaticFallback || analysis.key.candidates.length === 0
+    ? "none (chromatic)"
+    : `${NAMES[analysis.key.candidates[0].tonicPc]} ${analysis.key.candidates[0].mode}`;
+  return (
+    <div
+      className="rounded-[var(--radius-md)] border border-[color:var(--color-border)] bg-black/20 p-4 flex flex-col gap-2"
+      data-testid="chart-summary-card"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-[color:var(--color-text-1)]">
+          {CHART_SESSION_FILE_NAME}
+        </h2>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded border border-[color:var(--color-border)] px-2 py-0.5 text-xs text-[color:var(--color-text-2)]"
+            data-testid="chart-edit-button"
+          >
+            Edit chart
+          </button>
+          <button
+            type="button"
+            onClick={onStartOver}
+            className="rounded border border-[color:var(--color-border)] px-2 py-0.5 text-xs text-[color:var(--color-text-2)]"
+            data-testid="chart-start-over"
+          >
+            Start over
+          </button>
+        </div>
+      </div>
+      <p className="t-small text-[color:var(--color-text-2)]" data-testid="chart-directives">
+        {`${analysis.grid.bars.length} bars - key: ${keySeg}`}
+        {d?.tempoBpm != null ? ` - tempo: ${d.tempoBpm}` : ""}
+        {d?.timeSignature != null ? ` - time: ${d.timeSignature[0]}/${d.timeSignature[1]}` : ""}
+        {d?.styleId != null ? ` - style: ${d.styleId} (suggestion)` : ""}
+      </p>
+    </div>
   );
 };

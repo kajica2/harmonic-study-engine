@@ -11,6 +11,8 @@ import {
   confidenceTier,
   mergeAnalysis,
   EMPTY_OVERRIDES,
+  MIXER_DEFAULTS,
+  MIX_GROUPS,
   restCell,
 } from "./types";
 import { generateAccompaniment, gridFingerprint } from "./accompany";
@@ -306,5 +308,31 @@ describe("Phase 4 Slice 3: accompaniment type literals (D71)", () => {
     };
     expect(gridFingerprint(rested)).not.toBe(fp);
     expect(gridFingerprint(rested)).toContain("rest");
+  });
+});
+
+// PRD-001 Phase 4 Slice 4 (D85, test plan 5): mixer data shapes.
+describe("MIXER_DEFAULTS + MixGroup exhaustiveness (D85)", () => {
+  it("MIX_GROUPS is the 4-group PRD contract (W1: not a DAW)", () => {
+    expect([...MIX_GROUPS].sort()).toEqual(["bass", "chords", "original", "pad"]);
+  });
+
+  it("MIXER_DEFAULTS has an entry for every group, levels in (0,1], pad at the 0.8 taste default", () => {
+    for (const g of MIX_GROUPS) {
+      const m = MIXER_DEFAULTS[g];
+      expect(m.level).toBeGreaterThan(0);
+      expect(m.level).toBeLessThanOrEqual(1);
+      expect(m.muted).toBe(false);
+      expect(m.solo).toBe(false);
+    }
+    expect(MIXER_DEFAULTS.pad.level).toBeCloseTo(0.8, 9);
+    expect(MIXER_DEFAULTS.original.level).toBe(1);
+    expect(MIXER_DEFAULTS.bass.level).toBe(1);
+    expect(MIXER_DEFAULTS.chords.level).toBe(1);
+  });
+
+  it("MIXER_DEFAULTS is frozen (shared default must never be mutated by a UI patch)", () => {
+    expect(Object.isFrozen(MIXER_DEFAULTS)).toBe(true);
+    expect(Object.isFrozen(MIXER_DEFAULTS.pad)).toBe(true);
   });
 });

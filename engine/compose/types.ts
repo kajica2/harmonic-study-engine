@@ -367,6 +367,36 @@ export function confidenceTier(c: number): ConfidenceTier {
   return "manual";
 }
 
+/**
+ * PRD-001 Phase 4 Slice 4 (D77/D78/D85): the mixer's four GROUPS -
+ * exactly the PRD sec 7.2 contract (W1: NOT a DAW). "original" is the
+ * file's non-percussion tracks voiced by role (D78); the other three
+ * are the generated roles. Plain serializable session data (the store,
+ * the mixer UI and the player all import from the engine model).
+ */
+export type MixGroup = "original" | "bass" | "chords" | "pad";
+
+export const MIX_GROUPS: readonly MixGroup[] = ["original", "bass", "chords", "pad"];
+
+export interface MixerGroupState {
+  /** 0..1 linear gain (D88: knobs LOWER the mix, never boost). */
+  readonly level: number;
+  readonly muted: boolean;
+  readonly solo: boolean;
+}
+
+export type MixerState = { readonly [g in MixGroup]: MixerGroupState };
+
+/** D85 defaults: pad at 0.8 is the TASTE default (its recipe peak is
+ *  already the lowest; documented, and it doubles as the D88 data-level
+ *  mitigation - no limiter). muted/solo false everywhere. */
+export const MIXER_DEFAULTS: MixerState = Object.freeze({
+  original: Object.freeze({ level: 1, muted: false, solo: false }),
+  bass: Object.freeze({ level: 1, muted: false, solo: false }),
+  chords: Object.freeze({ level: 1, muted: false, solo: false }),
+  pad: Object.freeze({ level: 0.8, muted: false, solo: false }),
+});
+
 function sameKey(a: KeyCandidate, b: KeyCandidate): boolean {
   return a.tonicPc === b.tonicPc && a.mode === b.mode;
 }

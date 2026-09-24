@@ -152,7 +152,15 @@ export function analyzeProject(
 // Public surface (S2/S3/S4 import from here or the feature modules).
 export * from "./types";
 export { normalizeMidiJson, MAX_NOTES } from "./normalize";
-export { ticksPerBar, barBoundaries, ticksToSeconds, secondsToTicks, defaultWindow } from "./tempo";
+export {
+  ticksPerBar,
+  barBoundaries,
+  ticksToSeconds,
+  secondsToTicks,
+  defaultWindow,
+  withTempoOverride,
+  withTimeSignatureOverride,
+} from "./tempo";
 export { classifyRoles, ROLE_WEIGHTS, ROLE_THRESHOLDS } from "./roles";
 export { detectKey, pcProfile, pearson, KK_MAJOR, KK_MINOR, KEY_THRESHOLDS } from "./key";
 export { extractMelody } from "./melody";
@@ -176,3 +184,14 @@ export {
   cellGeometry,
   swingOnsets,
 } from "./accompany";
+// PRD-001 Phase 4 Slice 4 (D83): the chord-chart paste surface (the
+// grammar itself, chordsym.ts, is consumed via its own module - the
+// src-side shim re-exports it for existing importers).
+export {
+  parseChordChart,
+  buildChartSession,
+  CHART_PPQ,
+  CHART_MAX_BARS,
+  type ChartDirectives,
+  type ChordChart,
+} from "./chordchart";

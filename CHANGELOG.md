@@ -81,6 +81,78 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Mixer + exports + chord-chart paste + session URL (PRD-001
+  Phase 4 slice 4, D77..D92)** -- the final Phase 4 slice. MIXER
+  (REQ-COMP-37, architecture C per D77 -- a DELIBERATE parent-
+  intent delta vs D50's live-scheduler sketch: per-group BAKED
+  AudioBuffers + live GainNode buses instead of a from-scratch
+  mini-transport; knobs are instant AudioParam writes, re-render
+  only on content change, zero new transport surface): 4 rows
+  (Original/Bass/Chords/Pad), level + mute/solo -- gain math
+  AS PINNED by computeGroupGains: level * (muted || anySolo &&
+  !thisSolo ? 0 : 1), i.e. MUTE WINS OVER SOLO (the design doc's
+  handoff note "thisSolo wins over muted" contradicts its own body
+  formula; the shipped + table-tested behavior is authoritative),
+  [Play mix] on the ABSORBED S3 singleton (state machine +
+  pure-surface tests survive unedited), solo dims via data-dimmed,
+  honest disclosures
+  ("Original (drums not played)" / "no file - chart only").
+  ORIGINAL-GROUP VOICING (D78): every non-percussion track voiced
+  BY ROLE (new "lead" recipe for melody; bass/chords recipes reused;
+  unknown at 0.7x), percussion skipped WITH disclosure, the
+  extracted melody never re-voiced (no double line). TEMPO TRUTH
+  (D79, TD-043 CLOSED): withTempoOverride/withTimeSignatureOverride
+  at the single effectiveProject choke point -- preview, mixer, WAV,
+  MIDI and the roll all inherit; the previously-LYING tooltips are
+  now true (AnalysisCard string untouched; the S3 panel string
+  updated in panel + its component test). EXPORTS: combined MIDI
+  (REQ-COMP-40 -- originals incl. drums untransposed + generated
+  roles with GM programs, effective tempo map + time sigs;
+  keySignatures via midi-file EVENT INSERTION bypassing the
+  verified +14-off @tonejs encoder -- the GOLDEN TEST asserts
+  export->parse->normalize EQUALITY, killing errata-D6's landmine
+  with a test; midi-file is a package.json DECLARATION of an
+  already-bundled dep, zero downloads) + full-mix WAV (REQ-COMP-41
+  -- renderMixGroups internals summed at computeGroupGains levels,
+  peak-normalized clamped <=1.0, loopWav's encodeWav REUSED via one
+  export keyword, 600s cap) + effective-key filenames (REQ-COMP-43
+  -- spellTonic, key segment omitted on chromaticFallback, never a
+  fake key). CHART PASTE (REQ-IO-10..16): the chord grammar MOVES
+  to engine/compose/chordsym.ts (D82, shim keeps importers alive;
+  purity floor 33->35) so engine/compose/chordchart.ts (D83) can
+  reuse THE ONE recognizer -- directives {key:} {tempo:} {time:}
+  {style:}, whitespace tokens = bars, % repeat, | stripped, the
+  deterministic whole-token-first SLASH RULE (RK-S4-4; the doc's
+  "Em7/A" example is a pinned erratum -- split lands two cells),
+  non-chord tokens warn never fail; the EDITABLE preview
+  (REQ-IO-14) commits a chartText regenerated from the approved
+  grid so it re-parses to what the user saw (ONE documented
+  exception: a slash-bass cell inside a two-cell bar joins as
+  "C/E/Am" and re-parses non-chord - the preview is the valve).
+  Human grammar reference: docs/CHART-FORMAT.md. STORE: chartText
+  + mixer persist as OPTIONAL v4 fields, NO v5 (D84/D85 -- mixer is
+  per-song taste, kept on file
+  swap like the request). URL (D86, REQ-IO-50/51): 7 compose keys
+  ride the SINGLE ADR-015 debounced writer (~22 sanctioned App
+  lines: boot read + writer merge), 6000-char governor + honest
+  too-large notice, cfile/chash seed the EXISTING hash-gate prompt
+  cross-device, cchart auto-heals with no upload. GAP-3/TD-044
+  CLOSED (fingerprint honors bassPc -- chart paste makes slash
+  cells reachable); LOW-1/TD-045a CLOSED (voiceEnvelopeTimes clamp,
+  pure + pinned). D87 second parent-intent delta: NO compose
+  keyboard routing (button-only mixer; the pre-existing global-
+  Space wart is TD-048). Stems ZIP + /play DEFERRED (TD-046/047,
+  parent X10). e2e: new 6-leg spec (mixer state, tempo truth via a
+  REAL download parse, export fidelity incl. the keySig round-trip,
+  WAV magic + filename, chart-paste journey, fresh-context URL
+  round-trip); the S3 spec survives UNEDITED (D92.7). Gates:
+  lint + 2129/1/2 unit (the 2 failures are UNRELATED CSS-restyle
+  WIP riding in the same worktree - FormPlanner/FormTemplatePicker
+  class-string pins vs their unmodified tests; NOT S4 code, and
+  they pass on HEAD) + build x2 + check-links 362 +
+  check:paths 36/36 + e2e 15/15. HONESTY: the human LISTEN CHECK
+  is OPEN -- mixer AUDIO QUALITY + WAV-listen remain human-gated
+  (RK-S4-1) -- bytes and state machines are pinned, ears are not.
 - **Accompaniment generation + pattern library + preview (PRD-001
   Phase 4 slice 3, D66..D76)** -- the chart gets a voice. `engine/
   compose/patterns.ts` AUTHORS the PRD's missing "Pattern Library

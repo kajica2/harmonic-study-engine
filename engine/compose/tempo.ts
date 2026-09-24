@@ -128,3 +128,40 @@ export function defaultWindow(project: NormalizedProject): AnalysisWindow {
   const toTick = Math.round(secondsToTicks(project, 240));
   return { fromTick: 0, toTick };
 }
+
+/**
+ * PRD-001 Phase 4 Slice 4 (D79, TD-043 CLOSE-OUT): the tempo override
+ * as a PURE project transform, applied at the single effectiveProject
+ * choke point so preview / mixer / WAV / MIDI all inherit the truth.
+ *
+ * Semantics (documented honesty): a fixed PRACTICE tempo, not a
+ * tempo-map edit - the override REPLACES the file's map with a single
+ * tick-0 tempo. `bpm === null` returns the SAME object (identity
+ * preserved - memo-friendly). A non-finite or non-positive bpm is
+ * treated as null (defensive: garbage must never poison
+ * ticksToSeconds).
+ */
+export function withTempoOverride(
+  project: NormalizedProject,
+  bpm: number | null,
+): NormalizedProject {
+  if (bpm === null || !Number.isFinite(bpm) || bpm <= 0) return project;
+  return { ...project, tempos: [{ tick: 0, bpm }] };
+}
+
+/**
+ * D79: the meter override hoisted from ComposeSurface's inline patch
+ * (byte-identical to the shipped S2 behavior - one truth, no change).
+ * `ts === null` returns the SAME object (identity preserved).
+ */
+export function withTimeSignatureOverride(
+  project: NormalizedProject,
+  ts: readonly [number, number] | null,
+): NormalizedProject {
+  if (ts === null) return project;
+  const [num, den] = ts;
+  return {
+    ...project,
+    timeSignatures: [{ tick: 0, numerator: num, denominator: den }],
+  };
+}

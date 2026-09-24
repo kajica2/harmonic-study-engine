@@ -14,6 +14,8 @@ import {
   ticksToSeconds,
   secondsToTicks,
   defaultWindow,
+  withTempoOverride,
+  withTimeSignatureOverride,
 } from "./tempo";
 import type { NormalizedProject, ProjectTimeSignature } from "./types";
 
@@ -133,5 +135,65 @@ describe("defaultWindow (REQ-COMP-53)", () => {
     const p = proj({ endTick: 100000 });
     const w = defaultWindow(p);
     expect(p.endTick > w.toTick).toBe(false);
+  });
+});
+
+// PRD-001 Phase 4 Slice 4 (D79, TD-043 CLOSE-OUT): the override
+// transforms at the effectiveProject choke point.
+describe("withTempoOverride (D79)", () => {
+  const map = proj({ tempos: [{ tick: 0, bpm: 120 }, { tick: 4800, bpm: 96 }] });
+
+  it("null returns the SAME object (identity preserved, memo-friendly)", () => {
+    expect(withTempoOverride(map, null)).toBe(map);
+  });
+
+  it("a bpm REPLACES the whole map with one tick-0 tempo (practice tempo, not a map edit)", () => {
+    const out = withTempoOverride(map, 150);
+    expect(out).not.toBe(map);
+    expect(out.tempos).toEqual([{ tick: 0, bpm: 150 }]);
+    // Everything else survives untouched.
+    expect(out.ppq).toBe(map.ppq);
+    expect(out.tracks).toBe(map.tracks);
+    expect(out.endTick).toBe(map.endTick);
+  });
+
+  it("the override is audible in the tempo math: 1920 ticks = 4 beats at the override bpm", () => {
+    const out = withTempoOverride(map, 150);
+    expect(ticksToSeconds(out, 480)).toBeCloseTo(60 / 150, 9);
+    // Past the old second-tempo tick the map is GONE - still 150.
+    expect(ticksToSeconds(out, 9600)).toBeCloseTo((9600 / 480) * (60 / 150), 9);
+  });
+
+  it("garbage bpm (non-finite / <= 0) degrades to identity, never poisons the map", () => {
+    expect(withTempoOverride(map, Number.NaN)).toBe(map);
+    expect(withTempoOverride(map, Infinity)).toBe(map);
+    expect(withTempoOverride(map, 0)).toBe(map);
+    expect(withTempoOverride(map, -40)).toBe(map);
+  });
+});
+
+describe("withTimeSignatureOverride (D79 - hoisted from ComposeSurface, byte-identical)", () => {
+  const p = proj({ timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }, { tick: 3840, numerator: 3, denominator: 4 }] });
+
+  it("null returns the SAME object", () => {
+    expect(withTimeSignatureOverride(p, null)).toBe(p);
+  });
+
+  it("a ts replaces the list with one tick-0 entry (the exact shape S2 shipped inline)", () => {
+    const out = withTimeSignatureOverride(p, [6, 8]);
+    expect(out).not.toBe(p);
+    expect(out.timeSignatures).toEqual([{ tick: 0, numerator: 6, denominator: 8 }]);
+    // Byte-equal to the pre-hoist inline patch:
+    expect(out.timeSignatures).toEqual([
+      { tick: 0, numerator: 6, denominator: 8 },
+    ]);
+    expect(out.tempos).toBe(p.tempos);
+    expect(out.tracks).toBe(p.tracks);
+  });
+
+  it("the override drives barBoundaries (6/8 at ppq 480 -> 1440-tick bars)", () => {
+    const out = withTimeSignatureOverride(proj({ endTick: 2880 }), [6, 8]);
+    const bars = barBoundaries(out);
+    expect(bars.map((b) => b.endTick)).toEqual([1440, 2880]);
   });
 });

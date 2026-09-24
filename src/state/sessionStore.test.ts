@@ -23,6 +23,7 @@ import {
   SESSION_STORAGE_KEY,
   CURRENT_SESSION_VERSION,
   COMPOSE_UNDO_CAP,
+  CHART_SESSION_FILE_NAME,
   isMode,
   MODES,
   resolveEffectiveMode,
@@ -1027,5 +1028,170 @@ describe("Phase 4 Slice 3: accompaniment request + result (D73)", () => {
     expect(s.composeSession?.request).toEqual(REQUEST); // restored
     expect(s.composeAccompaniment).toBeNull(); // never was persisted
     // Generation stays EXPLICIT: rehydration never invents a result.
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 4 Slice 4 (D84/D85, test plan 10): chart text + mixer
+// persist INSIDE the v4 composeSession - NO v5, defaults at read.
+// ---------------------------------------------------------------------------
+
+describe("Phase 4 Slice 4: chartText + mixer optional fields, NO v5 (D84/D85)", () => {
+  beforeEach(() => {
+    STORE_API().clearCompose();
+  });
+
+  const REQUEST4 = {
+    version: 1,
+    styleId: "jazz",
+    roles: ["bass", "chords"],
+    density: 3,
+    seed: 42,
+  } as const;
+  const MIXER = {
+    original: { level: 0.5, muted: false, solo: false },
+    bass: { level: 1, muted: true, solo: false },
+    chords: { level: 0.8, muted: false, solo: true },
+    pad: { level: 0.8, muted: false, solo: false },
+  } as const;
+
+  it("OLD v4 payloads WITHOUT chartText/mixer hydrate default-at-read (CURRENT_SESSION_VERSION stays 4)", () => {
+    const legacy = {
+      state: {
+        mode: "compose",
+        composeSession: {
+          fileName: "old.mid",
+          fileHash: null,
+          overrides: EMPTY_OVERRIDES,
+          analyzeFull: false,
+        },
+      },
+      version: 4,
+    };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(legacy));
+    useSessionStore.persist.rehydrate();
+    const s = STORE_API();
+    expect(CURRENT_SESSION_VERSION).toBe(4);
+    expect(s.composeSession?.chartText ?? null).toBeNull(); // default at read
+    expect(s.composeSession?.mixer ?? null).toBeNull();
+  });
+
+  it("setComposeChart stores the chart identity + text + synthetic project; KEEPS request + mixer; NULLS the result", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: "h" });
+    STORE_API().setComposeRequest(REQUEST4);
+    STORE_API().setComposeMixer(MIXER);
+    STORE_API().setComposeAccompaniment({
+      version: 1,
+      generated: { bass: [], chords: [], pad: [] },
+      meta: {
+        version: 1, styleId: "jazz", density: 3, seed: 42, roles: ["bass", "chords"],
+        patternIds: { bass: "walking", chords: "freddieGreen", pad: "sustain" },
+        voicingStyle: "drop2", swingRatioApplied: 0.64, gridDivisions: 2,
+        registersUsed: { bass: [28, 48], chords: [48, 72], pad: [60, 84] },
+        transpose: 0, noteCounts: { bass: 0, chords: 0, pad: 0 },
+        rootlessCount: 0, quartalFallbackCount: 0, unknownQualityCount: 0,
+        bars: 0, endTick: 0, gridFingerprint: "x",
+      },
+      annotations: [],
+    });
+    const cp = fixtureProject(); // stand-in synthetic project (shape is what matters)
+    STORE_API().setComposeChart("{key: C}\nC F G", cp, fixtureAnalysis(cp));
+    const s = STORE_API();
+    expect(s.composeSession?.fileName).toBe(CHART_SESSION_FILE_NAME);
+    expect(s.composeSession?.fileHash).toBeNull(); // a chart has NO file identity
+    expect(s.composeSession?.chartText).toBe("{key: C}\nC F G");
+    expect(s.composeSession?.request).toEqual(REQUEST4); // taste KEEPS
+    expect(s.composeSession?.mixer).toEqual(MIXER); // taste KEEPS
+    expect(s.composeSession?.overrides).toEqual(EMPTY_OVERRIDES);
+    expect(s.composeAccompaniment).toBeNull(); // grid-derived result NULLed
+    expect(s.composeUndo).toEqual([]);
+    expect(s.composeProject).toBe(cp);
+  });
+
+  it("setComposeChart restore arm: persisted overrides SURVIVE the auto-heal rebuild (D84 reload)", () => {
+    const cp = fixtureProject();
+    const v1 = { ...EMPTY_OVERRIDES, tempoBpm: 128 };
+    STORE_API().setComposeChart("{key: C}\nC F", cp, fixtureAnalysis(cp), {
+      overrides: v1,
+      analyzeFull: false,
+    });
+    expect(STORE_API().composeSession?.overrides).toEqual(v1);
+  });
+
+  it("setComposeFile CLEARS chartText (a real file supersedes a chart) and KEEPS the mixer", () => {
+    const cp = fixtureProject();
+    STORE_API().setComposeChart("C F G", cp, fixtureAnalysis(cp));
+    STORE_API().setComposeMixer(MIXER);
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "song.mid", fileHash: "h" });
+    const s = STORE_API();
+    expect(s.composeSession?.chartText).toBeNull(); // CLEARED
+    expect(s.composeSession?.mixer).toEqual(MIXER); // KEPT (D85)
+    expect(s.composeProject).toBe(p);
+  });
+
+  it("setComposeMixer persists inside composeSession and does NOT touch undo (D85/D59)", () => {
+    const p = fixtureProject();
+    STORE_API().setComposeFile(p, fixtureAnalysis(p), { fileName: "fx.mid", fileHash: null });
+    STORE_API().patchComposeOverrides({ ...EMPTY_OVERRIDES, tempoBpm: 100 });
+    const undoBefore = STORE_API().composeUndo.length;
+    STORE_API().setComposeMixer(MIXER);
+    const s = STORE_API();
+    expect(s.composeSession?.mixer).toEqual(MIXER);
+    expect(s.composeUndo.length).toBe(undoBefore); // UNCHANGED
+    expect(s.composeRedo).toEqual([]);
+  });
+
+  it("setComposeMixer is a no-op WITHOUT a session (taste needs a home)", () => {
+    STORE_API().setComposeMixer(MIXER);
+    expect(STORE_API().composeSession).toBeNull();
+  });
+
+  it("restoreComposeSessionFromUrl replaces the session wholesale (URL > persisted, D86)", () => {
+    const session = {
+      fileName: "url-song.mid",
+      fileHash: "abc123",
+      overrides: { ...EMPTY_OVERRIDES, tempoBpm: 150 },
+      analyzeFull: true,
+      request: REQUEST4,
+      mixer: MIXER,
+      chartText: null,
+    };
+    STORE_API().restoreComposeSessionFromUrl(session);
+    expect(STORE_API().composeSession).toEqual(session);
+    // In-memory slots untouched (boot-time: they are null anyway).
+    expect(STORE_API().composeProject).toBeNull();
+  });
+
+  it("partialize round-trip: chartText + mixer persist; version stays 4; result still excluded", async () => {
+    const cp = fixtureProject();
+    STORE_API().setComposeChart("{key: C}\nC Am F G", cp, fixtureAnalysis(cp));
+    STORE_API().setComposeMixer(MIXER);
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY) as string;
+    const parsed = JSON.parse(raw) as { state: Record<string, unknown>; version: number };
+    expect(parsed.version).toBe(4); // NO v5 (D85)
+    const session = parsed.state.composeSession as Record<string, unknown>;
+    expect(session.chartText).toBe("{key: C}\nC Am F G");
+    expect(session.mixer).toEqual(MIXER);
+    expect(parsed.state.composeAccompaniment).toBeUndefined();
+    // Rehydrate restores both.
+    STORE_API().clearCompose();
+    localStorage.setItem(SESSION_STORAGE_KEY, raw); // clearCompose re-persisted null
+    useSessionStore.persist.rehydrate();
+    expect(STORE_API().composeSession?.chartText).toBe("{key: C}\nC Am F G");
+    expect(STORE_API().composeSession?.mixer).toEqual(MIXER);
+  });
+
+  it("clearCompose resets ALL S4 fields with the session (start-over is complete)", () => {
+    const cp = fixtureProject();
+    STORE_API().setComposeChart("C F", cp, fixtureAnalysis(cp));
+    STORE_API().setComposeMixer(MIXER);
+    STORE_API().clearCompose();
+    const s = STORE_API();
+    expect(s.composeSession).toBeNull();
+    expect(s.composeProject).toBeNull();
+    expect(s.composeAccompaniment).toBeNull();
   });
 });

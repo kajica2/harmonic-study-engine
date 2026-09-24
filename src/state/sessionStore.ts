@@ -39,6 +39,7 @@ import {
   type AccompanimentResult,
   type AnalysisOverrides,
   type ComposeAnalysis,
+  type MixerState,
   type NormalizedProject,
 } from "../../engine/compose/types";
 import type { Idea } from "../../engine/core/idea";
@@ -150,10 +151,26 @@ export interface ComposeSession {
    *  default at read via `session.request ?? null`. Style/seed are
    *  taste, not file state: setComposeFile KEEPS them. */
   request?: AccompanimentRequest | null;
+  /** PRD-001 Phase 4 Slice 4 (D84): the pasted chord-chart TEXT is an
+   *  OPTIONAL persisted field - NO v5. Text (not file bytes,
+   *  REQ-IO-70-safe); a reload AUTO-HEALS the session by re-parsing
+   *  (pure + sub-ms), so there is NO re-upload prompt for charts.
+   *  setComposeFile CLEARS it (a real file supersedes a chart). */
+  chartText?: string | null;
+  /** PRD-001 Phase 4 Slice 4 (D85): mixer levels are per-SONG taste
+   *  (mute THIS file's muddy bass), so they ride composeSession -
+   *  they travel with the restore flow AND the share URL. OPTIONAL,
+   *  default at read via `session.mixer ?? MIXER_DEFAULTS`. Like the
+   *  request, setComposeFile KEEPS it (resetting on every re-upload
+   *  during the prompt flow would be worse). */
+  mixer?: MixerState | null;
 }
 
 /** Undo stack cap (D59): whole-map snapshots, oldest dropped first. */
 export const COMPOSE_UNDO_CAP = 32;
+
+/** D84: the session identity of a pasted chart (no file, no hash). */
+export const CHART_SESSION_FILE_NAME = "Chord chart (pasted)";
 
 /** File identity + hash captured at upload (setComposeFile meta). */
 export interface ComposeFileMeta {
@@ -205,6 +222,35 @@ interface ComposeSlice {
   setComposeRequest: (req: AccompanimentRequest | null) => void;
   /** D73: in-memory result slot (never persisted). */
   setComposeAccompaniment: (r: AccompanimentResult | null) => void;
+  /** PRD-001 Phase 4 Slice 4 (D84): commit a pasted chord chart. The
+   *  synthetic project + analysis come from the PURE engine builders
+   *  (parseChordChart + buildChartSession - the surface owns them).
+   *  Session identity: fileName "Chord chart (pasted)", fileHash null,
+   *  EMPTY_OVERRIDES unless a hashless `restore` is supplied (the
+   *  reload auto-heal + URL-restore paths pass the persisted overrides
+   *  through - same pattern as setComposeFile's restore, minus the
+   *  gate: a chart IS its text, there is no file to verify). KEEPS
+   *  request + mixer (taste, D73/D85); nulls the accompaniment result
+   *  (grid-derived). Resets the undo stacks (new session). */
+  setComposeChart: (
+    chartText: string,
+    project: NormalizedProject,
+    analysis: ComposeAnalysis,
+    restore?: ComposeRestore,
+  ) => void;
+  /** D85: persist mixer state (inside composeSession, no v5). Does NOT
+   *  touch the undo stacks and does NOT dirty anything (ADR-007). */
+  setComposeMixer: (m: MixerState) => void;
+  /** D86: boot-time URL restore - sets the (already-resolved) session.
+   *  HIGH-001 (S4 fix round): the CALLER (App boot) now FIELD-WISE
+   *  MERGES the URL payload with the persisted session BEFORE calling
+   *  this (composeUrl.mergeComposeUrlWithPersisted) - a stale
+   *  debounced URL no longer clobbers fresher localStorage fields.
+   *  This action stays a plain wholesale setter (the merge needs the
+   *  raw URLSearchParams presence, a boot concern). Chart sessions
+   *  auto-heal their project via the surface's one-shot rebuild; MIDI
+   *  sessions land in the EXISTING hash-gate prompt. */
+  restoreComposeSessionFromUrl: (session: ComposeSession) => void;
   /** The "start over" reset - compose's OWN clear; resetModeSlice is
    *  deliberately NOT widened (sessionStore pins its shape). */
   clearCompose: () => void;
@@ -319,6 +365,12 @@ export const useSessionStore = create<SessionState>()(
             // persisted request SURVIVES a file swap (same reasoning
             // as etudeConstraints surviving mode switches).
             request: s0.composeSession?.request ?? null,
+            // D84: a real file SUPERSEDES a pasted chart.
+            chartText: null,
+            // D85: the mixer is per-song taste and KEEPS on file swap
+            // (consistent with request; resetting on every re-upload
+            // during the prompt flow would be worse).
+            mixer: s0.composeSession?.mixer ?? null,
           },
           // D73: the result is grid-derived - a new file invalidates it.
           composeAccompaniment: null,
@@ -380,6 +432,49 @@ export const useSessionStore = create<SessionState>()(
       },
       setComposeAccompaniment: (r) => {
         set({ composeAccompaniment: r });
+      },
+      setComposeChart: (chartText, project, analysis, restore) => {
+        const s0 = get();
+        const overrides = restore === undefined ? EMPTY_OVERRIDES : restore.overrides;
+        const analyzeFull = restore === undefined ? false : restore.analyzeFull;
+        set({
+          composeProject: project,
+          composeAnalysis: analysis,
+          composeSession: {
+            fileName: CHART_SESSION_FILE_NAME,
+            // D84: a chart has NO file identity (hash null - the
+            // hash-gate prompt machinery never applies).
+            fileHash: null,
+            overrides,
+            analyzeFull,
+            // Taste KEEPS across the commit (D73/D85 - same rule as
+            // setComposeFile).
+            request: s0.composeSession?.request ?? null,
+            chartText,
+            mixer: s0.composeSession?.mixer ?? null,
+          },
+          // Grid-derived result: a new chart invalidates it.
+          composeAccompaniment: null,
+          composeUndo: [],
+          composeRedo: [],
+        });
+      },
+      setComposeMixer: (m) => {
+        const s = get();
+        // Persisted INSIDE the v4 composeSession record (D85: optional
+        // field, no v5). No-op without a session (taste needs a home).
+        if (s.composeSession === null) return;
+        set({ composeSession: { ...s.composeSession, mixer: m } });
+      },
+      restoreComposeSessionFromUrl: (session) => {
+        // D86: plain wholesale setter (boot-time only, the App
+        // one-shot). HIGH-001 (S4 fix round): the App caller merges
+        // the URL payload field-wise with the persisted session
+        // BEFORE this (composeUrl.mergeComposeUrlWithPersisted), so
+        // what lands here is already the resolved value. In-memory
+        // project/analysis/result are null at boot, and the surface's
+        // chart auto-heal / MIDI hash-gate prompt take it from here.
+        set({ composeSession: session });
       },
       clearCompose: () => {
         set({

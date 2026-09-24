@@ -1,4 +1,4 @@
-# Compose Mode (PRD-001 Phase 4, Slices 2-3)
+# Compose Mode (PRD-001 Phase 4, Slices 2-4)
 
 Compose is the MIDI-file workspace. Drop in a `.mid` file and the app
 reads it, analyzes it, and hands back an editable chart: the detected
@@ -6,7 +6,11 @@ key, tempo, meter, melody line, and a chord for every bar -- each one
 yours to correct. Phase 4 slice 2 made this real for the first time;
 before it, Compose was an empty-state stub. Slice 3 added the
 accompaniment: the chart can now generate a style-aware backing
-(bass / chords / pad) you can audition.
+(bass / chords / pad) you can audition. Slice 4 completed the phase:
+a 4-group mixer with live knobs, combined MIDI + full-mix WAV
+export, chord-chart paste (no file required), and shareable session
+URLs. Phase 4 is done; what is NOT here is listed honestly in "Not
+yet" below.
 
 Everything happens in your browser. The file is parsed locally and
 the analysis runs locally -- nothing is uploaded anywhere. The
@@ -19,11 +23,17 @@ User requirements traced here: REQ-COMP-1 (upload), REQ-COMP-5
 (melody preview, melody-only carve), REQ-COMP-6 (pitch-bend warning),
 REQ-COMP-20..24 (editable analysis + undo), REQ-COMP-30..36
 (accompaniment: roles, voicing, patterns, density, seed),
+REQ-COMP-37/40/41/43 (mixer, combined MIDI export, full-mix WAV,
+key-in-filename; stems ZIP REQ-COMP-42 deferred TD-046),
 REQ-COMP-50..53 (edge cases + windowing), REQ-PED-4/5 (annotations +
 concept drawer, Compose host), REQ-TRANS-3 (accompaniment-only
-transpose), REQ-IO-51/70/71. Design authority:
+transpose), REQ-IO-10..16 (chord-chart paste; grammar reference:
+`docs/CHART-FORMAT.md`), REQ-IO-50/51 (session URL + hash-gated
+cross-device restore; /play REQ-IO-52 deferred TD-047),
+REQ-IO-70/71. Design authority:
 `docs/PHASE-4-S2-ANALYSIS-UI.md` (D57..D65) +
-`docs/PHASE-4-S3-ACCOMPANIMENT.md` (D66..D76); engine internals:
+`docs/PHASE-4-S3-ACCOMPANIMENT.md` (D66..D76) +
+`docs/PHASE-4-S4-MIXER-EXPORT.md` (D77..D92); engine internals:
 `docs/engine-compose.md`; pattern content: `docs/PATTERN-LIBRARY.md`.
 
 ## Uploading your file
@@ -154,7 +164,7 @@ Next to the file name and duration:
 
 | Field | Editing | What it actually does |
 |---|---|---|
-| Tempo | type a BPM, Enter/blur to commit | RECORDED for the full playback/export (slice 4). The accompaniment preview runs on the file's OWN tempo map, not this override - the preview's tooltip says so |
+| Tempo | type a BPM, Enter/blur to commit | applied EVERYWHERE since slice 4: the preview, mixer, WAV, MIDI and the roll all run on the EFFECTIVE tempo (the override REPLACES the file's map with one fixed practice tempo; with no override the file's own map is preserved) |
 | Meter | type e.g. `6/4` | re-runs the whole analysis on the new bar grid AND clears your chord edits (bar alignment changes make them unsafe) -- both in one step, so ONE undo restores the cells and the meter together |
 | Key | see the confidence section | drives chord spelling + the inference |
 | Melody track | pick a track (or "Auto (top line)") | re-extracts the melody from that track's REAL notes -- the roll below genuinely changes, it is not a relabel |
@@ -201,10 +211,13 @@ Every shipped signal lands on exactly one banner:
 ## Reloading: your edits survive, the file does not
 
 Your corrections (chord cells, key, tempo, meter, melody pick,
-window choice) persist across a reload -- but the 30 MB parsed
-project deliberately does NOT go into browser storage. So after a
-reload, Compose asks for the file again: "Re-upload <name> to
-restore your saved session."
+window choice - plus mixer levels and a pasted chart's text, since
+slice 4) persist across a reload -- but the 30 MB parsed project
+deliberately does NOT go into browser storage. So after a reload,
+Compose asks for the file again: "Re-upload <name> to restore your
+saved session." A pasted chart is the exception: its TEXT is the
+session (there is no file to re-drop), so it rebuilds itself
+silently on reload.
 
 What happens next is hash-gated, and it is honest about it:
 
@@ -230,44 +243,129 @@ rootless/drop-2 voicings) - and those claims are computed from the
 notes that actually sounded, never from what the pattern could
 have done (a thinned walking line says so).
 
+## The accompaniment (slice 3, live)
+
+Under the analysis card, the AccompanimentPanel generates a
+style-aware backing over the MERGED chart: pick a style
+(Jazz/Pop/Classical), one or more roles (bass / chords / pad), a
+density 0..5 (thins detail, never reshapes - the same notes at
+every level, just fewer), per-role register (low/standard/high), an
+accompaniment-only transpose, and a seed. Same seed + same chart =
+byte-identical output, across regenerate AND reload (the request
+survives reload; press Generate again - it never auto-fires).
+[Randomize] rolls a new seed. The panel states whether a key
+context is active: with one, walking-bass approaches may move
+diatonically; without one they stay chromatic. The generated layers
+render on an overlay piano roll under the chart, and [Preview
+(accompaniment)] renders offline and plays the accompaniment ALONE
+(the first 1:30 on longer charts, labeled) - the mixer below plays
+it together with your original tracks. Honest limits printed in the
+UI: the preview uses the EFFECTIVE tempo (the tempo/meter overrides
+bite everywhere since slice 4), and a "chart changed since
+generation - regenerate" chip appears the moment you edit a cell
+after generating (including slash-bass edits - the fingerprint
+honors the bass note since slice 4).
+
+## The mixer (slice 4, live)
+
+Four group rows - **Original** (your file), **Bass**, **Chords**,
+**Pad** - each with a level slider, **M** (mute) and **S** (solo).
+Defaults: everything at full except Pad at 0.8. Knobs are INSTANT:
+each group is rendered once to its own audio buffer when the content
+changes (regenerate, new file, tempo/meter override), and the mixer
+plays the four together through live gain nodes - moving a slider
+never re-renders, and playback stays sample-accurate.
+
+The mute/solo convention, as pinned by the gain math:
+**MUTE WINS OVER SOLO.** A group's level is
+`level * (muted || (anySolo && !thisSolo) ? 0 : 1)` - so a muted row
+is silent even when it is also soloed (mute-wins convention,
+Ableton/Reaper-style; Logic/Pro Tools lean solo-override),
+and any solo silences every non-soloed row. (The design doc's
+handoff checklist note "solo wins over mute" contradicts its own
+body formula and the shipped, test-pinned behavior - the code is
+authoritative.)
+
+Honest disclosures: the Original row says **"(drums not played)"**
+when your file has a percussion track with notes (the audition
+synthesizes pitched voices only - the MIDI export still includes
+your drums), and a pasted chart shows **"no file - chart only"** on
+a disabled Original row. [Play mix] caps the AUDITION at the first
+1:30 on long charts (labeled) - the WAV export is not capped that
+way (10:00). No seek/loop/effects: this is a 4-bus mixer, not a DAW
+(by design, PRD 7.2).
+
+## Paste a chord chart (slice 4, live)
+
+Empty state: **[Paste a chord chart]**. Type or paste a chart, see
+it PARSE LIVE - bar count, key, warnings - and EDIT the preview
+grid cell by cell BEFORE committing (a rejected symbol rings red;
+commit waits until you fix it). Grammar: one token per bar
+(`C Am F G`), `|` bars are stripped, `%` repeats the previous bar,
+`-`/`0`/`r` are rests, and header directives set the session:
+`{key: Bb}`, `{tempo: 132}`, `{time: 6/8}`, `{style: jazz}`. Charts
+are capped at 512 bars (an honest error, never a silent cut). The
+slash rule is deterministic: `C/G` is ONE chord with a G bass (the
+bass is a chord tone); `C/Am` is TWO chords in the bar; and the
+subtle one - `Em7/A` is ALSO two chords, because A is not an Em7
+chord tone, so the one-cell reading fails and the split rule lands
+Em7 then A. Bad tokens warn, they never fail the chart. The full
+human-facing grammar (every rule, worked examples, what round-trips
+on commit): **`docs/CHART-FORMAT.md`**. A pasted chart runs the FULL
+pipeline - generate, mixer, exports, share URL - exactly like an
+uploaded file (there is simply no Original group to play). [Edit
+chart] reopens the text any time.
+
+## Export + share (slice 4, live)
+
+Under the mixer: **[Export MIDI]** writes the COMBINED file - your
+original tracks (drums included, untransposed) + the generated
+roles with their instruments, the EFFECTIVE tempo map, time
+signatures AND key signatures (written spec-correct, bypassing a
+known encoder bug), named `song_accomp_C.mid` by the effective key
+(the key segment is omitted when no key was detected - never a
+fake). **[Export WAV]** renders the FULL MIX at the CURRENT
+mixer levels (mono, up to 10:00, peak-safe: a hot mix is turned
+down, never amplified). And the URL bar now carries the whole
+compose session (file identity + hash, chart text, overrides,
+request, mixer): share it and reopen on another device - a chart
+loads instantly; a MIDI file asks you to re-drop the matching file
+and restores your edits behind the same hash gate. The URL has a
+6000-character governor on its compose keys: if the session is too
+large to encode (a 200-cell override map is the realistic blowout),
+the compose keys are DROPPED from the URL entirely (your
+practice/etude params are untouched) and the page says "Session too
+large to share via URL." - never a silently truncated session.
+
 ## Not yet -- what Compose does NOT do today
 
-- **No playback of YOUR file.** Your original tracks never sound --
-  the Compose transport and mixer (per-group volume/solo) are slice
-  4. The only audio so far is the accompaniment preview below; the
-  global `Space` key still belongs to Etude playback -- a known
-  wart, not a Compose feature.
-- **Accompaniment generation + preview (slice 3, live).** Under the
-  analysis card, the AccompanimentPanel generates a style-aware
-  backing over the MERGED chart: pick a style (Jazz/Pop/Classical),
-  one or more roles (bass / chords / pad), a density 0..5 (thins
-  detail, never reshapes - the same notes at every level, just
-  fewer), per-role register (low/standard/high), an
-  accompaniment-only transpose, and a seed. Same seed + same chart =
-  byte-identical output, across regenerate AND reload (the request
-  survives reload; press Generate again - it never auto-fires).
-  [Randomize] rolls a new seed. The panel states whether a key
-  context is active: with one, walking-bass approaches may move
-  diatonically; without one they stay chromatic. The generated
-  layers render on an overlay piano roll under the chart, and
-  [Preview (accompaniment)] renders offline and plays it - the
-  first 1:30 on longer charts, labeled - no transport, no mixing
-  with your original tracks yet (that is slice 4). Honest limits
-  printed in the UI: the tempo OVERRIDE is not applied to the
-  preview until the mixer (the project tempo map is), and a "chart
-  changed since generation - regenerate" chip appears the moment
-  you edit a cell after generating.
-- **No export, no mixer, no chart-paste.** Saving the chart,
-  MIDI/WAV export, shareable analysis URLs, the mixer
-  (per-group volume/solo, original-track playback), and
-  chord-chart paste are all slice 4 (URL serialization is a
-  stretch goal).
+Phase 4 shipped in full with slice 4 (mixer, exports, chart paste,
+URL). What remains is deliberately small, and this list is the
+honest remainder:
+
+- **No drum audition.** The mixer's Original group synthesizes
+  pitched voices only - a channel-9 kit as sine/triangle voices is
+  noise pretending to be cymbals, so percussion is skipped WITH a
+  disclosure label (the MIDI export still carries your drums). The
+  global `Space` key still belongs to Etude playback in every mode
+  -- a known pre-existing wart (TD-048), not a Compose feature.
+- **The audition is capped.** [Play mix] and [Preview
+  (accompaniment)] render the first 1:30 of long charts (labeled);
+  the WAV export renders up to 10:00. Nothing plays or bounces a
+  full song past those caps.
+- **No stems ZIP or /play route.** Exporting the four groups as a
+  ZIP of WAVs (REQ-COMP-42) and a minimal shareable play page
+  (REQ-IO-52) are deliberate P2 deferrals (TD-046/TD-047) - the
+  per-group buffers make stems nearly free later.
 - **No piano-roll editing and one melody line only.** The roll is a
   preview; the multi-track editor is Phase 8.
-- **The accompaniment's musicality is not yet human-verified.**
-  Structure and determinism are test-pinned, but the manual listen
-  check (the only real bar for "does it sound idiomatic") is still
-  open - your ears are the gate (PRD Appendix F).
+- **The human listen check is OPEN.** Structure, determinism, gain
+  math and file bytes are test-pinned - but the accompaniment's
+  musicality, the mixer's AUDIO QUALITY (dense original files can
+  clip the audition; there is no limiter by design) and the WAV
+  export's sound have NOT been verified by human ears (RK-S4-1 /
+  RK6). Bytes and state machines are pinned; ears are not. Your
+  ears are the gate (PRD Appendix F).
 - **Detection accuracy on real-world files is still an open
   question.** The engine scores perfectly on its synthetic test
   corpus, which proves the wiring, not the world. That is exactly
@@ -276,7 +374,8 @@ have done (a thinned walking line says so).
 ## Where to look
 
 - Design: `docs/PHASE-4-S2-ANALYSIS-UI.md` (D57..D65); accompaniment:
-  `docs/PHASE-4-S3-ACCOMPANIMENT.md` (D66..D76)
+  `docs/PHASE-4-S3-ACCOMPANIMENT.md` (D66..D76); mixer/export/paste/URL:
+  `docs/PHASE-4-S4-MIXER-EXPORT.md` (D77..D92)
 - Engine internals: `docs/engine-compose.md`
 - Surface (three states + upload pipeline + undo keyboard):
   `src/components/ComposeSurface.tsx`
@@ -284,7 +383,11 @@ have done (a thinned walking line says so).
 - Analysis card (banners, tiers, header fields, annotations):
   `src/components/AnalysisCard.tsx`
 - Cell editor: `src/components/ChordCellPopover.tsx`; symbol
-  grammar: `src/lib/chordInput.ts`
+  grammar: `engine/compose/chordsym.ts` (shimmed at
+  `src/lib/chordInput.ts`); chart parser:
+  `engine/compose/chordchart.ts`; human-facing chart grammar
+  reference: `docs/CHART-FORMAT.md`; paste UI:
+  `src/components/ChartPastePanel.tsx`
 - Melody preview: `src/components/ComposePianoRoll.tsx`
 - Parse pipeline: `src/lib/composeMidi.ts` -> `engine/compose/`
 - Accompaniment panel: `src/components/AccompanimentPanel.tsx`;
@@ -292,4 +395,8 @@ have done (a thinned walking line says so).
   reference: `docs/PATTERN-LIBRARY.md`); pipeline:
   `engine/compose/accompany.ts`; preview:
   `src/lib/composePreview.ts` + `src/lib/composeVoices.ts`
-- Session persistence (v4): `src/state/sessionStore.ts`
+- Mixer UI: `src/components/ComposeMixer.tsx`; player + group
+  renders: `src/lib/composePreview.ts`; exports:
+  `src/lib/composeExport.ts`; URL: `src/lib/composeUrl.ts`
+- Session persistence (v4 + optional S4 fields):
+  `src/state/sessionStore.ts`

@@ -601,6 +601,40 @@ describe("h. EDGE ARMS", () => {
     expect(gridFingerprint(edited)).not.toBe(a);
     expect(gridFingerprint(iiVIGrid())).toBe(a);
   });
+
+  // D89 (TD-044 CLOSED): chart paste makes slash-bass cells REACHABLE
+  // ("Em7/A"), so a bassPc-only edit MUST invalidate the chip.
+  it("fingerprint honors bassPc: a slash-bass-only edit changes it (D89)", () => {
+    const a = gridFingerprint(iiVIGrid());
+    const slashed: ChordGrid = {
+      slotsPerBar: 1,
+      bars: iiVIGrid().bars.map((r, i) => (i === 2 ? { ...r, slots: [cell(4, "maj7", 9)] } : r)),
+    };
+    expect(gridFingerprint(slashed)).not.toBe(a);
+    // The bassPc serializes into the tuple with the documented "/pc" form.
+    expect(gridFingerprint(slashed)).toContain("4.maj7/9");
+    // Stability: the SAME slashed grid yields the SAME string.
+    expect(gridFingerprint(slashed)).toBe(gridFingerprint(slashed));
+    // bassPc null stays un-suffixed (no "/null" drift on plain cells).
+    const plain: ChordGrid = {
+      slotsPerBar: 1,
+      bars: [{ bar: 0, startTick: 0, endTick: 1920, slots: [cell(0, "maj7")] }],
+    };
+    expect(gridFingerprint(plain)).toBe("0:0.maj7");
+  });
+
+  it("fingerprint: rest cells ignore bassPc noise (rests serialize as 'rest')", () => {
+    const rested: ChordGrid = {
+      slotsPerBar: 1,
+      bars: [{ bar: 0, startTick: 0, endTick: 1920, slots: [cell(0, "maj7", 5)] }],
+    };
+    const restedSame: ChordGrid = {
+      slotsPerBar: 1,
+      bars: [{ bar: 0, startTick: 0, endTick: 1920, slots: [{ ...restCell(), bassPc: 7 }] }],
+    };
+    expect(gridFingerprint(rested)).toContain("0.maj7/5");
+    expect(gridFingerprint(restedSame)).toBe("0:rest");
+  });
 });
 
 describe("annotations truthfulness (D74 negatives)", () => {
