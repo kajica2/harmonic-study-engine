@@ -195,9 +195,9 @@ at 10:00, human LISTEN CHECK OPEN - RK-S4-1/RK6).
 
 | PRD item | Status | Notes |
 |---|---|---|
-| Seed-based exploration | NOT STARTED | No Explore surface today. |
-| Reharmonize + substitute | PARTIAL | `coCompose.ts` reharmonizes a single bar; no full progression reharm. |
-| Idea cards with rationale + concept links | NOT STARTED | Depends on Pedagogy layer (Phase 6). |
+| Seed-based exploration | SHIPPED - Phase 5, 2026-09-24 | `SeedPicker` on the real `ExploreSurface`: 5 seed kinds (chord / progression / scale / interval / free) + the 12 stub preset strings verbatim + free text (never an error arm); kind tabs are fill-hints only, live "parses as" readout; the IdeaBar carrier boots the seed. Docs: `docs/EXPLORE-MODE.md`. |
+| Reharmonize + substitute (+ expand / vary / voice-lead) | SHIPPED - Phase 5, 2026-09-24 | `engine/explore/`: reharmonize (3 fingerprint-distinct alternatives), substitute (clean-room over ChordCells, honesty predicates ported from the pedagogy annotator), expand (strict-superset gate), vary (retrograde / inversion / rotation-displacement / ornamentation; displacement is pitch rotation, TD-EXP-SLOT), voice-lead (the compose `voiceSequence` re-skinned per style, zero new math; concept links gated on realized pitches). Every card names the technique it actually computed. Carve-out: modulate (REQ-EXP-14) DEFERRED - TD-EXP-MOD (no button, stub seam only). `coCompose.ts` untouched (technique list only, never imported). |
+| Idea cards with rationale + concept links (+ Hear + crossover) | SHIPPED - Phase 5, 2026-09-24 | Cards render label + technique chip + description + rationale with INLINE concept links opening the ConceptDrawer (not the slice-3 chip-strip / About-panel / Notes-toggle surfaces) + [Hear][Send to Compose][Send to Etude][Save]. Hear (melody audio on cards) reuses the EXISTING compose preview singleton - no new AudioContext, no new transport, no audioEngine coupling. Crossover: Send-to-Compose lands editable chart text via the chart parser (Generate never auto-fires); Send-to-Etude carries key/mode/bars/seed only ("Practice in this key...", never literal chords); all three IdeaBar Send arms wired. Determinism pinned: same seed + inputs = same cards. Explore state stays transient (no store change). |
 
 ### PRD Phase 6 - Pedagogy
 

@@ -153,7 +153,7 @@ describe("IdeaBar populated state", () => {
     expect(useSessionStore.getState().currentIdea).toBeNull();
   });
 
-  it("Send-to dropdown includes Compose + Explore as disabled", () => {
+  it("Send-to dropdown includes Compose + Explore as enabled (D98)", () => {
     useSessionStore
       .getState()
       .setCurrentIdea(ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0));
@@ -170,9 +170,51 @@ describe("IdeaBar populated state", () => {
     const exploreOpt = Array.from(select.options).find((o) =>
       o.value.startsWith("explore"),
     );
-    expect(composeOpt?.disabled).toBe(true);
+    expect(composeOpt?.disabled).toBe(false);
     expect(etudeOpt?.disabled).toBe(false);
-    expect(exploreOpt?.disabled).toBe(true);
+    expect(exploreOpt?.disabled).toBe(false);
+  });
+
+  it("Send-to Compose with a chord idea lands a 1-bar chart + switches mode", () => {
+    useSessionStore.getState().setMode("etude");
+    useSessionStore
+      .getState()
+      .setCurrentIdea(ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0));
+    render(<IdeaBar />);
+    fireEvent.change(screen.getByLabelText("Send idea to mode"), {
+      target: { value: "compose" },
+    });
+    const s = useSessionStore.getState();
+    expect(s.mode).toBe("compose");
+    expect(s.composeSession?.chartText).toContain("Cmaj7");
+  });
+
+  it("Send-to Etude with a chord idea carries constraints (bars 1 -> 4) + switches mode", () => {
+    useSessionStore.getState().setMode("compose");
+    useSessionStore
+      .getState()
+      .setCurrentIdea(ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0));
+    render(<IdeaBar />);
+    fireEvent.change(screen.getByLabelText("Send idea to mode"), {
+      target: { value: "etude" },
+    });
+    const s = useSessionStore.getState();
+    expect(s.mode).toBe("etude");
+    expect(s.etudeConstraints?.bars).toBe(4);
+  });
+
+  it("Send-to Explore navigates with the idea as carrier (no store writes)", () => {
+    useSessionStore.getState().setMode("etude");
+    useSessionStore
+      .getState()
+      .setCurrentIdea(ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0));
+    render(<IdeaBar />);
+    fireEvent.change(screen.getByLabelText("Send idea to mode"), {
+      target: { value: "explore" },
+    });
+    const s = useSessionStore.getState();
+    expect(s.mode).toBe("explore");
+    expect(s.currentIdea?.chord).toBe("Cmaj7");
   });
 
   it("Send-to Etude calls requestMode('etude') (clean case)", () => {

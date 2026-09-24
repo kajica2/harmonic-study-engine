@@ -5,10 +5,14 @@
  * fixed MobileCommandBar on mobile via an extra pb wrapper. Shows the
  * current Idea as a chip + Send-to-Mode / Save / Share actions.
  *
- * Phase 1 wire scope:
- *   - Send-to-Mode dropdown (native <select>) routes the Idea to
- *     Compose / Etude / Explore. Compose + Explore warn that the
- *     landing surface isn't wired yet (Phase 4 / 5).
+ * Phase 5 completion (D98): all three Send arms are wired.
+ *   - Send-to-Compose: chord/progression Ideas transplant literally
+ *     via the chart-text path (D97); other kinds warn honestly (the
+ *     surface boots from currentIdea - never a dead end).
+ *   - Send-to-Etude: constraints-carry (D97b) via setEtudeConstraints
+ *     (NOT acceptEtude - no dirty; the user presses Generate).
+ *   - Send-to-Explore: requestMode only (currentIdea is the carrier;
+ *     ExploreSurface boots its seed from it).
  *   - Save button writes the current Idea to `hse.ideas` (capped 100).
  *   - Share button builds a `?idea=<base64>` URL and copies it to the
  *     clipboard. Server-less; the URL is the share channel
@@ -31,6 +35,20 @@ import { X } from "lucide-react";
 import { useSessionStore, type Mode } from "../state/sessionStore";
 import type { Idea } from "../../engine/core/idea";
 import { ideaFromChord } from "../../engine/core/idea";
+import {
+  ideaToSeedText,
+  parseExploreSeed,
+} from "../../engine/explore/seeds";
+import {
+  cardToEtudeConstraints,
+  progressionToChartText,
+} from "../../engine/explore/cards";
+import { cardId } from "../../engine/explore/types";
+import {
+  buildChartSession,
+  parseChordChart,
+} from "../../engine/compose/chordchart";
+import { DEFAULT_ETUDE_CONSTRAINTS } from "../lib/etudeEngine";
 import { transposeChordName } from "../lib/theory";
 import type { HarmonicStep } from "../lib/paths";
 
@@ -42,9 +60,9 @@ const SEND_OPTIONS: ReadonlyArray<{
   disabled?: boolean;
   hint?: string;
 }> = [
-  { value: "compose", label: "Send to Compose", disabled: true, hint: "Phase 4 wires the upload surface" },
+  { value: "compose", label: "Send to Compose", hint: "Send chord/progression to the chart grid" },
   { value: "etude", label: "Send to Etude" },
-  { value: "explore", label: "Send to Explore", disabled: true, hint: "Phase 5 wires idea cards" },
+  { value: "explore", label: "Send to Explore", hint: "Open in Explore" },
 ];
 
 function buildShareUrl(idea: Idea): string {
@@ -81,13 +99,69 @@ export const IdeaBar: React.FC<IdeaBarProps> = ({
   const handleSend = useCallback(
     (target: Mode | "__placeholder") => {
       if (target === "__placeholder") return;
+      const store = useSessionStore.getState();
+      const current = store.currentIdea;
       if (target === "compose") {
-        // eslint-disable-next-line no-console
-        console.warn("[IdeaBar] Send-to-Compose: Phase 4 wires the upload surface");
-      } else if (target === "explore") {
-        // eslint-disable-next-line no-console
-        console.warn("[IdeaBar] Send-to-Explore: Phase 5 wires idea cards");
+        // D97: chord/progression Ideas transplant literally through
+        // the chart-text path; other kinds warn + still navigate (the
+        // surface boots from currentIdea - never a dead end).
+        const seed = parseExploreSeed(
+          current === null ? "" : ideaToSeedText(current),
+        );
+        const progression =
+          seed.kind === "chord" && seed.chord !== null
+            ? [seed.chord]
+            : seed.kind === "progression" && seed.progression !== null
+              ? [...seed.progression]
+              : null;
+        if (progression === null) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[IdeaBar] Send-to-Compose: only chord/progression ideas transplant literally",
+          );
+        } else {
+          const text = progressionToChartText(progression, null);
+          const parsed = parseChordChart(text);
+          if (!parsed.ok) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              "[IdeaBar] Send-to-Compose: chart parse failed, opening Compose anyway",
+            );
+          } else {
+            const { project, analysis } = buildChartSession(parsed.value);
+            store.setComposeChart(text, project, analysis);
+          }
+        }
+      } else if (target === "etude") {
+        // D97b: constraints-carry (key/mode/bars/seed), never a
+        // literal symbol transplant. setEtudeConstraints, NOT
+        // acceptEtude - no dirty; the user presses Generate.
+        if (current !== null) {
+          const base = store.etudeConstraints ?? DEFAULT_ETUDE_CONSTRAINTS;
+          const text = ideaToSeedText(current);
+          const seed = parseExploreSeed(text);
+          const carried = cardToEtudeConstraints(
+            {
+              id: cardId(text, "substitute", 0),
+              progression:
+                seed.kind === "chord" && seed.chord !== null
+                  ? [seed.chord]
+                  : seed.kind === "progression" && seed.progression !== null
+                    ? [...seed.progression]
+                    : null,
+              melody: current.melody,
+            },
+            base,
+          );
+          store.setEtudeConstraints(
+            current.kind === "seed" && current.seed !== null
+              ? { ...carried, seed: current.seed }
+              : carried,
+          );
+        }
       }
+      // Explore arm: requestMode only - currentIdea is already the
+      // carrier (ExploreSurface boots its seed from it).
       requestMode(target);
       setSendTarget("__placeholder");
     },

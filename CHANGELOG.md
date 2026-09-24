@@ -81,6 +81,40 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Explore mode: seeds + honest transforms + Hear + crossover (PRD-001
+  Phase 5, D93..D101)** -- the first user-facing Explore surface (was a
+  stub with 3 visual chips + read-only planners). SEEDS (REQ-EXP-1/2):
+  free-text picker over the ONE chord grammar + scale/interval grammars
+  (5 kinds: chord / progression / scale / interval / free), the 12 stub
+  preset strings verbatim (numeral heads like "ii-V-I in C" realized in
+  the named key; "12-bar in A" spells the standard blues changes,
+  labeled as such on the card), kind tabs are fill-hints only with a
+  live "parses as" readout. OPS (REQ-EXP-10/11/12/13/15): reharmonize
+  (3 fingerprint-distinct alternatives of a progression), substitute +
+  expand per chord, vary (retrograde / inversion / rotation-displacement
+  / ornamentation over the pitch-only line via the "Vary a line" panel),
+  voice-lead (the 5 compose voicing styles re-skinned, zero new math) --
+  every card names the technique it ACTUALLY computed (D99 predicates
+  ported from the pedagogy annotator, negatives pinned; a style name
+  alone never claims). CARDS (REQ-EXP-20/21/22): label + technique chip
+  + rationale with concept-drawer links + [Hear][Send to Compose][Send
+  to Etude][Save]. HEAR (REQ-EXP-21): transient project through the
+  EXISTING compose preview singleton (no new AudioContext, no new
+  transport, no audioEngine coupling; the button mirrors
+  rendering -> playing -> Stop). CROSSOVER (REQ-IDEA-3): Send-to-Compose
+  dogfoods the chart parser (lands as an editable chart session;
+  Generate never auto-fires); Send-to-Etude carries key/mode/bars/seed
+  only ("Practice in this key (carries key and bar count, not literal
+  chords)", never literal chords); all three IdeaBar Send arms wired.
+  Determinism: same seed + inputs = same cards (seeded draws in fixed
+  order, hash ids). Carve-outs: modulate NOT shipped (no button,
+  TD-EXP-MOD); literal symbol->numeral Etude bridge deferred
+  (TD-EXP-LITERAL); displacement is pitch rotation, labeled as such
+  (TD-EXP-SLOT); Explore state is transient local state (no store
+  change, no session bump, no URL; Back/Forward history capped at 20).
+  Docs: `docs/EXPLORE-MODE.md`; design: `docs/PHASE-5-EXPLORE.md`;
+  e2e: `e2e/explore.spec.ts` (seed->cards, Send-to-Compose landing,
+  Hear state machine, Etude carry + truth spot).
 - **Mixer + exports + chord-chart paste + session URL (PRD-001
   Phase 4 slice 4, D77..D92)** -- the final Phase 4 slice. MIXER
   (REQ-COMP-37, architecture C per D77 -- a DELIBERATE parent-

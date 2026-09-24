@@ -1,4 +1,4 @@
-# Modes (PRD-001 Phases 1-3)
+# Modes (PRD-001 Phases 1-5)
 
 The Harmonic Study Engine ships in three modes -- Compose, Etude, and
 Explore -- plus a sticky-bottom Idea bar that carries a single
@@ -8,9 +8,10 @@ packageable as an `Idea`, so a chord you discover in Etude can become
 the seed of a Compose upload or an Explore preset. Phase 1 wires the
 shell: the selector, the per-mode dirty prompt, and the Idea bar.
 Compose's upload + editable analysis card shipped in Phase 4 slice 2
-(`docs/COMPOSE-MODE.md`); the rest of the deep feature surface for
-Compose (accompaniment generation, export) and Explore (reharmonize
-/ substitute / expand) arrives in later phases. Phase 2 adds the
+(`docs/COMPOSE-MODE.md`); accompaniment generation (slice 3) and
+mixer + export + chart paste + session URL (slice 4) followed, and
+Explore's operations + idea cards + Hear + crossover shipped in
+Phase 5 (`docs/EXPLORE-MODE.md`). Phase 2 adds the
 transposition layer on the Etude surface -- two offset rows, a
 sounding-key badge, and a cycle-all-12 practice loop (see
 Transposition below).
@@ -31,8 +32,8 @@ that output. Switching modes keeps the audio engine and the global
 transpose live; what changes is the main panel and the toolbar. The
 app launches in Etude today (the same surface as before the mode
 selector existed); Compose became a real workspace in Phase 4 slice
-2 (`docs/COMPOSE-MODE.md`), and Explore is still an empty-state stub
-for that mode.
+2 (`docs/COMPOSE-MODE.md`), and Explore became one in Phase 5
+(`docs/EXPLORE-MODE.md`).
 
 ## The three modes
 
@@ -46,7 +47,8 @@ much the app trusts each answer. Your edits survive reloads (the
 file itself does not -- it never leaves the tab, and nothing that
 big goes into storage). Full user guide:
 **`docs/COMPOSE-MODE.md`**. Accompaniment generation (slice 3) and
-audio playback / export (slice 4) are still to come; the Phase 1
+mixer + MIDI/WAV export + chart paste + session URL (slice 4) have
+all shipped since; the Phase 1
 empty-state copy ("Drop a .mid file to get started.", the
 import/export CTA, the privacy aside) survives verbatim as the
 upload state.
@@ -72,15 +74,20 @@ views. User guide: `docs/ETUDE-COMPOSER.md`.
 
 ### Explore
 
-The exploratory workspace. **Phase 1 ships** the empty state only:
-three random preset chips drawn from a fixed list of 12 (e.g.
-"Cmaj7", "ii-V-I in C", "D dorian", "C blues", "Phrygian in E"),
-plus the existing `<FormTemplatePicker>` + `<FormPlanner>` rendered
-read-only. No reharmonize / substitute / expand operations yet -- a
-small footer note points to Phase 5. The chip selection is purely
-visual today: clicking a chip highlights it but does not commit a
-plan. Each new entry into Explore mode re-draws the chips so the
-user sees different options every time.
+The exploratory what-if workspace -- and since Phase 5 (2026-09-24)
+it is a real surface, not a stub. Type any seed (a chord, a
+progression, a scale, an interval, or free text; three preset chips
+from the fixed list of 12 beside the input) and run honest harmonic
+operations over it: reharmonize a progression, substitute or expand
+a chord, voice-lead the same changes five ways, or vary a melody
+line. Every result is an idea card -- label, technique chip naming
+what was actually computed, rationale with concept-drawer links,
+and a Hear audition -- with Send to Compose (lands as editable
+chart text), Send to Etude (carries key + bar count under the
+honest "Practice in this key" title, never literal chords), and
+Save. There is deliberately no Modulate button (deferred,
+TD-EXP-MOD). Full user guide: **`docs/EXPLORE-MODE.md`**. The
+read-only form planners still render below the cards grid.
 
 The Explorer surface lives at `src/components/ExploreSurface.tsx`.
 
@@ -303,9 +310,9 @@ is present.
 
 | Action | Effect |
 |---|---|
-| **Send to Compose** | Disabled placeholder today; emits `console.warn("[IdeaBar] Send-to-Compose: Phase 4 wires the upload surface")`. Phase 4 wires the actual handoff. |
-| **Send to Etude** | Routes the Idea into the Etude surface (Etude is the default mode and accepts chord Ideas directly today). |
-| **Send to Explore** | Disabled placeholder today; emits `console.warn("[IdeaBar] Send-to-Explore: Phase 5 wires idea cards")`. Phase 5 wires the landing surface. |
+| **Send to Compose** | Chord/progression Ideas transplant literally to the chart grid via the chart-text path (other kinds warn honestly and still navigate -- the landing surface boots from the carried Idea, never a dead end). |
+| **Send to Etude** | Routes the Idea into the Etude surface as carried constraints (key/mode/bars/seed via `setEtudeConstraints`, NOT an accept -- no dirty; the user presses Generate). |
+| **Send to Explore** | Switches to Explore; the current Idea is already the carrier (Explore boots its seed text from it). |
 | **Save** | Persists the current Idea to `hse.ideas` (capped at 100 entries); emits `console.warn("[IdeaBar] Save: snapshot stored at hse.ideas")`. Saved ideas are accessible from any mode. |
 | **Share** | Base64-encodes the Idea as JSON and copies `<origin>/<path>?idea=<base64>` to the clipboard via `navigator.clipboard.writeText` (falls back to a status pill when the API is unavailable or blocked). Server-less per REQ-IO-50. Emits `console.warn("[IdeaBar] Share: not yet implemented -- Phase 8")`. |
 
