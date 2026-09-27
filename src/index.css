@@ -202,6 +202,29 @@ textarea:focus-visible,
   animation: drawer-in var(--dur-base) var(--easing-standard);
 }
 
+/* =============================================================================
+   PRD-001 Phase 7 S3 (D131): the wrong-note match flash on the bar strip.
+   The rail's 5th overlay layer tints a wrong/mixed cell vermillion (#D55E00,
+   the shipped Okabe-Ito constant in EtudePianoRoll.tsx) and flashes it ONCE
+   for 600 ms when the state appears. Color is NEVER the sole channel (PRD
+   9.8): the same cell also carries data-match + an ASCII glyph + the title
+   counts. prefers-reduced-motion: reduce -> the flash is replaced by a
+   STATIC inset border (same color, no motion) per D131 verbatim.
+   ============================================================================= */
+@keyframes hse-match-flash {
+  0% { box-shadow: inset 0 0 0 2px rgba(213, 94, 0, 0.95); }
+  100% { box-shadow: inset 0 0 0 2px rgba(213, 94, 0, 0); }
+}
+.hse-match-flash {
+  animation: hse-match-flash 600ms ease-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hse-match-flash {
+    animation: none;
+    box-shadow: inset 0 0 0 2px rgba(213, 94, 0, 0.8);
+  }
+}
+
 /* Print: WYSIWYG of the tagged root (.print-area - the EtudeViews section).
  * The VISIBILITY pattern (not display:none) avoids fighting the flex/grid
  * app layout; the sticky header, sidebars, keyboard and IdeaBar vanish

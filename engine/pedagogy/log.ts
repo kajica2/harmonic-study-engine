@@ -17,7 +17,13 @@ export type PracticeOutcome = "correct" | "incorrect" | "partial";
 
 export interface PracticeEntry extends Versioned {
   readonly atMs: number;
-  readonly mode: "etude" | "compose" | "explore" | "ear";
+  /**
+   * PRD-001 Phase 7 S3 (D136): "practice" ADDED (additive widening -
+   * no frozen pin, S3 audit 12). The practice sessions adapter is the
+   * only writer of this mode (ONE appendAttempt seam, D120 landing);
+   * ramp/pause/AB/detection never touch pedagogyLog directly.
+   */
+  readonly mode: "etude" | "compose" | "explore" | "ear" | "practice";
   readonly refId: string;
   readonly outcome: PracticeOutcome;
   readonly durationSec: number;

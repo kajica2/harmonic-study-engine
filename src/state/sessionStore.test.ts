@@ -1248,6 +1248,32 @@ describe("Phase 7 S2: practiceMechanics slice - ONE optional field, NO v5 (D126)
     expect(envelope.state.practiceMechanics?.mode).toBe("pause");
   });
 
+  it("S3: the detect slice survives the persist WRITE roundtrip, envelope STILL v4", async () => {
+    // The read side (rehydrate WITH detect + the missing-key legacy
+    // case) is pinned by the MED-1 block below and practiceMechanics.
+    // test; this pins partialize EMITS the detect values themselves
+    // (the panel's complete-config emits land in storage verbatim).
+    STORE_API().setPracticeMechanics({
+      detect: { enabled: true, toleranceMs: 200, passThreshold: 0.65 },
+    });
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY) as string;
+    const envelope = JSON.parse(raw) as {
+      version: number;
+      state: {
+        practiceMechanics: {
+          detect: { enabled: boolean; toleranceMs: number; passThreshold: number };
+        };
+      };
+    };
+    expect(envelope.version).toBe(4); // NO v5 - detect rides the field
+    expect(envelope.state.practiceMechanics.detect).toEqual({
+      enabled: true,
+      toleranceMs: 200,
+      passThreshold: 0.65,
+    });
+  });
+
   it("MED-1: a corrupt practiceMechanics in a v4 payload hydrates GUARDED, never raw", () => {
     // zustand persist SKIPS `migrate` when the envelope version
     // matches and its default merge is a shallow spread - the custom
@@ -1288,6 +1314,10 @@ describe("Phase 7 S2: practiceMechanics slice - ONE optional field, NO v5 (D126)
       ab: { a: { fromBar: 4, toBar: 7 }, b: { fromBar: 8, toBar: 11 }, swapBars: 2 },
       ramp: { startBpm: 96, targetBpm: 120, stepBpm: 6, repsPerStep: 2, failThreshold: 2 },
       rampEnabled: true,
+      // S3 (D132): normalize materializes the detect sub-field at read
+      // (defaults-at-read, no v5) - a complete stored payload carries it.
+      // The missing-key legacy case is pinned in practiceMechanics.test.
+      detect: { enabled: true, toleranceMs: 200, passThreshold: 0.65 },
     };
     localStorage.setItem(
       SESSION_STORAGE_KEY,

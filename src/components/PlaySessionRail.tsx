@@ -14,6 +14,14 @@ import { barOfStep, clampWindow, totalFormBars } from "../../engine/practice/win
 // PRD-001 Phase 7 S2 (D127): mechanics DOM hooks (e2e + a11y). The
 // rail renders them; the scheduler + gates live in App/engine.
 import type { AbConfig, AbSlot, DutyPhase, MechanicsMode } from "../../engine/practice/duty";
+// PRD-001 Phase 7 S3 (D131): the match overlay is the 5th layer on the
+// strip cells - SAME pattern as the loop/AB bands. The rail renders the
+// hook's boundary-batched per-bar mirror; ALL matching math lives in
+// engine/practice/detect.ts (type-only import, zero logic here).
+import type { BarMatch } from "../../engine/practice/detect";
+// Okabe-Ito constants REUSED from the shipped roll palette (audit #16):
+// chordLane #009E73 (matched), syncopated #D55E00 (wrong/mixed).
+import { ROLL_PALETTE } from "./EtudePianoRoll";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { InspectPanel } from "./InspectPanel";
@@ -88,6 +96,11 @@ interface RailProps {
   mechanicsWindowPhase?: DutyPhase;
   mechanicsAbSlot?: AbSlot | null;
   mechanicsAb?: AbConfig;
+  // PRD-001 Phase 7 S3 (D131): the match overlay (5th layer). The
+  // boundary-batched per-bar mirror from usePlayedCorrectly + the armed
+  // flag (container data-detect). Absent/off = NO data-match anywhere.
+  detectEnabled?: boolean;
+  detectPerBar?: readonly BarMatch[];
   // Note: metronome click toggle used to live here. As of dfd2be3 it
   // lives in PracticeHeader (next to Loop) — the practice header is
   // the canonical surface for practice-loop controls. The rail still
@@ -215,6 +228,8 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           mechanicsWindowPhase={p.mechanicsWindowPhase}
           mechanicsAbSlot={p.mechanicsAbSlot}
           mechanicsAb={p.mechanicsAb}
+          detectEnabled={p.detectEnabled}
+          detectPerBar={p.detectPerBar}
           tempo={p.tempo}
           setTempo={p.setTempo}
           transposeShift={p.transposeShift}
@@ -562,6 +577,79 @@ const ChooseStage: React.FC<{
   );
 };
 
+// =====================================================================
+// PRD-001 Phase 7 S3 (D131): the match overlay vocabulary. PURE
+// derivations over the hook's boundary-batched BarMatch mirror - the
+// rail renders, it never scores. PRD 9.8 colorblind law: every state
+// carries (a) the data-match attribute (e2e + SR), (b) an ASCII glyph
+// (shape), (c) the title counts (text). Okabe-Ito tints reuse the
+// shipped EtudePianoRoll constants (audit #16).
+// =====================================================================
+
+type MatchState = "matched" | "missed" | "wrong" | "mixed" | "rest-extra";
+
+/** The ONE state law: mixed = matched + errors (wrong tint wins, the
+ *  errors are the actionable signal, D131); errors fold wrong AND
+ *  extra (timing errors are as actionable as pitch errors); a rest
+ *  bar scores ONLY its discipline signal (restExtras > 0). Free bars
+ *  and unknown bars are unscored -> null -> NO data-match. */
+function matchStateOf(b: BarMatch | undefined): MatchState | null {
+  if (!b) return null;
+  if (b.kind === "free") return null;
+  if (b.kind === "rest") return b.restExtras > 0 ? "rest-extra" : null;
+  const errors = b.wrongCount + b.extraCount;
+  if (b.matched > 0 && errors > 0) return "mixed";
+  if (b.matched > 0) return "matched";
+  if (errors > 0) return "wrong";
+  return "missed";
+}
+
+/** #RRGGBB -> rgba() at alpha (ASCII-only helper for the tint bands). */
+function hexAlpha(hex: string, a: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function matchTint(state: MatchState): string | null {
+  // matched #009E73 @14% | wrong/mixed/rest-extra #D55E00 @22% |
+  // missed = no tint (the cell content dims instead).
+  if (state === "matched") return hexAlpha(ROLL_PALETTE.chordLane, 0.14);
+  if (state === "missed") return null;
+  return hexAlpha(ROLL_PALETTE.syncopated, 0.22);
+}
+
+/** The flash rides the vermillion states (D131: wrong tint + 600 ms
+ *  flash; reduced-motion -> static border via the CSS rule). */
+function matchFlashes(state: MatchState): boolean {
+  return state === "wrong" || state === "mixed" || state === "rest-extra";
+}
+
+/** Corner glyph (bottom-right, opposite the A/B letter): matched =
+ *  the shipped lucide Check convention (PlaySessionRail stage ticks),
+ *  wrong/mixed "X", missed "-", rest-extra "!" (D131 ASCII set). */
+const MATCH_GLYPH: Record<Exclude<MatchState, "matched">, string> = {
+  missed: "-",
+  wrong: "X",
+  mixed: "X",
+  "rest-extra": "!",
+};
+
+/** Title counts (SR + hover parity): "matched 2/2 | wrong 1 | missed
+ *  0 | extra 0 | rest 0" per bar. */
+function matchTitle(b: BarMatch, state: MatchState): string {
+  if (b.kind === "rest") {
+    return `Detection ${state}: ${b.restExtras} note${b.restExtras === 1 ? "" : "s"} played during the rest`;
+  }
+  const expected = b.matchedPcs.length + b.missedPcs.length;
+  return (
+    `Detection ${state}: ${b.matched}/${expected} hit` +
+    ` | wrong ${b.wrongCount} | missed ${b.missedPcs.length}` +
+    ` | extra ${b.extraCount} | rest ${b.restExtras}`
+  );
+}
+
 const PerformStage: React.FC<{
   path: HarmonicPath;
   /** F3 (D110): form-relative bar unit, computed once in App. */
@@ -578,6 +666,9 @@ const PerformStage: React.FC<{
   mechanicsWindowPhase?: DutyPhase;
   mechanicsAbSlot?: AbSlot | null;
   mechanicsAb?: AbConfig;
+  // PRD-001 Phase 7 S3 (D131): match overlay inputs (see RailProps).
+  detectEnabled?: boolean;
+  detectPerBar?: readonly BarMatch[];
   tempo: number;
   setTempo: (v: number) => void;
   transposeShift: number;
@@ -601,6 +692,7 @@ const PerformStage: React.FC<{
   loopStartBar = null, loopEndBar = null, setLoopBar,
   mechanicsMode = "off", mechanicsWindowPhase = "play",
   mechanicsAbSlot = null, mechanicsAb,
+  detectEnabled = false, detectPerBar,
   tempo, setTempo,
   transposeShift, setTransposeShift,
   persona, personas, selectedPersonaId, onPersona,
@@ -649,6 +741,18 @@ const PerformStage: React.FC<{
     mechMode === "ab" && mechanicsAb ? clampWindow(mechanicsAb.a, formLen) : null;
   const abB =
     mechMode === "ab" && mechanicsAb ? clampWindow(mechanicsAb.b, formLen) : null;
+
+  // S3 (D131): per-bar match lookup keyed by FORM bar index. The hook
+  // mirror updates ONCE per boundary (D135.6) - this memo is cheap and
+  // re-runs at that cadence only. Bars outside the grid/span have no
+  // entry -> no data-match (unscored).
+  const detectByBar = useMemo(() => {
+    const m = new Map<number, BarMatch>();
+    if (detectEnabled && detectPerBar) {
+      for (const b of detectPerBar) m.set(b.bar, b);
+    }
+    return m;
+  }, [detectEnabled, detectPerBar]);
 
   return (
     <div>
@@ -770,6 +874,8 @@ const PerformStage: React.FC<{
           // active AB slot on the container in ab mode.
           data-phase={mechMode === "pause" ? mechanicsWindowPhase ?? "play" : "play"}
           data-window={mechMode === "ab" ? mechanicsAbSlot ?? undefined : undefined}
+          // S3 (D131): the strip-level detection state (6.1 contract).
+          data-detect={detectEnabled ? "on" : "off"}
         >
           {Array.from({ length: totalBars }).map((_, barIdx) => {
                   // F3 (#5): 1:1 - form bar b IS step b (first pass).
@@ -791,10 +897,22 @@ const PerformStage: React.FC<{
                   const inA = abA !== null && barIdx >= abA.fromBar && barIdx <= abA.toBar;
                   const inB = abB !== null && barIdx >= abB.fromBar && barIdx <= abB.toBar;
                   const windowTag = inA && inB ? "ab" : inA ? "a" : inB ? "b" : undefined;
+                  // S3 (D131): the match overlay state (undefined cell =
+                  // unscored / detection off -> NO data-match attribute).
+                  const match = detectEnabled ? detectByBar.get(barIdx) : undefined;
+                  const matchState = matchStateOf(match);
+                  const matchTintCss = matchState ? matchTint(matchState) : null;
+                  const baseTitle =
+                    loopStartBar !== null &&
+                    barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
+                    barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar)
+                      ? `Bar ${barIdx + 1} - in loop range. Shift+click another bar to resize, shift+click the same bar to clear.`
+                      : `Bar ${barIdx + 1} - click to jump here, shift+click to set loop range.`;
                   return (
                     <button
                       key={barIdx}
                       data-window={windowTag}
+                      data-match={matchState ?? undefined}
                       onClick={(e) => {
                         // Shift-click: set loop range. Plain click: step + audition.
                         if (e.shiftKey && setLoopBar) {
@@ -815,11 +933,9 @@ const PerformStage: React.FC<{
                         if (stepNotes.length) onPlayChord(stepNotes);
                       }}
                       title={
-                        loopStartBar !== null &&
-                        barIdx >= Math.min(loopStartBar, loopEndBar ?? loopStartBar) &&
-                        barIdx <= Math.max(loopEndBar ?? loopStartBar, loopStartBar)
-                          ? `Bar ${barIdx + 1} — in loop range. Shift+click another bar to resize, shift+click the same bar to clear.`
-                          : `Bar ${barIdx + 1} — click to jump here, shift+click to set loop range.`
+                        match !== undefined && matchState !== null
+                          ? `${baseTitle} ${matchTitle(match, matchState)}`
+                          : baseTitle
                       }
                       className={`relative flex-1 min-w-[60px] rounded-lg border px-2 py-1.5 text-left text-xs transition overflow-hidden ${
                         isActiveBar
@@ -875,6 +991,41 @@ const PerformStage: React.FC<{
                           {windowTag === "ab" ? "AB" : windowTag.toUpperCase()}
                         </span>
                       )}
+                      {/* S3 (D131): the 5th overlay layer - match tint band
+                          (matched #009E73 @14%, wrong/mixed/rest-extra
+                          #D55E00 @22% + 600ms flash, missed = NO color, the
+                          content dims). Same absolute-band pattern as the
+                          loop/AB layers above. */}
+                      {matchState !== null && matchTintCss !== null && (
+                        <div
+                          className={`absolute inset-0 rounded-lg pointer-events-none${
+                            matchFlashes(matchState) ? " hse-match-flash" : ""
+                          }`}
+                          style={{
+                            background: matchTintCss,
+                            boxShadow:
+                              matchState === "matched"
+                                ? "inset 0 0 0 1px rgba(0,158,115,0.45)"
+                                : "inset 0 0 0 1px rgba(213,94,0,0.55)",
+                          }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      {/* Corner glyph, bottom-right (opposite the A/B
+                          letter): shape redundancy - PRD 9.8. matched =
+                          the shipped lucide Check convention. */}
+                      {matchState !== null && (
+                        <span
+                          className="absolute bottom-1 right-1 flex items-center text-[9px] font-mono text-neutral-200 pointer-events-none"
+                          aria-hidden="true"
+                        >
+                          {matchState === "matched" ? (
+                            <Check size={10} />
+                          ) : (
+                            MATCH_GLYPH[matchState]
+                          )}
+                        </span>
+                      )}
                       {/* Phase 5: persona-driven left-edge accent (per-bar hue from
                           persona.colorPalette). Pure tonal flavor — not an
                           information channel, since bar position already does
@@ -914,8 +1065,12 @@ const PerformStage: React.FC<{
                         </span>
                       )}
               {/* Content wrapper — relative so it sits above the loop
-                  band overlay. */}
-              <div className="relative">
+                  band overlay. S3 (D131): a MISSED bar rides the
+                  existing dim convention (opacity .55, no new color). */}
+              <div
+                className="relative"
+                style={matchState === "missed" ? { opacity: 0.55 } : undefined}
+              >
               <div className="text-[10px] font-mono text-neutral-500 flex items-center gap-1">
                 <span>Bar {barIdx + 1}</span>
                 <span className="flex-1" />

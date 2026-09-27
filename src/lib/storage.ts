@@ -71,6 +71,13 @@ export const K = {
   // Phase 6 (REQ-PED-30/40, D107): SRS + practice log OUTSIDE zustand.
   pedagogySrs: "pedagogy.srs",
   pedagogyLog: "pedagogy.log",
+  // Phase 7 S3 (REQ-PRAC-40/41/60/61, D133/D134): latency calibration
+  // + completed practice sessions OUTSIDE zustand (performanceLog
+  // precedent). NOTE: practiceSessions (below) is the LEGACY set-runner
+  // key; completedSessions is the S3 SessionRecordV1 store - different
+  // type, different key, no FK (D133 terminology law).
+  practiceLatency: "practice.latency",
+  completedSessions: "practice.sessions",
 } as const;
 
 export type StorageKey = (typeof K)[keyof typeof K];
@@ -136,7 +143,9 @@ export const STORAGE_KEYS: StorageKeyMeta[] = [
   { key: K.session, since: "1", shape: "zustand persist JSON (mode slice)" },
   { key: K.ideas, since: "1", shape: "Idea[] JSON (capped at 100, REQ-IDEA-4)" },
   { key: K.pedagogySrs, since: "1", shape: "Record<string, SrsState> JSON (capped at 10, REQ-PED-30)" },
-  { key: K.pedagogyLog, since: "1", shape: "PracticeEntry[] JSON (capped at 500, REQ-PED-40)" },
+  { key: K.pedagogyLog, since: "1", shape: "PracticeEntry[] JSON (capped at 500, modes etude|compose|explore|ear|practice, REQ-PED-40 + D136)" },
+  { key: K.practiceLatency, since: "1", shape: "LatencyRecord JSON (REQ-PRAC-41, D134)" },
+  { key: K.completedSessions, since: "1", shape: "SessionRecordV1[] JSON (capped at 50, REQ-PRAC-61, D133)" },
 ];
 
 /**

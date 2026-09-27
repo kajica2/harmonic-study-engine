@@ -22,7 +22,14 @@ function isEntry(value: unknown): value is PracticeEntry {
   const v = value as Record<string, unknown>;
   return (
     typeof v.atMs === "number" &&
-    (v.mode === "etude" || v.mode === "compose" || v.mode === "explore" || v.mode === "ear") &&
+    // D136 (S3): "practice" MUST stay in this guard - the widened
+    // union with a pinned guard silently drops entries (THE fork
+    // risk of the doc; covered by the colocated acceptance pin).
+    (v.mode === "etude" ||
+      v.mode === "compose" ||
+      v.mode === "explore" ||
+      v.mode === "ear" ||
+      v.mode === "practice") &&
     typeof v.refId === "string" &&
     (v.outcome === "correct" || v.outcome === "incorrect" || v.outcome === "partial") &&
     typeof v.durationSec === "number"

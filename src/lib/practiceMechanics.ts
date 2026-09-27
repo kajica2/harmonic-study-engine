@@ -26,6 +26,19 @@ import {
   type RampState,
 } from "../../engine/practice/ramp";
 
+/** S3 (D132): played-correctly detection config. Rides the ONE
+ *  practiceMechanics field - NO new zustand field, NO v5 (D126
+ *  lineage): normalize DEFAULTS THE MISSING SUB-FIELD at read. */
+export interface DetectConfig {
+  /** Armed iff enabled AND the Web MIDI API is present (REQ-PRAC-54
+   *  gate lives at the hook/panel; this is the user's taste). */
+  enabled: boolean;
+  /** Timing window per bar start, 60..300 ms (engine floor 60). */
+  toleranceMs: number;
+  /** matchedFraction needed for an auto-rep success, 0.5..1.0. */
+  passThreshold: number;
+}
+
 export interface PracticeMechanicsConfig {
   /** off | loop | pause | ab - ONE selector (mode exclusivity, D122). */
   mode: MechanicsMode;
@@ -38,10 +51,13 @@ export interface PracticeMechanicsConfig {
   ramp: RampConfig;
   /** Ramp is ORTHOGONAL: rides any mode (D122). */
   rampEnabled: boolean;
+  /** S3 detection (D132): armed auto-rep + tolerance + threshold. */
+  detect: DetectConfig;
 }
 
 /** Shipped defaults (section 2): pause 4/4, AB 0-7 vs 8-15 swap 4,
- *  ramp 90->150 step 4 reps 2 threshold 2, mode off, ramp off. */
+ *  ramp 90->150 step 4 reps 2 threshold 2, mode off, ramp off,
+ *  detection OFF with the 120 ms window + 0.8 pass threshold (S3). */
 export const DEFAULT_MECHANICS: PracticeMechanicsConfig = {
   mode: "off",
   pause: { playBars: 4, restBars: 4 },
@@ -58,6 +74,7 @@ export const DEFAULT_MECHANICS: PracticeMechanicsConfig = {
     failThreshold: 2,
   },
   rampEnabled: false,
+  detect: { enabled: false, toleranceMs: 120, passThreshold: 0.8 },
 };
 
 const MODES: readonly MechanicsMode[] = ["off", "loop", "pause", "ab"];
@@ -125,12 +142,33 @@ export function normalizePracticeMechanics(raw: unknown): PracticeMechanicsConfi
   const rampEnabled =
     ramp !== null && r.rampEnabled === true;
 
+  // S3 (D132/D126 lineage): the detect sub-field DEFAULTS AT READ -
+  // a legacy payload without the key resolves to the shipped default
+  // (NO v5, no migration; the no-v5 pin is the missing-key case in
+  // practiceMechanics.test.ts).
+  const detectRaw = (typeof r.detect === "object" && r.detect !== null ? r.detect : {}) as Record<string, unknown>;
+  const detect: DetectConfig = {
+    enabled: detectRaw.enabled === true,
+    toleranceMs: intInRange(
+      detectRaw.toleranceMs,
+      60,
+      300,
+      DEFAULT_MECHANICS.detect.toleranceMs,
+    ),
+    passThreshold:
+      typeof detectRaw.passThreshold === "number" &&
+      Number.isFinite(detectRaw.passThreshold)
+        ? Math.min(1, Math.max(0.5, detectRaw.passThreshold))
+        : DEFAULT_MECHANICS.detect.passThreshold,
+  };
+
   return {
     mode,
     pause,
     ab,
     ramp: ramp ?? editedRampLadder(r.ramp),
     rampEnabled,
+    detect,
   };
 }
 
@@ -179,6 +217,7 @@ function structuredCloneDefault(c: PracticeMechanicsConfig): PracticeMechanicsCo
     ab: { a: { ...c.ab.a }, b: { ...c.ab.b }, swapBars: c.ab.swapBars },
     ramp: { ...c.ramp },
     rampEnabled: c.rampEnabled,
+    detect: { ...c.detect },
   };
 }
 

@@ -59,3 +59,23 @@ describe("pedagogyLog contract", () => {
     }
   });
 });
+
+describe("D136 (S3): isEntry accepts the widened union (THE fork-risk cover)", () => {
+  it("'practice' mode SURVIVES the persist -> load round-trip (guard not left behind)", () => {
+    appendLog({ atMs: NOW, mode: "practice", refId: "path-9", outcome: "partial", durationSec: 45, conceptId: null });
+    const raw = JSON.parse(localStorage.getItem(K.pedagogyLog) ?? "[]") as unknown[];
+    expect(raw.length).toBe(1);
+    expect(loadLog().length).toBe(1); // would be 0 if isEntry missed "practice"
+    expect(loadLog()[0].mode).toBe("practice");
+  });
+
+  it("unknown modes are still REJECTED by the guard (widening is not a free-for-all)", () => {
+    localStorage.setItem(
+      K.pedagogyLog,
+      JSON.stringify([
+        { version: 1, atMs: NOW, mode: "karaoke", refId: "x", outcome: "correct", durationSec: 1, conceptId: null },
+      ]),
+    );
+    expect(loadLog()).toEqual([]);
+  });
+});

@@ -109,6 +109,28 @@ to would lose meaning.
 | `Persona` → `HarmonicProfile` | High (204 usages) | Generic-flavored | **No** — too expensive for marginal gain |
 | `Masterclass` → `Curriculum` | High (36 usages) | Generic-flavored | **No** — same reason |
 
+## Tier 7: practice-block vocabulary (Phase 7 S3, D133)
+
+Three similarly-named concepts coexist in the app. The naming law,
+verbatim from `docs/PHASE-7-S3-DETECTION.md` section 6.4:
+
+> PRACTICE SESSION (REQ-PRAC-60, this slice): one continuous practice
+> block bundling drill config + attempts; stored under
+> practice.sessions. SET-RUNNER SESSION (legacy): one run of a
+> practice SET playlist (synesthesia_practice_sessions). TAKE: one
+> recorded audio performance (hse.performance.log.v1). Three
+> concepts, three keys, no foreign keys.
+
+| Existing | HSE term | Status | Notes |
+|---|---|---|---|
+| `SessionRecordV1` (`engine/practice/session.ts`) | Practice session | Aligned | New in S3. The type name, the adapter (`src/lib/practiceSessions.ts`, plural) and the key (`practice.sessions`) deliberately avoid the legacy word collision. |
+| `PracticeSession` (`src/lib/paths.ts`) | Set-runner session | Out of scope | Legacy playlist-run type + `practiceStore.ts` + `PracticeSessionPlayer.tsx` - UNTOUCHED by S3 (D119). Do not reuse for practice blocks. |
+| `Take` (`src/lib/performanceLog.ts`) | Recorded audio take | Aligned | One recorded performance artifact (cap 50). Disjoint from sessions by design: different grain, different lifecycle, no shared store. |
+
+The runner guard (D125) keeps a set-runner session and a practice
+block from overlapping at runtime; the two timeline-link only through
+the pedagogy practice log.
+
 ## Naming patterns (your proposal)
 
 Use these patterns for new code:
@@ -151,7 +173,8 @@ When (if ever) you want to migrate to the HSE terminology:
 
 ---
 
-**Last reviewed:** 2026-09-12. The doc is the reference for any future
+**Last reviewed:** 2026-09-27 (Tier 7 added with PRD-001 Phase 7 S3).
+The doc is the reference for any future
 naming decisions. If you add a new identifier, look here first; if
 it doesn't fit any row, that's a hint the concept may be missing
 from the HSE glossary — flag it and we'll add a row.

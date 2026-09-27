@@ -29,6 +29,13 @@ const JSDOM_FILES = [
   // env comments - the list is the only opt-in (AGENTS gotcha).
   "src/lib/backingEngine.test.ts",
   "src/components/PracticeMechanicsPanel.test.tsx",
+  // PRD-001 Phase 7 S3: the detection hook jsdom pins (synthetic
+  // "midin" CustomEvents + explicit flushNow - the flush API is the
+  // seam, the test NEVER starts a clock).
+  "src/hooks/usePlayedCorrectly.test.ts",
+  // PRD-001 Phase 7 S3 step 9: the latency wizard DOM pins (ModalShell
+  // state machine, fake-timer roll, saveLatency roundtrip).
+  "src/components/LatencyWizard.test.tsx",
   "src/lib/storage.test.ts",
   "src/state/sessionStore.test.ts",
   "tests/usePathGenerator.test.ts",

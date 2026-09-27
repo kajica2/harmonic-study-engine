@@ -109,3 +109,24 @@ describe("appendEntry caps + clamps", () => {
     expect(big[0].durationSec).toBe(3600);
   });
 });
+
+describe("D136 (S3): mode 'practice' widening", () => {
+  it("'practice' entries round-trip append + summarize like any other mode", () => {
+    const e = entry({ atMs: NOW - 1000, mode: "practice", refId: "path-1", durationSec: 120 });
+    const log = appendEntry([], e);
+    expect(log[0].mode).toBe("practice");
+    const summary = summarizeLog(log, NOW);
+    // minutesPerDay gets REAL practice minutes for free (the Phase 6
+    // heatmap was built for exactly this, D136).
+    expect(summary.minutesPerDay["2026-09-24"]).toBeCloseTo(2, 5);
+    expect(summary.totalAttempts).toBe(1);
+  });
+
+  it("outcome 'partial' (the detection verdict band) weighs 0.5", () => {
+    const log = [
+      entry({ atMs: NOW - 2, mode: "practice", outcome: "correct" }),
+      entry({ atMs: NOW - 1, mode: "practice", outcome: "partial" }),
+    ];
+    expect(summarizeLog(log, NOW).rollingAccuracy).toBeCloseTo(0.75, 5);
+  });
+});

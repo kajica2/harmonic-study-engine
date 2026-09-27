@@ -1,4 +1,4 @@
-# Practice Mechanics (PRD-001 Phase 3 Slice 3 + Phase 7 S1/S2)
+# Practice Mechanics (PRD-001 Phase 3 Slice 3 + Phase 7 S1/S2/S3)
 
 The click got a real control panel. A gear button beside the
 practice header's "Click" toggle opens the click settings popover:
@@ -13,6 +13,12 @@ windows), and the tempo ramp (a rep-rated ladder). The drills ride
 the same honest transport F3 shipped: one step per bar, form-relative
 windows, per-bar reanchor.
 
+Phase 7 S3 (D129-D136) closed the loop with **feedback that listens**:
+a latency calibration wizard, played-correctly detection (your MIDI
+input is scored against what each bar expects, on the bar strip and
+in a post-pass summary), and practice sessions that bundle the whole
+block -- config, attempts, max tempo -- into a reviewable log.
+
 None of this is etude-specific: the metronome and count-in ride the
 shared transport, so they apply to every path -- curated standards,
 masterclass tunes, and generated etudes alike. The annotation
@@ -24,9 +30,12 @@ User requirements traced here: REQ-PRAC-1 (settings), REQ-PRAC-2
 (volume independence), REQ-PRAC-10/11 (count-in), REQ-PED-5 (concept
 drawer), REQ-ETU-32 (print); Phase 7 S2: REQ-PRAC-21 (pause),
 REQ-PRAC-22 (A/B), REQ-PRAC-3 (click-through rests, verified by
-construction), REQ-PRAC-30..33 (ramp). Design authority:
-`docs/PHASE-3-SLICE3.md` (D32-D44) and
-`docs/PHASE-7-S2-MECHANICS.md` (D121-D128).
+construction), REQ-PRAC-30..33 (ramp); Phase 7 S3: REQ-PRAC-40..42
+(latency calibration), REQ-PRAC-50..54 (detection), REQ-PRAC-60..62
+(sessions), REQ-PRAC-33 (completion marking). Design authority:
+`docs/PHASE-3-SLICE3.md` (D32-D44),
+`docs/PHASE-7-S2-MECHANICS.md` (D121-D128) and
+`docs/PHASE-7-S3-DETECTION.md` (D129-D136).
 
 ## Where the controls live
 
@@ -215,12 +224,14 @@ Enable the ramp in the Drills panel: start/target tempo, step, reps
 per step, and the failure threshold (defaults 90 -> 150, step 4, 2
 reps, 2 consecutive misses; start/target clamp 30..240 like the
 slider). Rate what you just played with **Made it / Missed it** --
-each click is one rep, and until S3's detection replaces the input
-the ladder advances ONLY on this self-report. Reach `repsPerStep`
+each click is one rep, and with detection OFF the ladder advances
+ONLY on this self-report (S3's detection replaces the input when
+armed; the machine itself is unchanged). Reach `repsPerStep`
 successes and the ladder climbs one step (clamped to the target);
 `failThreshold` CONSECUTIVE misses drop it one step (clamped to the
 start); one success clears the miss streak. Landing on the target via
-the ladder marks **TARGET** (session bookkeeping arrives with S3).
+the ladder marks **TARGET** and completes the open practice session
+(REQ-PRAC-33, shipped with S3).
 
 - The live chip (`role="status"`) shows, while the ramp is engaged,
   `RAMP 96 -> 102 (+6)  rep 0/4  S4/F0`-style state (exact pinned
@@ -235,14 +246,135 @@ the ladder marks **TARGET** (session bookkeeping arrives with S3).
   active ramp RESEEDS the ladder to your tempo and resets the reps.
   The ramp's own writes never reseed (the equality guard breaks the
   echo loop).
-- The ladder is source-agnostic: S3's automatic pass detection will
-  feed the SAME machine on the `passCompleted` seam -- the buttons
-  stay as a manual override.
+- The ladder is source-agnostic: S3's automatic detection feeds the
+  SAME machine on the `passCompleted` seam -- the buttons stay as the
+  manual source while detection is off, and are disabled while it is
+  armed (never both rating one rep).
 - Honest restart: the ladder POSITION is run state, not taste -- it
   is never persisted. A reload with the ramp enabled re-engages at
   `startBpm` and WRITES that tempo (your persisted slider value is
   overridden on purpose); the panel's Reset does the same thing
   mid-session.
+
+## Latency calibration (REQ-PRAC-40..42)
+
+The Detection section of the Drills panel carries a **Calibrate**
+button. The wizard plays 16 clicks at your current tempo through the
+SAME metronome bus practice uses (the path being measured is the path
+you will be using), listens for your MIDI taps, and stores your input
+latency: the MEDIAN tap-minus-click offset minus the browser-reported
+output latency, clamped to 0..500 ms, with the device name and the
+calibration time. Click count is adjustable (8..32). Fewer than 8
+paired taps report "not enough taps" and retry -- never a silent 0.
+Escape or 8 s of silence aborts the roll; no timers leak.
+
+- The gate is honest: calibration needs the Web MIDI API AND at least
+  one connected input (measuring with nothing to tap is theater).
+  Without a device the wizard says "Connect a MIDI input to
+  calibrate" and offers the manual field -- manual entry (0..500 ms,
+  stored as source "manual") is ALWAYS available.
+- The canonical equation, stated once: a compensated tap is
+  `tap - inputLatency - outputLatency`, compared against the bar
+  boundary's emission time. A perfectly timed tap leaves exactly zero
+  residual. The matcher sees ONE number (the sum, computed in exactly
+  one place); the subtraction is what REQ-PRAC-42 stores the output
+  latency for.
+- Honesty limits (the panel says this verbatim): the browser-reported
+  output latency EXCLUDES Bluetooth/USB/display-audio buffering;
+  calibration is per audio path, so recalibrate when you switch
+  headphones or speakers. The stored number is displayed with
+  "calibrated X ago via <device>" so staleness is visible.
+
+## Played-correctly detection (REQ-PRAC-50..54)
+
+Arm **Played-correctly detection** in the Drills panel and play:
+every bar of the active window is scored against what the bar
+EXPECTS. The expectation is the app's own practice doctrine -- the
+bar's guide tones (the 3rd and 7th of the sounding chord, bass-
+relative), anchored at the bar's attack. Detection scores the same
+thing the guide-tone chip and the coverage row teach; the sounding
+voicing (transpose, persona, drift) is what is expected, so the
+target is never a fiction the app does not play.
+
+- Grid kinds per bar: **target** = the chord has guide tones; the
+  expected set is those pitch classes. **free** = a chord with no
+  3rd/7th (sus/power voicings) -- unscored, excluded from the
+  denominator, your notes there are penalized nowhere. **rest** = an
+  empty step or the pause mode's rest phase -- the expectation is
+  SILENCE, and any note you play is a discipline error counted
+  separately as rest notes.
+- The bucket law (every note lands in exactly one bucket):
+  **matched** = right pitch class inside the timing window;
+  **missed** = an expected pitch class never played; **wrong** = a
+  note whose pitch is not in the bar's expected set (a pitch error);
+  **extra** = a duplicate of an already-matched note, a right note
+  outside the window (a timing error), or a note during a rest.
+  Accuracy counts rest notes against you -- playing over rests IS
+  inaccurate practice.
+- Tolerance: default 120 ms, adjustable 60..300. The window is
+  anchored at the bar boundary where the click actually fired: the
+  app's own scheduling jitter moves the click and the anchor TOGETHER,
+  so you are never blamed for the app's clock (the boundary-anchored
+  design, D129). At the max tolerance, consecutive bar windows never
+  overlap at any supported tempo.
+- Visual states on the bar strip (the 5th overlay layer): matched
+  cells ride a bluish-green tint + a check glyph, wrong/mixed flash
+  vermillion with an "X" (reduced-motion: static border, no flash),
+  missed dim with a "-", rest notes mark "!". The palette is
+  Okabe-Ito, and every state ALSO carries a data attribute and a
+  counts-in-text hover/screen-reader title -- shape and text
+  redundancy, never color alone (PRD 9.8).
+- Auto-rep: with detection armed the tempo ramp rates itself at each
+  pass boundary -- a pass is a "made it" when the share of expected
+  notes hit reaches the panel's **Pass at** threshold (default 0.8,
+  range 0.5..1.0; timing never gates the verdict, tolerance already
+  did). The Made it / Missed it buttons are disabled while armed (the
+  machine and the click can never double-rate one rep); turn
+  detection off and they return, S2 behavior unchanged.
+- Requirements (REQ-PRAC-54): detection needs a browser with the Web
+  MIDI API -- without it the panel shows the honest unavailable state
+  and drills, ramp and manual rating work unchanged. With the API but
+  no device connected, detection arms and stays silent ("connect a
+  MIDI input"); hot-plugging a controller just works.
+- Feedback surfaces: a post-pass summary card ("Pass 3 - 7/8 notes
+  (88%) | avg +23 ms late | 1 wrong | 1 rest") and a compact header
+  chip while armed. The summary and the strip update ONCE PER BAR
+  boundary, never per note; the live per-note chip stays the
+  immediate surface.
+
+## Practice sessions (REQ-PRAC-60..62)
+
+Playing with any drill, the ramp, or detection engaged records a
+**practice session**: one continuous practice block bundling a config
+snapshot (path, meter, windows, ramp ladder, metronome settings,
+start tempo) and one attempt per pass (or per manual rating),
+summarized when the block ends.
+
+- Start: on the play edge, iff a practice context is engaged. Bare
+  audition play (no drill, no ramp, no detection) never opens a
+  session -- the log stays signal.
+- End: on stop/pause or on switching paths. Blocks shorter than 20
+  seconds are DISCARDED (a noise filter, stated honestly). Reaching
+  the ramp target marks the open session completed immediately
+  (REQ-PRAC-33); the record keeps playing and re-persists when the
+  block actually closes.
+- Caps: the last 50 sessions, each keeping the last 50 RAW attempts
+  folded into running aggregates (attempts, successes, notes hit,
+  total play time, max tempo) -- a marathon session cannot blow the
+  storage quota.
+- Surface: the Drills panel shows an end-of-session card (max tempo,
+  total time, made count, accuracy, TARGET badge) and a recent-
+  sessions list with relative times. Sessions also feed the pedagogy
+  practice log (mode "practice"), so the Phase 6 heatmap minutes now
+  include real practice time.
+- Limitations, honestly: a tab unload mid-block is NOT persisted (a
+  session is a practice block, not a crash journal); a pause splits
+  sessions (the summary grain is the continuous block).
+- Terminology: a session is NOT a take. A **take** is a recorded
+  audio performance (the takes panel); a **set-runner session** is
+  the legacy run through a practice-set playlist. Three concepts,
+  three storage keys, no foreign keys -- the full law lives in
+  `docs/TERMINOLOGY.md`.
 
 ## Print
 
@@ -320,9 +452,13 @@ path exists for future registry entries.
   during a SUB-window loop/pause/A-B the bass/piano CONTENT walks the
   full path while the groove timing stays honest. Rest muting is
   content-agnostic (bus level) and correct regardless.
-- **Ramp session marking + automatic detection**: reaching TARGET is
-  visible only; the rep source becomes detection on `passCompleted`
-  in S3 (the ladder is unchanged).
+- **Detection without a MIDI input**: the strip never scores and the
+  summary stays at zero hits -- by construction, not by fallback
+  (there is no honest way to detect notes the browser cannot hear).
+  Manual rating covers that case.
+- **Session unload gap**: an open session is persisted when the block
+  ENDS (stop / path switch); closing the tab mid-block loses it.
+  Sessions are practice blocks, not a crash journal (D133.4).
 - **Mobile**: the Drills gear is desktop-first (same class as the
   click gear); MobileCommandBar keeps the loop toggle only.
 - **No new keyboard shortcuts**: every drill control is a real
@@ -356,6 +492,22 @@ path exists for future registry entries.
 - Drills panel UI: `src/components/PracticeMechanicsPanel.tsx`; gear
   + chips host: `src/components/PracticeHeader.tsx`; rail data attrs:
   `src/components/PlaySessionRail.tsx`
+- Matcher math (pure, S3): `engine/practice/detect.ts`
+  (`matchPhrase` + `assignBar`, the bucket + no-overlap laws);
+  latency median/clamp: `engine/practice/latency.ts`; session
+  fold/summarize: `engine/practice/session.ts`
+- Expected grid (S3): `src/lib/practiceExpected.ts` (guideTonePcs is
+  a pinned mirror of the shipped `intervalToRole` law -- the
+  cross-check oracle pin lives in its test)
+- Detection hook (S3): `src/hooks/usePlayedCorrectly.ts` (window
+  "midin" subscription + read-only `playbackClock.subscribe` boundary
+  observer -- TD-052); wiring + verdict routing + session lifecycle:
+  the S3 effects block in `src/App.tsx`
+- Wizard (S3): `src/components/LatencyWizard.tsx`; latency record:
+  `src/lib/practiceLatency.ts`; sessions adapter (the ONE
+  appendAttempt dual-write seam): `src/lib/practiceSessions.ts`;
+  keys `K.practiceLatency` / `K.completedSessions` in
+  `src/lib/storage.ts`
 - Count-in: sequence `src/lib/countIn.ts`, timer
   `src/hooks/useCountIn.ts`, visible overlay
   `src/components/CountInOverlay.tsx`, gate `requestPlayState` in
@@ -369,4 +521,7 @@ path exists for future registry entries.
 - e2e: `e2e/count-in.spec.ts`; S2 legs:
   `e2e/practice-pause.spec.ts`, `e2e/practice-ab.spec.ts`,
   `e2e/practice-ramp.spec.ts` (the ramp leg is click-deterministic,
-  no playback)
+  no playback); S3 legs: `e2e/practice-detection.spec.ts` (negative
+  no-API leg, a synthetic-stream leg driving the shipped window
+  "midin" seam on the real transport with monotonic-counter asserts
+  only, and a deterministic wizard/persistence leg)

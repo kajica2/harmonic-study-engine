@@ -61,10 +61,16 @@ const ENGINE = "engine";
  *  (50 -> 51, tree scans 52). Phase 7 S2 adds practice/{duty,ramp} per
  *  D123 (51 -> 53, tree scans 54) - the scheduler + ladder are NEW
  *  pure sources; windows.ts stays geometry-only (ratified deviation:
- *  the D123 fork, engine/practice/duty.ts header).
+ *  the D123 fork, engine/practice/duty.ts header). Phase 7 S3 adds
+ *  practice/{detect,latency,session} per D130 (53 -> 56, tree scans
+ *  57): the matcher math (detect.ts - the D130 naming deviation from
+ *  the parent sketch's match.ts is ratified by the task), the
+ *  calibration median/clamp math, and the SessionRecordV1 fold/
+ *  summarize math - all THREE ZERO-import (timestamps are INPUTS;
+ *  docs/PHASE-7-S3-DETECTION.md audit 20).
  *  Raise this only alongside
  *  real files. */
-const MIN_SCANNED_FILES = 53;
+const MIN_SCANNED_FILES = 56;
 
 const BANNED: readonly RegExp[] = [
   /\bMath\.random\b/, // no paren: calls AND aliasing

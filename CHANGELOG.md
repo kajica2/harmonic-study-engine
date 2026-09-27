@@ -426,6 +426,41 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **Latency calibration, played-correctly detection, practice
+  sessions (PRD-001 Phase 7 slice 3, D129-D136).** (1) LATENCY
+  CALIBRATION: a "Calibrate" wizard in the Drills panel plays 16
+  clicks, listens for your MIDI taps, and stores the median offset
+  (minus the browser's output latency) - detection timing now
+  subtracts it automatically; manual entry (0..500 ms) always works,
+  and the stored number shows when it was calibrated and via which
+  device. (2) PLAYED-CORRECTLY DETECTION (requires a MIDI input + a
+  Web MIDI browser): bars light green (guide tones hit), dim
+  (missed), or flash vermillion (wrong notes); playing during rests
+  is counted. Every state also carries a letter glyph and a text
+  summary (colorblind-safe, never color alone), and a post-pass
+  summary shows notes hit, average timing offset, and accuracy. (3)
+  The tempo ramp now rates itself from detection when armed (the
+  Made-it / Missed-it buttons return when detection is off - never
+  both rating one rep); reaching the ramp target marks the practice
+  session COMPLETED (REQ-PRAC-33, the S2 deferral closes). (4)
+  PRACTICE SESSIONS: playing with any drill/ramp/detection engaged
+  records a session (config snapshot + attempts + max tempo); the
+  last 50 are listed in the Drills panel with an end-of-session
+  summary. Sessions also feed the practice log (mode "practice"), so
+  the heatmap minutes now include real practice time. (5) Sessions
+  are NOT takes: takes stay recorded-audio artifacts; sessions are
+  practice-block logs (three concepts, three keys - the law lives in
+  `docs/TERMINOLOGY.md`). The matcher is a pure engine
+  (`engine/practice/detect.ts`) fed by a boundary-anchored expected
+  grid: the detector subscribes to the shipped window "midin" event
+  and READS the transport clock only (TD-052) - the sacred measure
+  handler gained ZERO new hunks (detection rides the S2 repPulse
+  mirror). Engine purity floor 53 -> 56; no zustand v5 (the detect
+  config rides the existing practiceMechanics field, defaults-at-
+  read); no new keyboard shortcuts; frozen tests/ pins untouched;
+  3 new e2e legs (negative no-API, synthetic-stream positive on the
+  real transport with monotonic-counter asserts only, deterministic
+  wizard/persistence). Design: `docs/PHASE-7-S3-DETECTION.md`.
 - **Practice drills: pause mode, A/B compare, tempo ramp (PRD-001
   Phase 7 slice 2, D121-D128).** A second gear in the practice header
   ("Drills") opens the mechanics panel: (1) PAUSE mode plays N bars

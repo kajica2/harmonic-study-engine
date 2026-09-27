@@ -9,6 +9,13 @@ import {
 import { formatRampChip, type PracticeMechanicsConfig } from "../lib/practiceMechanics";
 import type { DutyPhase } from "../../engine/practice/duty";
 import type { RampState } from "../../engine/practice/ramp";
+// PRD-001 Phase 7 S3 (D131/D134): the compact accuracy chip (armed only,
+// same region as the ramp chip) + the wizard mount (dialog state lives
+// HERE, mirroring the drills-popover precedent - App stays wiring-only).
+import type { PhraseMatch } from "../../engine/practice/detect";
+import type { SessionRecordV1 } from "../../engine/practice/session";
+import type { LatencyRecord } from "../lib/practiceLatency";
+import { LatencyWizard } from "./LatencyWizard";
 import { GuideToneFeedback } from "./GuideToneFeedback";
 import { MetronomeControls } from "./MetronomeControls";
 import { PracticeMechanicsPanel } from "./PracticeMechanicsPanel";
@@ -116,6 +123,47 @@ interface PracticeHeaderProps {
   onMechanicsChange: (next: PracticeMechanicsConfig) => void;
   onRepOutcome: (success: boolean) => void;
   onRampReset: () => void;
+
+  // PRD-001 Phase 7 S3 (D131/D134): the detection chip + the Detection
+  // section view-model + the wizard inputs. Pure props-forwarding; the
+  // hook state + storage writes live in App.
+  /** enabled && Web MIDI API present (D135.4) - chip + disable law. */
+  detectionArmed: boolean;
+  /** REQ-PRAC-54: no Web MIDI API (panel honest-unavailable state). */
+  detectionUnavailable: boolean;
+  /** D135.4 status line: a MIDI input has been observed. */
+  detectionHasDevice: boolean;
+  /** S3 fix round (MED-001): target bars in the built grid - the
+   *  panel's canAutoRate disable law (all-free grid keeps manual). */
+  detectionGridTargets: number;
+  /** Last scored pass (summary card + chip readout). */
+  detectionPhrase: PhraseMatch | null;
+  /** "Pass N" counter (App-owned state). */
+  detectionPassCount: number;
+  /** Stored latency record (panel honesty copy + wizard prefill). */
+  latencyRecord: LatencyRecord | null;
+  /** Panel manual entry (0..500 ms, source "manual", D134). */
+  onManualLatency: (ms: number) => void;
+  /** Re-read the stored record after a wizard save. */
+  onLatencySaved: () => void;
+  /** Wizard gate: MIDI input device list non-empty (useMidiDevices). */
+  midiHasDevice: boolean;
+  /** Selected input name for the stored record (best effort). */
+  midiDeviceName: string | null;
+  /** Bass-channel exclusion (wizard taps; same law as the trail). */
+  bassMidiChannel: number | null;
+  /** Recent completed sessions, newest last (D133 summary surface). */
+  sessions: SessionRecordV1[];
+  /** Last closed session for the end-of-session card (null = none). */
+  lastSession: SessionRecordV1 | null;
+}
+
+/** S3 (D131): compact ASCII accuracy readout for the chip row -
+ *  "DET 88%" once a pass scored, "DET armed" before the first one.
+ *  Text + role=status: color never carries it alone (PRD 9.8). */
+export function formatDetectionChip(m: PhraseMatch | null): string {
+  if (m === null) return "DET armed";
+  return `DET ${Math.round(m.matchedFraction * 100)}%`;
 }
 
 const BACKING_STYLE_LABELS: Record<BackingStyle, string> = {
@@ -165,6 +213,20 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onMechanicsChange,
   onRepOutcome,
   onRampReset,
+  detectionArmed,
+  detectionUnavailable,
+  detectionHasDevice,
+  detectionGridTargets,
+  detectionPhrase,
+  detectionPassCount,
+  latencyRecord,
+  onManualLatency,
+  onLatencySaved,
+  midiHasDevice,
+  midiDeviceName,
+  bassMidiChannel,
+  sessions,
+  lastSession,
 }) => {
   // F3 (D112): the honest form-relative readout. The legacy
   // formatChordReadout stays exported-but-dead in practiceHeader.ts
@@ -225,6 +287,12 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
     };
   }, [drillsOpen]);
 
+  // PRD-001 Phase 7 S3 (D134): the calibration wizard mount. Dialog
+  // state lives HERE (the header owns its popover surfaces); the panel
+  // Calibrate button opens it. Escape/backdrop close = onClose; the
+  // wizard's rolling effect cleans itself up on unmount (no leaks).
+  const [wizardOpen, setWizardOpen] = useState(false);
+
   return (
     <div
       className="w-full rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 px-4 py-3 flex flex-wrap items-center gap-4"
@@ -284,6 +352,25 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
               title="Tempo ramp: current bpm -> target (+step), reps at bpm, success/fail streaks"
             >
               {formatRampChip(rampState, mechanics.ramp)}
+            </span>
+          )}
+          {/* PRD-001 Phase 7 S3 (D131): compact accuracy chip - ARMED
+              only (enabled + Web MIDI present), same region as the ramp
+              chip. ASCII text readout, never color-only (PRD 9.8). */}
+          {detectionArmed && (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 text-[11px] t-mono text-neutral-200${isPlaying ? "" : " opacity-60"}`}
+              role="status"
+              aria-live="polite"
+              data-testid="detect-chip"
+              data-notes-hit={detectionPhrase !== null ? detectionPhrase.matched : undefined}
+              title={
+                detectionPhrase !== null
+                  ? `Detection: ${detectionPhrase.matched}/${detectionPhrase.expectedTotal} expected notes hit on the last pass`
+                  : "Detection armed - play a full pass for the first verdict"
+              }
+            >
+              {formatDetectionChip(detectionPhrase)}
             </span>
           )}
           {/* Phase badge (pause mode): glyph + TEXT, never color-only
@@ -460,6 +547,17 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
                 onConfigChange={onMechanicsChange}
                 onRepOutcome={onRepOutcome}
                 onRampReset={onRampReset}
+                // S3: the Detection section view-model (pure forwarding).
+                detectionUnavailable={detectionUnavailable}
+                detectionHasDevice={detectionHasDevice}
+                detectionGridTargets={detectionGridTargets}
+                phrase={detectionPhrase}
+                passCount={detectionPassCount}
+                latencyRecord={latencyRecord}
+                onManualLatency={onManualLatency}
+                onCalibrate={() => setWizardOpen(true)}
+                sessions={sessions}
+                lastSession={lastSession}
               />
             </div>
           )}
@@ -525,6 +623,20 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           </select>
         </label>
       </div>
+
+      {/* S3 (D134): the calibration wizard (ModalShell, mounted only
+          while open - unmount runs the rolling cleanup). */}
+      {wizardOpen && (
+        <LatencyWizard
+          onClose={() => setWizardOpen(false)}
+          tempo={tempo}
+          hasMidiApi={!detectionUnavailable}
+          hasDevice={midiHasDevice}
+          deviceName={midiDeviceName}
+          bassMidiChannel={bassMidiChannel}
+          onSaved={onLatencySaved}
+        />
+      )}
     </div>
   );
 };

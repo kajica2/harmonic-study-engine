@@ -37,6 +37,12 @@ function isValid(c: ReturnType<typeof normalizePracticeMechanics>): void {
   expect(c.ramp.repsPerStep).toBeGreaterThanOrEqual(1);
   expect(c.ramp.failThreshold).toBeGreaterThanOrEqual(1);
   expect(typeof c.rampEnabled).toBe("boolean");
+  // S3 (D132): the detect slice is TOTAL after normalize too.
+  expect(typeof c.detect.enabled).toBe("boolean");
+  expect(c.detect.toleranceMs).toBeGreaterThanOrEqual(60);
+  expect(c.detect.toleranceMs).toBeLessThanOrEqual(300);
+  expect(c.detect.passThreshold).toBeGreaterThanOrEqual(0.5);
+  expect(c.detect.passThreshold).toBeLessThanOrEqual(1);
 }
 
 describe("normalizePracticeMechanics - total-shape guard", () => {
@@ -128,6 +134,10 @@ describe("normalizePracticeMechanics - total-shape guard", () => {
       ab: { a: { fromBar: 4, toBar: 7 }, b: { fromBar: 8, toBar: 11 }, swapBars: 2 },
       ramp: { startBpm: 90, targetBpm: 102, stepBpm: 6, repsPerStep: 2, failThreshold: 2 },
       rampEnabled: true,
+      // S3: a COMPLETE stored detect with NON-default values - the
+      // round-trip must preserve them (not clobber with defaults).
+      // The legacy missing-key case is pinned separately (no-v5 pin).
+      detect: { enabled: true, toleranceMs: 90, passThreshold: 0.9 },
     };
     expect(normalizePracticeMechanics(stored)).toEqual(stored);
   });
@@ -174,5 +184,51 @@ describe("formatRampChip", () => {
     expect(formatRampChip(initialRampState(cfg), cfg)).toBe(
       "RAMP 90 -> 102 (+6)  rep 0/4  S0/F0",
     );
+  });
+});
+
+describe("S3 detect slice (D132): defaults-at-read, no v5", () => {
+  it("LEGACY S2 payload WITHOUT the detect key -> shipped detect defaults (the no-v5 pin)", () => {
+    const legacy = {
+      mode: "pause",
+      pause: { playBars: 2, restBars: 6 },
+      ab: { a: { fromBar: 0, toBar: 3 }, b: { fromBar: 4, toBar: 7 }, swapBars: 2 },
+      ramp: { startBpm: 100, targetBpm: 140, stepBpm: 5, repsPerStep: 3, failThreshold: 2 },
+      rampEnabled: true,
+    };
+    const c = normalizePracticeMechanics(legacy);
+    isValid(c);
+    expect(c.detect).toEqual({ enabled: false, toleranceMs: 120, passThreshold: 0.8 });
+    // Siblings untouched by the widening.
+    expect(c.mode).toBe("pause");
+    expect(c.pause).toEqual({ playBars: 2, restBars: 6 });
+    expect(c.rampEnabled).toBe(true);
+  });
+
+  it("garbage detect -> defaults per field (string enabled, wild tolerance, NaN threshold)", () => {
+    const c = normalizePracticeMechanics({
+      detect: { enabled: "yes", toleranceMs: "120", passThreshold: Number.NaN },
+    });
+    isValid(c);
+    expect(c.detect.enabled).toBe(false);
+    expect(c.detect.toleranceMs).toBe(120);
+    expect(c.detect.passThreshold).toBe(0.8);
+  });
+
+  it("range clamps: tolerance 60..300 INT, passThreshold 0.5..1.0", () => {
+    const hi = normalizePracticeMechanics({ detect: { enabled: true, toleranceMs: 9999, passThreshold: 2 } });
+    expect(hi.detect).toEqual({ enabled: true, toleranceMs: 300, passThreshold: 1 });
+    const lo = normalizePracticeMechanics({ detect: { toleranceMs: 5, passThreshold: 0.1 } });
+    expect(lo.detect.toleranceMs).toBe(60);
+    expect(lo.detect.passThreshold).toBe(0.5);
+    const frac = normalizePracticeMechanics({ detect: { toleranceMs: 120.7 } });
+    expect(frac.detect.toleranceMs).toBe(120); // intInRange floors
+  });
+
+  it("DEFAULT_MECHANICS.detect shape + clone isolation", () => {
+    expect(DEFAULT_MECHANICS.detect).toEqual({ enabled: false, toleranceMs: 120, passThreshold: 0.8 });
+    const c = normalizePracticeMechanics("garbage");
+    c.detect.enabled = true;
+    expect(DEFAULT_MECHANICS.detect.enabled).toBe(false); // constant never mutated
   });
 });

@@ -196,6 +196,35 @@ import {
 } from "../engine/practice/ramp";
 import type { BarWindow } from "../engine/practice/windows";
 import type { PracticeMechanicsConfig } from "./lib/practiceMechanics";
+// PRD-001 Phase 7 S3 (D129-D136): played-correctly detection wiring.
+// ALL math lives in engine/practice/{detect,session}.ts + the src/lib
+// adapters; App holds ONLY wiring effects + the session draft ref
+// (the shipped S2 pattern). The advanceTransport handler stays
+// byte-identical: detection rides the repPulse mirror (D132) and the
+// hook's read-only playbackClock observer (TD-052).
+import { usePlayedCorrectly } from "./hooks/usePlayedCorrectly";
+import { buildExpectedGrid, type ExpectedBar } from "./lib/practiceExpected";
+import type { PhraseMatch } from "../engine/practice/detect";
+import {
+  compensationOf,
+  loadLatency,
+  saveLatency,
+  type LatencyRecord,
+} from "./lib/practiceLatency";
+import {
+  appendAttempt,
+  appendSession,
+  loadSessions,
+  markRampCompleted,
+} from "./lib/practiceSessions";
+import {
+  closeSession,
+  isSessionWorthSaving,
+  openSession,
+  type AttemptV1,
+  type SessionRecordV1,
+  type SessionWindows,
+} from "../engine/practice/session";
 import { isModeShortcutModifierKey, classifyTransposeKey } from "./hooks/useKeyDown";
 // PRD-001 Phase 3 Slice 2: etude composer panel + engine adapter +
 // URL constraint serialization (D22/D24/D28).
@@ -278,6 +307,11 @@ function runWhenIdle(fn: () => void): () => void {
   const id = window.setTimeout(fn, 0);
   return () => window.clearTimeout(id);
 }
+
+/** S3: identity-stable empties for the detection memos (the grid is
+ *  built ONLY while armed - cheap guard, docs section 5 step 7). */
+const EMPTY_DETECT_GRID: ExpectedBar[] = [];
+const EMPTY_REST_BARS: ReadonlySet<number> = new Set<number>();
 
 function AppShell() {
   // Run the localStorage schema gate before any hook hydrates from
@@ -1748,6 +1782,360 @@ function AppShell() {
     [formLen, setPracticeMechanicsStore],
   );
 
+  // ===================================================================
+  // PRD-001 Phase 7 S3 (D129-D136): detection wiring. Grid memo +
+  // hook + verdict routing (repPulse edge guard) + session lifecycle
+  // + REQ-33 completion + latency state. The advanceTransport handler
+  // below is byte-identical to S2 (zero new hunks, D132).
+  // ===================================================================
+
+  // REQ-PRAC-41: the latency record loads on mount; refreshLatency
+  // is the seam the step-9 wizard calls after a save. The matcher
+  // sees ONE number (the single-sum law lives in practiceLatency).
+  const [latencyRecord, setLatencyRecord] = useState<LatencyRecord | null>(
+    () => loadLatency(),
+  );
+  const refreshLatency = useCallback(() => {
+    setLatencyRecord(loadLatency());
+  }, []);
+  const latencyCompensationMs = compensationOf(latencyRecord);
+
+  // Steps 8+9 SURFACE state (state + formatting only, no new logic):
+  // the "Pass N" counter for the summary card + the closed-sessions
+  // view-model (adapter load at mount; refreshed at each persisted
+  // close - the panel renders these plain values). NAMING (D133):
+  // "PracticeSessions" suffix - the legacy set-runner recentSessions
+  // (PracticeSession[]) keeps its name, the trio stays UNTOUCHED.
+  const [detectPassCount, setDetectPassCount] = useState(0);
+  const closedPracticeSessionsView = (all: SessionRecordV1[]): SessionRecordV1[] =>
+    all.filter((s) => s.endedAtMs !== null).slice(-5);
+  const [recentPracticeSessions, setRecentPracticeSessions] = useState<SessionRecordV1[]>(
+    () => closedPracticeSessionsView(loadSessions()),
+  );
+  const [lastClosedSession, setLastClosedSession] = useState<SessionRecordV1 | null>(
+    () => {
+      const closed = closedPracticeSessionsView(loadSessions());
+      return closed.length > 0 ? closed[closed.length - 1] : null;
+    },
+  );
+
+  // D134 manual latency entry (panel field; the wizard has its own
+  // save path): write through the adapter + re-read via the EXISTING
+  // refresh seam. Source "manual", output 0 (single-sum law).
+  const handleManualLatency = useCallback(
+    (ms: number) => {
+      const v = Number.isFinite(ms) ? Math.min(500, Math.max(0, Math.floor(ms))) : 0;
+      saveLatency({
+        version: 1,
+        inputLatencyMs: v,
+        outputLatencyMs: 0,
+        source: "manual",
+        calibratedAtMs: Date.now(),
+        deviceName: null,
+      });
+      refreshLatency();
+    },
+    [refreshLatency],
+  );
+
+  // D130: the ACTIVE SPAN in form-bar coordinates. loop/pause (and
+  // the legacy loop under mode "off") = the shipped loop window ??
+  // the whole form (duty span law 6, the same expression the
+  // scheduler ref uses); ab = the LIVE slot's window (a slot change
+  // IS the ab pass boundary, duty law 5 - the new head ends the old
+  // pass cleanly at the wrap).
+  const detectSpan = useMemo<{ fromBar: number; toBar: number } | null>(() => {
+    if (practiceMechanics.mode === "ab") {
+      return abSlot === "b"
+        ? clampWindow(practiceMechanics.ab.b, formLen)
+        : clampWindow(practiceMechanics.ab.a, formLen);
+    }
+    return loopStartBar !== null
+      ? clampWindow(
+          { fromBar: loopStartBar, toBar: loopEndBar ?? totalFormBars(formLen) - 1 },
+          formLen,
+        )
+      : null;
+  }, [
+    practiceMechanics.mode,
+    practiceMechanics.ab,
+    abSlot,
+    loopStartBar,
+    loopEndBar,
+    formLen,
+  ]);
+
+  // The pause duty phase is DYNAMIC (duty law 3): the bar ENTERING
+  // rest is marked rest in the grid, and the hook freezes each bar's
+  // entry at its boundary stamp - so a per-bar rebuild never poisons
+  // already-scored bars (D130 rest kind = the discipline signal).
+  const detectRestBars = useMemo<ReadonlySet<number>>(() => {
+    if (practiceMechanics.mode !== "pause" || windowPhase !== "rest") {
+      return EMPTY_REST_BARS;
+    }
+    return new Set([activeStepIndex]);
+  }, [practiceMechanics.mode, windowPhase, activeStepIndex]);
+
+  // The expected grid, armed-only. Sounding notes =
+  // exportNotesOverride, the shipped per-step mirror of what the
+  // synth ACTUALLY plays (transpose + voicing + drift baked in -
+  // the D130 "sounding notes" law held against the real arrays; the
+  // doc's literal optimizedStepsNotes does NOT bake transpose in,
+  // see the S3 report deviation note).
+  const detectGrid = useMemo<ExpectedBar[]>(() => {
+    if (!practiceMechanics.detect.enabled) return EMPTY_DETECT_GRID;
+    return buildExpectedGrid(
+      formLen,
+      exportNotesOverride,
+      detectSpan,
+      detectRestBars,
+    );
+  }, [
+    practiceMechanics.detect.enabled,
+    formLen,
+    exportNotesOverride,
+    detectSpan,
+    detectRestBars,
+  ]);
+
+  // S3 FIX ROUND (MED-001): how many grid bars can ACTUALLY score
+  // (kind "target"). The panel's disable law keys on this + mode:
+  // armed-but-unable-to-rate (all-free grid -> the D132 no-verdict
+  // law; mode "off" -> no repPulse seam) must keep the manual
+  // buttons LIVE so the ramp can never soft-lock. Derivation only -
+  // the grid memo itself is untouched.
+  const detectGridTargetCount = useMemo(
+    () => detectGrid.reduce((n, b) => (b.kind === "target" ? n + 1 : n), 0),
+    [detectGrid],
+  );
+
+  // D133: ONE open session max - the draft is a ref (no render);
+  // all fold/close/summarize math lives in engine + adapter code.
+  const sessionDraftRef = useRef<SessionRecordV1 | null>(null);
+  const pendingVerdictRef = useRef<PhraseMatch | null>(null);
+  const lastRoutedVerdictRef = useRef<PhraseMatch | null>(null);
+  const lastPulseRef = useRef(0);
+
+  const attemptPhaseKind = useCallback((): AttemptV1["phaseKind"] => {
+    const m = practiceMechanics.mode;
+    if (m === "ab") return abSlot === "b" ? "b" : "a";
+    if (m === "pause") return windowPhase;
+    if (m === "loop") return "play";
+    return "full";
+  }, [practiceMechanics.mode, abSlot, windowPhase]);
+
+  // D132 verdict routing: the EXISTING ramp path (handleRepOutcome,
+  // zero new ramp code) + the ONE appendAttempt dual-write seam
+  // (D136). Idempotent per PhraseMatch identity, so the onPass seam
+  // and the [repPulse] edge-guarded consumer can NEVER double-rate
+  // one pass. Zero-expected passes never arrive at all (the
+  // no-verdict law lives in the hook, jsdom-pinned).
+  const routeDetectVerdict = useCallback(
+    (m: PhraseMatch) => {
+      if (lastRoutedVerdictRef.current === m) return;
+      lastRoutedVerdictRef.current = m;
+      if (pendingVerdictRef.current === m) pendingVerdictRef.current = null;
+      setDetectPassCount((n) => n + 1); // "Pass N" surface counter
+      // D132 rides the duty passCompleted mirror: mode "off" has no
+      // pass boundary, so no rep event and no attempt (D133).
+      if (practiceMechanics.mode === "off") return;
+      const success =
+        m.matchedFraction >= practiceMechanics.detect.passThreshold;
+      handleRepOutcome(success);
+      const draft = sessionDraftRef.current;
+      if (draft !== null) {
+        const beats = Number(timeSignature.split("/")[0]) || 4;
+        const passLengthSec = (m.bars.length * beats * 60) / Math.max(1, tempo);
+        sessionDraftRef.current = appendAttempt(
+          draft,
+          {
+            atMs: Date.now(),
+            bpm: tempo,
+            phaseKind: attemptPhaseKind(),
+            source: "detect",
+            success,
+            matchedFraction: m.matchedFraction,
+            avgOffsetMs: m.avgOffsetMs,
+          },
+          passLengthSec,
+          m.matched,
+        );
+      }
+    },
+    [
+      handleRepOutcome,
+      practiceMechanics.mode,
+      practiceMechanics.detect.passThreshold,
+      tempo,
+      timeSignature,
+      attemptPhaseKind,
+    ],
+  );
+
+  const handleDetectPass = useCallback(
+    (m: PhraseMatch) => {
+      pendingVerdictRef.current = m;
+      // The shipped clock observes the step flip on the NEXT rAF
+      // tick - just AFTER the repPulse microtask edge - so routing
+      // happens here to keep the verdict ON-TIME for this pass (a
+      // pure [repPulse]-only consumer would rate every pass one
+      // boundary late; reported deviation, docs section 12). The
+      // effect below stays the edge-guarded consumer for verdicts
+      // that land between edges.
+      routeDetectVerdict(m);
+    },
+    [routeDetectVerdict],
+  );
+
+  const detection = usePlayedCorrectly({
+    enabled: practiceMechanics.detect.enabled,
+    grid: detectGrid,
+    tempo,
+    latencyCompensationMs,
+    toleranceMs: practiceMechanics.detect.toleranceMs,
+    bassMidiChannel,
+    isPlayingAuto,
+    onPass: handleDetectPass,
+  });
+  // Step 8 (rail overlay) + step 9 (panel summary) consume
+  // detection.perBar / detection.phrase / detection.unavailable /
+  // detection.hasDevice + refreshLatency - the state lands HERE,
+  // the surfaces are wired THERE (not this dispatch).
+
+  // D132/D135.4 derived surface flags (render-time formatting only):
+  // ARMED = enabled + Web MIDI API present; the wizard gate reads the
+  // shipped useMidiDevices list (NO new permission flow).
+  const detectArmed = practiceMechanics.detect.enabled && !detection.unavailable;
+  const midiHasDevice = midiInputs.length > 0;
+  const midiDeviceName =
+    midiInputs.find((i) => i.id === selectedMidiInId)?.name ??
+    midiInputs[0]?.name ??
+    null;
+
+  // D132: the repPulse edge guard. The counter starts at 0 and
+  // StrictMode double-fires effects - compare against the ref
+  // (docs section 12 handoff note).
+  useEffect(() => {
+    if (repPulse === lastPulseRef.current) return;
+    lastPulseRef.current = repPulse;
+    if (!practiceMechanics.detect.enabled) return;
+    const pending = pendingVerdictRef.current;
+    // A pass verdict ready -> route. Zero-expected pass -> no
+    // verdict ever arrives -> NO rep event (D132 no-verdict law).
+    if (pending !== null) routeDetectVerdict(pending);
+  }, [repPulse, practiceMechanics.detect.enabled, routeDetectVerdict]);
+
+  // D133: manual Made-it/Missed-it clicks are attempts too (source
+  // "manual", matchedFraction null) WHILE a session is open. The
+  // ramp path itself is the shipped handleRepOutcome; the fold is
+  // additive AT THE PROP SITE (the panel keeps calling onRepOutcome
+  // - the sacred handler is untouched).
+  const handleManualRepOutcome = useCallback(
+    (success: boolean) => {
+      handleRepOutcome(success);
+      const draft = sessionDraftRef.current;
+      if (draft === null) return;
+      sessionDraftRef.current = appendAttempt(
+        draft,
+        {
+          atMs: Date.now(),
+          bpm: tempo,
+          phaseKind: attemptPhaseKind(),
+          source: "manual",
+          success,
+          matchedFraction: null,
+          avgOffsetMs: null,
+        },
+        0,
+        0,
+      );
+    },
+    [handleRepOutcome, tempo, attemptPhaseKind],
+  );
+
+  const closeOpenSession = useCallback(() => {
+    const draft = sessionDraftRef.current;
+    if (draft === null) return;
+    sessionDraftRef.current = null;
+    const closed = closeSession(draft, Date.now());
+    // >= MIN_SESSION_SEC -> persist; shorter blocks are DISCARDED
+    // (the noise filter is honest, D133 rule 1).
+    if (isSessionWorthSaving(closed)) {
+      appendSession(closed);
+      // Surface refresh (state only): the panel's card + list.
+      setLastClosedSession(closed);
+      setRecentPracticeSessions(closedPracticeSessionsView(loadSessions()));
+    }
+  }, []);
+
+  // D133 lifecycle on the isPlayingAuto edges (additive - the
+  // shipped duty-reset effect above stays byte-identical). Bare
+  // audition play (no drill, no ramp, no detection) does NOT open a
+  // session. Edge-triggered on [isPlayingAuto] ONLY by design: the
+  // snapshot must be the config AT START (the same closure law the
+  // shipped [isPlayingAuto] effects follow).
+  useEffect(() => {
+    if (isPlayingAuto) {
+      detection.resetRun(); // the detector reset rides the same edge
+      setDetectPassCount(0); // the "Pass N" label restarts with the run
+      const engaged =
+        practiceMechanics.mode !== "off" ||
+        practiceMechanics.rampEnabled ||
+        practiceMechanics.detect.enabled;
+      if (
+        !engaged ||
+        activePracticeSet !== null ||
+        sessionDraftRef.current !== null
+      ) {
+        return;
+      }
+      const windows: SessionWindows = {
+        pause: { ...practiceMechanics.pause },
+        ab: {
+          a: { ...practiceMechanics.ab.a },
+          b: { ...practiceMechanics.ab.b },
+          swapBars: practiceMechanics.ab.swapBars,
+        },
+      };
+      if (loopStartBar !== null) {
+        windows.loop = {
+          fromBar: loopStartBar,
+          toBar: loopEndBar ?? totalFormBars(formLen) - 1,
+        };
+      }
+      if (practiceMechanics.rampEnabled) windows.ramp = { ...practiceMechanics.ramp };
+      sessionDraftRef.current = openSession({
+        startedAtMs: Date.now(),
+        refId: path.id,
+        meter: timeSignature,
+        tempoStartBpm: tempo,
+        metronome: metronomeConfig, // the K.metronomeConfig blob VERBATIM
+        windows,
+      });
+    } else {
+      closeOpenSession();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlayingAuto]);
+
+  // D133 rule 2: a path/refId switch ends the block; a new session
+  // may open on the next play.
+  useEffect(() => {
+    const draft = sessionDraftRef.current;
+    if (draft === null || draft.refId === path.id) return;
+    closeOpenSession();
+  }, [path.id, closeOpenSession]);
+
+  // REQ-PRAC-33 (D132): the ramp phase mirror marks the OPEN block
+  // completed + persists the interim record (upsert; the close
+  // re-writes the same key - single record, two writes, cap-safe).
+  useEffect(() => {
+    if (rampState === null || rampState.phase !== "complete") return;
+    const draft = sessionDraftRef.current;
+    if (draft === null || draft.rampCompleted) return;
+    sessionDraftRef.current = markRampCompleted(draft);
+  }, [rampState]);
+
   useEffect(() => {
     const handler = () => {
       // PRD-001 Phase 2 (D13): the next-step computation moved OUT of
@@ -2477,8 +2865,25 @@ function AppShell() {
         repPulse={repPulse}
         windowPhase={windowPhase}
         onMechanicsChange={handleMechanicsChange}
-        onRepOutcome={handleRepOutcome}
+        onRepOutcome={handleManualRepOutcome}
         onRampReset={handleRampReset}
+        // PRD-001 Phase 7 S3 (steps 8+9): the detection surfaces -
+        // chip + Detection section + wizard. Plain values + the two
+        // existing seams (refreshLatency, the manual-latency writer).
+        detectionArmed={detectArmed}
+        detectionUnavailable={detection.unavailable}
+        detectionHasDevice={detection.hasDevice}
+        detectionGridTargets={detectGridTargetCount}
+        detectionPhrase={detection.phrase}
+        detectionPassCount={detectPassCount}
+        latencyRecord={latencyRecord}
+        onManualLatency={handleManualLatency}
+        onLatencySaved={refreshLatency}
+        midiHasDevice={midiHasDevice}
+        midiDeviceName={midiDeviceName}
+        bassMidiChannel={bassMidiChannel}
+        sessions={recentPracticeSessions}
+        lastSession={lastClosedSession}
       />
 
       <main
@@ -2640,6 +3045,10 @@ function AppShell() {
           mechanicsWindowPhase={windowPhase}
           mechanicsAbSlot={abSlot}
           mechanicsAb={practiceMechanics.ab}
+          // PRD-001 Phase 7 S3 (D131): the match overlay - the hook's
+          // boundary-batched per-bar mirror + the armed flag.
+          detectEnabled={practiceMechanics.detect.enabled}
+          detectPerBar={detection.perBar}
           setLoopBar={(from, to) => {
             setLoopStartBar(from);
             setLoopEndBar(to);
