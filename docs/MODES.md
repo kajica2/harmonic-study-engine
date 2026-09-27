@@ -156,7 +156,10 @@ composition edit).
 The metronome click settings (volume / sound / subdivision /
 accents) and the count-in pre-roll live in the practice header's
 Click-settings popover -- they ride this same transport on every
-path, etudes included: `docs/PRACTICE-MECHANICS.md`.
+path, etudes included: `docs/PRACTICE-MECHANICS.md`. Beside that
+gear, the **Drills** popover (Phase 7 S2) adds pause mode (play N /
+rest M), A/B compare, and the tempo ramp -- same transport, same
+doc.
 
 ### Keyboard map (changed in Phase 2 -- muscle memory!)
 

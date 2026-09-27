@@ -39,6 +39,10 @@ import {
   type NormalizedProject,
 } from "../../engine/compose/types";
 import { K } from "../lib/storage";
+import {
+  DEFAULT_MECHANICS,
+  normalizePracticeMechanics,
+} from "../lib/practiceMechanics";
 import { ideaFromChord } from "../../engine/core/idea";
 import type { EtudeConstraints } from "../../engine/etude/types";
 
@@ -1193,5 +1197,112 @@ describe("Phase 4 Slice 4: chartText + mixer optional fields, NO v5 (D84/D85)", 
     expect(s.composeSession).toBeNull();
     expect(s.composeProject).toBeNull();
     expect(s.composeAccompaniment).toBeNull();
+  });
+});
+
+describe("Phase 7 S2: practiceMechanics slice - ONE optional field, NO v5 (D126)", () => {
+  beforeEach(() => {
+    // resetModeSlice does not (and must not) touch the mechanics field;
+    // the new slice resets itself so order-independence holds.
+    useSessionStore.setState({
+      practiceMechanics: normalizePracticeMechanics(undefined),
+    });
+  });
+
+  it("boots with the shipped defaults when the payload lacks the field", () => {
+    // Fresh boot (localStorage cleared in the global beforeEach): the
+    // initial state IS the normalize-at-read default.
+    expect(STORE_API().practiceMechanics).toEqual(DEFAULT_MECHANICS);
+    expect(CURRENT_SESSION_VERSION).toBe(4);
+  });
+
+  it("setPracticeMechanics patch-merges (partial) and guards every write", () => {
+    STORE_API().setPracticeMechanics({ mode: "pause" });
+    let m = STORE_API().practiceMechanics;
+    expect(m.mode).toBe("pause");
+    expect(m.pause).toEqual(DEFAULT_MECHANICS.pause); // untouched section survives
+    expect(m.ab).toEqual(DEFAULT_MECHANICS.ab);
+
+    STORE_API().setPracticeMechanics({ pause: { playBars: 2, restBars: 1 } });
+    m = STORE_API().practiceMechanics;
+    expect(m.mode).toBe("pause");
+    expect(m.pause).toEqual({ playBars: 2, restBars: 1 });
+
+    // corrupt write -> normalize guard (mode off, never a crash)
+    STORE_API().setPracticeMechanics({ mode: "teleport" as never });
+    expect(STORE_API().practiceMechanics.mode).toBe("off");
+  });
+
+  it("persist envelope version is STILL 4 after a mechanics write (the no-v5 pin)", async () => {
+    STORE_API().setPracticeMechanics({ mode: "ab", rampEnabled: true });
+    // Force the async persist write to flush (persistence block pattern).
+    STORE_API().setPracticeMechanics({ mode: "pause" });
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    expect(raw).toBeTruthy();
+    const envelope = JSON.parse(raw as string) as {
+      version: number;
+      state: { practiceMechanics?: { mode?: string } };
+    };
+    expect(envelope.version).toBe(4); // NO v5 (D126)
+    expect(envelope.state.practiceMechanics?.mode).toBe("pause");
+  });
+
+  it("MED-1: a corrupt practiceMechanics in a v4 payload hydrates GUARDED, never raw", () => {
+    // zustand persist SKIPS `migrate` when the envelope version
+    // matches and its default merge is a shallow spread - the custom
+    // persist `merge` is the ONLY guard on this path. The payload is
+    // the reviewer's worst case: rampEnabled true + a ramp that is a
+    // STRING. Unguarded, App's engage effect computes
+    // initialRampState -> NaN -> setTempo(NaN) -> setInterval(NaN).
+    const corrupt = {
+      version: 4,
+      state: {
+        practiceMechanics: {
+          mode: "pause",
+          rampEnabled: true,
+          ramp: "fast",
+          pause: { playBars: null, restBars: "x" },
+        },
+      },
+    };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(corrupt));
+    useSessionStore.persist.rehydrate();
+    const m = STORE_API().practiceMechanics;
+    // valid sibling fields survive the guard...
+    expect(m.mode).toBe("pause");
+    // ...garbage resolves per-field (garbage ramp -> DEFAULT ladder,
+    // force-disabled per law 6; NaN/null pause fields -> defaults).
+    expect(m.ramp).toEqual(DEFAULT_MECHANICS.ramp);
+    expect(m.rampEnabled).toBe(false);
+    expect(m.pause).toEqual(DEFAULT_MECHANICS.pause);
+    // The NaN chain is dead at the source: every bpm is finite.
+    expect(Number.isFinite(m.ramp.startBpm)).toBe(true);
+    expect(Number.isFinite(m.ramp.targetBpm)).toBe(true);
+  });
+
+  it("MED-1 (cont): a VALID stored config round-trips through rehydrate untouched", () => {
+    const stored = {
+      mode: "ab",
+      pause: { playBars: 2, restBars: 6 },
+      ab: { a: { fromBar: 4, toBar: 7 }, b: { fromBar: 8, toBar: 11 }, swapBars: 2 },
+      ramp: { startBpm: 96, targetBpm: 120, stepBpm: 6, repsPerStep: 2, failThreshold: 2 },
+      rampEnabled: true,
+    };
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ version: 4, state: { practiceMechanics: stored } }),
+    );
+    useSessionStore.persist.rehydrate();
+    expect(STORE_API().practiceMechanics).toEqual(stored);
+  });
+
+  it("MED-1 (cont): a v4 payload WITHOUT the field hydrates the shipped defaults", () => {
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ version: 4, state: { mode: "etude" } }),
+    );
+    useSessionStore.persist.rehydrate();
+    expect(STORE_API().practiceMechanics).toEqual(DEFAULT_MECHANICS);
   });
 });

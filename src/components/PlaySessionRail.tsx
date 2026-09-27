@@ -10,7 +10,10 @@ import { PathFilterBar } from "./PathFilterBar";
 import { NOTE_NAMES } from "../lib/theory";
 import { RenderMode, formatLoopDurationLabel } from "../lib/loopWav";
 // F3 (D110): the rail consumes the ONE honest bar<->step law.
-import { barOfStep, totalFormBars } from "../../engine/practice/windows";
+import { barOfStep, clampWindow, totalFormBars } from "../../engine/practice/windows";
+// PRD-001 Phase 7 S2 (D127): mechanics DOM hooks (e2e + a11y). The
+// rail renders them; the scheduler + gates live in App/engine.
+import type { AbConfig, AbSlot, DutyPhase, MechanicsMode } from "../../engine/practice/duty";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { InspectPanel } from "./InspectPanel";
@@ -78,6 +81,13 @@ interface RailProps {
   loopStartBar?: number | null;
   loopEndBar?: number | null;
   setLoopBar?: (from: number | null, to: number | null) => void;
+  // PRD-001 Phase 7 S2 (D127): data-phase on the strip container,
+  // data-window on cells + A/B bands + corner glyphs. NO changes to
+  // shift-click math or the loop band while mode is off/loop.
+  mechanicsMode?: MechanicsMode;
+  mechanicsWindowPhase?: DutyPhase;
+  mechanicsAbSlot?: AbSlot | null;
+  mechanicsAb?: AbConfig;
   // Note: metronome click toggle used to live here. As of dfd2be3 it
   // lives in PracticeHeader (next to Loop) — the practice header is
   // the canonical surface for practice-loop controls. The rail still
@@ -201,6 +211,10 @@ export const PlaySessionRail: React.FC<RailProps> = (p) => {
           loopStartBar={p.loopStartBar}
           loopEndBar={p.loopEndBar}
           setLoopBar={p.setLoopBar}
+          mechanicsMode={p.mechanicsMode}
+          mechanicsWindowPhase={p.mechanicsWindowPhase}
+          mechanicsAbSlot={p.mechanicsAbSlot}
+          mechanicsAb={p.mechanicsAb}
           tempo={p.tempo}
           setTempo={p.setTempo}
           transposeShift={p.transposeShift}
@@ -559,6 +573,11 @@ const PerformStage: React.FC<{
   loopStartBar?: number | null;
   loopEndBar?: number | null;
   setLoopBar?: (from: number | null, to: number | null) => void;
+  // PRD-001 Phase 7 S2 (D127): see RailProps - forwarded verbatim.
+  mechanicsMode?: MechanicsMode;
+  mechanicsWindowPhase?: DutyPhase;
+  mechanicsAbSlot?: AbSlot | null;
+  mechanicsAb?: AbConfig;
   tempo: number;
   setTempo: (v: number) => void;
   transposeShift: number;
@@ -580,6 +599,8 @@ const PerformStage: React.FC<{
   isPlayingAuto, setIsPlayingAuto,
   isLooping, setIsLooping,
   loopStartBar = null, loopEndBar = null, setLoopBar,
+  mechanicsMode = "off", mechanicsWindowPhase = "play",
+  mechanicsAbSlot = null, mechanicsAb,
   tempo, setTempo,
   transposeShift, setTransposeShift,
   persona, personas, selectedPersonaId, onPersona,
@@ -620,6 +641,14 @@ const PerformStage: React.FC<{
     if (transposeShift === 0) return "Global transpose (path-level)";
     return `Global transpose ${transposeShift > 0 ? "+" : ""}${transposeShift} st`;
   };
+
+  // PRD-001 Phase 7 S2 (D127): A/B display windows clamped to the
+  // ACTIVE form (the same clampWindow law the scheduler read uses).
+  const mechMode = mechanicsMode ?? "off";
+  const abA =
+    mechMode === "ab" && mechanicsAb ? clampWindow(mechanicsAb.a, formLen) : null;
+  const abB =
+    mechMode === "ab" && mechanicsAb ? clampWindow(mechanicsAb.b, formLen) : null;
 
   return (
     <div>
@@ -733,7 +762,15 @@ const PerformStage: React.FC<{
           strip metrics (flex-1 min-w-[60px] gap-1) with a fixed min-h to
           avoid CLS. */}
       <div className="overflow-x-auto pb-2">
-        <div className="flex items-stretch gap-1">
+        <div
+          className="flex items-stretch gap-1"
+          data-testid="rail-strip"
+          // S2 e2e/a11y hooks: pause duty phase on the container
+          // ("play" whenever pause is not engaged - honest default),
+          // active AB slot on the container in ab mode.
+          data-phase={mechMode === "pause" ? mechanicsWindowPhase ?? "play" : "play"}
+          data-window={mechMode === "ab" ? mechanicsAbSlot ?? undefined : undefined}
+        >
           {Array.from({ length: totalBars }).map((_, barIdx) => {
                   // F3 (#5): 1:1 - form bar b IS step b (first pass).
                   const stepIdx = barIdx;
@@ -749,9 +786,15 @@ const PerformStage: React.FC<{
                   // Phase 5: pull the per-bar behavioral marker (motifTracker /
                   // frozenBass hints + persona accent hue).
                   const marker = behavioralMarkers[barIdx];
+                  // S2 (D127): A/B window membership (clamped windows).
+                  // A and B MAY overlap -> "ab". Only in ab mode.
+                  const inA = abA !== null && barIdx >= abA.fromBar && barIdx <= abA.toBar;
+                  const inB = abB !== null && barIdx >= abB.fromBar && barIdx <= abB.toBar;
+                  const windowTag = inA && inB ? "ab" : inA ? "a" : inB ? "b" : undefined;
                   return (
                     <button
                       key={barIdx}
+                      data-window={windowTag}
                       onClick={(e) => {
                         // Shift-click: set loop range. Plain click: step + audition.
                         if (e.shiftKey && setLoopBar) {
@@ -799,6 +842,39 @@ const PerformStage: React.FC<{
                             aria-hidden="true"
                           />
                         )}
+                      {/* S2 (D127): A/B bands - A reuses the brass loop-band
+                          tint, B rides a purple tint (the brand IS brass
+                          #D4A857 - purple is only a tint here); overlap gets
+                          both.
+                          Corner letter glyphs add text redundancy (never
+                          color-only, PRD 9.8). Rendered ONLY in ab mode:
+                          off/loop keep the shipped band behavior. */}
+                      {mechMode === "ab" && windowTag !== undefined && (
+                        <div
+                          className="absolute inset-0 rounded-lg pointer-events-none"
+                          style={{
+                            background:
+                              windowTag === "ab"
+                                ? "linear-gradient(180deg, rgba(212,168,87,0.20), rgba(147,51,234,0.16))"
+                                : windowTag === "a"
+                                  ? "linear-gradient(180deg, rgba(212,168,87,0.22), rgba(212,168,87,0.10))"
+                                  : "linear-gradient(180deg, rgba(147,51,234,0.24), rgba(147,51,234,0.12))",
+                            boxShadow:
+                              windowTag === "b"
+                                ? "inset 0 0 0 1px rgba(147,51,234,0.45)"
+                                : "inset 0 0 0 1px rgba(212,168,87,0.45)",
+                          }}
+                          aria-hidden="true"
+                        />
+                      )}
+                      {mechMode === "ab" && windowTag !== undefined && (
+                        <span
+                          className="absolute top-1 left-1 text-[8px] font-mono text-neutral-300 pointer-events-none"
+                          aria-hidden="true"
+                        >
+                          {windowTag === "ab" ? "AB" : windowTag.toUpperCase()}
+                        </span>
+                      )}
                       {/* Phase 5: persona-driven left-edge accent (per-bar hue from
                           persona.colorPalette). Pure tonal flavor — not an
                           information channel, since bar position already does

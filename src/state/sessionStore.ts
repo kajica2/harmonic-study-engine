@@ -24,6 +24,17 @@
  * `etudeConstraints: null`; v3 -> v4 (Phase 4 Slice 2, D57) appends
  * `composeSession: null`. CURRENT_SESSION_VERSION = 4 and the
  * persist envelope version mirrors it (ADR-004).
+ *
+ * PRD-001 Phase 7 S2 (D126): `practiceMechanics` rides the v4 envelope
+ * as ONE optional top-level field - NO v5, NO migration step. The
+ * runner spreads unknown keys (verified precondition, S2 audit #13)
+ * and a CUSTOM persist `merge` normalizes the field at hydrate (S2
+ * fix-round MED-1: zustand SKIPS `migrate` when the version matches
+ * and its default merge is a shallow spread, so a corrupt
+ * practiceMechanics in a v4 payload would otherwise reach live state
+ * raw - rampEnabled:true + garbage ramp -> NaN -> setTempo(NaN)).
+ * The merge replicates the default shallow spread for every OTHER
+ * field; partialize GAINS the key.
  */
 
 import { create } from "zustand";
@@ -45,6 +56,10 @@ import {
 import type { Idea } from "../../engine/core/idea";
 import { advanceKeyCycle as nextInCycleRotation } from "../../engine/core/spelling";
 import type { EtudeConstraints } from "../../engine/etude/types";
+import {
+  normalizePracticeMechanics,
+  type PracticeMechanicsConfig,
+} from "../lib/practiceMechanics";
 import { K } from "../lib/storage";
 
 /** The 3 modes a user can explicitly pick. `null` = legacy / first-run. */
@@ -256,7 +271,20 @@ interface ComposeSlice {
   clearCompose: () => void;
 }
 
-export type SessionState = ModeSlice & EtudeSlice & ComposeSlice;
+/** PRD-001 Phase 7 S2 (D126): the practice-mechanics CONFIG TASTE
+ *  slice - mode selector, pause N/M, AB windows + swapBars, ramp
+ *  config + rampEnabled. ONE optional top-level persisted field, the
+ *  D73/D85 verbatim pattern: NO v5, NO migration. The LIVE run state
+ *  (barCounter, phase, ramp run) is refs + mirrors in App (D13) - it
+ *  deliberately does NOT live here. */
+interface MechanicsSlice {
+  practiceMechanics: PracticeMechanicsConfig;
+  /** Patch-merge + normalize (the panel emits COMPLETE per-section
+   *  objects; the store still guards every write). */
+  setPracticeMechanics: (patch: Partial<PracticeMechanicsConfig>) => void;
+}
+
+export type SessionState = ModeSlice & EtudeSlice & ComposeSlice & MechanicsSlice;
 
 export const useSessionStore = create<SessionState>()(
   persist(
@@ -273,6 +301,9 @@ export const useSessionStore = create<SessionState>()(
       composeAccompaniment: null,
       composeUndo: [],
       composeRedo: [],
+      // D126: mechanics config taste; defaults at read for v4 payloads
+      // that lack the key (zustand shallow-merges persisted over these).
+      practiceMechanics: normalizePracticeMechanics(undefined),
       dirty: { compose: "none", etude: "none", explore: "none" },
       pendingModeRequest: null,
       setMode: (m) => set({ mode: m }),
@@ -486,6 +517,15 @@ export const useSessionStore = create<SessionState>()(
           composeRedo: [],
         });
       },
+      // --- PRD-001 Phase 7 S2 (D126): mechanics config taste. ---
+      setPracticeMechanics: (patch) => {
+        set((s) => ({
+          practiceMechanics: normalizePracticeMechanics({
+            ...s.practiceMechanics,
+            ...patch,
+          }),
+        }));
+      },
       setCurrentIdea: (i) => set({ currentIdea: i }),
       saveCurrentIdea: () => {
         const idea = get().currentIdea;
@@ -557,6 +597,25 @@ export const useSessionStore = create<SessionState>()(
         }
         return result.value as SessionState;
       },
+      // S2 fix-round (MED-1): the D126 hydrate guard, WIRED. zustand
+      // persist SKIPS `migrate` when the envelope version matches and
+      // its default merge is a raw shallow spread - so a corrupt
+      // practiceMechanics inside a v4 payload would otherwise reach
+      // live state untouched (rampEnabled:true + garbage ramp -> NaN
+      // -> setTempo(NaN) -> setInterval(NaN)). This merge replicates
+      // the default spread for every OTHER field and normalizes ONLY
+      // the mechanics slice; a payload lacking the key keeps the
+      // initial defaults (the D126 no-v5 contract is unchanged).
+      merge: (persistedState, current) => {
+        const p = (persistedState ?? {}) as Partial<SessionState>;
+        return {
+          ...current,
+          ...p,
+          practiceMechanics: p.practiceMechanics
+            ? normalizePracticeMechanics(p.practiceMechanics)
+            : current.practiceMechanics,
+        };
+      },
       partialize: (s) => ({
         mode: s.mode,
         globalTranspose: s.globalTranspose,
@@ -567,6 +626,9 @@ export const useSessionStore = create<SessionState>()(
         // D57: ONLY the small persisted compose record. The 30MB
         // project, its analysis and the undo stacks are in-memory.
         composeSession: s.composeSession,
+        // D126: mechanics config taste (mode/pause/ab/ramp + flag).
+        // NO envelope v5 - the key simply rides the v4 payload.
+        practiceMechanics: s.practiceMechanics,
       }),
     },
   ),

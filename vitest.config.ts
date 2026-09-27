@@ -24,6 +24,11 @@ const JSDOM_FILES = [
   "src/lib/playbackClock.test.ts",
   "src/lib/useCanvasSize.test.ts",
   "src/lib/backingTrack.test.ts",
+  // PRD-001 Phase 7 S2: backingEngine rest-mute bus pins (fake ctx on
+  // window) + the mechanics panel DOM test. Vitest 5 IGNORES per-file
+  // env comments - the list is the only opt-in (AGENTS gotcha).
+  "src/lib/backingEngine.test.ts",
+  "src/components/PracticeMechanicsPanel.test.tsx",
   "src/lib/storage.test.ts",
   "src/state/sessionStore.test.ts",
   "tests/usePathGenerator.test.ts",

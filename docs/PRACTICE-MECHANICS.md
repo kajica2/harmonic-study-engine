@@ -1,4 +1,4 @@
-# Practice Mechanics (PRD-001 Phase 3, Slice 3)
+# Practice Mechanics (PRD-001 Phase 3 Slice 3 + Phase 7 S1/S2)
 
 The click got a real control panel. A gear button beside the
 practice header's "Click" toggle opens the click settings popover:
@@ -6,6 +6,12 @@ an independent click volume, three click sounds, subdivision,
 per-beat accents, and a count-in pre-roll. Slice 3 also added the
 print path for the etude views and the Concept drawer that explains
 an etude's margin annotations.
+
+Phase 7 S2 (D121-D128) added the second gear: **Drills** -- pause
+mode (play N bars, rest M bars), A/B compare (alternate two captured
+windows), and the tempo ramp (a rep-rated ladder). The drills ride
+the same honest transport F3 shipped: one step per bar, form-relative
+windows, per-bar reanchor.
 
 None of this is etude-specific: the metronome and count-in ride the
 shared transport, so they apply to every path -- curated standards,
@@ -16,17 +22,26 @@ About panel) live on the etude views and are documented in
 
 User requirements traced here: REQ-PRAC-1 (settings), REQ-PRAC-2
 (volume independence), REQ-PRAC-10/11 (count-in), REQ-PED-5 (concept
-drawer), REQ-ETU-32 (print). Design authority:
-`docs/PHASE-3-SLICE3.md` (D32-D44).
+drawer), REQ-ETU-32 (print); Phase 7 S2: REQ-PRAC-21 (pause),
+REQ-PRAC-22 (A/B), REQ-PRAC-3 (click-through rests, verified by
+construction), REQ-PRAC-30..33 (ramp). Design authority:
+`docs/PHASE-3-SLICE3.md` (D32-D44) and
+`docs/PHASE-7-S2-MECHANICS.md` (D121-D128).
 
 ## Where the controls live
 
 The practice header (the region at the top of the Etude surface)
 carries, left to right: the Start/Pause button, Tempo, Loop, the
-**Click** toggle (mute/unmute the click -- off by default), and the
-**gear button** that opens the click settings popover. The popover
-closes on Escape, on a click outside it, or on the gear again.
-Everything you set in it persists across reloads.
+**Click** toggle (mute/unmute the click -- off by default), the
+**click-settings gear** (volume / sound / subdivision / accents /
+count-in), the **Drills gear** (pause / A/B / ramp), then Backing,
+Vol and Score. Both popovers close on Escape, on a click outside
+them, or on the gear again. Everything you SET in them persists
+across reloads -- a drill's live POSITION does not (the run state
+dies with the run; see the ramp's honest restart). The ramp chip and
+the PLAY/REST badge live in the readout row under the bar number --
+always visible while a drill runs. The drills are unavailable during a
+practice-set runner session (the panel renders disabled).
 
 ## The click settings popover
 
@@ -119,9 +134,9 @@ What the countdown looks and sounds like:
 
 Cancelling: press Start/Space again **during** the countdown and it
 cancels -- the second press resolves against "playing or counting",
-so it reads as a stop. A MIDI transport stop cancels too. (Escape
-stops real playback but does nothing during a pre-roll -- the
-countdown runs to the end or you press Start again.)
+so it reads as a stop. A MIDI transport stop cancels too, and so
+does `Escape`: the global stop always routes through the gate, and
+a stop must never leave a countdown running behind it.
 
 Recording nuance: if you start a take with a count-in armed, the
 take window includes the pre-roll beats. The recorder captures
@@ -146,6 +161,88 @@ user-facing bar number honest to that truth:
   the corrected mapping -- re-pick once after updating.
 - The click is unaffected by window selection: metronome truth lives
   in `rhythmEngine.playStep`, which no window math ever gates.
+
+## Pause mode (play N, rest M -- REQ-PRAC-21)
+
+Pick **Pause** in the Drills panel and set the play/rest bar counts
+(1..16 each; defaults 4 play / 4 rest). The drill runs a duty cycle
+over the current span: the loop window if you set one (shift-click
+two bars in the strip -- the window itself feeds the drill whether or
+not the Loop toggle is on), otherwise the whole FORM -- a 32-bar
+standard padded x3 rests on the tune's bars, never on a pad repeat.
+
+The point of resting is resting **in time**:
+
+- The transport NEVER stops during a rest. The playhead keeps moving,
+  the metronome keeps clicking (this is REQ-PRAC-3 by construction --
+  the click path in `rhythm.ts` is byte-frozen and the rest gate sits
+  at the chord effect + the backing BUS gains, never at `playStep`).
+- Chord + backing audio go silent for the M rest bars: the chord
+  effect early-returns after stopAll (takes record honest rests) and
+  the backing's drum/bass/piano bus gains drop to 0 at the exact bar
+  boundary (a schedule-skip would silence FOUR bars later -- the
+  lookahead pre-schedules -- so the bus gate is the only correct
+  mechanism).
+- Bar 1 after the count-in is ALWAYS a play bar. The badge beside the
+  readout shows `>> PLAY` / `-- REST`, and the rail strip container
+  mirrors the same state as `data-phase="play"/"rest"` (e2e + a11y
+  read; "play" whenever pause is not engaged).
+
+## A/B compare (REQ-PRAC-22)
+
+Pick **A/B** in the Drills panel. Select bars in the strip
+(shift-click two bars), press **Capture A**; select the variant
+range, press **Capture B**; set the swap interval (1..32 bars).
+Captured windows read back 1-based in the panel ("A: bars 5-8");
+defaults are A bars 1-8, B bars 9-16, swap every 4. The transport
+alternates the two windows, jumping to the new window's head on
+every swap -- bar-aligned, never mid-bar.
+
+- The active slot shows as `data-window` on the strip container, the
+  cells inside each window carry `data-window="a"/"b"/"ab"`, the A
+  band reuses the brass loop-band tint (the brand color), B rides a
+  purple tint, and corner letter glyphs mark both (never color-only).
+- A and B MAY overlap -- comparing overlapping variants is legal.
+- Windows are clamped to the active form on save AND on every
+  scheduler read: switch to a shorter path and a persisted window
+  narrows, it never crashes.
+- The loop band and shift-click math are UNCHANGED while the mode is
+  Off/Loop.
+
+## Tempo ramp (REQ-PRAC-30..33)
+
+Enable the ramp in the Drills panel: start/target tempo, step, reps
+per step, and the failure threshold (defaults 90 -> 150, step 4, 2
+reps, 2 consecutive misses; start/target clamp 30..240 like the
+slider). Rate what you just played with **Made it / Missed it** --
+each click is one rep, and until S3's detection replaces the input
+the ladder advances ONLY on this self-report. Reach `repsPerStep`
+successes and the ladder climbs one step (clamped to the target);
+`failThreshold` CONSECUTIVE misses drop it one step (clamped to the
+start); one success clears the miss streak. Landing on the target via
+the ladder marks **TARGET** (session bookkeeping arrives with S3).
+
+- The live chip (`role="status"`) shows, while the ramp is engaged,
+  `RAMP 96 -> 102 (+6)  rep 0/4  S4/F0`-style state (exact pinned
+  format), flipping to `RAMP 102 - TARGET` on completion. The S and F
+  streaks are never BOTH nonzero: a success clears the fail streak
+  and vice versa.
+- Tempo changes apply through the STORE setter -- exactly like
+  dragging the slider mid-playback: the grid re-anchors at the bar
+  head and the brief click overlap is the documented accepted tail
+  (TD-038a class), not a new mechanism.
+- Manual takeover: moving the slider (or Comma/Period) during an
+  active ramp RESEEDS the ladder to your tempo and resets the reps.
+  The ramp's own writes never reseed (the equality guard breaks the
+  echo loop).
+- The ladder is source-agnostic: S3's automatic pass detection will
+  feed the SAME machine on the `passCompleted` seam -- the buttons
+  stay as a manual override.
+- Honest restart: the ladder POSITION is run state, not taste -- it
+  is never persisted. A reload with the ramp enabled re-engages at
+  `startBpm` and WRITES that tempo (your persisted slider value is
+  overridden on purpose); the panel's Reset does the same thing
+  mid-session.
 
 ## Print
 
@@ -184,7 +281,11 @@ Opening it:
 Inside: a category badge (with a text label, never color alone), the
 concept title, a one-line definition, the body in paragraphs, and
 **Related concepts** chips that navigate in place (opening a related
-concept resets the drawer's scroll).
+concept resets the drawer's scroll). The footer (shipped with
+Phase 6, REQ-PED-13) carries **"Hear an example"** (generated
+exampleNumerals in C) and **"Send to Explore"** (seed carry); the
+global header gained **Concept search** (REQ-PED-12) in the same
+slice.
 
 Closing it: the X button, `Escape`, or a click on the backdrop.
 Focus returns to the chip or link that opened it (the shared
@@ -193,22 +294,39 @@ reimplement it).
 
 References: when a concept carries external references they render
 as links that open in a new tab with `rel="noopener noreferrer"`
-(the app never shares its window with the target). The eight
+(the app never shares its window with the target). The ten
 concepts shipped today carry no reference URLs yet -- the rendering
 path exists for future registry entries.
 
 ## Not yet (honest carve-outs)
 
 - **Right-click a chord symbol to open the drawer** (REQ-PED-6):
-  deferred -- its natural hosts are components mid-refactor.
-- **Concept search** in the global header (REQ-PED-12) and the
-  drawer's **"Hear an example" / "Send to Explore"** actions
-  (REQ-PED-13): deferred; the drawer reserves a footer slot.
-- **Annotation surfaces on Compose / Explore**: only the Etude
-  portion of REQ-PED-4 ships; the other hosts wait for their
-  surfaces to land.
+  shipped for the Compose host in Phase 6 (AnalysisCard chord cells
+  via `useConceptPress`; bare cells prefill the global search); the
+  Etude chord-symbol host stays deferred (TD-PED-6-REST).
+- **Annotation surfaces on Explore**: REQ-PED-4 ships the Etude
+  portion (margin chips, Phase 3 S3) and the Compose portion
+  (analysis chips under the chart, Phase 4 S2); Explore's idea cards
+  carry inline concept links but the margin-note/About-panel host is
+  deferred.
 - **Etude melody audio**: the generated melody is notation + roll
   only; playback is the chord backing (TD-034, formally deferred).
+- **Drills under the runner**: pause/A/B/ramp NEVER engage while a
+  practice-set runner session is active (the runner and the measure
+  handler are dual writers of the step -- TD-052). The panel renders
+  disabled there.
+- **Backing chord content vs sub-window loops** (pre-existing,
+  TD-053): the backing's scheduling cursor ignores window wraps, so
+  during a SUB-window loop/pause/A-B the bass/piano CONTENT walks the
+  full path while the groove timing stays honest. Rest muting is
+  content-agnostic (bus level) and correct regardless.
+- **Ramp session marking + automatic detection**: reaching TARGET is
+  visible only; the rep source becomes detection on `passCompleted`
+  in S3 (the ladder is unchanged).
+- **Mobile**: the Drills gear is desktop-first (same class as the
+  click gear); MobileCommandBar keeps the loop toggle only.
+- **No new keyboard shortcuts**: every drill control is a real
+  button/input (the cheatsheet surface is frozen).
 
 ## Where to look
 
@@ -225,6 +343,19 @@ path exists for future registry entries.
 - Bar<->step law (pure, F3): `engine/practice/windows.ts`
   (`barOfStep`, `windowStepRange`, `clampWindow`); design authority
   `docs/PHASE-7-PRACTICE.md` (D110-D113)
+- Duty scheduler (pure, S2): `engine/practice/duty.ts`
+  (`advanceTransport` - loop/pause/AB next-measure decisions; the
+  loop law is pinned EQUIVALENT to the shipped F3 handler branch)
+- Tempo ladder (pure, S2): `engine/practice/ramp.ts`
+  (`rampNext` + `normalizeRampConfig`); config taste + chip
+  formatter: `src/lib/practiceMechanics.ts`
+- Mechanics wiring (refs + handler branch + gates): the S2 block in
+  `src/App.tsx` (D123: exactly ONE new handler branch; D128: chord
+  early-return + `backingEngine.setRestMuted`)
+- Rest bus gate: `setRestMuted` in `src/lib/backingEngine.ts`
+- Drills panel UI: `src/components/PracticeMechanicsPanel.tsx`; gear
+  + chips host: `src/components/PracticeHeader.tsx`; rail data attrs:
+  `src/components/PlaySessionRail.tsx`
 - Count-in: sequence `src/lib/countIn.ts`, timer
   `src/hooks/useCountIn.ts`, visible overlay
   `src/components/CountInOverlay.tsx`, gate `requestPlayState` in
@@ -235,4 +366,7 @@ path exists for future registry entries.
   `print-hide` usage in `src/components/EtudeViews.tsx`
 - Persistence: `metronomeConfig` in `src/hooks/useSessionStore.ts`,
   registry key `K.metronomeConfig` in `src/lib/storage.ts`
-- e2e: `e2e/count-in.spec.ts`
+- e2e: `e2e/count-in.spec.ts`; S2 legs:
+  `e2e/practice-pause.spec.ts`, `e2e/practice-ab.spec.ts`,
+  `e2e/practice-ramp.spec.ts` (the ramp leg is click-deterministic,
+  no playback)

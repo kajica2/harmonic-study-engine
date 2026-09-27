@@ -58,10 +58,13 @@ const ENGINE = "engine";
  *  Phase 6 adds ear-training/{types,generate,distractors,check} +
  *  pedagogy/{srs,log} per D102 (44 -> 50, tree scans 51 with the
  *  index-file slack). Phase 7 S1 adds practice/windows per D110
- *  (50 -> 51, tree scans 52).
+ *  (50 -> 51, tree scans 52). Phase 7 S2 adds practice/{duty,ramp} per
+ *  D123 (51 -> 53, tree scans 54) - the scheduler + ladder are NEW
+ *  pure sources; windows.ts stays geometry-only (ratified deviation:
+ *  the D123 fork, engine/practice/duty.ts header).
  *  Raise this only alongside
  *  real files. */
-const MIN_SCANNED_FILES = 51;
+const MIN_SCANNED_FILES = 53;
 
 const BANNED: readonly RegExp[] = [
   /\bMath\.random\b/, // no paren: calls AND aliasing

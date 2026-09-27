@@ -426,6 +426,37 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **Practice drills: pause mode, A/B compare, tempo ramp (PRD-001
+  Phase 7 slice 2, D121-D128).** A second gear in the practice header
+  ("Drills") opens the mechanics panel: (1) PAUSE mode plays N bars
+  then rests M bars over the loop window (or the whole form) - the
+  click and the playhead keep running through rests (REQ-PRAC-3:
+  rhythm.ts is byte-frozen; the rest gate sits at the chord effect
+  early-return + a new backing BUS mute, never at the scheduler or
+  the click path); (2) A/B compare alternates two windows captured
+  from the rail selection every K bars, with data-window attributes
+  + A/B bands + corner glyphs on the strip; (3) TEMPO RAMP - a rep-
+  rated ladder (start/target/step/reps/failure threshold) driven by
+  Made it / Missed it clicks; the live chip shows bpm, reps and
+  streaks; reaching the target marks the ramp COMPLETE (session
+  bookkeeping arrives with S3, where detection replaces the buttons
+  on the same passCompleted seam - the ladder is unchanged). Tempo
+  changes ride the EXISTING store-tempo path (slider-equivalent; the
+  brief click overlap is the documented accepted tail TD-038a), and
+  manual takeover RESEEDS the ladder. The sacred measure handler
+  gained EXACTLY ONE branch (the pure engine/practice/duty.ts
+  scheduler; mode "loop" routes through it under an equivalence pin
+  that re-implements the shipped F3 lines - behavior-preserving BY
+  TEST). Config taste rides ONE optional zustand field (no envelope
+  v5, no migration, no new K.* keys); drills are disabled under the
+  practice-set runner (TD-052 guard). Release-note caveat (S2 fix
+  round, dev D5): with the ramp persisted ENABLED, a reload RE-ENGAGES
+  the ladder at startBpm and WRITES that tempo - the ramp overrides
+  the persisted slider value. Zero new global keyboard
+  shortcuts. Frozen tests/ pins untouched; 3 new e2e legs (pause,
+  A/B, and a click-deterministic ramp leg with NO playback). Design:
+  `docs/PHASE-7-S2-MECHANICS.md`.
+
 - **Section loops now play the bars you select (F3 transport honesty,
   PRD-001 Phase 7 slice 1).** The loop-window math inside the measure
   handler assumed the retired 4-steps-per-bar labeling; a 4-bar section

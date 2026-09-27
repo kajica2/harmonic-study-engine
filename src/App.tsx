@@ -177,7 +177,25 @@ import { useSessionStore as useNewSessionStore, resolveBootTranspose, SESSION_ST
 import { ideaFromChord, isIdea } from "../engine/core/idea";
 // PRD-001 Phase 7 S1 (F3, D110): the pure bar<->step law for the
 // form-relative 1:1 loop windows.
-import { totalFormBars, windowStepRange } from "../engine/practice/windows";
+import { clampWindow, totalFormBars, windowStepRange } from "../engine/practice/windows";
+// PRD-001 Phase 7 S2 (D123): the pure duty scheduler (pause/AB/loop) +
+// the pure tempo ladder (D121). windows.ts stays geometry-only (the
+// ratified D123 deviation); duty.ts owns the per-firing decision.
+import {
+  advanceTransport,
+  type AbConfig,
+  type AbSlot,
+  type DutyPhase,
+  type MechanicsMode,
+  type PauseConfig,
+} from "../engine/practice/duty";
+import {
+  initialRampState,
+  rampNext,
+  type RampState,
+} from "../engine/practice/ramp";
+import type { BarWindow } from "../engine/practice/windows";
+import type { PracticeMechanicsConfig } from "./lib/practiceMechanics";
 import { isModeShortcutModifierKey, classifyTransposeKey } from "./hooks/useKeyDown";
 // PRD-001 Phase 3 Slice 2: etude composer panel + engine adapter +
 // URL constraint serialization (D22/D24/D28).
@@ -374,6 +392,41 @@ function AppShell() {
   useLayoutEffect(() => {
     activeStepIndexRef.current = activeStepIndex;
   }, [activeStepIndex]);
+
+  // ===================================================================
+  // PRD-001 Phase 7 S2 (D121-D126): practice mechanics - pause duty,
+  // A/B compare, tempo ramp. CONFIG TASTE rides the ONE optional
+  // zustand field (D126, no v5); LIVE run state rides refs + microtask
+  // mirrors (D13). DECLARATIONS live here (the chord-effect gate reads
+  // windowPhase); the sync effects + handler branch live with the
+  // transport block below. The handler reads refs ONLY (D123).
+  // ===================================================================
+  const practiceMechanics = useNewSessionStore((s) => s.practiceMechanics);
+  const setPracticeMechanicsStore = useNewSessionStore((s) => s.setPracticeMechanics);
+
+  // Live run state (dies with the run - a reload restarts drills from
+  // bar 1, honest, D126).
+  const barCounterRef = useRef(0);
+  const windowPhaseRef = useRef<DutyPhase>("play");
+  const abSlotRef = useRef<AbSlot | null>("a");
+  const rampPassRef = useRef(false); // S3 seam (D121): pass signal
+  const rampStateRef = useRef<RampState | null>(null);
+  const [windowPhase, setWindowPhase] = useState<DutyPhase>("play");
+  const [abSlot, setAbSlot] = useState<AbSlot | null>(null);
+  const [rampState, setRampState] = useState<RampState | null>(null);
+  const [repPulse, setRepPulse] = useState(0); // chip pulse, no tempo math
+
+  // Config -> refs. schedulerModeRef keeps the NON-off narrowing (the
+  // handler's `mechanics` guard makes the value total; D123). The
+  // D125 runner guard lives HERE: mechanicsActive = mode !== "off" &&
+  // !activePracticeSet - a REF the handler reads with ZERO dep-array
+  // changes to the handler effect itself.
+  const schedulerModeRef = useRef<Exclude<MechanicsMode, "off">>("loop");
+  const mechanicsActiveRef = useRef(false);
+  const loopWindowRef = useRef<BarWindow | null>(null);
+  const pauseCfgRef = useRef<PauseConfig>(practiceMechanics.pause);
+  const abCfgRef = useRef<AbConfig>(practiceMechanics.ab);
+  const rampCfgRef = useRef(practiceMechanics.ramp);
 
   // PRD-001 Phase 2 (MED-002 review fix) + fix round 2: the exercise
   // row + cycle toggle are Etude-surface-only and must NEVER disagree
@@ -1041,6 +1094,17 @@ function AppShell() {
     audioEngine.stopAll();
     midiOut.stopAll();
 
+    // PRD-001 Phase 7 S2 (D128): duty REST gate - early-return AFTER
+    // the stopAll pair, so audio + midiOut + recorder see nothing and
+    // takes record honest rests. The metronome click is NOT here (the
+    // rhythm.ts playStep path is IMMUTABLE - REQ-PRAC-3). windowPhase
+    // is ALSO in the deps: a phase flip at a same-chord repeat still
+    // re-runs (belt beyond the per-bar identity change, audit #4).
+    if (windowPhase === "rest") {
+      setActiveMidis([]);
+      return;
+    }
+
     if (arpType === "none") {
       setActiveMidis(currentChordNotes);
       // Velocity per note — bass softer, top louder. Bass (idx=0)
@@ -1134,7 +1198,7 @@ function AppShell() {
         }
       };
     }
-  }, [currentChordNotes, arpNotes, arpType, arpRate, arpGate, tempo]);
+  }, [currentChordNotes, arpNotes, arpType, arpRate, arpGate, tempo, windowPhase]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1558,6 +1622,132 @@ function AppShell() {
   // rhythm engine only owns transport (tempo, time signature, metronome
   // click, measure-start callback); it doesn't synthesize the beat.
 
+  // --- S2 mechanics sync effects (declarations live with the
+  // activeStepIndexRef block above; D121-D126) ----------------------
+
+  useEffect(() => {
+    const m = practiceMechanics.mode;
+    if (m !== "off") schedulerModeRef.current = m;
+    pauseCfgRef.current = practiceMechanics.pause;
+    abCfgRef.current = practiceMechanics.ab;
+    rampCfgRef.current = practiceMechanics.ramp;
+    mechanicsActiveRef.current = m !== "off" && activePracticeSet === null;
+  }, [practiceMechanics, activePracticeSet]);
+
+  // The GRANDFATHERED legacy loop window (D122/D126: stays
+  // synesthesia_loop* useState, never migrated) is the pause/loop
+  // SPAN. toBar resolves to the form tail exactly like the shipped F3
+  // call site; the scheduler clamps again at read.
+  useEffect(() => {
+    loopWindowRef.current =
+      loopStartBar !== null
+        ? { fromBar: loopStartBar, toBar: loopEndBar ?? totalFormBars(formLen) - 1 }
+        : null;
+  }, [loopStartBar, loopEndBar, formLen]);
+
+  // Bar 1 after the count-in is ALWAYS a play bar (D122): the duty
+  // counter + phase mirror reset on the isPlayingAuto TRUE edge - the
+  // count-in gate itself (:471-:540) is IMMUTABLE and keeps
+  // isPlayingAuto FALSE through the pre-roll.
+  useEffect(() => {
+    if (isPlayingAuto) {
+      barCounterRef.current = 0;
+      windowPhaseRef.current = "play";
+      abSlotRef.current = "a";
+      setWindowPhase("play");
+      setAbSlot("a");
+    }
+  }, [isPlayingAuto]);
+
+  // D128: rest = backing BUS mute (drum/bass/piano gains x0, the third
+  // gain factor composing with the per-track mutes). NEVER a schedule
+  // skip - the 4-bar lookahead would silence the wrong bars (audit #6).
+  // The metronome click rides the independent metronomeGain bus (D33):
+  // resting the backing does NOT mute the click (REQ-PRAC-3).
+  useEffect(() => {
+    backingEngine.setRestMuted(windowPhase === "rest");
+  }, [windowPhase]);
+
+  // --- ramp (D121/D124) ------------------------------------------------
+  // Engage: the ladder takes the wheel - initialRampState + ONE store
+  // write. Disengage: the run state dies with the run (the tempo the
+  // ladder last wrote stays the user's). StrictMode-safe: the effect
+  // is an idempotent pure set (PHASE-3-03 audit - no non-idempotent
+  // queued state).
+  useEffect(() => {
+    if (practiceMechanics.rampEnabled) {
+      const s0 = initialRampState(practiceMechanics.ramp);
+      rampStateRef.current = s0;
+      setRampState(s0);
+      setTempo(s0.bpm);
+    } else {
+      rampStateRef.current = null;
+      setRampState(null);
+    }
+    // The ladder config itself must NOT re-engage (editing reps while
+    // running keeps the current run).
+  }, [practiceMechanics.rampEnabled]);
+
+  // Manual tempo takeover -> reseed (D124.5). The EQUALITY check
+  // breaks the echo loop: the ramp's OWN setTempo lands tempo ===
+  // state.bpm, so this dispatches only for FOREIGN changes (slider,
+  // Comma/Period, MIDI clock) - pinned by ramp law 5.
+  useEffect(() => {
+    const s = rampStateRef.current;
+    if (s === null || !practiceMechanics.rampEnabled) return;
+    if (s.bpm === tempo) return;
+    const next = rampNext(s, practiceMechanics.ramp, { kind: "reseed", bpm: tempo });
+    rampStateRef.current = next;
+    setRampState(next);
+  }, [tempo, practiceMechanics.rampEnabled, practiceMechanics.ramp]);
+
+  // D121: EACH CLICK IS ONE REP OUTCOME. The machine is
+  // source-agnostic - S3 detection replaces the SOURCE, not this call.
+  const handleRepOutcome = useCallback(
+    (success: boolean) => {
+      const s = rampStateRef.current;
+      if (s === null) return;
+      const next = rampNext(s, rampCfgRef.current, { kind: "rep", success });
+      if (next === s) return;
+      rampStateRef.current = next;
+      queueMicrotask(() => {
+        setRampState(next);
+        // D124: NEVER rhythmEngine.setTempo directly - write the ONE
+        // store tempo source; the existing [tempo] effects drive
+        // rhythm + clock + backing (the S1-pinned 120->240 path).
+        if (next.bpm !== s.bpm) setTempo(next.bpm);
+      });
+    },
+    [setTempo],
+  );
+
+  const handleRampReset = useCallback(() => {
+    const s = rampStateRef.current;
+    if (s === null) return;
+    const next = rampNext(s, rampCfgRef.current, { kind: "reset" });
+    rampStateRef.current = next;
+    queueMicrotask(() => {
+      setRampState(next);
+      if (next.bpm !== s.bpm) setTempo(next.bpm);
+    });
+  }, [setTempo]);
+
+  // Panel change -> store, with the D122 clamp-on-WRITE for the AB
+  // windows (the scheduler clamps again at read; both are pinned).
+  const handleMechanicsChange = useCallback(
+    (next: PracticeMechanicsConfig) => {
+      setPracticeMechanicsStore({
+        ...next,
+        ab: {
+          ...next.ab,
+          a: clampWindow(next.ab.a, formLen),
+          b: clampWindow(next.ab.b, formLen),
+        },
+      });
+    },
+    [formLen, setPracticeMechanicsStore],
+  );
+
   useEffect(() => {
     const handler = () => {
       // PRD-001 Phase 2 (D13): the next-step computation moved OUT of
@@ -1567,9 +1757,41 @@ function AppShell() {
       // ref mirrors activeStepIndex and is written through below.
       const prev = activeStepIndexRef.current;
       // Sub-range loop wins when active and a start bar is set.
-      const useLoop = isLoopingRef.current && loopStartBar !== null;
+      const useLoopFallback = isLoopingRef.current && loopStartBar !== null;
+      const mechanics = mechanicsActiveRef.current;
       let next: number;
-      if (useLoop) {
+      if (mechanics) {
+        // PRD-001 Phase 7 S2 (D123): the ONE new branch. While a drill
+        // mode is engaged (and the runner is NOT active - D125 guard),
+        // the pure scheduler owns the next-measure decision. Mode
+        // "loop" routes through here under the duty.test EQUIVALENCE
+        // PIN #2 (the test re-implements the shipped F3 lines below as
+        // the oracle) - behavior-preserving BY TEST, not by argument.
+        // barCounter counts handler firings since play-start; it resets
+        // on the isPlayingAuto TRUE edge (bar 1 = play / slot A).
+        const k = ++barCounterRef.current;
+        const d = advanceTransport({
+          prevStep: prev,
+          barCounter: k,
+          formLen,
+          totalSteps: path.steps.length,
+          mode: schedulerModeRef.current,
+          loop: loopWindowRef.current,
+          pause: pauseCfgRef.current,
+          ab: abCfgRef.current,
+        });
+        next = d.nextStep;
+        windowPhaseRef.current = d.phase;
+        abSlotRef.current = d.activeWindow;
+        rampPassRef.current = d.passCompleted; // S3 seam (D121)
+        queueMicrotask(() => {
+          // UI mirrors land OUTSIDE the audio callback (D13): phase
+          // badge + rail attrs + ramp chip pulse. NO tempo math here.
+          setWindowPhase(d.phase);
+          setAbSlot(d.activeWindow);
+          if (d.passCompleted) setRepPulse((n) => n + 1);
+        });
+      } else if (useLoopFallback) {
         // F3 (D110): audio truth is 1 step = 1 bar (see
         // docs/PHASE-7-PRACTICE.md section 1.1). Bars are
         // form-relative; within the first pass the map is the
@@ -1610,7 +1832,11 @@ function AppShell() {
           formLen,
           totalSteps: path.steps.length,
           cycleActive: keyCycleActive,
-          subLoopActive: useLoop,
+          // S2 (D123): subLoopActive widens to "any active windowed
+          // mode" - pause/ab wrap at arbitrary offsets exactly like
+          // loop. In mode "off" the expression value is IDENTICAL to
+          // today. keyCycle.ts itself is UNTOUCHED.
+          subLoopActive: mechanics ? true : useLoopFallback,
         })
       ) {
         queueMicrotask(() => {
@@ -1621,10 +1847,13 @@ function AppShell() {
     rhythmEngine.setOnMeasureStart(handler);
     // Detach on unmount or before the next re-bind so we never leave
     // a stale closure pointing at a different path's step count.
+    // S2 (D123): deps GAIN the mechanics mode slice (rebind-on-change
+    // is the existing supported pattern; the config DETAILS flow
+    // through refs, the DETACH hunk stays byte-identical).
     return () => {
       rhythmEngine.setOnMeasureStart(() => {});
     };
-  }, [path.steps.length, loopStartBar, loopEndBar, formLen, keyCycleActive]);
+  }, [path.steps.length, loopStartBar, loopEndBar, formLen, keyCycleActive, practiceMechanics.mode]);
 
   useEffect(() => {
     if (isPlayingAuto) {
@@ -2234,6 +2463,22 @@ function AppShell() {
         onVolumeChange={setVolume}
         scoreDisplayMode={scoreDisplayMode}
         onScoreDisplayModeChange={setScoreDisplayMode}
+        // PRD-001 Phase 7 S2 (D127): the Drills gear + live chips.
+        // Pure props-forwarding; the panel is presentational and the
+        // D125 guard renders it DISABLED under the runner.
+        mechanics={practiceMechanics}
+        mechanicsDisabled={activePracticeSet !== null}
+        mechanicsLoopSelection={
+          loopStartBar !== null
+            ? { from: loopStartBar, to: loopEndBar ?? totalFormBars(formLen) - 1 }
+            : null
+        }
+        rampState={rampState}
+        repPulse={repPulse}
+        windowPhase={windowPhase}
+        onMechanicsChange={handleMechanicsChange}
+        onRepOutcome={handleRepOutcome}
+        onRampReset={handleRampReset}
       />
 
       <main
@@ -2387,6 +2632,14 @@ function AppShell() {
           setIsLooping={setIsLooping}
           loopStartBar={loopStartBar}
           loopEndBar={loopEndBar}
+          // PRD-001 Phase 7 S2 (D127): rail DOM hooks for e2e + a11y.
+          // data-phase on the strip container, data-window on cells +
+          // A/B bands; NO changes to shift-click math or the loop band
+          // while mode is off/loop.
+          mechanicsMode={practiceMechanics.mode}
+          mechanicsWindowPhase={windowPhase}
+          mechanicsAbSlot={abSlot}
+          mechanicsAb={practiceMechanics.ab}
           setLoopBar={(from, to) => {
             setLoopStartBar(from);
             setLoopEndBar(to);

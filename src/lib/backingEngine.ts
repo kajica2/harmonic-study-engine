@@ -102,6 +102,19 @@ class BackingEngine {
   private levels: BackingLevels = DEFAULT_LEVELS;
   private style: BackingStyle = "off";
   private scheduledSteps = 0;
+  /**
+   * PRD-001 Phase 7 S2 (D128): the pause/AB REST gate - a third gain
+   * factor on the drum/bass/piano BUSSES (gain = muted || rest ? 0 :
+   * level). NEVER a schedule skip: scheduleAhead pre-schedules 4 bars
+   * via the internal cursor (audit #6), so skipping the per-bar call
+   * would silence FOUR bars later - the wrong bar - and desync the
+   * cursor. Bus gain applies live to everything routed through,
+   * including pre-scheduled events: exact bar-boundary silence. The
+   * metronome click rides the independent metronomeGain bus in
+   * audio.ts (D33) - resting the backing does NOT mute the click
+   * (REQ-PRAC-3 by construction).
+   */
+  private restMuted = false;
   private bassPlayer: any = null;
   private pianoPlayer: any = null;
   private isPlaying = false;
@@ -181,6 +194,26 @@ class BackingEngine {
    *  bus to zero gain without stopping scheduled events. */
   setLevels(next: Partial<BackingLevels>) {
     this.levels = { ...this.levels, ...next };
+    this.applyBusGains();
+  }
+
+  /**
+   * PRD-001 Phase 7 S2 (D128): mute/unmute the whole backing mix for a
+   * duty REST. Composes with the per-track mutes: a bus is silent iff
+   * its own mute OR the rest flag is set. The scheduledSteps cursor
+   * keeps walking (start()/stop() unaffected), so the backing resumes
+   * in-phase with the transport at rest end - the clock reanchor keeps
+   * stepIdx aligned (D113). Rest muting is CONTENT-agnostic: it works
+   * regardless of the pre-existing sub-window content drift (TD-053).
+   */
+  setRestMuted(on: boolean) {
+    this.restMuted = on;
+    this.applyBusGains();
+  }
+
+  /** The shared gain law for setLevels + setRestMuted: one wobble pass,
+   *  three buses, mute-or-rest => 0. */
+  private applyBusGains() {
     // Pull a fresh wobble pass from the shared mix humanizer if
     // one is wired. Single source of randomness so drums/bass/piano
     // drift together rather than independently.
@@ -188,17 +221,17 @@ class BackingEngine {
       ? this.mixHumanizer.nextPass()
       : { drums: 1, bass: 1, piano: 1 };
     if (this.drumBus && this.ctx) {
-      const userGain = this.levels.drumsMuted ? 0 : this.levels.drums;
+      const userGain = this.levels.drumsMuted || this.restMuted ? 0 : this.levels.drums;
       const target = userGain * wob.drums;
       this.drumBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
     }
     if (this.bassBus && this.ctx) {
-      const userGain = this.levels.bassMuted ? 0 : this.levels.bass;
+      const userGain = this.levels.bassMuted || this.restMuted ? 0 : this.levels.bass;
       const target = userGain * wob.bass;
       this.bassBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
     }
     if (this.pianoBus && this.ctx) {
-      const userGain = this.levels.pianoMuted ? 0 : this.levels.piano;
+      const userGain = this.levels.pianoMuted || this.restMuted ? 0 : this.levels.piano;
       const target = userGain * wob.piano;
       this.pianoBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
     }

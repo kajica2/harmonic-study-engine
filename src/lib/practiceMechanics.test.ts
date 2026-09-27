@@ -1,0 +1,178 @@
+/**
+ * src/lib/practiceMechanics.test.ts - PRD-001 Phase 7 S2 (D126): the
+ * hydrate-guard pins. normalizePracticeMechanics must map ANY stored
+ * JSON to a valid config (normalizeMetronomeConfig's contract,
+ * audit #14); formatRampChip pins the exact REQ-PRAC-32 strings.
+ * Node env (pure logic).
+ */
+
+import { describe, it, expect } from "vitest";
+import {
+  DEFAULT_MECHANICS,
+  formatRampChip,
+  normalizePracticeMechanics,
+} from "./practiceMechanics";
+import { initialRampState, rampNext } from "../../engine/practice/ramp";
+
+function isValid(c: ReturnType<typeof normalizePracticeMechanics>): void {
+  expect(["off", "loop", "pause", "ab"]).toContain(c.mode);
+  expect(c.pause.playBars).toBeGreaterThanOrEqual(1);
+  expect(c.pause.playBars).toBeLessThanOrEqual(16);
+  expect(c.pause.restBars).toBeGreaterThanOrEqual(1);
+  expect(c.pause.restBars).toBeLessThanOrEqual(16);
+  expect(c.ab.a.fromBar).toBeLessThanOrEqual(c.ab.a.toBar);
+  expect(c.ab.b.fromBar).toBeLessThanOrEqual(c.ab.b.toBar);
+  expect(c.ab.swapBars).toBeGreaterThanOrEqual(1);
+  expect(c.ab.swapBars).toBeLessThanOrEqual(32);
+  // Law 6 + S2 fix-round LOW-3 contract: an ENABLED ramp is always a
+  // valid ladder (start < target); a rejected-but-edited ladder
+  // survives ONLY force-disabled, with every field finite + clamped
+  // (no NaN ever reaches live state - the MED-1 guarantee).
+  if (c.rampEnabled) expect(c.ramp.startBpm).toBeLessThan(c.ramp.targetBpm);
+  expect(c.ramp.startBpm).toBeGreaterThanOrEqual(30);
+  expect(c.ramp.startBpm).toBeLessThanOrEqual(240);
+  expect(c.ramp.targetBpm).toBeGreaterThanOrEqual(30);
+  expect(c.ramp.targetBpm).toBeLessThanOrEqual(240);
+  expect(c.ramp.stepBpm).toBeGreaterThanOrEqual(1);
+  expect(c.ramp.repsPerStep).toBeGreaterThanOrEqual(1);
+  expect(c.ramp.failThreshold).toBeGreaterThanOrEqual(1);
+  expect(typeof c.rampEnabled).toBe("boolean");
+}
+
+describe("normalizePracticeMechanics - total-shape guard", () => {
+  it("undefined -> shipped defaults", () => {
+    const c = normalizePracticeMechanics(undefined);
+    expect(c).toEqual(DEFAULT_MECHANICS);
+    isValid(c);
+  });
+
+  it("null / array / string garbage -> defaults, never throws", () => {
+    for (const raw of [null, [], "pause", 42, true]) {
+      isValid(normalizePracticeMechanics(raw));
+    }
+  });
+
+  it("empty object -> all defaults", () => {
+    expect(normalizePracticeMechanics({})).toEqual(DEFAULT_MECHANICS);
+  });
+
+  it("string fields / out-of-range numbers -> clamped or defaulted", () => {
+    const c = normalizePracticeMechanics({
+      mode: "teleport",
+      pause: { playBars: "4", restBars: 999 },
+      ab: { a: { fromBar: -5, toBar: "x" }, b: null, swapBars: 0 },
+      ramp: { startBpm: "90", targetBpm: null },
+      rampEnabled: "yes",
+    });
+    isValid(c);
+    expect(c.mode).toBe("off");
+    expect(c.pause.playBars).toBe(DEFAULT_MECHANICS.pause.playBars);
+    expect(c.pause.restBars).toBe(16);
+    expect(c.ab.a).toEqual(DEFAULT_MECHANICS.ab.a);
+    expect(c.ab.swapBars).toBe(1);
+    expect(c.ramp).toEqual(DEFAULT_MECHANICS.ramp);
+    expect(c.rampEnabled).toBe(false);
+  });
+
+  it("NaN anywhere -> defaults for that field", () => {
+    const c = normalizePracticeMechanics({
+      pause: { playBars: Number.NaN, restBars: 2 },
+      ab: { a: { fromBar: 0, toBar: Number.NaN }, b: { fromBar: 8, toBar: 15 }, swapBars: Number.NaN },
+    });
+    isValid(c);
+    expect(c.pause.playBars).toBe(DEFAULT_MECHANICS.pause.playBars);
+    expect(c.ab.a).toEqual(DEFAULT_MECHANICS.ab.a);
+    expect(c.ab.swapBars).toBe(DEFAULT_MECHANICS.ab.swapBars);
+  });
+
+  it("pause steppers clamp to 1..16", () => {
+    const c = normalizePracticeMechanics({ pause: { playBars: 100, restBars: -3 } });
+    expect(c.pause).toEqual({ playBars: 16, restBars: 1 });
+  });
+
+  it("reversed persisted windows normalize ascending; huge indices cap", () => {
+    const c = normalizePracticeMechanics({
+      ab: { a: { fromBar: 10, toBar: 2 }, b: { fromBar: 1e9, toBar: 3 } },
+    });
+    expect(c.ab.a).toEqual({ fromBar: 2, toBar: 10 });
+    expect(c.ab.b).toEqual({ fromBar: 3, toBar: 128 });
+    isValid(c);
+  });
+
+  it("a REJECTED ramp config (start >= target) disables the ramp but KEEPS the edited ladder (LOW-3)", () => {
+    const c = normalizePracticeMechanics({
+      ramp: { startBpm: 150, targetBpm: 90, stepBpm: 6, repsPerStep: 3, failThreshold: 2 },
+      rampEnabled: true,
+    });
+    isValid(c);
+    // S2 fix-round LOW-3: no silent wipe - the user's numbers survive
+    // (each law-6 clamped), the ramp is force-disabled (law 6: it can
+    // never engage while start >= target).
+    expect(c.ramp).toEqual({ startBpm: 150, targetBpm: 90, stepBpm: 6, repsPerStep: 3, failThreshold: 2 });
+    expect(c.rampEnabled).toBe(false);
+  });
+
+  it("a GARBAGE ramp (non-object / non-finite bpms) still falls to the default ladder", () => {
+    for (const raw of ["fast", 42, null, [], { startBpm: Number.NaN, targetBpm: 120 }]) {
+      const c = normalizePracticeMechanics({ ramp: raw, rampEnabled: true });
+      isValid(c);
+      expect(c.ramp).toEqual(DEFAULT_MECHANICS.ramp);
+      expect(c.rampEnabled).toBe(false);
+    }
+  });
+
+  it("a valid stored config round-trips untouched", () => {
+    const stored = {
+      mode: "pause",
+      pause: { playBars: 2, restBars: 6 },
+      ab: { a: { fromBar: 4, toBar: 7 }, b: { fromBar: 8, toBar: 11 }, swapBars: 2 },
+      ramp: { startBpm: 90, targetBpm: 102, stepBpm: 6, repsPerStep: 2, failThreshold: 2 },
+      rampEnabled: true,
+    };
+    expect(normalizePracticeMechanics(stored)).toEqual(stored);
+  });
+
+  it("defaults are not shared-mutable: mutating a result cannot poison DEFAULT_MECHANICS", () => {
+    const c = normalizePracticeMechanics(undefined);
+    c.pause.playBars = 99;
+    c.ab.a.fromBar = 77;
+    expect(DEFAULT_MECHANICS.pause.playBars).toBe(4);
+    expect(DEFAULT_MECHANICS.ab.a.fromBar).toBe(0);
+  });
+});
+
+describe("formatRampChip", () => {
+  const cfg = { startBpm: 90, targetBpm: 102, stepBpm: 6, repsPerStep: 4, failThreshold: 2 };
+
+  it("climbing chip: bpm, target, step, rep, streaks", () => {
+    let s = initialRampState(cfg);
+    s = rampNext(s, cfg, { kind: "rep", success: true });
+    s = rampNext(s, cfg, { kind: "rep", success: true });
+    s = rampNext(s, cfg, { kind: "rep", success: true });
+    s = rampNext(s, cfg, { kind: "rep", success: true });
+    // 4 reps at 90 -> climb to 96, reps reset, streak keeps counting.
+    expect(formatRampChip(s, cfg)).toBe("RAMP 96 -> 102 (+6)  rep 0/4  S4/F0");
+    s = rampNext(s, cfg, { kind: "rep", success: false });
+    // A failure clears successStreak (CONSECUTIVE literal) - the doc's
+    // illustrative "S3/F1" is UNREACHABLE by construction: F>0 only
+    // while the current event is a fail (S=0). Pinned honestly here.
+    expect(formatRampChip(s, cfg)).toBe("RAMP 96 -> 102 (+6)  rep 0/4  S0/F1");
+    s = rampNext(s, cfg, { kind: "rep", success: true });
+    expect(formatRampChip(s, cfg)).toBe("RAMP 96 -> 102 (+6)  rep 1/4  S1/F0");
+  });
+
+  it("complete chip: TARGET visible (REQ-PRAC-33)", () => {
+    const c2 = { ...cfg, repsPerStep: 1 };
+    let s = initialRampState(c2);
+    s = rampNext(s, c2, { kind: "rep", success: true });
+    s = rampNext(s, c2, { kind: "rep", success: true });
+    s = rampNext(s, c2, { kind: "rep", success: true }); // 90->96->102
+    expect(formatRampChip(s, c2)).toBe("RAMP 102 - TARGET");
+  });
+
+  it("initial chip", () => {
+    expect(formatRampChip(initialRampState(cfg), cfg)).toBe(
+      "RAMP 90 -> 102 (+6)  rep 0/4  S0/F0",
+    );
+  });
+});

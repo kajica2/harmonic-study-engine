@@ -1,13 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Play, Pause, Repeat, Drum, Settings2 } from "lucide-react";
+import { Play, Pause, Repeat, Drum, Settings2, ListChecks } from "lucide-react";
 import {
   formatBarReadout,
   formatGuideToneTally,
   formatStepEyebrow,
   formatTempo,
 } from "../lib/practiceHeader";
+import { formatRampChip, type PracticeMechanicsConfig } from "../lib/practiceMechanics";
+import type { DutyPhase } from "../../engine/practice/duty";
+import type { RampState } from "../../engine/practice/ramp";
 import { GuideToneFeedback } from "./GuideToneFeedback";
 import { MetronomeControls } from "./MetronomeControls";
+import { PracticeMechanicsPanel } from "./PracticeMechanicsPanel";
 import type { GuideToneTrail } from "../lib/guideToneTrail";
 import type { BackingStyle } from "../lib/backingEngine";
 import type { HarmonicPath } from "../lib/paths";
@@ -94,6 +98,24 @@ interface PracticeHeaderProps {
   // Score display mode (full / zoom)
   scoreDisplayMode: ScoreDisplayMode;
   onScoreDisplayModeChange: (m: ScoreDisplayMode) => void;
+
+  // PRD-001 Phase 7 S2 (D127): the Drills gear + the two always-
+  // visible live surfaces. Pure props-forwarding; ALL mechanics state
+  // lives upstream (zustand practiceMechanics + App run mirrors).
+  mechanics: PracticeMechanicsConfig;
+  /** D125: runner active -> the panel renders DISABLED. */
+  mechanicsDisabled: boolean;
+  /** Current rail selection for the Capture A/B snapshot buttons. */
+  mechanicsLoopSelection: { from: number; to: number } | null;
+  /** Live ramp mirror; null = ramp not engaged. */
+  rampState: RampState | null;
+  /** passCompleted pulse counter (S3 seam indicator, D121). */
+  repPulse: number;
+  /** Pause duty phase for the PLAY/REST badge. */
+  windowPhase: DutyPhase;
+  onMechanicsChange: (next: PracticeMechanicsConfig) => void;
+  onRepOutcome: (success: boolean) => void;
+  onRampReset: () => void;
 }
 
 const BACKING_STYLE_LABELS: Record<BackingStyle, string> = {
@@ -134,6 +156,15 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onVolumeChange,
   scoreDisplayMode,
   onScoreDisplayModeChange,
+  mechanics,
+  mechanicsDisabled,
+  mechanicsLoopSelection,
+  rampState,
+  repPulse,
+  windowPhase,
+  onMechanicsChange,
+  onRepOutcome,
+  onRampReset,
 }) => {
   // F3 (D112): the honest form-relative readout. The legacy
   // formatChordReadout stays exported-but-dead in practiceHeader.ts
@@ -168,6 +199,31 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
       document.removeEventListener("mousedown", onDown);
     };
   }, [clickSettingsOpen]);
+
+  // PRD-001 Phase 7 S2 (D127): the Drills popover. EXACT metronome-gear
+  // D36 pattern - local visibility state, document keydown/mousedown
+  // listeners mounted ONLY while open (PHASE-3-03-safe, full cleanup),
+  // Escape + outside-click close, z-40 above the sticky header.
+  const [drillsOpen, setDrillsOpen] = useState(false);
+  const drillsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!drillsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrillsOpen(false);
+    };
+    const onDown = (ev: MouseEvent) => {
+      const host = drillsRef.current;
+      if (host && !host.contains(ev.target as Node)) {
+        setDrillsOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+    };
+  }, [drillsOpen]);
 
   return (
     <div
@@ -210,6 +266,47 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
             >
               <span aria-hidden>GT</span>
               <span>{guideToneLabel}</span>
+            </span>
+          )}
+          {/* PRD-001 Phase 7 S2 (D127/REQ-PRAC-32): the ramp chip -
+              left readout row, NOT the button row. Rendered only when
+              the ramp is engaged. data-* hooks feed the deterministic
+              e2e leg (no playback needed). */}
+          {mechanics.rampEnabled && rampState !== null && (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 text-[11px] t-mono text-neutral-200${isPlaying ? "" : " opacity-60"}`}
+              role="status"
+              aria-live="polite"
+              data-testid="ramp-chip"
+              data-bpm={rampState.bpm}
+              data-phase={rampState.phase}
+              data-rep-pulse={repPulse}
+              title="Tempo ramp: current bpm -> target (+step), reps at bpm, success/fail streaks"
+            >
+              {formatRampChip(rampState, mechanics.ramp)}
+            </span>
+          )}
+          {/* Phase badge (pause mode): glyph + TEXT, never color-only
+              (PRD 9.8). ASCII glyphs: >> play, -- rest. */}
+          {mechanics.mode === "pause" && (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] border text-[11px] t-mono${
+                windowPhase === "rest"
+                  ? " border-[color:var(--color-border)] text-neutral-400 surface-1"
+                  : " border-[color:var(--color-brand)] text-[color:var(--color-brand)] bg-[color:var(--color-brand)]/10"
+              }`}
+              role="status"
+              aria-live="polite"
+              data-testid="phase-badge"
+              data-phase={windowPhase}
+              title={
+                windowPhase === "rest"
+                  ? "Rest bar - the click and the playhead keep running"
+                  : "Play bar"
+              }
+            >
+              <span aria-hidden>{windowPhase === "rest" ? "--" : ">>"}</span>
+              <span>{windowPhase === "rest" ? "REST" : "PLAY"}</span>
             </span>
           )}
         </div>
@@ -328,6 +425,41 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
                 config={metronomeConfig}
                 timeSignature={timeSignature}
                 onChange={onMetronomeConfigChange}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Drills (S2, D127): gear beside the click gear, same row,
+            same token styling, same open/close machinery. Pause mode,
+            A/B compare, tempo ramp. Zero new global keys - every
+            control inside is a real button/input. */}
+        <div className="relative" ref={drillsRef}>
+          <button
+            onClick={() => setDrillsOpen((v) => !v)}
+            aria-expanded={drillsOpen}
+            aria-label="Drills settings"
+            title="Drills - pause mode, A/B compare, tempo ramp"
+            data-testid="mechanics-settings-toggle"
+            className={`flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-xs t-mono border transition-colors ${
+              drillsOpen
+                ? "border-[color:var(--color-brand)] text-[color:var(--color-brand)] bg-[color:var(--color-brand)]/10"
+                : "border-[color:var(--color-border)] text-neutral-400 hover:text-neutral-200 surface-1"
+            }`}
+          >
+            <ListChecks size={12} aria-hidden />
+          </button>
+          {drillsOpen && (
+            <div className="absolute right-0 top-full mt-2 z-40 w-96 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 p-3 shadow-xl">
+              <PracticeMechanicsPanel
+                config={mechanics}
+                rampState={rampState}
+                loopSelection={mechanicsLoopSelection}
+                formLen={formLen}
+                disabled={mechanicsDisabled}
+                onConfigChange={onMechanicsChange}
+                onRepOutcome={onRepOutcome}
+                onRampReset={onRampReset}
               />
             </div>
           )}
