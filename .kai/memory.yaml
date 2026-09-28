@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-27T18:05:00Z"
-total_pipeline_runs: 19
+last_updated: "2026-09-28T03:30:00Z"
+total_pipeline_runs: 20
 
 flags:
   has_conventions: true
@@ -94,3 +94,11 @@ active_prevention_rules:
   - id: "S3-001"
     when: "Widening a total-shape normalize (new sub-field materialized at read) in a store/config module"
     action: "Grep for round-trip pins asserting toEqual(stored) on the OLD shape and update fixtures to the NEW complete shape with NON-default values (agreement-with-defaults is a weaker pin than preservation). Two S2 MED-1 pins broke exactly this way in S3. Also re-audit prior design-doc seam claims against SHIPPED code before consuming them (audit #15 transpose claim was false; the dev caught it live)."
+
+  - id: "S4-001"
+    when: "Reusing an existing component's interaction pattern in a NEW input surface ('reuse the law, not the file')"
+    action: "Re-audit the inherited pattern against CURRENT constraints before copying - shipped patterns predate newer laws. The display piano's keyAccess press handler had no modifier guard; copying it into NoteInputPiano would have shipped a PHASE-1-01 gap (review MED-002). Guard the PRESS path; keep release paths ungated (stuck-note law)."
+
+  - id: "ORCH-001"
+    when: "Kai pre-edits a file that the upcoming slice's design lists as DO-NOT/ownership-restricted (e.g. PRD erratum applied before dispatch)"
+    action: "Declare the exact edited files + hunk content as signed-off orchestrator deltas in BOTH the developer and reviewer directives. Undeclared, review correctly flags an ownership HIGH (S4 HIGH-001: PRD-001.md REQ-PRAC-54 erratum - real edit, false violation, one wasted merge cycle)."
