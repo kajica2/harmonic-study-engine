@@ -232,9 +232,9 @@ at 10:00, human LISTEN CHECK OPEN - RK-S4-1/RK6).
 | Chord-chart paste | SHIPPED early - Phase 4 slice 4, 2026-09-24 | Shipped with Compose, not Phase 8: `engine/compose/chordchart.ts` (directives/%/rests/slash rule, editable preview; grammar: `docs/CHART-FORMAT.md`). The old row ("no paste parser") predates it. |
 | Piano-roll editor | NOT STARTED | New. |
 | WAV export (user-facing) | SHIPPED | Buttons exist: backing-loop render (`src/lib/loopWav.ts`, Practice) + Compose full-mix WAV (Phase 4 slice 4, `src/lib/composeExport.ts`). The old row's premise was stale. |
-| MusicXML export | NOT STARTED | New (Q2 / Phase 3 decision). |
-| ABC export | PARTIAL | `sheetMusicExport.ts` exists. |
-| Session sharing via URL | SHIPPED (Compose) - Phase 4 slice 4, 2026-09-24 | Compose session (file identity + hash, chart text, overrides, request, mixer) serializes on the single debounced writer with a 6000-char governor + honest too-large notice; Etude constraints shipped in Phase 3 slice 2; practice state predates both. The old row ("No URL serialization") was stale. Carve-out: the /play page below. |
+| MusicXML export | SHIPPED - Phase 3 slice 2, 2026-09-23 | Etude "MusicXML (with melody)" download (D27) + practice MusicXML export (`toMusicXml`, `src/lib/scoreExport.ts`; buttons wired in `App.tsx` + `LeadSheet.tsx`). The old "NOT STARTED" row contradicted this doc's own Phase 3 row. |
+| ABC export | PARTIAL (lead sheet shipped, etude open) | `sheetMusicExport.ts` exists. Lead-sheet `.abc` download (`LeadSheet.tsx`) shipped BROKEN - the textarea scrape always fell through to the "ABC source unavailable" stub - and is now FIXED to download the real `buildLeadSheetAbc` output (regression-pinned in `LeadSheet.test.tsx`). Open: the ETUDE `.abc` download button (this phase). |
+| Session sharing via URL | PARTIAL (Compose + Etude) - Phase 4 slice 4, 2026-09-24 | Compose session (file identity + hash, chart text, overrides, request, mixer) serializes on the single debounced writer with a 6000-char governor + honest too-large notice; Etude constraints shipped in Phase 3 slice 2. REQ-IO-50 covers ALL modes: practice + explore serialize nothing. Carve-outs: boot read only - no popstate/back-forward (TD-027); the /play page below. |
 | `/play` route for idea links | DEFERRED - TD-047 | REQ-IO-52 deliberately deferred at Phase 4 S4 (parent X10): no router exists, the app is single-route; revisit with a real routing decision. |
 
 ### PRD Phase 9 - Polish & launch

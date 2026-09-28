@@ -6,7 +6,7 @@ Harmonic Study Engine — React 19 + Vite 6 + Tailwind 4 SPA (trumpet practice e
 
 ```bash
 npm run lint        # tsc --noEmit — there is NO eslint
-npm test            # vitest run — 899 passed / 1 skipped (77 files)
+npm test            # vitest run — 2664 passed / 1 skipped (202 files)
 npm run build       # TWO builds: vite.rnn.config.ts first, then main vite build
 npm run check:paths # tsx scripts/check-path-bars.ts — bar-count invariant (36/36 OK)
 npm run test:py     # backend pytest (prefers .venv/bin/python)
@@ -22,7 +22,7 @@ Gate order (CI mirrors this): `npm run lint` → `npm test` → `npm run build`.
 
 - **New DOM-touching test files MUST be added to `JSDOM_FILES` in `vitest.config.ts`.** Vitest 5 multi-project mode IGNORES per-file `// @vitest-environment jsdom` comments. Pure-logic tests run in the node project automatically.
 - **Count pins fail CI if you change the underlying data without updating them:**
-  - `tests/count-tunes.test.js` pins `tunesCount()` to 40 (masterclass catalog size)
+  - `tests/count-tunes.test.ts` pins `tunesCount()` to 40 (masterclass catalog size)
   - `tests/pathBriefing.test.ts` pins `curatedBriefingCount()` to 12 — bump when enabling a masterclass tune with a curated `objective`
   - `assets/check-links.cjs` (drift gate, runs FIRST in CI) asserts persona/tune counts cited in README.md and `src/magenta/personaProfiles.ts` match SPEC.md
 - **`tests/no-debug-logs.test.ts` bans `console.log/info/debug` in `src/`.** Only `console.warn/error` allowed (error-path reporting).
@@ -45,7 +45,7 @@ To enable a catalog tune (see MASTERCLASS_TODO.md):
 
 ## Architecture essentials
 
-- `src/App.tsx` is a ~3300-line monolith owning playback state, persona/voicing/tempo, keyboard/MIDI wiring. Most UI changes touch it.
+- `src/App.tsx` is a ~5300-line monolith owning playback state, persona/voicing/tempo, keyboard/MIDI wiring. Most UI changes touch it.
 - Audio engines are module-level singletons: `audioEngine` (`src/lib/audio.ts`), `rhythmEngine` (`src/lib/rhythm.ts`), `backingEngine` (`src/lib/backingEngine.ts`), `playbackClock` (`src/lib/playbackClock.ts`).
 - **Metronome click**: `rhythmEngine.playStep()` fires `audioEngine.playMetronomeClick()` gated on `metronomeEnabled`. App.tsx syncs the UI toggle via `useEffect(() => rhythmEngine.setMetronomeEnabled(metronomeOn), [metronomeOn])`. The backing beat styles are owned by `backingEngine` — muting the click does NOT mute the backing track (by design).
 - `src/lib/` = pure, testable logic; `src/components/` = React UI; `src/data/` = JSON/TS data (personas.json, masterclass.ts, styles/, formTemplates/, quizzes/).
