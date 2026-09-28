@@ -151,7 +151,9 @@ export const KeyboardShortcutsCheatsheet: React.FC<{ onClose: () => void }> = ({
 
       <div className="px-5 py-3 border-t border-white/10 text-[10px] t-mono text-[color:var(--color-text-3)]">
         Shortcuts are inactive when a text field is focused. Tempo down /
-        up by 5 BPM: comma / period.
+        up by 5 BPM: comma / period. Piano keys (study view, when
+        Keyboard / piano input is on): A W S E D F T G Y H U J K play one
+        octave from the root; Z / X shift the octave.
       </div>
     </div>
   );

@@ -39,6 +39,20 @@ export interface DetectConfig {
   passThreshold: number;
 }
 
+/** S4 (D143): the fallback INPUT surfaces config (REQ-IO-4/5). Rides
+ *  the ONE practiceMechanics field - NO new zustand field, NO v5, NO
+ *  new K.* keys (D126/D132 lineage): normalize DEFAULTS THE MISSING
+ *  SUB-FIELD at read. */
+export interface NoteInputConfig {
+  /** Opt-in arming of the keyboard mapping + input piano
+   *  (REQ-IO-4/5). Default OFF: no letter ever sounds without the
+   *  user turning this on (D139 anti-regression law). */
+  enabled: boolean;
+  /** Root octave for the A-W-S-E mapping, 2..5 (root MIDI =
+   *  (rootOctave + 1) * 12; default 4 = C4 = 60). Persisted. */
+  rootOctave: number;
+}
+
 export interface PracticeMechanicsConfig {
   /** off | loop | pause | ab - ONE selector (mode exclusivity, D122). */
   mode: MechanicsMode;
@@ -53,6 +67,9 @@ export interface PracticeMechanicsConfig {
   rampEnabled: boolean;
   /** S3 detection (D132): armed auto-rep + tolerance + threshold. */
   detect: DetectConfig;
+  /** S4 note input (D139/D143): opt-in keyboard/piano surfaces +
+   *  persisted root octave. */
+  noteInput: NoteInputConfig;
 }
 
 /** Shipped defaults (section 2): pause 4/4, AB 0-7 vs 8-15 swap 4,
@@ -75,6 +92,9 @@ export const DEFAULT_MECHANICS: PracticeMechanicsConfig = {
   },
   rampEnabled: false,
   detect: { enabled: false, toleranceMs: 120, passThreshold: 0.8 },
+  // S4 (D139): OFF by default - the anti-regression law (a user who
+  // never turns it on keeps byte-identical behavior).
+  noteInput: { enabled: false, rootOctave: 4 },
 };
 
 const MODES: readonly MechanicsMode[] = ["off", "loop", "pause", "ab"];
@@ -162,6 +182,21 @@ export function normalizePracticeMechanics(raw: unknown): PracticeMechanicsConfi
         : DEFAULT_MECHANICS.detect.passThreshold,
   };
 
+  // S4 (D143/D126 lineage): the noteInput sub-field DEFAULTS AT READ -
+  // a legacy payload without the key resolves to the shipped default
+  // (NO v5, no migration; the no-v5 pin is the missing-key case in
+  // practiceMechanics.test.ts). rootOctave clamps 2..5 (D139).
+  const noteInputRaw = (typeof r.noteInput === "object" && r.noteInput !== null ? r.noteInput : {}) as Record<string, unknown>;
+  const noteInput: NoteInputConfig = {
+    enabled: noteInputRaw.enabled === true,
+    rootOctave: intInRange(
+      noteInputRaw.rootOctave,
+      2,
+      5,
+      DEFAULT_MECHANICS.noteInput.rootOctave,
+    ),
+  };
+
   return {
     mode,
     pause,
@@ -169,6 +204,7 @@ export function normalizePracticeMechanics(raw: unknown): PracticeMechanicsConfi
     ramp: ramp ?? editedRampLadder(r.ramp),
     rampEnabled,
     detect,
+    noteInput,
   };
 }
 
@@ -218,6 +254,7 @@ function structuredCloneDefault(c: PracticeMechanicsConfig): PracticeMechanicsCo
     ramp: { ...c.ramp },
     rampEnabled: c.rampEnabled,
     detect: { ...c.detect },
+    noteInput: { ...c.noteInput },
   };
 }
 

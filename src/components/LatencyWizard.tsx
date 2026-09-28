@@ -36,26 +36,50 @@
  *     and an 8 s idle watchdog - every interval/timeout/listener is
  *     torn down in the rolling effect's cleanup (no leaks, pinned by
  *     the timer-count test).
+ *
+ * S4 (D141): PER-SOURCE CALIBRATION. A new tapSource ("midi" |
+ * "fallback") selector gates WHICH midin events pair (MIDI mode
+ * ignores hse-* - a stray keyboard tap can never poison a MIDI
+ * calibration; fallback mode accepts ONLY hse-*). The fallback roll
+ * needs no MIDI at all (taps ride the embedded compact NoteInputPiano
+ * or the live global keyboard listener, D139's wizard exception) and
+ * saves into the record's fallback pair, MERGING with the stored
+ * MIDI fields (loadLatency first; neither source ever clobbers the
+ * other - pinned). The median math is source-agnostic (engine
+ * functions: arrays in, number out).
  */
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModalShell, useModalLabel } from "./ModalShell";
 import { audioEngine } from "../lib/audio";
 import type { MidiInEvent } from "../lib/midiIn";
+import { emitNoteInput, isHseInputId } from "../lib/noteInputBus";
+import { NoteInputPiano } from "./NoteInputPiano";
+import { noteKeyChipsForRoot } from "../hooks/useKeyDown";
 import {
   clampInputLatency,
   medianOffset,
   MIN_TAP_PAIRS,
 } from "../../engine/practice/latency";
-import { saveLatency, type LatencyRecord } from "../lib/practiceLatency";
+import {
+  loadLatency,
+  saveLatency,
+  type LatencyRecord,
+} from "../lib/practiceLatency";
 
 type WizardPhase = "idle" | "gate" | "arming" | "rolling" | "result" | "saved";
+
+/** S4 (D141): which tap path is being calibrated. */
+export type WizardTapSource = "midi" | "fallback";
 
 export interface LatencyWizardProps {
   onClose: () => void;
   /** Current practice tempo (BPM) - the beat period the clicks ride. */
   tempo: number;
-  /** Gate half 1: the Web MIDI API exists (REQ-PRAC-54 lineage). */
+  /** Gate half 1: the Web MIDI API exists (REQ-PRAC-54 lineage).
+   *  S4: the TRUE API flag (App reads midiInAvailable(), NOT
+   *  !detectionUnavailable - the widened gate lies open on the
+   *  fallback input alone). */
   hasMidiApi: boolean;
   /** Gate half 2: at least one MIDI INPUT device is present. */
   hasDevice: boolean;
@@ -63,6 +87,14 @@ export interface LatencyWizardProps {
   deviceName: string | null;
   /** Bass-channel exclusion (the shipped useGuideToneTrail law). */
   bassMidiChannel: number | null;
+  /** S4 (D141): the note-input toggle - gates the fallback
+   *  calibration mode (the chip is HIDDEN when off; the roll then
+   *  needs no MIDI at all - the taps ride the "midin" seam as
+   *  hse-* events). */
+  noteInputEnabled: boolean;
+  /** S4 (D140): root octave for the embedded compact input piano
+   *  (same component, same persisted root as the study surface). */
+  noteInputRootOctave: number;
   /** Called after saveLatency so App re-reads the record (refresh seam). */
   onSaved: () => void;
 }
@@ -107,6 +139,8 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
   hasDevice,
   deviceName,
   bassMidiChannel,
+  noteInputEnabled,
+  noteInputRootOctave,
   onSaved,
 }) => {
   const labelId = useModalLabel("latency-wizard");
@@ -118,8 +152,17 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
   const [draftMs, setDraftMs] = useState("");
   const [edited, setEdited] = useState(false);
   const [abortNote, setAbortNote] = useState<string | null>(null);
+  // S4 (D141): which tap path is measured. Default: MIDI when the
+  // gate is open, else the fallback (the only source that can roll).
+  const [tapSource, setTapSource] = useState<WizardTapSource>(
+    hasMidiApi && hasDevice ? "midi" : noteInputEnabled ? "fallback" : "midi",
+  );
 
   const gateOk = hasMidiApi && hasDevice;
+  // S4: the fallback mode needs NO MIDI (the roll is driven by taps
+  // on the embedded piano / the computer keyboard - D139's wizard
+  // exception keeps the global listener live while the modal is up).
+  const fallbackOk = noteInputEnabled && tapSource === "fallback";
 
   // Live inputs the rolling effect must read WITHOUT re-subscribing
   // (a tempo/count change mid-roll never restarts the measurement).
@@ -129,6 +172,10 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
   countRef.current = clickCount;
   const bassRef = useRef(bassMidiChannel);
   bassRef.current = bassMidiChannel;
+  // S4 (D141): the mode filter reads the LIVE source without ever
+  // restarting a roll (the selector is not rendered while rolling).
+  const tapSourceRef = useRef<WizardTapSource>(tapSource);
+  tapSourceRef.current = tapSource;
 
   // Roll state (per-mount refs - the D135.5 StrictMode law).
   const pendingRef = useRef<number[]>([]);
@@ -216,6 +263,12 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
     const onMidin = (e: Event): void => {
       const detail = (e as CustomEvent<Partial<MidiInEvent> | undefined>).detail;
       if (!detail || detail.type !== "noteon") return;
+      // S4 (D141) SOURCE FILTER (the one condition at the top): MIDI
+      // mode IGNORES hse-* events (a stray keyboard tap can never
+      // poison a MIDI calibration); fallback mode accepts ONLY
+      // hse-* events (hardware taps belong to the other number).
+      const synthetic = isHseInputId(detail.inputId);
+      if (tapSourceRef.current === "midi" ? synthetic : !synthetic) return;
       if (typeof detail.note !== "number" || !Number.isInteger(detail.note)) return;
       const bass = bassRef.current;
       if (bass !== null && detail.channel === bass) return;
@@ -275,25 +328,70 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
     setPhase("rolling");
   }, []);
 
+  // S4 (D140 mounting #2): the embedded compact input piano. Audio +
+  // the bus emit ONLY (no recorder, no live-note visuals - the
+  // wizard is not a practice take); taps pair with the existing
+  // midin listener through the D141 source filter.
+  const wizardNote = useCallback((midi: number, down: boolean) => {
+    if (down) audioEngine.playNote(midi);
+    else audioEngine.stopNote(midi);
+    emitNoteInput(midi, down, "screen");
+  }, []);
+  const wizardRootMidi = (noteInputRootOctave + 1) * 12;
+  const wizardKeyLabels = useMemo(
+    () => noteKeyChipsForRoot(wizardRootMidi),
+    [wizardRootMidi],
+  );
+
   const save = useCallback(() => {
-    const fromMidi = result !== null && result.ok && !edited;
-    const inputMs = fromMidi
+    const fromMedian = result !== null && result.ok && !edited;
+    const value = fromMedian
       ? result.inputMs
       : clampInt(Number(draftMs), 0, MANUAL_MAX_MS);
-    const record: LatencyRecord = {
-      version: 1,
-      inputLatencyMs: inputMs,
-      // Manual stores output 0: compensationOf() = the typed number
-      // exactly (the single-sum law, practiceLatency).
-      outputLatencyMs: fromMidi ? result.outputMs : 0,
-      source: fromMidi ? "midi" : "manual",
-      calibratedAtMs: Date.now(),
-      deviceName: fromMidi ? tapNameRef.current ?? deviceName : null,
-    };
+    // Manual stores output 0: the compensation getters then equal the
+    // typed number exactly (the single-sum law, practiceLatency). A
+    // median save stores the MEASURED output - shared by all paths
+    // (same speakers, same ctx; D141).
+    const outputMs = fromMedian ? result.outputMs : 0;
+    const now = Date.now();
+    // S4 (D141): the save MERGES with the stored record - a fallback
+    // calibration never clobbers the MIDI fields and vice versa
+    // (pinned: both survive a save from the other source).
+    const prev = loadLatency();
+    const record: LatencyRecord =
+      tapSource === "fallback"
+        ? {
+            version: 1,
+            // MIDI fields survive verbatim; a fallback-only record
+            // keeps inputLatencyMs null + source "manual" (harmless
+            // discriminator, normalize accepts null - D141).
+            inputLatencyMs: prev?.inputLatencyMs ?? null,
+            outputLatencyMs: outputMs,
+            source: prev?.source ?? "manual",
+            calibratedAtMs: prev?.inputLatencyMs != null ? prev.calibratedAtMs : now,
+            deviceName:
+              prev?.inputLatencyMs != null
+                ? prev.deviceName
+                : fromMedian
+                  ? tapNameRef.current ?? "Computer keyboard"
+                  : null,
+            fallbackInputLatencyMs: value,
+            fallbackCalibratedAtMs: now,
+          }
+        : {
+            version: 1,
+            inputLatencyMs: value,
+            outputLatencyMs: outputMs,
+            source: fromMedian ? "midi" : "manual",
+            calibratedAtMs: now,
+            deviceName: fromMedian ? tapNameRef.current ?? deviceName : null,
+            fallbackInputLatencyMs: prev?.fallbackInputLatencyMs ?? null,
+            fallbackCalibratedAtMs: prev?.fallbackCalibratedAtMs ?? null,
+          };
     saveLatency(record);
     onSaved();
     setPhase("saved");
-  }, [result, edited, draftMs, deviceName, onSaved]);
+  }, [result, edited, draftMs, deviceName, onSaved, tapSource]);
 
   // S3 FIX ROUND (LOW-002): once the draft is EDITED the median no
   // longer backs the save - the draft alone must validate. An
@@ -330,13 +428,47 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
 
         {(phase === "gate" || phase === "idle") && !gateOk && (
           <div data-testid="wizard-gate" className="flex flex-col gap-2">
-            <p className="text-[11px] text-neutral-300 leading-snug">
-              {!hasMidiApi
-                ? "This browser has no Web MIDI API - calibrate by hand instead."
-                : "Connect a MIDI input to calibrate."}{" "}
-              You can enter the offset manually (0..500 ms) - it is used
-              identically.
-            </p>
+            <SourceSelector
+              tapSource={tapSource}
+              gateOk={gateOk}
+              noteInputEnabled={noteInputEnabled}
+              onSelect={setTapSource}
+            />
+            {fallbackOk ? (
+              <>
+                <p className="text-[11px] text-neutral-300 leading-snug">
+                  Tap the piano below (or type the A-W-S-E mapping) on
+                  every click.
+                </p>
+                <div data-testid="wizard-piano">
+                  <NoteInputPiano
+                    rootMidi={wizardRootMidi}
+                    octaves={1}
+                    keyLabels={wizardKeyLabels}
+                    onNote={wizardNote}
+                    compact
+                  />
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    data-testid="wizard-start"
+                    onClick={startRoll}
+                    className="px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-semibold border border-[color:var(--color-brand-strong)] text-[color:var(--color-text-inverse)] bg-[color:var(--color-brand-strong)] hover:opacity-90"
+                  >
+                    Start
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-[11px] text-neutral-300 leading-snug">
+                {!hasMidiApi
+                  ? "This browser has no Web MIDI API - calibrate by hand instead."
+                  : "Connect a MIDI input to calibrate."}{" "}
+                You can enter the offset manually (0..500 ms) - it is used
+                identically.
+              </p>
+            )}
             <ManualEntry
               draftMs={draftMs}
               setDraftMs={setDraftMs}
@@ -349,11 +481,35 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
         {(phase === "arming" ||
           ((phase === "gate" || phase === "idle") && gateOk)) && (
           <div data-testid="wizard-arming" className="flex flex-col gap-2">
-            <p className="text-[11px] text-neutral-300 leading-snug">
-              Ready: MIDI input {hasMidiApi && hasDevice ? "detected" : "required"}.
-              Clicks ride the current tempo ({clampInt(tempo, 30, 240)} BPM)
-              through the same metronome bus as practice.
-            </p>
+            <SourceSelector
+              tapSource={tapSource}
+              gateOk={gateOk}
+              noteInputEnabled={noteInputEnabled}
+              onSelect={setTapSource}
+            />
+            {tapSource === "fallback" ? (
+              <>
+                <p className="text-[11px] text-neutral-300 leading-snug">
+                  Tap the piano below (or type the A-W-S-E mapping) on
+                  every click.
+                </p>
+                <div data-testid="wizard-piano">
+                  <NoteInputPiano
+                    rootMidi={wizardRootMidi}
+                    octaves={1}
+                    keyLabels={wizardKeyLabels}
+                    onNote={wizardNote}
+                    compact
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-[11px] text-neutral-300 leading-snug">
+                Ready: MIDI input {hasMidiApi && hasDevice ? "detected" : "required"}.
+                Clicks ride the current tempo ({clampInt(tempo, 30, 240)} BPM)
+                through the same metronome bus as practice.
+              </p>
+            )}
             <label className="flex items-center gap-1.5 text-[10px] t-mono text-neutral-400">
               Clicks
               <input
@@ -394,9 +550,21 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
               Listening... {emitted} clicks, {paired} taps.
             </p>
             <p className="text-[10px] text-neutral-400">
-              Tap a MIDI note on every click. Escape or 8 s of silence
-              stops the run.
+              {tapSource === "fallback"
+                ? "Tap the piano below (or type the A-W-S-E mapping) on every click. Escape or 8 s of silence stops the run."
+                : "Tap a MIDI note on every click. Escape or 8 s of silence stops the run."}
             </p>
+            {tapSource === "fallback" && (
+              <div data-testid="wizard-piano">
+                <NoteInputPiano
+                  rootMidi={wizardRootMidi}
+                  octaves={1}
+                  keyLabels={wizardKeyLabels}
+                  onNote={wizardNote}
+                  compact
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -442,6 +610,20 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
               buffering; calibration is per audio path - recalibrate
               when switching headphones or speakers.
             </p>
+            {/* S4 (D141) honesty copy (verbatim, section 7.2): the
+                keyboard and touch paths SHARE one number and the
+                screen says so. */}
+            {tapSource === "fallback" && (
+              <p
+                data-testid="wizard-fallback-honesty"
+                className="text-[10px] text-neutral-400 leading-snug"
+              >
+                Keyboard and touch taps share one calibration number -
+                measure with the surface you will play on. The gap
+                between the two is typically smaller than the timing
+                tolerance.
+              </p>
+            )}
           </div>
         )}
 
@@ -471,6 +653,63 @@ export const LatencyWizard: React.FC<LatencyWizardProps> = ({
 
 const secondaryBtn =
   "px-2 py-1 rounded-[var(--radius-sm)] text-xs t-mono border border-[color:var(--color-border)] text-neutral-300 hover:text-neutral-100 surface-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+
+/** S4 (D141): the per-source calibration selector (section 7.1).
+ *  Renders iff at least one source can roll (gateOk || noteInput);
+ *  the MIDI chip is honestly DISABLED (aria-disabled + title) when
+ *  no device exists; the fallback chip only exists with the toggle
+ *  on (it is the only mode that needs no MIDI at all). */
+const SourceSelector: React.FC<{
+  tapSource: WizardTapSource;
+  gateOk: boolean;
+  noteInputEnabled: boolean;
+  onSelect: (s: WizardTapSource) => void;
+}> = ({ tapSource, gateOk, noteInputEnabled, onSelect }) => {
+  if (!gateOk && !noteInputEnabled) return null;
+  return (
+    <div
+      className="flex items-center gap-1"
+      role="group"
+      aria-label="Calibration tap source"
+    >
+      <button
+        type="button"
+        data-testid="wizard-source-midi"
+        aria-pressed={tapSource === "midi"}
+        disabled={!gateOk}
+        aria-disabled={!gateOk}
+        title={
+          gateOk
+            ? "Calibrate the hardware MIDI tap path"
+            : "no MIDI device - connect one or calibrate the keyboard"
+        }
+        onClick={() => onSelect("midi")}
+        className={segChip(tapSource === "midi")}
+      >
+        MIDI
+      </button>
+      {noteInputEnabled && (
+        <button
+          type="button"
+          data-testid="wizard-source-fallback"
+          aria-pressed={tapSource === "fallback"}
+          title="Calibrate the computer-keyboard / touch tap path"
+          onClick={() => onSelect("fallback")}
+          className={segChip(tapSource === "fallback")}
+        >
+          Keyboard / piano
+        </button>
+      )}
+    </div>
+  );
+};
+
+const segChip = (active: boolean): string =>
+  `px-2 py-1 rounded-[var(--radius-sm)] text-[10px] t-mono border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+    active
+      ? "border-[color:var(--color-brand)] text-[color:var(--color-brand)] bg-[color:var(--color-brand)]/10"
+      : "border-[color:var(--color-border)] text-neutral-400 hover:text-neutral-200 surface-1"
+  }`;
 
 const ManualEntry: React.FC<{
   draftMs: string;

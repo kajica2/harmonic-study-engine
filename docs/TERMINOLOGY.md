@@ -131,6 +131,22 @@ The runner guard (D125) keeps a set-runner session and a practice
 block from overlapping at runtime; the two timeline-link only through
 the pedagogy practice log.
 
+## Tier 8: note-source vocabulary (Phase 7 S4, D137/D140)
+
+> NOTE SOURCE: anything that feeds the window "midin" seam - Web MIDI
+> hardware (inputId = device id) or fallback input (inputId =
+> "hse-keyboard" / "hse-screen", channel 0 sentinel). FALLBACK INPUT:
+> the computer-keyboard mapping + on-screen NoteInputPiano
+> (REQ-IO-4/5). The synesthesia PianoKeyboard is a DISPLAY +
+> audition surface, not a note source (D140).
+
+| Term | Identifier | Notes |
+|---|---|---|
+| Note source | the "midin" seam contract (`src/lib/midiIn.ts` dispatch; `src/lib/noteInputBus.ts` synthetic emitter) | The detector, the wizard and the IN picker consume ANY source identically. |
+| hse-\* sentinel | `isHseInputId()` (`src/lib/noteInputBus.ts`) | Tags synthetic events; the channel-0 sentinel keeps them out of the 1..16 bass exclusion. Hardware source ids are implementation strings and can never collide. |
+| Fallback input | `practiceMechanics.noteInput` (`src/lib/practiceMechanics.ts`) | The opt-in toggle + persisted root octave; the surfaces are `useNoteInput` (keyboard) and `NoteInputPiano` (touch). |
+| Display piano | `PianoKeyboard.tsx` | Synesthesia layer display + audition. Its clicks play audio but deliberately never dispatch "midin" - one surface, one purpose. |
+
 ## Naming patterns (your proposal)
 
 Use these patterns for new code:
@@ -173,7 +189,8 @@ When (if ever) you want to migrate to the HSE terminology:
 
 ---
 
-**Last reviewed:** 2026-09-27 (Tier 7 added with PRD-001 Phase 7 S3).
+**Last reviewed:** 2026-09-28 (Tier 8 added with PRD-001 Phase 7 S4;
+Tier 7 with S3).
 The doc is the reference for any future
 naming decisions. If you add a new identifier, look here first; if
 it doesn't fit any row, that's a hint the concept may be missing

@@ -407,6 +407,11 @@ separate unshipped work: PianoKeyboard needs press handlers; the
 AWSED mapping needs a new `classifyNoteKey` in `useKeyDown.ts`) - they
 are NOT detection surfaces and are NOT pulled into Phase 7 scope;
 flagged in risks.
+**(Superseded by Phase 7 Slice 4, D144 - ratified):** the press-handlers
+premise above is FALSE in shipped code (handlers exist; they never
+dispatch `midin`), the AWSED mapping collides with nothing, and the
+surfaces ARE now pulled in as S4 with detection integration per
+`docs/PHASE-7-S4-INPUTS.md` (D137..D144).
 
 ### 5.3 PracticeSession (REQ-PRAC-60..62)
 

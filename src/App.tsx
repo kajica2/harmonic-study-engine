@@ -202,15 +202,24 @@ import type { PracticeMechanicsConfig } from "./lib/practiceMechanics";
 // (the shipped S2 pattern). The advanceTransport handler stays
 // byte-identical: detection rides the repPulse mirror (D132) and the
 // hook's read-only playbackClock observer (TD-052).
-import { usePlayedCorrectly } from "./hooks/usePlayedCorrectly";
+import { usePlayedCorrectly, midiInAvailable } from "./hooks/usePlayedCorrectly";
 import { buildExpectedGrid, type ExpectedBar } from "./lib/practiceExpected";
 import type { PhraseMatch } from "../engine/practice/detect";
 import {
   compensationOf,
+  compensationOfFallback,
   loadLatency,
   saveLatency,
   type LatencyRecord,
 } from "./lib/practiceLatency";
+// PRD-001 Phase 7 S4 (D137-D141): the fallback INPUT surfaces. The
+// keyboard is a SEPARATE listener (the sacred handler at :1238-1380
+// stays byte-identical); every synthetic note rides the "midin" seam
+// through noteInputBus (ONE seam, source-tagged, channel-0 sentinel).
+import { useNoteInput } from "./hooks/useNoteInput";
+import { emitNoteInput } from "./lib/noteInputBus";
+import { NoteInputPiano } from "./components/NoteInputPiano";
+import { noteKeyChipsForRoot } from "./hooks/useKeyDown";
 import {
   appendAttempt,
   appendSession,
@@ -1822,9 +1831,13 @@ function AppShell() {
   // D134 manual latency entry (panel field; the wizard has its own
   // save path): write through the adapter + re-read via the EXISTING
   // refresh seam. Source "manual", output 0 (single-sum law).
+  // S4 (D141): the MIDI-path write MERGES the stored fallback pair -
+  // a manual MIDI entry must never clobber a keyboard calibration
+  // (and vice versa at the wizard).
   const handleManualLatency = useCallback(
     (ms: number) => {
       const v = Number.isFinite(ms) ? Math.min(500, Math.max(0, Math.floor(ms))) : 0;
+      const prev = loadLatency();
       saveLatency({
         version: 1,
         inputLatencyMs: v,
@@ -1832,6 +1845,8 @@ function AppShell() {
         source: "manual",
         calibratedAtMs: Date.now(),
         deviceName: null,
+        fallbackInputLatencyMs: prev?.fallbackInputLatencyMs ?? null,
+        fallbackCalibratedAtMs: prev?.fallbackCalibratedAtMs ?? null,
       });
       refreshLatency();
     },
@@ -1992,6 +2007,12 @@ function AppShell() {
     grid: detectGrid,
     tempo,
     latencyCompensationMs,
+    // S4 (D138): the gate widens to ANY note source; S4 (D141): the
+    // fallback path carries its OWN compensation (null = never
+    // calibrated -> the hook stamps 0, "uncalibrated runs
+    // uncompensated"). Mixed passes are per-note correct.
+    fallbackInputEnabled: practiceMechanics.noteInput.enabled,
+    fallbackCompensationMs: compensationOfFallback(latencyRecord),
     toleranceMs: practiceMechanics.detect.toleranceMs,
     bassMidiChannel,
     isPlayingAuto,
@@ -2011,6 +2032,102 @@ function AppShell() {
     midiInputs.find((i) => i.id === selectedMidiInId)?.name ??
     midiInputs[0]?.name ??
     null;
+
+  // ===================================================================
+  // PRD-001 Phase 7 S4 (D137-D143): the fallback INPUT surfaces.
+  // WIRING ONLY - the mapping math lives in classifyNoteKey, the
+  // event contract in noteInputBus, the guards in useNoteInput, the
+  // touch surface in NoteInputPiano. The sacred keydown handler
+  // (:1238-1380) is a SEPARATE listener and stays byte-identical.
+  // ===================================================================
+
+  // D139 activation gate (composed from EXISTING App state, audit
+  // #13): study surface + opt-in toggle + no blocking modal. The
+  // LatencyWizard is the ONE modal that does NOT disarm the keyboard
+  // (it is a note-input consumer in fallback mode, D141).
+  const noteInputBlockingModal =
+    showImportExport ||
+    showLeadSheet ||
+    showChordInspector ||
+    showRecordingModal ||
+    showCheatsheet;
+  const noteInputArmed =
+    practiceMechanics.noteInput.enabled &&
+    showExerciseTranspose &&
+    !noteInputBlockingModal;
+  const noteInputRootMidi = (practiceMechanics.noteInput.rootOctave + 1) * 12;
+
+  // The fallback audio trio: the shipped display-piano trio
+  // (audioEngine + recorder + live-note visuals) MINUS midiOut.playNote
+  // (orchestrator ruling on the D137 loopback risk, option b):
+  // hardware MIDI input notes never echo to midiOut either
+  // (consistency), and a loopback echo would double-count into
+  // detection. External-gear driving stays the display piano's job.
+  const handleNoteInput = useCallback(
+    (midi: number, down: boolean) => {
+      if (down) {
+        audioEngine.playNote(midi);
+        recorder.recordNoteOn(midi);
+        setActiveMidis((prev) => Array.from(new Set([...prev, midi])));
+      } else {
+        audioEngine.stopNote(midi);
+        recorder.recordNoteOff(midi);
+        setActiveMidis((prev) => prev.filter((m) => m !== midi));
+      }
+    },
+    [setActiveMidis],
+  );
+
+  // The on-screen surface: same trio + the "screen"-tagged bus emit
+  // (ONE emit site per surface, D137; the keyboard's emit lives in
+  // useNoteInput). The DISPLAY piano's call site is NOT refactored to
+  // share this (DO-NOT: it stays a byte-identical display, D140).
+  const handleScreenNoteInput = useCallback(
+    (midi: number, down: boolean) => {
+      handleNoteInput(midi, down);
+      emitNoteInput(midi, down, "screen");
+    },
+    [handleNoteInput],
+  );
+
+  // Z / X + the piano's "-"/"+" buttons: clamp 2..5, persist through
+  // the store's normalize-at-read guard (D139; no new K keys).
+  const handleNoteOctaveShift = useCallback(
+    (delta: 1 | -1) => {
+      const cur = practiceMechanics.noteInput.rootOctave;
+      const next = Math.min(5, Math.max(2, cur + delta));
+      if (next === cur) return;
+      setPracticeMechanicsStore({
+        noteInput: { ...practiceMechanics.noteInput, rootOctave: next },
+      });
+    },
+    [practiceMechanics.noteInput, setPracticeMechanicsStore],
+  );
+
+  // The global computer-keyboard listener (REQ-IO-5). The hook owns
+  // NO state; unhandled keys fall through byte-identically.
+  useNoteInput({
+    enabled: noteInputArmed,
+    rootOctave: practiceMechanics.noteInput.rootOctave,
+    onNote: handleNoteInput,
+    onOctaveShift: handleNoteOctaveShift,
+  });
+
+  // Letter chips for the first 13 keys of the input piano (A W S E
+  // D F T G Y H U J K = root..root+12). Derived from the ONE mapping
+  // table via the shared pure helper (the chip a user sees IS the
+  // key the classifier fires).
+  const noteInputKeyLabels = useMemo(
+    () => noteKeyChipsForRoot(noteInputRootMidi),
+    [noteInputRootMidi],
+  );
+
+  // D138: the TRUE API-presence signal for the panel status line +
+  // the wizard gate (the shipped `hasMidiApi={!unavailable}`
+  // derivation would LIE once the widened gate opens on the
+  // fallback alone - reported deviation, the hook exports the
+  // single predicate).
+  const midiApiPresent = midiInAvailable();
 
   // D132: the repPulse edge guard. The counter starts at 0 and
   // StrictMode double-fires effects - compare against the ref
@@ -2873,6 +2990,9 @@ function AppShell() {
         detectionArmed={detectArmed}
         detectionUnavailable={detection.unavailable}
         detectionHasDevice={detection.hasDevice}
+        // S4 (D138): the widened-gate signals + the TRUE API flag.
+        detectionSawFallback={detection.sawFallback}
+        detectionHasMidiApi={midiApiPresent}
         detectionGridTargets={detectGridTargetCount}
         detectionPhrase={detection.phrase}
         detectionPassCount={detectPassCount}
@@ -2882,6 +3002,10 @@ function AppShell() {
         midiHasDevice={midiHasDevice}
         midiDeviceName={midiDeviceName}
         bassMidiChannel={bassMidiChannel}
+        // S4 (D140/D141): the wizard's fallback mode inputs (the
+        // panel reads the toggle from the mechanics config itself).
+        noteInputEnabled={practiceMechanics.noteInput.enabled}
+        noteInputRootOctave={practiceMechanics.noteInput.rootOctave}
         sessions={recentPracticeSessions}
         lastSession={lastClosedSession}
       />
@@ -4957,6 +5081,23 @@ function AppShell() {
                 </div>
               </div>
             </div>
+            {/* PRD-001 Phase 7 S4 (REQ-IO-4/6, D140): the touch-friendly
+                INPUT piano, above the synesthesia display, iff the
+                opt-in toggle is on (the card itself is etude-surface
+                only - ModeGate's AppMain). The display keyboard below
+                stays a byte-identical DISPLAY + audition surface; its
+                clicks deliberately never dispatch "midin". */}
+            {practiceMechanics.noteInput.enabled && (
+              <div className="w-full bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 p-4 shadow-2xl">
+                <NoteInputPiano
+                  rootMidi={noteInputRootMidi}
+                  octaves={2}
+                  keyLabels={noteInputKeyLabels}
+                  onNote={handleScreenNoteInput}
+                  onOctaveShift={handleNoteOctaveShift}
+                />
+              </div>
+            )}
             <div className="w-full bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 p-4 shadow-2xl">
               <PianoKeyboard
                 chordMidis={currentChordNotes}

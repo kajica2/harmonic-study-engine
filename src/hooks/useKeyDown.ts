@@ -45,3 +45,59 @@ export function classifyTransposeKey(
   if (e.code === "BracketRight") return e.shiftKey ? "up12" : "up1";
   return null;
 }
+
+/**
+ * PRD-001 Phase 7 S4 (REQ-IO-5, D139): computer-keyboard note
+ * mapping. PURE, no DOM reads beyond the event fields; matched by
+ * e.code (physical position, the D14 law - NEVER e.key, layouts
+ * shift). This is the seam the parent doc (PHASE-7-PRACTICE) named
+ * but never built; audit #3 verified all 15 codes are collision-free
+ * in shipped code (the only bound letter is M, App:1363).
+ */
+export type NoteKeyAction =
+  | { kind: "note"; semitones: number } // 0..12 from the root
+  | { kind: "octave"; delta: 1 | -1 }; // Z down, X up
+
+/** A W S E D F T G Y H U J K = 0..12 semitones (one octave + root). */
+export const NOTE_KEY_SEMITONES_BY_CODE: Readonly<Record<string, number>> = {
+  KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6,
+  KeyG: 7, KeyY: 8, KeyH: 9, KeyU: 10, KeyJ: 11, KeyK: 12,
+};
+
+/**
+ * Returns null when meta/ctrl/alt is held (PHASE-1-01 guard FIRST,
+ * before any key branch - same law as classifyTransposeKey:43),
+ * when the code is unmapped, or on non-key input. Shift is
+ * DELIBERATELY not guarded (D139): no mapping key uses shift
+ * semantics and shift-while-playing is physically common.
+ */
+export function classifyNoteKey(
+  e: Pick<KeyboardEvent, "code" | "metaKey" | "ctrlKey" | "altKey">,
+): NoteKeyAction | null {
+  if (e.metaKey || e.ctrlKey || e.altKey) return null;
+  const semitones = NOTE_KEY_SEMITONES_BY_CODE[e.code];
+  if (typeof semitones === "number") {
+    return { kind: "note", semitones };
+  }
+  if (e.code === "KeyZ") return { kind: "octave", delta: -1 };
+  if (e.code === "KeyX") return { kind: "octave", delta: 1 };
+  return null;
+}
+
+/**
+ * S4 (D140): the letter-chip map for an input piano rooted at
+ * rootMidi - midi -> "A".."K" for the first 13 keys, plain beyond.
+ * Derived from the ONE mapping table (anti-drift: the chip a user
+ * sees is the key the classifier fires). Shared by the study-surface
+ * piano (App) and the wizard's compact embed; pure + node-testable
+ * through the table pins above.
+ */
+export function noteKeyChipsForRoot(
+  rootMidi: number,
+): Readonly<Record<number, string>> {
+  const out: Record<number, string> = {};
+  for (const [code, semitones] of Object.entries(NOTE_KEY_SEMITONES_BY_CODE)) {
+    out[rootMidi + semitones] = code.startsWith("Key") ? code.slice(3) : code;
+  }
+  return out;
+}

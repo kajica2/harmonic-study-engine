@@ -72,6 +72,11 @@ function renderPanel(over: {
   // grid has targets, no phrase, uncalibrated, no sessions).
   detectionUnavailable?: boolean;
   detectionHasDevice?: boolean;
+  /** S4 (D138): fallback notes observed (status-line state). */
+  detectionSawFallback?: boolean;
+  /** S4 (D138): Web MIDI API present (status-line state). Default
+   *  TRUE keeps the shipped S3 "live but silent" pins meaningful. */
+  detectionHasMidiApi?: boolean;
   /** MED-001: target bars in the built grid (nonzero default so the
    *  shipped disable pins keep meaning "can actually auto-rate"). */
   detectionGridTargets?: number;
@@ -99,6 +104,8 @@ function renderPanel(over: {
       onRampReset={onRampReset}
       detectionUnavailable={over.detectionUnavailable ?? false}
       detectionHasDevice={over.detectionHasDevice ?? false}
+      detectionSawFallback={over.detectionSawFallback ?? false}
+      detectionHasMidiApi={over.detectionHasMidiApi ?? true}
       detectionGridTargets={over.detectionGridTargets ?? 4}
       phrase={over.phrase === undefined ? null : over.phrase}
       passCount={over.passCount ?? 0}
@@ -331,10 +338,14 @@ describe("PracticeMechanicsPanel - S3 Detection section (D131/D132/D133/D135.4)"
     expect(card.textContent).toMatch(/44 notes hit/);
   });
 
-  it("REQ-PRAC-54: unavailable state renders the honest copy + blocks the toggle", () => {
+  it("REQ-PRAC-54 (D138-AMENDED): unavailable state renders the new honest copy + blocks the toggle", () => {
     const { onConfigChange } = renderPanel({ detectionUnavailable: true });
     const note = screen.getByTestId("detect-unavailable");
-    expect(note.textContent).toMatch(/requires Web MIDI input/i);
+    // The D138 verbatim obligation (section 7.2) REPLACES the old
+    // MIDI-only text - the copy names the new door.
+    expect(note.textContent).toMatch(/needs a note source/i);
+    expect(note.textContent).toMatch(/no Web MIDI API and keyboard \/ piano input is off/i);
+    expect(note.textContent).toMatch(/Turn on Keyboard \/ piano input above/i);
     // A DISABLED control is the block (a real pointer cannot hit it;
     // fireEvent.dispatchEvent would bypass the guard, so no click pin).
     expect((screen.getByTestId("detect-toggle") as HTMLInputElement).disabled).toBe(true);
@@ -360,6 +371,8 @@ describe("PracticeMechanicsPanel - S3 Detection section (D131/D132/D133/D135.4)"
         source: "manual",
         calibratedAtMs: Date.now() - 3 * 60_000,
         deviceName: null,
+        fallbackInputLatencyMs: null,
+        fallbackCalibratedAtMs: null,
       },
     });
     const rec = screen.getByTestId("latency-record");
@@ -375,5 +388,128 @@ describe("PracticeMechanicsPanel - S3 Detection section (D131/D132/D133/D135.4)"
     const { onCalibrate } = renderPanel();
     fireEvent.click(screen.getByTestId("latency-calibrate-btn"));
     expect(onCalibrate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * PRD-001 Phase 7 S4 (D138/D139/D141/D143): the note-input section,
+ * the four honest detection copy states, and the two per-source
+ * latency rows.
+ */
+describe("PracticeMechanicsPanel S4 note-input (D138-D143)", () => {
+  it("note-input toggle emits the COMPLETE config (noteInput flipped, siblings kept)", () => {
+    const { onConfigChange } = renderPanel();
+    fireEvent.click(screen.getByTestId("noteinput-toggle"));
+    expect(onConfigChange).toHaveBeenCalledTimes(1);
+    const payload = onConfigChange.mock.calls[0][0] as PracticeMechanicsConfig;
+    expect(payload.noteInput).toEqual({ enabled: true, rootOctave: 4 });
+    // COMPLETE object (MetronomeControls contract): every sibling.
+    expect(payload.detect).toEqual(DEFAULT_MECHANICS.detect);
+    expect(payload.mode).toBe(DEFAULT_MECHANICS.mode);
+    expect(payload.ramp).toEqual(DEFAULT_MECHANICS.ramp);
+    // The mapping hint text ships beside the toggle (D143: the
+    // discoverability lives HERE + on the piano chips + the
+    // cheatsheet footer - never as SHORTCUTS chips).
+    expect(screen.getByTestId("noteinput-hint").textContent).toMatch(
+      /A W S E D F T G Y H U J K play one octave from the root/i,
+    );
+    expect(screen.getByTestId("noteinput-hint").textContent).toMatch(
+      /Z \/ X shift the octave/i,
+    );
+    expect(screen.getByTestId("noteinput-hint").textContent).toMatch(
+      /on-screen piano works with touch/i,
+    );
+  });
+
+  it("D138 copy states: fallback-only armed silent, fallback notes observed, hw string byte-identical", () => {
+    const armed: PracticeMechanicsConfig = {
+      ...DEFAULT_MECHANICS,
+      detect: { ...DEFAULT_MECHANICS.detect, enabled: true },
+      noteInput: { enabled: true, rootOctave: 4 },
+    };
+    // (2) ARMED, fallback-only (no API), nothing played:
+    renderPanel({
+      config: armed,
+      detectionHasMidiApi: false,
+      detectionSawFallback: false,
+      detectionHasDevice: false,
+    });
+    expect(screen.getByTestId("detect-status").textContent).toBe(
+      "No MIDI input - detection will score your computer keyboard and on-screen piano.",
+    );
+    cleanup();
+    // (3) ARMED, fallback notes observed (any API state):
+    renderPanel({
+      config: armed,
+      detectionHasMidiApi: false,
+      detectionSawFallback: true,
+      detectionHasDevice: false,
+    });
+    expect(screen.getByTestId("detect-status").textContent).toBe(
+      "Scoring keyboard / piano input - MIDI hardware stays welcome (hot-plug just works).",
+    );
+  });
+
+  it("D138: API-present armed-silent status stays BYTE-IDENTICAL to the shipped S3 string", () => {
+    renderPanel({
+      config: {
+        ...DEFAULT_MECHANICS,
+        detect: { ...DEFAULT_MECHANICS.detect, enabled: true },
+      },
+      detectionHasMidiApi: true,
+      detectionSawFallback: false,
+      detectionHasDevice: false,
+    });
+    expect(screen.getByTestId("detect-status").textContent).toBe(
+      "connect a MIDI input - detection is live but silent. Hot-plugging just works.",
+    );
+  });
+
+  it("S4 (D141): TWO latency rows - MIDI null-guarded + keyboard/piano, uncalibrated honest zeros", () => {
+    // Fresh: both rows honest-zero.
+    renderPanel();
+    expect(screen.getByTestId("latency-record").textContent).toBe(
+      "uncalibrated - detection runs uncompensated (0 ms)",
+    );
+    expect(screen.getByTestId("latency-record-fallback").textContent).toBe(
+      "Keyboard/piano: uncalibrated - keyboard notes run uncompensated (0 ms)",
+    );
+    // Fallback-only record: the MIDI row guards null EXPLICITLY
+    // (never "null ms"), the fallback row shows its own number.
+    cleanup();
+    renderPanel({
+      latencyRecord: {
+        version: 1,
+        inputLatencyMs: null,
+        outputLatencyMs: 0,
+        source: "manual",
+        calibratedAtMs: Date.now() - 60_000,
+        deviceName: null,
+        fallbackInputLatencyMs: 37,
+        fallbackCalibratedAtMs: Date.now() - 60_000,
+      },
+    });
+    expect(screen.getByTestId("latency-record").textContent).toBe(
+      "MIDI: uncalibrated - MIDI notes run uncompensated (0 ms)",
+    );
+    expect(screen.getByTestId("latency-record-fallback").textContent).toMatch(
+      /^Keyboard\/piano: 37 ms - calibrated .* ago$/,
+    );
+  });
+
+  it("D138 widened gate: detect-toggle ENABLED when note-input on + no API (unavailable false reaches the panel)", () => {
+    // The panel's disable law is UNCHANGED (it rides the widened
+    // detectionUnavailable) - the value it receives is the point.
+    renderPanel({ detectionUnavailable: false });
+    expect((screen.getByTestId("detect-toggle") as HTMLInputElement).disabled).toBe(
+      false,
+    );
+    // And the note-input toggle itself NEVER depends on the gate -
+    // it is the door the unavailable copy points at.
+    cleanup();
+    renderPanel({ detectionUnavailable: true });
+    expect((screen.getByTestId("noteinput-toggle") as HTMLInputElement).disabled).toBe(
+      false,
+    );
   });
 });

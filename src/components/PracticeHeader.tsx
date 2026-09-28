@@ -129,10 +129,16 @@ interface PracticeHeaderProps {
   // hook state + storage writes live in App.
   /** enabled && Web MIDI API present (D135.4) - chip + disable law. */
   detectionArmed: boolean;
-  /** REQ-PRAC-54: no Web MIDI API (panel honest-unavailable state). */
+  /** REQ-PRAC-54 (AMENDED D138): NO note source (no API AND no
+   *  note-input) - panel honest-unavailable state. */
   detectionUnavailable: boolean;
-  /** D135.4 status line: a MIDI input has been observed. */
+  /** D135.4 status line: a HARDWARE MIDI input has been observed. */
   detectionHasDevice: boolean;
+  /** S4 (D138): a fallback (hse-*) note-on was observed (status copy). */
+  detectionSawFallback: boolean;
+  /** S4 (D138): the Web MIDI API exists - the TRUE flag (with the
+   *  widened gate, !detectionUnavailable no longer implies it). */
+  detectionHasMidiApi: boolean;
   /** S3 fix round (MED-001): target bars in the built grid - the
    *  panel's canAutoRate disable law (all-free grid keeps manual). */
   detectionGridTargets: number;
@@ -152,6 +158,12 @@ interface PracticeHeaderProps {
   midiDeviceName: string | null;
   /** Bass-channel exclusion (wizard taps; same law as the trail). */
   bassMidiChannel: number | null;
+  /** S4 (D141): the note-input toggle - enables the wizard's
+   *  fallback calibration mode (deviceList-free tap measurement). */
+  noteInputEnabled: boolean;
+  /** S4 (D140 mounting): root octave for the wizard's embedded
+   *  compact piano (same component, same persisted root). */
+  noteInputRootOctave: number;
   /** Recent completed sessions, newest last (D133 summary surface). */
   sessions: SessionRecordV1[];
   /** Last closed session for the end-of-session card (null = none). */
@@ -216,6 +228,8 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   detectionArmed,
   detectionUnavailable,
   detectionHasDevice,
+  detectionSawFallback,
+  detectionHasMidiApi,
   detectionGridTargets,
   detectionPhrase,
   detectionPassCount,
@@ -225,6 +239,8 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   midiHasDevice,
   midiDeviceName,
   bassMidiChannel,
+  noteInputEnabled,
+  noteInputRootOctave,
   sessions,
   lastSession,
 }) => {
@@ -550,6 +566,9 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
                 // S3: the Detection section view-model (pure forwarding).
                 detectionUnavailable={detectionUnavailable}
                 detectionHasDevice={detectionHasDevice}
+                // S4 (D138): the widened-gate signals for the copy.
+                detectionSawFallback={detectionSawFallback}
+                detectionHasMidiApi={detectionHasMidiApi}
                 detectionGridTargets={detectionGridTargets}
                 phrase={detectionPhrase}
                 passCount={detectionPassCount}
@@ -625,15 +644,21 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
       </div>
 
       {/* S3 (D134): the calibration wizard (ModalShell, mounted only
-          while open - unmount runs the rolling cleanup). */}
+          while open - unmount runs the rolling cleanup). S4 (D138/
+          D141): hasMidiApi is the TRUE API flag (the old
+          !detectionUnavailable derivation would LIE once the widened
+          gate opens on the fallback input alone), and the wizard
+          gains the fallback calibration mode. */}
       {wizardOpen && (
         <LatencyWizard
           onClose={() => setWizardOpen(false)}
           tempo={tempo}
-          hasMidiApi={!detectionUnavailable}
+          hasMidiApi={detectionHasMidiApi}
           hasDevice={midiHasDevice}
           deviceName={midiDeviceName}
           bassMidiChannel={bassMidiChannel}
+          noteInputEnabled={noteInputEnabled}
+          noteInputRootOctave={noteInputRootOctave}
           onSaved={onLatencySaved}
         />
       )}

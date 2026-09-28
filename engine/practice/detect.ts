@@ -22,8 +22,11 @@
  *      exactly ONE bucket (matched | wrong | extra | rest-extra) and
  *      every expected pc lands in matched or missed. Free bars -> no
  *      buckets. Conservation asserted by the property sweep.
- *   4 LATENCY       compensated = atMs - latencyCompensationMs BEFORE
- *      any comparison (REQ-PRAC-42 literal); the borderline-flip pin.
+ *   4 LATENCY       compensated = atMs - (n.compensationMs ??
+ *      latencyCompensationMs) BEFORE any comparison (REQ-PRAC-42
+ *      literal; S4 D141 adds the per-note override for mixed MIDI +
+ *      keyboard passes - an undefined override keeps the shipped
+ *      global-only behavior byte-identical); the borderline-flip pin.
  *   5 EMPTY GUARDS  expectedTotal 0 -> matchedFraction 0 (NEVER NaN);
  *      empty performed -> all missed, avgOffset null; zero-length
  *      arrays everywhere -> total zero result, no throw.
@@ -58,6 +61,11 @@ export interface PerformedNote {
   note: number;
   /** Event timestamp, performance.now domain (midiIn msg.timeStamp). */
   atMs: number;
+  /** S4 (D141): per-note compensation override (ms). Present =
+   *  subtract THIS instead of the global latencyCompensationMs
+   *  (keyboard/touch taps carry their own measured path);
+   *  undefined = use the global value. 0 is a REAL number. */
+  compensationMs?: number;
 }
 
 export interface BarMatch {
@@ -223,7 +231,10 @@ export function matchPhrase(input: MatchInput): PhraseMatch {
   for (let k = 0; k < input.performed.length; k++) {
     const p = input.performed[k];
     if (!isValidNote(p)) continue; // law 1: unscored garbage
-    const compensated = p.atMs - comp;
+    // Law 4 (S4, D141): per-note override ?? global compensation -
+    // mixed MIDI + keyboard passes are per-note correct. ?? (not ||):
+    // an override of 0 is a REAL number, never "absent".
+    const compensated = p.atMs - (p.compensationMs ?? comp);
     const a = assignBar(compensated, input.boundariesMs.slice(0, n), tol);
     if (a === null) continue; // outside the phrase
     const e = input.expected[a.bar];

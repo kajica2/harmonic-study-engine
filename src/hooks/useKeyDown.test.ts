@@ -8,6 +8,9 @@ import { describe, it, expect } from "vitest";
 import {
   isModeShortcutModifierKey,
   classifyTransposeKey,
+  classifyNoteKey,
+  NOTE_KEY_SEMITONES_BY_CODE,
+  type NoteKeyAction,
 } from "./useKeyDown";
 
 describe("isModeShortcutModifierKey", () => {
@@ -82,5 +85,116 @@ describe("classifyTransposeKey", () => {
     expect(classifyTransposeKey(ev("Comma"))).toBeNull();
     expect(classifyTransposeKey(ev("Period"))).toBeNull();
     expect(classifyTransposeKey(ev("Space"))).toBeNull();
+  });
+});
+
+/**
+ * PRD-001 Phase 7 S4 (REQ-IO-5, D139) pins: the computer-keyboard
+ * note mapping. The PHASE-1-01 modifier-guard pin is the whole
+ * slice's safety law - meta/ctrl/alt must return null BEFORE any key
+ * branch. Matching is by e.code, NEVER e.key (the D14 law).
+ */
+describe("classifyNoteKey (S4, D139)", () => {
+  const ev = (
+    code: string,
+    opts: Partial<{
+      key: string;
+      metaKey: boolean;
+      ctrlKey: boolean;
+      altKey: boolean;
+      shiftKey: boolean;
+    }> = {},
+  ) =>
+    ({
+      code,
+      key: opts.key ?? "?",
+      metaKey: opts.metaKey ?? false,
+      ctrlKey: opts.ctrlKey ?? false,
+      altKey: opts.altKey ?? false,
+      shiftKey: opts.shiftKey ?? false,
+    }) as KeyboardEvent;
+
+  const note = (semitones: number): NoteKeyAction => ({
+    kind: "note",
+    semitones,
+  });
+
+  it("every mapped code returns its semitone (table-driven, all 13)", () => {
+    const TABLE: [string, number][] = [
+      ["KeyA", 0], ["KeyW", 1], ["KeyS", 2], ["KeyE", 3], ["KeyD", 4],
+      ["KeyF", 5], ["KeyT", 6], ["KeyG", 7], ["KeyY", 8], ["KeyH", 9],
+      ["KeyU", 10], ["KeyJ", 11], ["KeyK", 12],
+    ];
+    for (const [code, semitones] of TABLE) {
+      expect(classifyNoteKey(ev(code))).toEqual(note(semitones));
+    }
+  });
+
+  it("the table constant matches the REQ-IO-5 literal order exactly", () => {
+    expect(Object.keys(NOTE_KEY_SEMITONES_BY_CODE)).toEqual([
+      "KeyA", "KeyW", "KeyS", "KeyE", "KeyD", "KeyF", "KeyT",
+      "KeyG", "KeyY", "KeyH", "KeyU", "KeyJ", "KeyK",
+    ]);
+    expect(Object.values(NOTE_KEY_SEMITONES_BY_CODE)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    ]);
+  });
+
+  it("PHASE-1-01 PIN: metaKey + KeyA returns null BEFORE any key branch", () => {
+    expect(classifyNoteKey(ev("KeyA", { metaKey: true }))).toBeNull();
+    expect(classifyNoteKey(ev("KeyK", { metaKey: true }))).toBeNull();
+    expect(classifyNoteKey(ev("KeyZ", { metaKey: true }))).toBeNull();
+  });
+
+  it("ctrlKey / altKey held -> null on mapped codes too (browser yields)", () => {
+    expect(classifyNoteKey(ev("KeyA", { ctrlKey: true }))).toBeNull();
+    expect(classifyNoteKey(ev("KeyW", { altKey: true }))).toBeNull();
+    expect(classifyNoteKey(ev("KeyX", { ctrlKey: true }))).toBeNull();
+  });
+
+  it("shift PASSES (D139: no mapping key uses shift semantics)", () => {
+    expect(classifyNoteKey(ev("KeyA", { shiftKey: true }))).toEqual(note(0));
+    expect(classifyNoteKey(ev("KeyT", { shiftKey: true }))).toEqual(note(6));
+  });
+
+  it("unmapped codes -> null (incl. the bound M + brackets + digits)", () => {
+    expect(classifyNoteKey(ev("KeyM"))).toBeNull();
+    expect(classifyNoteKey(ev("BracketLeft"))).toBeNull();
+    expect(classifyNoteKey(ev("Space"))).toBeNull();
+    expect(classifyNoteKey(ev("Digit1"))).toBeNull();
+    expect(classifyNoteKey(ev("Escape"))).toBeNull();
+  });
+
+  it("KeyZ -> octave -1, KeyX -> octave +1", () => {
+    expect(classifyNoteKey(ev("KeyZ"))).toEqual({ kind: "octave", delta: -1 });
+    expect(classifyNoteKey(ev("KeyX"))).toEqual({ kind: "octave", delta: 1 });
+  });
+
+  it("e.key is NEVER consulted: mismatched key/code still classifies by code", () => {
+    // A Dvorak/COLEMAP-style mismatch: physical KeyA carrying some
+    // other glyph must map to semitone 0; a "q" glyph on KeyZ is an
+    // octave shift, NOT a note. Any e.key matcher breaks here.
+    expect(classifyNoteKey(ev("KeyA", { key: "q" }))).toEqual(note(0));
+    expect(classifyNoteKey(ev("KeyZ", { key: "a" }))).toEqual({
+      kind: "octave",
+      delta: -1,
+    });
+    expect(classifyNoteKey(ev("KeyM", { key: "a" }))).toBeNull();
+  });
+
+  it("prototype keys are not notes: code 'toString'/'constructor' -> null", () => {
+    // The lookup table is a plain object; inherited members must not
+    // classify as mapped (the typeof === number guard is the law).
+    expect(classifyNoteKey(ev("toString"))).toBeNull();
+    expect(classifyNoteKey(ev("constructor"))).toBeNull();
+  });
+
+  it("the mapping steals nothing: M/brackets/space/digits stay unclassified", () => {
+    // Collision-audit regression (section 0 #3): the ONLY letters in
+    // the table are A W S E D F T G Y H U J K Z X - M stays free for
+    // the shipped melody-mute binding.
+    for (const code of ["KeyM", "KeyB", "KeyC", "KeyV", "KeyQ", "KeyR", "KeyI", "KeyO", "KeyP", "KeyL"]) {
+      expect(classifyNoteKey(ev(code))).toBeNull();
+    }
   });
 });

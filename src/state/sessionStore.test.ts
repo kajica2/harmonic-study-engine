@@ -1318,6 +1318,9 @@ describe("Phase 7 S2: practiceMechanics slice - ONE optional field, NO v5 (D126)
       // (defaults-at-read, no v5) - a complete stored payload carries it.
       // The missing-key legacy case is pinned in practiceMechanics.test.
       detect: { enabled: true, toleranceMs: 200, passThreshold: 0.65 },
+      // S4 (D143): same law for noteInput - a COMPLETE stored payload
+      // carries the materialized sub-field (round-trips untouched).
+      noteInput: { enabled: false, rootOctave: 4 },
     };
     localStorage.setItem(
       SESSION_STORAGE_KEY,
@@ -1334,5 +1337,45 @@ describe("Phase 7 S2: practiceMechanics slice - ONE optional field, NO v5 (D126)
     );
     useSessionStore.persist.rehydrate();
     expect(STORE_API().practiceMechanics).toEqual(DEFAULT_MECHANICS);
+  });
+
+  it("S4: the noteInput slice survives the persist roundtrip, envelope STILL v4 (the no-v5 store pin)", async () => {
+    STORE_API().setPracticeMechanics({
+      noteInput: { enabled: true, rootOctave: 5 },
+    });
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY) as string;
+    const envelope = JSON.parse(raw) as {
+      version: number;
+      state: {
+        practiceMechanics: {
+          noteInput: { enabled: boolean; rootOctave: number };
+        };
+      };
+    };
+    expect(envelope.version).toBe(4); // NO v5 - noteInput rides the field
+    expect(envelope.state.practiceMechanics.noteInput).toEqual({
+      enabled: true,
+      rootOctave: 5,
+    });
+    // And a legacy v4 payload WITHOUT the sub-field hydrates the
+    // shipped defaults (detect survives beside it - defaults-at-read).
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({
+        version: 4,
+        state: {
+          practiceMechanics: {
+            mode: "loop",
+            detect: { enabled: true, toleranceMs: 120, passThreshold: 0.8 },
+          },
+        },
+      }),
+    );
+    useSessionStore.persist.rehydrate();
+    const m = STORE_API().practiceMechanics;
+    expect(m.noteInput).toEqual({ enabled: false, rootOctave: 4 });
+    expect(m.detect.enabled).toBe(true);
+    expect(m.mode).toBe("loop");
   });
 });

@@ -109,6 +109,70 @@ describe("detect law 4: LATENCY COMPENSATION IS LOAD-BEARING (REQ-PRAC-42)", () 
   });
 });
 
+/**
+ * PRD-001 Phase 7 S4 (D141): the per-note compensation override.
+ * Mixed MIDI + keyboard passes are per-note correct - the same tap
+ * matches under one source's number and misses under the other's.
+ */
+describe("detect law 4 (S4): per-note compensationMs override", () => {
+  const expected = [target(0, B0, [2, 5])];
+  const boundariesMs = [B0];
+
+  it("borderline tap: matched under the global 50, MISSED under a smaller override (load-bearing pin)", () => {
+    // Dressed as a pc-5 note landing 130 ms after the boundary. The
+    // global (MIDI) compensation of 50 pulls it IN (130-50=80 <=120);
+    // the keyboard path's own measured 5 leaves it OUT (130-5=125).
+    // One source's number matches, the other's misses - the mixed-
+    // pass law that makes per-source calibration load-bearing.
+    const performed: PerformedNote[] = [{ note: 65, atMs: B0 + 130 }];
+    const globalMatch = run({ expected, boundariesMs, performed, latencyCompensationMs: 50 });
+    expect(globalMatch.matched).toBe(1);
+    const overridden: PerformedNote[] = [{ note: 65, atMs: B0 + 130, compensationMs: 5 }];
+    const overrideMiss = run({
+      expected,
+      boundariesMs,
+      performed: overridden,
+      latencyCompensationMs: 50,
+    });
+    expect(overrideMiss.matched).toBe(0);
+    expect(overrideMiss.extraNotes).toEqual([5]); // timing error, not wrong pitch
+    // And the reverse direction: global 0 misses, override 50 matches.
+    const reverse: PerformedNote[] = [{ note: 65, atMs: B0 + 130, compensationMs: 50 }];
+    const rescued = run({ expected, boundariesMs, performed: reverse, latencyCompensationMs: 0 });
+    expect(rescued.matched).toBe(1);
+    expect(rescued.avgOffsetMs).toBeCloseTo(80, 10);
+  });
+
+  it("undefined override == global behavior BYTE-IDENTICAL (regression pin)", () => {
+    // Hardware notes carry NO override: every existing consumer's
+    // output must be deep-equal to the shipped S3 math.
+    const performed: PerformedNote[] = [
+      { note: 65, atMs: B0 + 130 },
+      { note: 62, atMs: B0 + 300 },
+    ];
+    const withUndefined: PerformedNote[] = [
+      { note: 65, atMs: B0 + 130, compensationMs: undefined },
+      { note: 62, atMs: B0 + 300, compensationMs: undefined },
+    ];
+    const base = run({ expected, boundariesMs, performed, latencyCompensationMs: 50 });
+    const undef = run({ expected, boundariesMs, performed: withUndefined, latencyCompensationMs: 50 });
+    expect(undef).toEqual(base);
+    expect(base.matched).toBe(1); // sanity: the fixture is load-bearing
+  });
+
+  it("override 0 is RESPECTED, not treated as absent (the ?? law)", () => {
+    // The trap this pin exists for: `n.compensationMs || global`
+    // would silently fall back to 50 for an override of 0 and MATCH.
+    // An uncalibrated fallback source stamps 0 - it must run
+    // genuinely uncompensated even while the MIDI path is calibrated.
+    const performed: PerformedNote[] = [{ note: 65, atMs: B0 + 130, compensationMs: 0 }];
+    const m = run({ expected, boundariesMs, performed, latencyCompensationMs: 50 });
+    expect(m.matched).toBe(0);
+    expect(m.extraNotes).toEqual([5]);
+    expect(m.avgOffsetMs).toBeNull(); // nothing matched, nothing averaged
+  });
+});
+
 describe("detect law 1: PC EQUALITY + integer guard", () => {
   it("octave-agnostic: any octave of the pc matches", () => {
     const expected = [target(0, B0, [5])];

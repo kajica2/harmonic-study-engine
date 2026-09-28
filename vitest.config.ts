@@ -36,6 +36,12 @@ const JSDOM_FILES = [
   // PRD-001 Phase 7 S3 step 9: the latency wizard DOM pins (ModalShell
   // state machine, fake-timer roll, saveLatency roundtrip).
   "src/components/LatencyWizard.test.tsx",
+  // PRD-001 Phase 7 S4: the synthetic note bus (window "midin"
+  // dispatch pins) + the computer-keyboard listener pins. The new
+  // component test NoteInputPiano.test.tsx is covered by the
+  // components glob at the top - do NOT add it here twice.
+  "src/lib/noteInputBus.test.ts",
+  "src/hooks/useNoteInput.test.ts",
   "src/lib/storage.test.ts",
   "src/state/sessionStore.test.ts",
   "tests/usePathGenerator.test.ts",

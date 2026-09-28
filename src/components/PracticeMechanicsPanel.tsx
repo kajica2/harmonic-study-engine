@@ -51,10 +51,17 @@ export interface PracticeMechanicsPanelProps {
   onRepOutcome: (success: boolean) => void;
   onRampReset: () => void;
   // --- S3 detection view-model (all read-only; D135.4 arm gate) ---
-  /** REQ-PRAC-54: no Web MIDI API -> honest UNAVAILABLE state. */
+  /** REQ-PRAC-54 (AMENDED by D138): no note source at all (no Web
+   *  MIDI API AND note-input off) -> honest UNAVAILABLE state. */
   detectionUnavailable: boolean;
-  /** D135.4: API present but no note-on observed yet -> status line. */
+  /** D135.4: API present but no note-on observed yet -> status line.
+   *  S4: flips ONLY for hardware events (hasDevice stays honest). */
   detectionHasDevice: boolean;
+  /** D138: a fallback (hse-*) note-on was observed at least once. */
+  detectionSawFallback: boolean;
+  /** D138 copy-state input: the Web MIDI API exists in this browser
+   *  (distinguishes "connect a MIDI input" from "no MIDI possible"). */
+  detectionHasMidiApi: boolean;
   /** S3 FIX ROUND (MED-001): bars of the built expected grid with
    *  kind "target" (App-derived from the grid memo). An all-free
    *  grid can NEVER verdict (the D132 no-verdict law), so the
@@ -128,6 +135,14 @@ function latencyAgeLabel(r: LatencyRecord): string {
   return `calibrated ${rel} ago${via}`;
 }
 
+/** S4 (D141): the fallback row's own staleness label (its save time
+ *  is fallbackCalibratedAtMs, NOT the shared MIDI calibratedAtMs).
+ *  The caller renders "calibrated X ago" around the relative time. */
+function fallbackLatencyAge(r: LatencyRecord): string {
+  const at = r.fallbackCalibratedAtMs ?? r.calibratedAtMs;
+  return formatRelativeTime(new Date(at).toISOString());
+}
+
 /** REQ-PRAC-53 summary copy (D131 verbatim shape):
  *  "Pass 3 - 7/8 notes (88%) | avg +23 ms late | 1 wrong | 1 rest" */
 function summarizePhrase(m: PhraseMatch, passCount: number): string {
@@ -185,6 +200,8 @@ export const PracticeMechanicsPanel: React.FC<PracticeMechanicsPanelProps> = ({
   onRampReset,
   detectionUnavailable,
   detectionHasDevice,
+  detectionSawFallback,
+  detectionHasMidiApi,
   detectionGridTargets,
   phrase,
   passCount,
@@ -447,6 +464,37 @@ export const PracticeMechanicsPanel: React.FC<PracticeMechanicsPanelProps> = ({
         </p>
       </div>
 
+      {/* 4b. Keyboard / piano input (S4, REQ-IO-4/5, D139/D143): the
+          ONE honest opt-in toggle. Default OFF (anti-regression law:
+          a user who never turns it on keeps byte-identical
+          behavior). The mapping ships collision-free (audit #3);
+          discoverability lives HERE + on the piano's key chips + the
+          cheatsheet footer - never as SHORTCUTS chips (frozen reverse
+          pin, D143). */}
+      <div className="flex flex-col gap-1.5">
+        <label className={`${rowLabelClass} text-[10px] flex items-center gap-1.5`}>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            aria-label="Keyboard / piano input"
+            data-testid="noteinput-toggle"
+            checked={config.noteInput.enabled}
+            onChange={(e) =>
+              patch({ noteInput: { ...config.noteInput, enabled: e.target.checked } })
+            }
+            className="accent-[color:var(--color-brand)]"
+          />
+          Keyboard / piano input
+        </label>
+        <p
+          data-testid="noteinput-hint"
+          className="text-[10px] text-neutral-500 leading-snug"
+        >
+          Keys A W S E D F T G Y H U J K play one octave from the root;
+          Z / X shift the octave. The on-screen piano works with touch.
+        </p>
+      </div>
+
       {/* 5. Detection (S3, REQ-PRAC-50..54, D131/D132/D134/D135.4). */}
       <div className="flex flex-col gap-2">
         <label className={`${rowLabelClass} text-[10px] flex items-center gap-1.5`}>
@@ -464,26 +512,37 @@ export const PracticeMechanicsPanel: React.FC<PracticeMechanicsPanelProps> = ({
           Played-correctly detection
         </label>
 
-        {/* REQ-PRAC-54 honest unavailable state (D135.4 arm gate). */}
+        {/* REQ-PRAC-54 (AMENDED by D138): honest UNAVAILABLE copy -
+            the gate is "any note source" now, so the text names the
+            new door (verbatim obligation, section 7.2). */}
         {detectionUnavailable && (
           <div
             data-testid="detect-unavailable"
             className="text-[10px] text-neutral-400 leading-snug"
           >
-            Requires Web MIDI input - this browser has no Web MIDI API, so
-            detection cannot arm. Drills, ramp and manual rating work
-            unchanged.
+            Needs a note source - this browser has no Web MIDI API and
+            keyboard / piano input is off. Turn on Keyboard / piano
+            input above to arm detection with the computer keyboard
+            and on-screen piano.
           </div>
         )}
 
-        {/* D135.4: API present, no input observed -> armed but silent. */}
+        {/* D135.4 + D138 status line (four honest states):
+            - fallback notes observed -> name the live source;
+            - no API (fallback-only armed), nothing played yet ->
+              promise the fallback scoring;
+            - API present, no device, no fallback notes -> the SHIPPED
+              :485 string byte-identical. */}
         {!detectionUnavailable && config.detect.enabled && !detectionHasDevice && (
           <div
             data-testid="detect-status"
             className="text-[10px] text-neutral-400 leading-snug"
           >
-            connect a MIDI input - detection is live but silent. Hot-plugging
-            just works.
+            {detectionSawFallback
+              ? "Scoring keyboard / piano input - MIDI hardware stays welcome (hot-plug just works)."
+              : !detectionHasMidiApi
+                ? "No MIDI input - detection will score your computer keyboard and on-screen piano."
+                : "connect a MIDI input - detection is live but silent. Hot-plugging just works."}
           </div>
         )}
 
@@ -583,7 +642,7 @@ export const PracticeMechanicsPanel: React.FC<PracticeMechanicsPanelProps> = ({
               key={latencyRecord !== null ? `${latencyRecord.inputLatencyMs}-${latencyRecord.calibratedAtMs}` : "uncalibrated"}
               className={inputClass}
               placeholder="0"
-              defaultValue={latencyRecord !== null ? latencyRecord.inputLatencyMs : ""}
+              defaultValue={latencyRecord !== null ? (latencyRecord.inputLatencyMs ?? "") : ""}
               onBlur={(e) => {
                 const raw = e.target.value.trim();
                 if (raw === "") return;
@@ -597,13 +656,27 @@ export const PracticeMechanicsPanel: React.FC<PracticeMechanicsPanelProps> = ({
             />
           </label>
         </div>
+        {/* S4 (D141): TWO honest rows - the MIDI-path record keeps
+            its id + byte-identical calibrated copy (the S3 e2e pin);
+            the new row shows the keyboard/touch number. Null fields
+            are guarded EXPLICITLY (never "null ms"). */}
         <div
           data-testid="latency-record"
           className="text-[10px] t-mono text-neutral-400"
         >
-          {latencyRecord !== null
-            ? `${latencyRecord.inputLatencyMs} ms (${latencyRecord.source}) - ${latencyAgeLabel(latencyRecord)}`
-            : "uncalibrated - detection runs uncompensated (0 ms)"}
+          {latencyRecord === null
+            ? "uncalibrated - detection runs uncompensated (0 ms)"
+            : latencyRecord.inputLatencyMs === null
+              ? "MIDI: uncalibrated - MIDI notes run uncompensated (0 ms)"
+              : `${latencyRecord.inputLatencyMs} ms (${latencyRecord.source}) - ${latencyAgeLabel(latencyRecord)}`}
+        </div>
+        <div
+          data-testid="latency-record-fallback"
+          className="text-[10px] t-mono text-neutral-400"
+        >
+          {latencyRecord !== null && latencyRecord.fallbackInputLatencyMs !== null
+            ? `Keyboard/piano: ${latencyRecord.fallbackInputLatencyMs} ms - calibrated ${fallbackLatencyAge(latencyRecord)} ago`
+            : "Keyboard/piano: uncalibrated - keyboard notes run uncompensated (0 ms)"}
         </div>
         <p className="text-[10px] text-neutral-500 leading-snug">
           Browser-reported output latency excludes Bluetooth/USB buffering;

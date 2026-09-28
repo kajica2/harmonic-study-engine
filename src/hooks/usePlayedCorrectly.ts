@@ -36,6 +36,15 @@
  *     this file never writes transport state (grep gate, docs
  *     section 9 item 8).
  *
+ * S4 (D138/D141) widenings (thin): the arm gate accepts ANY note
+ * source (API OR fallback-input enabled), hse-* buffer notes carry a
+ * per-note compensationMs override (mixed MIDI + keyboard passes are
+ * per-note correct), hasDevice stays HARDWARE-only and sawFallback
+ * is the new one-shot fallback signal. The matcher math, the grid,
+ * the buckets, the pass verdict, the ramp routing and the overlay
+ * are UNCHANGED - a synthetic note is indistinguishable from a
+ * hardware note to matchPhrase except by the compensation stamp.
+ *
  * Deviations from the 3.5 sketch (reported, minimal):
  *   - grid entries FREEZE per bar at boundary-stamp time, so the App
  *     may rebuild the live grid every bar (the pause duty phase is
@@ -50,6 +59,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { playbackClock, type TickDetail } from "../lib/playbackClock";
 import type { MidiInEvent } from "../lib/midiIn";
+import { isHseInputId } from "../lib/noteInputBus";
 import {
   matchPhrase,
   type BarMatch,
@@ -60,10 +70,16 @@ import {
 
 export interface UsePlayedCorrectly {
   enabled: boolean;
-  /** REQ-PRAC-54: no Web MIDI API at all (the honest-unavailable state). */
+  /** REQ-PRAC-54 (AMENDED by D138): NO note source at all - no Web
+   *  MIDI API AND note-input off (the honest-unavailable state). */
   unavailable: boolean;
-  /** Status line only (D135.4): a MIDI input has been observed. */
+  /** Status line only (D135.4): a HARDWARE MIDI note-on has been
+   *  observed. S4: flips ONLY for non-hse events - a keyboard tap
+   *  must never silence the "connect a MIDI input" line (D138). */
   hasDevice: boolean;
+  /** S4 (D138): a fallback (hse-*) note-on was observed at least
+   *  once - one-shot, the shipped hasDevice pattern. */
+  sawFallback: boolean;
   /** State mirror of the pass so far, updated at boundaries ONLY. */
   perBar: readonly BarMatch[];
   /** Last completed pass WITH expected notes (D132: zero-expected
@@ -80,8 +96,15 @@ export interface UsePlayedCorrectlyArgs {
   /** Built by the App (practiceExpected); frozen per bar at stamp. */
   grid: ExpectedBar[];
   tempo: number;
-  /** THE single-sum compensation (practiceLatency.compensationOf). */
+  /** THE single-sum compensation, MIDI path (practiceLatency.
+   *  compensationOf). */
   latencyCompensationMs: number;
+  /** S4 (D138) gate half 2: the note-input toggle - detection arms
+   *  iff (Web MIDI API) OR (note input enabled). */
+  fallbackInputEnabled: boolean;
+  /** S4 (D141): compensationOfFallback(record) - stamped per-note on
+   *  hse-* buffer pushes (null = uncalibrated -> 0). */
+  fallbackCompensationMs: number | null;
   toleranceMs: number;
   /** Exclusion precedent (useGuideToneTrail); null = no exclusion. */
   bassMidiChannel: number | null;
@@ -107,14 +130,24 @@ function midiInAvailable(): boolean {
   return typeof nav.requestMIDIAccess === "function";
 }
 
+/** S4 (D138): the API-presence predicate, exported as the SINGLE
+ *  source (App's panel status-line + the wizard's hasMidiApi read
+ *  the TRUE API state - `!unavailable` no longer implies it, since
+ *  the widened gate can be open on the fallback input alone). */
+export { midiInAvailable };
+
 export function usePlayedCorrectly(
   args: UsePlayedCorrectlyArgs,
 ): UsePlayedCorrectly {
   const [perBar, setPerBar] = useState<readonly BarMatch[]>(EMPTY_BARS);
   const [phrase, setPhrase] = useState<PhraseMatch | null>(null);
   const [hasDevice, setHasDevice] = useState(false);
+  const [sawFallback, setSawFallback] = useState(false);
 
-  const unavailable = !midiInAvailable();
+  // D138 (REQ-PRAC-54 AMENDED): arm iff ANY note source exists -
+  // Web MIDI API OR the fallback keyboard/piano input is enabled.
+  // The ONLY gate line changed from shipped S3 (:117).
+  const unavailable = !midiInAvailable() && !args.fallbackInputEnabled;
 
   // Live arg mirrors (the shipped ref-mirror pattern): the
   // subscription binds ONCE per arm toggle, everything else is read
@@ -128,6 +161,10 @@ export function usePlayedCorrectly(
   tempoRef.current = args.tempo;
   const compRef = useRef(args.latencyCompensationMs);
   compRef.current = args.latencyCompensationMs;
+  // S4 (D141): the fallback path's OWN number (read via ref so a
+  // wizard save mid-pass never re-subscribes the listener).
+  const fallbackCompRef = useRef(args.fallbackCompensationMs);
+  fallbackCompRef.current = args.fallbackCompensationMs;
   const tolRef = useRef(args.toleranceMs);
   tolRef.current = args.toleranceMs;
   const bassRef = useRef(args.bassMidiChannel);
@@ -146,6 +183,7 @@ export function usePlayedCorrectly(
   const progressedRef = useRef(false);
   const skipNextRef = useRef(false);
   const deviceSeenRef = useRef(false);
+  const fallbackSeenRef = useRef(false);
 
   const barMs = useCallback((): number => {
     const t = tempoRef.current;
@@ -295,9 +333,23 @@ export function usePlayedCorrectly(
           ? detail.timestamp
           : performance.now();
       const buf = bufferRef.current;
-      buf.push({ note: detail.note, atMs });
+      // S4 (D137/D141): a synthetic (hse-*) note carries its OWN
+      // compensation stamp - fallbackCompensationMs ?? 0, so an
+      // uncalibrated fallback path runs genuinely uncompensated even
+      // while the MIDI number is live (never fake-shared). Hardware
+      // notes carry NO override (engine uses the global value).
+      const synthetic = isHseInputId(detail.inputId);
+      buf.push(synthetic ? { note: detail.note, atMs, compensationMs: fallbackCompRef.current ?? 0 } : { note: detail.note, atMs });
       if (buf.length > BUFFER_CAP) buf.splice(0, buf.length - BUFFER_CAP);
-      if (!deviceSeenRef.current) {
+      if (synthetic) {
+        // D138: the fallback signal is its OWN one-shot; hasDevice
+        // stays the HARDWARE status line (a keyboard tap must never
+        // silence "connect a MIDI input" - that would lie).
+        if (!fallbackSeenRef.current) {
+          fallbackSeenRef.current = true;
+          setSawFallback(true); // ONE state touch, first hse note-on ever
+        }
+      } else if (!deviceSeenRef.current) {
         deviceSeenRef.current = true;
         setHasDevice(true); // ONE state touch, first event ever
       }
@@ -346,6 +398,7 @@ export function usePlayedCorrectly(
     enabled: args.enabled,
     unavailable,
     hasDevice,
+    sawFallback,
     perBar,
     phrase,
     flushNow,

@@ -272,7 +272,56 @@ Escape or 8 s of silence aborts the roll; no timers leak.
   one connected input (measuring with nothing to tap is theater).
   Without a device the wizard says "Connect a MIDI input to
   calibrate" and offers the manual field -- manual entry (0..500 ms,
-  stored as source "manual") is ALWAYS available.
+  stored as source "manual") is ALWAYS available. With the S4
+  note-input toggle on, the wizard additionally offers a
+  **Keyboard / piano** source (see the input-surfaces section) that
+  needs no MIDI at all.
+
+## Input surfaces: keyboard + on-screen piano (REQ-IO-4/5/6, S4)
+
+The **Keyboard / piano input** toggle in the Drills panel (default
+OFF -- no letter ever sounds until you turn it on) arms two fallback
+note sources on the study surface:
+
+- Computer keyboard: A W S E D F T G Y H U J K play one octave from a
+  movable root (position-based by physical key, layout-proof); Z / X
+  shift the root octave (2..5, persisted). The mapping is a SEPARATE
+  listener with the full guard stack (typing fields first,
+  Cmd/Ctrl/Alt yield to the browser, no auto-repeat), armed only in
+  the study view and never while a blocking modal is open (the
+  calibration wizard is the one exception -- it is a note-input
+  consumer).
+- On-screen piano: a touch-friendly input surface (pointer events,
+  44x56 px minimum white keys, horizontal scroll on narrow screens,
+  letter chips on the mapped keys, "-"/"+" octave buttons) above the
+  synesthesia display keyboard. The colorful display keyboard stays
+  exactly what it was: a display + audition surface whose clicks
+  deliberately never enter the practice pipeline.
+
+Both sources emit through ONE seam -- the same window "midin" event
+hardware MIDI dispatches, tagged inputId "hse-keyboard" /
+"hse-screen" on the channel-0 sentinel (never bass-excluded). The
+detector, the calibration wizard and the IN picker all see fallback
+input with zero extra plumbing, and detection arms for laptop-only
+users (REQ-PRAC-54 amended: any note source suffices). Fallback notes
+play through the app's own synth but do NOT drive external MIDI gear
+(no loopback echo; the display keyboard stays the gear-driver).
+
+Per-source latency (D141): keyboard/touch taps travel a different
+input path than a MIDI controller, so the wizard can calibrate them
+SEPARATELY (source selector; the fallback roll is driven by tapping
+the embedded compact piano or typing the mapping). Both numbers
+coexist in one record -- a fallback save never clobbers the MIDI
+number and vice versa -- and each note is compensated with ITS own
+source's number (mixed MIDI + keyboard passes are per-note correct).
+Uncalibrated sources run honestly uncompensated (0 ms), and the
+panel shows both rows with their own staleness labels. Keyboard and
+touch taps share ONE fallback number -- measure with the surface you
+will play on. One honesty wrinkle: a manual (typed-number) save on
+EITHER source stores output 0 (the typed number is then the whole
+compensation), which also zeroes the SHARED outputLatencyMs -- so a
+prior median calibration on the OTHER source loses the output
+component of its compensation until it is re-measured.
 - The canonical equation, stated once: a compensated tap is
   `tap - inputLatency - outputLatency`, compared against the bar
   boundary's emission time. A perfectly timed tap leaves exactly zero
@@ -331,11 +380,14 @@ target is never a fiction the app does not play.
   did). The Made it / Missed it buttons are disabled while armed (the
   machine and the click can never double-rate one rep); turn
   detection off and they return, S2 behavior unchanged.
-- Requirements (REQ-PRAC-54): detection needs a browser with the Web
-  MIDI API -- without it the panel shows the honest unavailable state
-  and drills, ramp and manual rating work unchanged. With the API but
-  no device connected, detection arms and stays silent ("connect a
-  MIDI input"); hot-plugging a controller just works.
+- Requirements (REQ-PRAC-54, AMENDED by S4 D138): detection arms for
+  ANY note source -- a browser with the Web MIDI API OR the
+  Keyboard / piano input toggle on. Without either, the panel shows
+  the honest unavailable state and drills, ramp and manual rating
+  work unchanged. With the API but no device connected, detection
+  arms and stays silent ("connect a MIDI input"); hot-plugging a
+  controller just works. Once a keyboard/piano note is observed the
+  status line names the live source instead.
 - Feedback surfaces: a post-pass summary card ("Pass 3 - 7/8 notes
   (88%) | avg +23 ms late | 1 wrong | 1 rest") and a compact header
   chip while armed. The summary and the strip update ONCE PER BAR
@@ -452,17 +504,22 @@ path exists for future registry entries.
   during a SUB-window loop/pause/A-B the bass/piano CONTENT walks the
   full path while the groove timing stays honest. Rest muting is
   content-agnostic (bus level) and correct regardless.
-- **Detection without a MIDI input**: the strip never scores and the
-  summary stays at zero hits -- by construction, not by fallback
-  (there is no honest way to detect notes the browser cannot hear).
-  Manual rating covers that case.
+- **Detection without any note source**: with neither the Web MIDI
+  API nor the S4 keyboard/piano input enabled, the strip never scores
+  and the summary stays at zero hits -- by construction (there is no
+  honest way to detect notes the browser cannot hear). The S4
+  fallback surfaces close most of that gap; manual rating covers
+  the rest.
 - **Session unload gap**: an open session is persisted when the block
   ENDS (stop / path switch); closing the tab mid-block loses it.
   Sessions are practice blocks, not a crash journal (D133.4).
 - **Mobile**: the Drills gear is desktop-first (same class as the
-  click gear); MobileCommandBar keeps the loop toggle only.
-- **No new keyboard shortcuts**: every drill control is a real
-  button/input (the cheatsheet surface is frozen).
+  click gear); MobileCommandBar keeps the loop toggle only. The S4
+  input piano IS touch-first (REQ-IO-6).
+- **No new cheatsheet shortcut chips**: the S4 keyboard mapping is
+  documented in the cheatsheet FOOTER prose + the piano's own key
+  chips (the SHORTCUTS surface is frozen by a reverse-consistency
+  pin); every drill control stays a real button/input.
 
 ## Where to look
 
@@ -524,4 +581,21 @@ path exists for future registry entries.
   no playback); S3 legs: `e2e/practice-detection.spec.ts` (negative
   no-API leg, a synthetic-stream leg driving the shipped window
   "midin" seam on the real transport with monotonic-counter asserts
-  only, and a deterministic wizard/persistence leg)
+  only, and a deterministic wizard/persistence leg); S4 legs:
+  `e2e/practice-inputs.spec.ts` (REAL trusted keyboard + pointer
+  input through the app's own listener into the same "midin" seam:
+  keyboard->detection, on-screen piano + the 44x56 geometry floor,
+  octave persistence + the Meta-guard, and the zero-timing wizard
+  fallback merge).
+- S4 input surfaces: mapping `classifyNoteKey` +
+  `NOTE_KEY_SEMITONES_BY_CODE` in `src/hooks/useKeyDown.ts`;
+  listener `src/hooks/useNoteInput.ts`; seam emitter
+  `src/lib/noteInputBus.ts` (the ONE "midin" contract, hse-*
+  sentinels, channel 0); touch surface
+  `src/components/NoteInputPiano.tsx` (mounted by `src/App.tsx`
+  above the display piano + embedded in the wizard); config slice
+  `noteInput` in `src/lib/practiceMechanics.ts`; per-source record
+  widening + `compensationOfFallback` in
+  `src/lib/practiceLatency.ts`; per-note override
+  `PerformedNote.compensationMs` in `engine/practice/detect.ts`
+  (law 4, additive).

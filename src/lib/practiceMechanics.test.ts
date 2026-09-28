@@ -43,6 +43,10 @@ function isValid(c: ReturnType<typeof normalizePracticeMechanics>): void {
   expect(c.detect.toleranceMs).toBeLessThanOrEqual(300);
   expect(c.detect.passThreshold).toBeGreaterThanOrEqual(0.5);
   expect(c.detect.passThreshold).toBeLessThanOrEqual(1);
+  // S4 (D143): the noteInput slice is TOTAL after normalize too.
+  expect(typeof c.noteInput.enabled).toBe("boolean");
+  expect(c.noteInput.rootOctave).toBeGreaterThanOrEqual(2);
+  expect(c.noteInput.rootOctave).toBeLessThanOrEqual(5);
 }
 
 describe("normalizePracticeMechanics - total-shape guard", () => {
@@ -138,6 +142,10 @@ describe("normalizePracticeMechanics - total-shape guard", () => {
       // round-trip must preserve them (not clobber with defaults).
       // The legacy missing-key case is pinned separately (no-v5 pin).
       detect: { enabled: true, toleranceMs: 90, passThreshold: 0.9 },
+      // S4: same law for noteInput - a COMPLETE stored payload carries
+      // the materialized sub-field (the missing-key case is the no-v5
+      // pin in the S4 describe below).
+      noteInput: { enabled: true, rootOctave: 3 },
     };
     expect(normalizePracticeMechanics(stored)).toEqual(stored);
   });
@@ -230,5 +238,53 @@ describe("S3 detect slice (D132): defaults-at-read, no v5", () => {
     const c = normalizePracticeMechanics("garbage");
     c.detect.enabled = true;
     expect(DEFAULT_MECHANICS.detect.enabled).toBe(false); // constant never mutated
+  });
+});
+
+/**
+ * PRD-001 Phase 7 S4 (D139/D143): the noteInput slice rides the ONE
+ * practiceMechanics field - defaults-at-read, no v5, no new K keys.
+ */
+describe("S4 noteInput slice (D143): defaults-at-read, no v5", () => {
+  it("LEGACY S3 payload WITHOUT the noteInput key -> shipped defaults (the no-v5 pin)", () => {
+    const legacy = {
+      mode: "loop",
+      pause: { playBars: 4, restBars: 4 },
+      ab: { a: { fromBar: 0, toBar: 7 }, b: { fromBar: 8, toBar: 15 }, swapBars: 4 },
+      ramp: { startBpm: 90, targetBpm: 150, stepBpm: 4, repsPerStep: 2, failThreshold: 2 },
+      rampEnabled: false,
+      detect: { enabled: true, toleranceMs: 200, passThreshold: 0.65 },
+    };
+    const c = normalizePracticeMechanics(legacy);
+    isValid(c);
+    // Default OFF (D139 anti-regression law): a legacy user never
+    // hears a letter-key note.
+    expect(c.noteInput).toEqual({ enabled: false, rootOctave: 4 });
+    // Siblings untouched by the widening.
+    expect(c.detect).toEqual(legacy.detect);
+    expect(c.mode).toBe("loop");
+  });
+
+  it("octave garbage -> clamped 2..5 (string/float/wild/negative all resolve)", () => {
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: "4" } }).noteInput.rootOctave).toBe(4);
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 99 } }).noteInput.rootOctave).toBe(5);
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 0 } }).noteInput.rootOctave).toBe(2);
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 3.7 } }).noteInput.rootOctave).toBe(4); // non-int -> default
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: null } }).noteInput.rootOctave).toBe(4);
+    const hi = normalizePracticeMechanics({ noteInput: { enabled: true, rootOctave: 5 } });
+    expect(hi.noteInput).toEqual({ enabled: true, rootOctave: 5 });
+  });
+
+  it("enabled non-boolean -> false (strict === true law, mirrors detect)", () => {
+    for (const raw of ["true", 1, {}, []]) {
+      const c = normalizePracticeMechanics({ noteInput: { enabled: raw } });
+      isValid(c);
+      expect(c.noteInput.enabled).toBe(false);
+    }
+    // DEFAULT_MECHANICS shape + clone isolation.
+    expect(DEFAULT_MECHANICS.noteInput).toEqual({ enabled: false, rootOctave: 4 });
+    const c = normalizePracticeMechanics("garbage");
+    c.noteInput.enabled = true;
+    expect(DEFAULT_MECHANICS.noteInput.enabled).toBe(false); // constant never mutated
   });
 });

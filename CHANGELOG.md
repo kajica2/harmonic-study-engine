@@ -426,6 +426,54 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **Input surfaces: computer-keyboard playing + on-screen piano
+  (PRD-001 Phase 7 slice 4, D137-D144).** (1) COMPUTER-KEYBOARD
+  PLAYING: the "Keyboard / piano input" toggle in the Drills panel
+  (opt-in, default OFF - a user who never turns it on keeps
+  byte-identical behavior) arms A W S E D F T G Y H U J K = one
+  octave from a movable root (matched by physical key, layout-proof;
+  Z / X shift the root octave, 2..5, persisted). The mapping is a
+  SEPARATE listener with the full guard stack (typing fields first,
+  Cmd/Ctrl/Alt yield to the browser, no auto-repeat, then classify
+  by e.code), armed only on the study surface and never under a
+  blocking modal (the calibration wizard is the one exception - it
+  consumes the taps). The collision audit found all 15 codes free;
+  the sacred measure handler is byte-identical. (2) ON-SCREEN INPUT
+  PIANO: a touch-friendly input surface (pointer events only, white
+  keys >= 44x56 px, horizontal scroll on narrow screens - shrinking
+  is banned, letter chips on the mapped keys, "-"/"+" octave
+  buttons) mounts above the synesthesia keyboard when the toggle is
+  on, and embeds (compact) in the calibration wizard. (3) DETECTION
+  ACCEPTS FALLBACK INPUT: every fallback note rides the SAME window
+  "midin" seam hardware MIDI dispatches (source-tagged
+  "hse-keyboard" / "hse-screen", channel-0 sentinel - never
+  bass-excluded), so detector, wizard and IN picker consume it with
+  zero new subscriptions; REQ-PRAC-54 AMENDED - detection arms for
+  ANY note source, so laptop-only users get scored practice (the
+  honest panel copy states which source is live). Fallback notes
+  play the app's own synth + recorder but emit NO midiOut
+  (orchestrator ruling - a loopback echo would double-count into
+  detection; the display keyboard stays the external-gear driver).
+  (4) PER-SOURCE LATENCY CALIBRATION (D134 adjudicated): the wizard
+  measures the keyboard/touch tap path SEPARATELY from a MIDI
+  controller; both numbers coexist in one widened record
+  (defaults-at-read, version stays 1, no migration) and every note
+  is compensated with ITS source's number - mixed MIDI + keyboard
+  passes are per-note correct. Uncalibrated sources run honestly
+  uncompensated (0 ms); a save from one source never clobbers the
+  other. (5) The colorful synesthesia keyboard is UNCHANGED - a
+  display + audition surface whose clicks deliberately never enter
+  the practice pipeline; the new piano is the input surface (two
+  keys, two purposes). Suite 2598 -> 2660 / 1 skipped (net +62 its;
+  frozen tests/ pins untouched, it( stays 362); engine purity floor
+  stays 56 (detect.ts gains one optional per-note field + one ??
+  expression); no zustand v5 (noteInput rides the practiceMechanics
+  field, defaults-at-read); no new K keys; no new cheatsheet chips
+  (the mapping is footer prose + on-key chips - the frozen reverse
+  pin); e2e 30 -> 34 tests / 13 -> 14 specs - the first positive
+  legs drive REAL trusted keyboard/pointer input through the app's
+  own listener (break-guard-FAIL on the pre-S4 build). Design +
+  post-ship errata: `docs/PHASE-7-S4-INPUTS.md` (section 14).
 - **Latency calibration, played-correctly detection, practice
   sessions (PRD-001 Phase 7 slice 3, D129-D136).** (1) LATENCY
   CALIBRATION: a "Calibrate" wizard in the Drills panel plays 16

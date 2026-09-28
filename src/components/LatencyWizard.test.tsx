@@ -26,10 +26,10 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import React from "react";
 import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 import { LatencyWizard } from "./LatencyWizard";
-import { loadLatency } from "../lib/practiceLatency";
+import { loadLatency, saveLatency } from "../lib/practiceLatency";
 import { audioEngine } from "../lib/audio";
 
-function dispatchTap(offsetMs: number, channel = 1): void {
+function dispatchTap(offsetMs: number, channel = 1, inputId = "test-in"): void {
   window.dispatchEvent(
     new CustomEvent("midin", {
       detail: {
@@ -37,8 +37,8 @@ function dispatchTap(offsetMs: number, channel = 1): void {
         velocity: 90,
         type: "noteon",
         channel,
-        inputId: "test-in",
-        inputName: "TestIn",
+        inputId,
+        inputName: inputId === "hse-keyboard" ? "Computer keyboard" : "TestIn",
         timestamp: performance.now() + offsetMs,
       },
     }),
@@ -50,6 +50,7 @@ function renderWizard(over: {
   tempo?: number;
   hasMidiApi?: boolean;
   hasDevice?: boolean;
+  noteInputEnabled?: boolean;
   onSaved?: () => void;
 } = {}) {
   const onClose = over.onClose ?? vi.fn();
@@ -62,6 +63,8 @@ function renderWizard(over: {
       hasDevice={over.hasDevice ?? true}
       deviceName="TestIn"
       bassMidiChannel={2}
+      noteInputEnabled={over.noteInputEnabled ?? false}
+      noteInputRootOctave={4}
       onSaved={onSaved}
     />,
   );
@@ -69,10 +72,10 @@ function renderWizard(over: {
 }
 
 /** Run a full roll: start, then tap every click (+offset ms). */
-function runRoll(taps: number): void {
+function runRoll(taps: number, inputId = "test-in"): void {
   fireEvent.click(screen.getByTestId("wizard-start"));
   for (let i = 0; i < 16; i++) {
-    if (i < taps) dispatchTap(40);
+    if (i < taps) dispatchTap(40, 1, inputId);
     act(() => {
       vi.advanceTimersByTime(250);
     });
@@ -213,5 +216,122 @@ describe("LatencyWizard (D134)", () => {
     const { onClose } = renderWizard({ hasDevice: false });
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * PRD-001 Phase 7 S4 (D141): per-source calibration. The selector
+ * gates the mode, the SOURCE FILTER keeps the two numbers honest
+ * (MIDI mode never pairs a synthetic tap; fallback mode pairs ONLY
+ * hse-*), and every save MERGES - neither source clobbers the other.
+ */
+describe("LatencyWizard S4 per-source calibration (D141)", () => {
+  it("source selector renders iff (gateOk || noteInputEnabled); MIDI chip honestly disabled", () => {
+    // gateOk, note-input off: selector shows the single MIDI chip
+    // (the fallback chip is HIDDEN - the toggle is the gate).
+    const a = renderWizard();
+    expect(screen.getByTestId("wizard-source-midi")).toBeTruthy();
+    expect(screen.queryByTestId("wizard-source-fallback")).toBeNull();
+    a.unmount();
+    // No gate, no note-input: NO selector (the S3 manual-gate screen).
+    const b = renderWizard({ hasDevice: false });
+    expect(screen.queryByTestId("wizard-source-midi")).toBeNull();
+    b.unmount();
+    // No gate, note-input ON: selector shows, MIDI disabled with the
+    // honest title, fallback pressed by default (the only roller).
+    renderWizard({ hasDevice: false, noteInputEnabled: true });
+    const midi = screen.getByTestId("wizard-source-midi");
+    const fb = screen.getByTestId("wizard-source-fallback");
+    expect((midi as HTMLButtonElement).disabled).toBe(true);
+    expect(midi.getAttribute("title")).toMatch(/no MIDI device/i);
+    expect(fb.getAttribute("aria-pressed")).toBe("true");
+    expect(midi.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("fallback mode pairs SYNTHETIC hse midin events (fake-timer roll) and saves the fallback pair", () => {
+    renderWizard({ hasDevice: false, noteInputEnabled: true });
+    // Start lives on the gate screen in fallback mode (no device to
+    // wait for - the roll is driven by the taps themselves).
+    runRoll(16, "hse-keyboard");
+    expect(screen.getByTestId("wizard-result").textContent).toMatch(/40 ms/);
+    fireEvent.click(screen.getByTestId("wizard-save"));
+    const r = loadLatency();
+    expect(r?.fallbackInputLatencyMs).toBe(40);
+    expect(r?.fallbackCalibratedAtMs).not.toBeNull();
+    // deviceName for a fallback median comes from the event's
+    // inputName (tapNameRef reuse, D141).
+    expect(r?.deviceName).toBe("Computer keyboard");
+    expect(r?.inputLatencyMs).toBeNull(); // MIDI field never invented
+  });
+
+  it("POISON GUARD: MIDI mode IGNORES hse-* events entirely", () => {
+    // A stray keyboard tap can never poison a MIDI calibration:
+    // 16 hse taps against the MIDI-mode filter -> zero pairs ->
+    // the honest "not enough taps" retry, never a fake median.
+    renderWizard();
+    runRoll(16, "hse-keyboard");
+    expect(screen.getByTestId("wizard-not-enough")).toBeTruthy();
+    expect(loadLatency()).toBeNull();
+  });
+
+  it("fallback save MERGES: a stored MIDI record survives a keyboard calibration verbatim", () => {
+    saveLatency({
+      version: 1,
+      inputLatencyMs: 40,
+      outputLatencyMs: 20,
+      source: "midi",
+      calibratedAtMs: 1_700_000_000_000,
+      deviceName: "LPK88",
+      fallbackInputLatencyMs: null,
+      fallbackCalibratedAtMs: null,
+    });
+    renderWizard({ hasDevice: false, noteInputEnabled: true });
+    fireEvent.change(screen.getByTestId("wizard-input-ms"), {
+      target: { value: "37" },
+    });
+    fireEvent.click(screen.getByTestId("wizard-save"));
+    const r = loadLatency();
+    // MIDI fields survive (the merge law, pinned both directions).
+    expect(r?.inputLatencyMs).toBe(40);
+    expect(r?.source).toBe("midi");
+    expect(r?.deviceName).toBe("LPK88");
+    // The fallback pair lands beside them.
+    expect(r?.fallbackInputLatencyMs).toBe(37);
+    expect(r?.fallbackCalibratedAtMs).not.toBeNull();
+  });
+
+  it("manual entry in fallback mode writes the fallback pair (source stays manual semantics)", () => {
+    renderWizard({ hasDevice: false, noteInputEnabled: true });
+    fireEvent.change(screen.getByTestId("wizard-input-ms"), {
+      target: { value: "37" },
+    });
+    fireEvent.click(screen.getByTestId("wizard-save"));
+    const r = loadLatency();
+    expect(r?.fallbackInputLatencyMs).toBe(37);
+    expect(r?.inputLatencyMs).toBeNull(); // no MIDI calibration invented
+    expect(r?.source).toBe("manual"); // harmless discriminator
+    // Manual semantics: output 0 -> compensationOfFallback = 37 exactly.
+    expect(r?.outputLatencyMs).toBe(0);
+  });
+
+  it("embedded compact piano present in the fallback roll (testid wizard-piano)", () => {
+    renderWizard({ hasDevice: false, noteInputEnabled: true });
+    expect(screen.getByTestId("wizard-piano")).toBeTruthy();
+    expect(screen.getByTestId("note-input-piano")).toBeTruthy();
+    // 13-key compact span root..root+12 (C4..C5 at octave 4).
+    expect(screen.getByTestId("note-key-60")).toBeTruthy();
+    expect(screen.getByTestId("note-key-72")).toBeTruthy();
+    expect(screen.queryByTestId("note-key-73")).toBeNull();
+    // Tapping it plays audio AND emits through the bus (no take):
+    // the wizard's own midin listener pairs it.
+    const spy = vi.spyOn(audioEngine, "playNote");
+    fireEvent.pointerDown(screen.getByTestId("note-key-60"), { pointerId: 1 });
+    expect(spy).toHaveBeenCalledWith(60);
+    fireEvent.click(screen.getByTestId("wizard-start"));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    // ...and the piano stays mounted while rolling.
+    expect(screen.getByTestId("wizard-piano")).toBeTruthy();
   });
 });
