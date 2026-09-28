@@ -7,8 +7,8 @@ project:
   test_runner: "vitest + pytest + playwright"
 
 memory_version: "1.0"
-last_updated: "2026-09-28T03:30:00Z"
-total_pipeline_runs: 20
+last_updated: "2026-09-28T07:00:00Z"
+total_pipeline_runs: 21
 
 flags:
   has_conventions: true
@@ -102,3 +102,7 @@ active_prevention_rules:
   - id: "ORCH-001"
     when: "Kai pre-edits a file that the upcoming slice's design lists as DO-NOT/ownership-restricted (e.g. PRD erratum applied before dispatch)"
     action: "Declare the exact edited files + hunk content as signed-off orchestrator deltas in BOTH the developer and reviewer directives. Undeclared, review correctly flags an ownership HIGH (S4 HIGH-001: PRD-001.md REQ-PRAC-54 erratum - real edit, false violation, one wasted merge cycle)."
+
+  - id: "S8-001"
+    when: "Shipping any UI that READS the live URL (copy-link, share, open-in-new) while a debounced URL writer exists"
+    action: "Force the pending write synchronously BEFORE reading location - a click inside the debounce window otherwise copies a stale URL. Pin with a literal call-ORDER assertion (write before read), not a status check (Phase 8 S1 shareUrl.ts pattern; same family as the pagehide flush rule)."
