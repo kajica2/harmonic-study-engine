@@ -334,10 +334,32 @@ slice-by-slice in Phase 1.5 (ADR-004). `partialize` keeps only
 `pendingModeRequest` are session-scoped. URL persistence is wired
 both ways in App.tsx: boot-time read seeds `mode` / `transpose` /
 shared `?idea=`, and a debounced (200 ms) store subscription writes
-`?mode=&transpose=` back via `history.replaceState` (no `pushState`,
-never pollutes the back stack). Keyboard shortcuts `1` / `2` / `3`
+back via `history.replaceState` (no `pushState`, never pollutes the
+back stack). Keyboard shortcuts `1` / `2` / `3`
 are added to the existing `handleKeyDown` (additive; `isTyping` guard
 preserved).
+
+**URL state today (Phase 8 S1).** The boot read is one-shot (ADR-011
+read-once doctrine) and the write is ONE debounced `write()` function
+(ADR-015 single writer) whose debounce/flush live in
+`src/lib/urlSyncBus.ts` (register/schedule/flush - the bus is a
+SCHEDULER, not a second writer). Six key families ride it: core
+(`mode`, `transpose`), idea (`idea` - `src/lib/ideaShare.ts`, the
+ONE codec shared by App boot / IdeaBar / PlaySurface), etude (13
+keys), compose (7 keys), practice (`path,bpm,persona,voicing` -
+`src/lib/practiceUrl.ts`; the legacy-hook scalars reach the writer
+through a React-deps sync effect + ref, since the zustand
+subscription cannot see them), and explore (`eseed` -
+`src/lib/exploreUrl.ts`, an ephemeral store mirror outside
+partialize). Share buttons on five surfaces copy through
+`src/lib/shareUrl.ts`, which FLUSHES the writer synchronously before
+reading the location (D149 - a copy inside the 200 ms window is
+never stale). Boot merges are FIELD-WISE: the URL wins only for
+PRESENT keys (presence maps; HIGH-001 doctrine). Browser
+back/forward exits the app by design (replaceState-only sync creates
+no history entries - D147); links are the share channel. Routing is
+one pathname branch in `src/main.tsx` (`isPlayRoute` -> `PlaySurface`
+for `/play?idea=`, D148) - no router dependency.
 
 **Idea object.** Pure engine/ at `engine/core/idea.ts` -- discriminated
 union over `kind` (chord / progression / scale / melody / seed) with
@@ -345,8 +367,10 @@ exactly one populated slot per kind; `id` is a deterministic
 `CanonicalId` (ADR-005) so dedup collapses identical materials;
 `isIdea(raw)` is the runtime guard for trust boundaries (URL share
 link, `hse.ideas`). Save writes to `hse.ideas` (capped at 100);
-Share builds a base64 `?idea=<base64>` URL and copies to clipboard
-(server-less per REQ-IO-50).
+Share copies the flushed session URL with the idea re-set on
+`?idea=<base64>` (server-less per REQ-IO-50; encode/decode live in
+`src/lib/ideaShare.ts` - one codec, three consumers: App boot,
+IdeaBar, PlaySurface).
 
 **Storage.** `src/lib/storage.ts` registers `K.session` (`hse.session`)
 and `K.ideas` (`hse.ideas`) with shape metadata in `STORAGE_KEYS`.

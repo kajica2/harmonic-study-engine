@@ -19,6 +19,7 @@
  */
 
 import type { EtudeConstraints } from "../../engine/etude/types";
+import type { Idea } from "../../engine/core/idea";
 import type { ComposeSession } from "../state/sessionStore";
 
 /** The slice of store state the URL writer tracks. The full zustand
@@ -32,6 +33,16 @@ export interface UrlSyncSnapshot {
    *  single-writer). Reference-compared like etudeConstraints - the
    *  store replaces, never mutates. */
   composeSession: ComposeSession | null;
+  /** PRD-001 Phase 8 S1 (D149): the shared idea rides the `idea`
+   *  key. Ref-compared like etudeConstraints (setCurrentIdea
+   *  REPLACES, never mutates). */
+  currentIdea: Idea | null;
+  /** PRD-001 Phase 8 S1 (D146): the explore seed mirror rides the
+   *  `eseed` key. Primitive compare (string | null). Practice
+   *  scalars are NOT here: the legacy hook is invisible to the
+   *  zustand subscription - the App practice-sync effect calls
+   *  scheduleUrlWrite() directly (D149). */
+  exploreSeedUrl: string | null;
 }
 
 /** True when a store change must be reflected in the URL. */
@@ -43,6 +54,8 @@ export function shouldScheduleUrlWrite(
     next.mode !== prev.mode ||
     next.globalTranspose !== prev.globalTranspose ||
     next.etudeConstraints !== prev.etudeConstraints ||
-    next.composeSession !== prev.composeSession
+    next.composeSession !== prev.composeSession ||
+    next.currentIdea !== prev.currentIdea ||
+    next.exploreSeedUrl !== prev.exploreSeedUrl
   );
 }

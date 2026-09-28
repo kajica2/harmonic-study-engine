@@ -35,6 +35,12 @@ import { shippedStyleIds } from "../../engine/styles/index";
 import {
   DEFAULT_ETUDE_CONSTRAINTS,
 } from "../lib/etudeEngine";
+// PRD-001 Phase 8 S1 (D149): the flush-before-copy share seam. The
+// panel DRAFT (mid-edit values) is local per the shipped law (never
+// in the store, never in the URL) - the copied link shares the last
+// APPLIED constraints, which is exactly what the URL contains.
+// One truth.
+import { copyShareUrl, shareStatusText, type ShareStatus } from "../lib/shareUrl";
 import { StageFrame } from "./StageFrame";
 
 export interface EtudeComposerPanelProps {
@@ -143,6 +149,17 @@ export function EtudeComposerPanel({
     loadedTitle !== null
       ? `Loaded: ${loadedTitle}`
       : blockingMessage ?? "Ready to generate.";
+
+  // PRD-001 Phase 8 S1 (D149): the Share button copies the CURRENT
+  // URL (flushed fresh). HONESTY (documented, not a code path): the
+  // panel DRAFT is local per the shipped law (PHASE-3-SLICE2.md:57
+  // "never in the store, never in the URL") - the copied link shares
+  // the last APPLIED constraints, which is exactly what the URL
+  // contains. One truth.
+  const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
+  const handleShare = (): void => {
+    void copyShareUrl().then(setShareStatus);
+  };
 
   return (
     <StageFrame
@@ -317,6 +334,29 @@ export function EtudeComposerPanel({
               MusicXML (with melody)
             </button>
           )}
+
+          <div className="flex items-center gap-2">
+            {shareStatus !== null && (
+              <span
+                role="status"
+                aria-live="polite"
+                data-testid="share-url-status"
+                className="text-[10px] t-mono text-[color:var(--color-text-3)]"
+              >
+                {shareStatusText(shareStatus)}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleShare}
+              aria-label="Share session link"
+              title="Copy the current URL - the link carries the last APPLIED constraints"
+              data-testid="share-url-button"
+              className="px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-mono border border-[color:var(--color-border)] text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+            >
+              Share
+            </button>
+          </div>
         </div>
 
         <details className="surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-md)] px-3 py-2">

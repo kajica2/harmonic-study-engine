@@ -1214,3 +1214,74 @@ HANDOFF_TO_DEVELOPER:
 ```
 
 **Version:** 1.2.2 | **Phase:** 8 S1 design | **Depends on:** Phases 1-7 shipped (S4 lineage: 763bb7c, ledger 227c0c7) | **Closes:** REQ-IO-50 (P0, with the D151 reading), REQ-IO-52 (P2, armed-state carve), TD-047 (routing verdict), the IdeaBar stale-warn | **Keeps open:** TD-027 (refined wording, D147 - by design), TD-023 (monolith split - untouched on purpose)
+
+---
+
+## 14. ERRATA (post-ship, Kai rulings + dev deviations)
+
+Appended by @docs at ship time. Sections 0-13 are the design as
+written at 6875eb2 - kept byte-unchanged as history (this section
+is purely additive: git diff shows ZERO deleted lines). This is the
+authoritative delta between design and shipped code; read it before
+reusing any premise above.
+
+### 14.1 D151 PRD erratum set - APPLIED (Kai, at 6875eb2)
+
+The sec 2 D151 erratum list landed in docs/PRD-001.md in the same
+commit that shipped this design (6875eb2): the REQ-IO-50 reading
+note (musical SESSION state - playheads, drill ergonomics, device
+physics and hardware gates excluded, so the P0 CLOSES honestly),
+REQ-IO-52's "immediately plays it" amended to the armed-one-gesture
+contract plus the scale/seed payload carve, and the 11.2 example
+URLs fixed (`seed=` -> `eseed=`; the double-`mode` collision the
+same example carried was already resolved by ADR-015's `tmode`).
+PRD-ownership law honored: the design flagged, the orchestrator
+edited - this slice touched no PRD line.
+
+### 14.2 D150 cut line - NOT INVOKED (shipped whole)
+
+The pre-agreed cut line (roadmap steps 13-17 -> S2) was NOT used:
+the slice shipped S1-core AND the /play block as one pipeline - the
+architect's recommendation ("ship as one; the cut line is
+insurance, not a hedge"). /play is browser-proven by e2e legs 5-7
+(armed -> playing through the shipped machinery; empty honesty +
+the CTA landing in the real App; URL pristineness - no writer runs
+because App never mounts). Leg 5 doubles as the public/serve.json
+config's own pin: if serve.json ever stops being read, it fails
+LOUDLY and cannot false-pass.
+
+### 14.3 Design-claim corrections confirmed at ship
+
+Two claims that circulated pre-ship were corrected in the sec 0
+re-audit and re-confirmed against the shipped tree:
+
+- The etude URL is 13 keys, NOT 14 (audit #4). The task packet's
+  "14 keys" claim had no evidence: `ETUDE_URL_CORE_KEYS` (6) +
+  advanced (7) = 13, exactly per ADR-015 sec 1. The sec 7.3 table,
+  docs/MODES.md and docs/ARCHITECTURE.md all ship the 13.
+- Vercel PREVIEW deployments 404 `/play` until THIS slice's
+  vercel.json deploys (audit #11). "Preview has implicit fallback"
+  is true only for local `vite dev` / `vite preview`; Vercel
+  previews use the same vercel.json, so the rewrite ships with the
+  push - the 404 window is pre-deploy only, and manual item 6.3
+  verifies it once post-deploy.
+
+### 14.4 Shipped deviations D-1..D-3 (dev report; statuses per Kai)
+
+| ID | Deviation (design -> shipped) | Status |
+|---|---|---|
+| D-1 | ExploreSurface's boot effect reads `location.search` LIVE (child-first), not only the ephemeral store mirror: React passive effects run child-before-parent, so on a persisted-mode reload the child's boot can precede App's boot populating `exploreSeedUrl` - the deep link must still land (the store read stays as the same-session-mount fallback). Read-only, never touches history; the ADR-015 single writer is untouched. (The inline code comment self-labels this "D-2"; this table's numbering is the canonical one.) | ACCEPTED |
+| D-2 | Cosmetic typo in a new e2e spec TITLE (display-only; zero pin or behavior impact - the leg itself is the shipped design's leg) | NOTED |
+| D-3 | docs/ARCHITECTURE.md says "six key families" per the sec 7.3 AUTHORITATIVE table (core/idea/etude/compose/practice/explore), not the sec 5 file-plan shorthand ("4 -> 10 key families") | ACCEPTED |
+
+### 14.5 Final counts vs predictions (sec 6.1/6.2; checklist 15)
+
+The suite landed EXACTLY on the prediction: 2664 -> **2743 passed /
+1 skipped / 0 failed** (202 -> 211 files; the sec 6.1 per-file pin
+allocations sum to +79 - exact hit, checklist item 15). e2e 34 ->
+**41 tests / 16 specs** (sec 6.2 predicted 41/16 - exact hit:
+share-url 4 legs + play-route 3 legs). `it(` in tests/ stayed 362
+(tests/** byte-frozen); the engine purity floor stayed 56 (zero
+engine files added/removed); check-links 362 + 29 unmoved;
+check:paths 36/36 OK. The AGENTS.md lockstep line
+(2664/202 -> 2743/211) was updated by dev at ship.

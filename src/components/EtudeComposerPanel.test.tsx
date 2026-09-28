@@ -20,6 +20,16 @@ import { EtudeComposerPanel } from "./EtudeComposerPanel";
 import { DEFAULT_ETUDE_CONSTRAINTS } from "../lib/etudeEngine";
 import type { EtudeConstraints } from "../../engine/etude/types";
 
+// PRD-001 Phase 8 S1 (D149): mock ONLY the copy seam (call counting);
+// shareStatusText stays REAL so the pin asserts the shipped strings.
+vi.mock("../lib/shareUrl", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/shareUrl")>();
+  return {
+    ...actual,
+    copyShareUrl: vi.fn(async () => "copied" as const),
+  };
+});
+
 afterEach(() => {
   cleanup();
 });
@@ -186,5 +196,29 @@ describe("EtudeComposerPanel status line", () => {
     expect(
       screen.getByRole("button", { name: /MusicXML \(with melody\)/ }),
     ).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 8 S1 (D149): the Share button - routed through the ONE
+// sanctioned seam (the seam's own behavior is pinned in
+// shareUrl.test.ts). Honesty: the link carries the last APPLIED
+// constraints, never the local draft (documented in the button title).
+// ---------------------------------------------------------------------------
+
+describe("EtudeComposerPanel Share (D149)", () => {
+  it("renders, click routes through copyShareUrl once, status text renders", async () => {
+    const { copyShareUrl } = await import("../lib/shareUrl");
+    render(<EtudeComposerPanel {...panelProps()} />);
+    const btn = screen.getByTestId("share-url-button");
+    expect(btn.getAttribute("title")).toContain("last APPLIED");
+    expect(screen.queryByTestId("share-url-status")).toBeNull();
+    fireEvent.click(btn);
+    expect(copyShareUrl).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("share-url-status").textContent).toBe(
+        "Share link copied to clipboard.",
+      );
+    });
   });
 });

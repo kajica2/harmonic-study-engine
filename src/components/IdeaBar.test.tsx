@@ -21,6 +21,9 @@ import type { HarmonicStep } from "../lib/paths";
 beforeEach(() => {
   localStorage.clear();
   useSessionStore.getState().resetModeSlice();
+  // Phase 8 S1: the share seam reads location.href - start every
+  // test from the bare origin (order independence for the fixtures).
+  window.history.replaceState({}, "", "/");
   // Stub clipboard so the Share button can be exercised without
   // pulling in the real WebAPI.
   Object.defineProperty(navigator, "clipboard", {
@@ -142,6 +145,44 @@ describe("IdeaBar populated state", () => {
     ).mock.calls[0][0];
     expect(arg).toContain("?idea=");
     expect(arg).toMatch(/%[0-9A-Fa-f]{2}/); // base64 went through encodeURIComponent
+  });
+
+  // PRD-001 Phase 8 S1 (D149) RETARGET: the copied link is now the
+  // FULL session URL (the writer's location + the live idea re-set)
+  // - the shipped origin+pathname search-dropping base is gone.
+  it("Share copies the location-based URL INCLUDING the mode/transpose context", async () => {
+    window.history.replaceState({}, "", "/?mode=compose&transpose=2");
+    useSessionStore
+      .getState()
+      .setCurrentIdea(ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0));
+    render(<IdeaBar />);
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await Promise.resolve();
+    const arg = (
+      navigator.clipboard.writeText as unknown as { mock: { calls: string[][] } }
+    ).mock.calls[0][0];
+    expect(arg).toContain("mode=compose");
+    expect(arg).toContain("transpose=2");
+    expect(arg).toContain("idea=");
+    // The idea param round-trips through the shared codec (D149):
+    const idea = new URL(arg).searchParams.get("idea");
+    expect(idea).not.toBeNull();
+  });
+
+  it("Share success emits NO console.warn (the stale-warn kill, D149)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    useSessionStore
+      .getState()
+      .setCurrentIdea(ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0));
+    render(<IdeaBar />);
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+    // The status pill still reports the shipped copy verbatim:
+    const pill = await screen.findByTestId("share-url-status");
+    expect(pill.textContent).toBe("Share link copied to clipboard.");
   });
 
   it("Clear (X) button removes the current idea", () => {

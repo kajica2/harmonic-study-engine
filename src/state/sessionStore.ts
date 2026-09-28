@@ -284,7 +284,21 @@ interface MechanicsSlice {
   setPracticeMechanics: (patch: Partial<PracticeMechanicsConfig>) => void;
 }
 
-export type SessionState = ModeSlice & EtudeSlice & ComposeSlice & MechanicsSlice;
+/** PRD-001 Phase 8 S1 (D146): the explore seed-text mirror for the
+ *  URL writer. EPHEMERAL: NOT in partialize, NOT persisted, envelope
+ *  version UNCHANGED (the no-v5 law - the envelope never sees the
+ *  key). The pendingModeRequest precedent: ephemeral fields already
+ *  exist in this store. */
+interface ExploreSeedSlice {
+  exploreSeedUrl: string | null;
+  setExploreSeedUrl: (seed: string | null) => void;
+}
+
+export type SessionState = ModeSlice &
+  EtudeSlice &
+  ComposeSlice &
+  MechanicsSlice &
+  ExploreSeedSlice;
 
 export const useSessionStore = create<SessionState>()(
   persist(
@@ -306,6 +320,8 @@ export const useSessionStore = create<SessionState>()(
       practiceMechanics: normalizePracticeMechanics(undefined),
       dirty: { compose: "none", etude: "none", explore: "none" },
       pendingModeRequest: null,
+      // D146: ephemeral (outside partialize - the no-v5 law).
+      exploreSeedUrl: null,
       setMode: (m) => set({ mode: m }),
       requestMode: (next) => {
         const cur = get().mode;
@@ -526,6 +542,9 @@ export const useSessionStore = create<SessionState>()(
           }),
         }));
       },
+      // D146: plain ephemeral setter (the URL writer + ExploreSurface
+      // push/boot are the only readers; never persisted).
+      setExploreSeedUrl: (seed) => set({ exploreSeedUrl: seed }),
       setCurrentIdea: (i) => set({ currentIdea: i }),
       saveCurrentIdea: () => {
         const idea = get().currentIdea;

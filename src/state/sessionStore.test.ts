@@ -1379,3 +1379,38 @@ describe("Phase 7 S2: practiceMechanics slice - ONE optional field, NO v5 (D126)
     expect(m.mode).toBe("loop");
   });
 });
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 8 S1 (D146): the ephemeral exploreSeedUrl mirror -
+// live-store round trip, NEVER persisted (the no-v5 / partialize
+// byte-shape pin: the envelope must not learn the key at all).
+// ---------------------------------------------------------------------------
+
+describe("Phase 8 S1: exploreSeedUrl is EPHEMERAL (D146, no-v5 law)", () => {
+  it("setExploreSeedUrl round-trips in the live store (set + clear)", () => {
+    expect(STORE_API().exploreSeedUrl).toBeNull();
+    STORE_API().setExploreSeedUrl("Dm7 G7 Cmaj7");
+    expect(STORE_API().exploreSeedUrl).toBe("Dm7 G7 Cmaj7");
+    STORE_API().setExploreSeedUrl(null);
+    expect(STORE_API().exploreSeedUrl).toBeNull();
+  });
+
+  it("the persisted envelope NEVER contains exploreSeedUrl (partialize byte-shape)", async () => {
+    STORE_API().setMode("explore"); // force the async persist write to flush
+    STORE_API().setExploreSeedUrl("Cmaj7");
+    await Promise.resolve();
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY) as string;
+    expect(raw).toBeTruthy();
+    const envelope = JSON.parse(raw) as {
+      version: number;
+      state: Record<string, unknown>;
+    };
+    expect(envelope.version).toBe(4); // NO v5 (D146)
+    expect(envelope.state.exploreSeedUrl).toBeUndefined();
+    // Reload simulation (the shipped pattern): the fresh-boot default
+    // is null and rehydrating the key-free envelope cannot invent it.
+    STORE_API().setExploreSeedUrl(null);
+    useSessionStore.persist.rehydrate();
+    expect(STORE_API().exploreSeedUrl).toBeNull();
+  });
+});

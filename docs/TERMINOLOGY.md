@@ -147,6 +147,20 @@ the pedagogy practice log.
 | Fallback input | `practiceMechanics.noteInput` (`src/lib/practiceMechanics.ts`) | The opt-in toggle + persisted root octave; the surfaces are `useNoteInput` (keyboard) and `NoteInputPiano` (touch). |
 | Display piano | `PianoKeyboard.tsx` | Synesthesia layer display + audition. Its clicks play audio but deliberately never dispatch "midin" - one surface, one purpose. |
 
+## Tier 9: sharing vocabulary (Phase 8 S1, D145-D149)
+
+> SESSION LINK: the URL is the share channel - one debounced writer
+> (ADR-015) syncs the musical session state; browser history is NOT
+> (replaceState-only, D147). A link reproduces a session; your
+> playhead and device calibration stay yours.
+
+| Term | Identifier | Notes |
+|---|---|---|
+| Share URL | `copyShareUrl()` (`src/lib/shareUrl.ts`) | The ONLY sanctioned copy path. Copies the CURRENT location after the flush; raw `clipboard.writeText` of a self-built URL is banned (drift magnet). |
+| Flush-before-copy | `flushUrlWrite()` (`src/lib/urlSyncBus.ts`) | The synchronous pagehide-flush law reused by every Share click: a link copied within the 200 ms debounce window is never stale (D149). |
+| eseed | `src/lib/exploreUrl.ts` | The explore seed text as URL key. Named to dodge the etude integer-`seed` collision, exactly per the shipped `tmode` precedent (D146). |
+| Armed state | `PlaySurface` (`src/components/PlaySurface.tsx`) | The honest `/play` contract: the idea is shown with ONE big Play button; the click IS the gesture browsers require before audio (no autoplay attempt - D148). |
+
 ## Naming patterns (your proposal)
 
 Use these patterns for new code:

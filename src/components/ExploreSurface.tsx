@@ -39,6 +39,13 @@ import {
   type PreviewState,
 } from "../lib/composePreview";
 import { hearIdeaCard } from "../lib/exploreHear";
+// PRD-001 Phase 8 S1 (D146/D149): the eseed codec (governor constant
+// + live boot read) and the flush-before-copy share seam.
+import {
+  ESEED_URL_MAX,
+  parseExploreSeedParam,
+} from "../lib/exploreUrl";
+import { copyShareUrl, shareStatusText, type ShareStatus } from "../lib/shareUrl";
 import {
   parseExploreSeed,
   ideaToSeedText,
@@ -579,6 +586,8 @@ export const ExploreSurface: React.FC<ExploreSurfaceProps> = ({
   const [varyInput, setVaryInput] = useState<readonly number[] | null>(null);
   const [varyText, setVaryText] = useState("");
   const [conceptOpen, setConceptOpen] = useState<string | null>(null);
+  // PRD-001 Phase 8 S1 (D149): the Share button's 3-state status.
+  const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
   const [hearState, setHearState] = useState<PreviewState>(() =>
     composePreviewPlayer.getState(),
   );
@@ -723,21 +732,38 @@ export const ExploreSurface: React.FC<ExploreSurfaceProps> = ({
     pushHistory(seedText, next);
   };
 
-  // Boot from the current idea (one-shot, StrictMode-safe): the IdeaBar
-  // carrier lands here via requestMode("explore").
+  // Boot (one-shot, StrictMode-safe). D146 precedence: eseed > the
+  // carried idea (the IdeaBar carrier lands here via
+  // requestMode("explore")) > "". The URL is read LIVE here: on a
+  // persisted-mode reload this child's boot effect runs BEFORE
+  // App's parent boot effect (React passive effects are child-
+  // first), so the store mirror may not be populated yet - the
+  // deep link must still land (slice deviation D-1: the doc's
+  // store-only channel cannot cover that ordering; the store read
+  // stays as the fallback for same-session mounts).
   useEffect(() => {
     if (bootedRef.current) return;
     bootedRef.current = true;
-    const idea = useSessionStore.getState().currentIdea;
-    if (idea === null || idea === undefined) return;
-    const text = ideaToSeedText(idea);
+    const s = useSessionStore.getState();
+    const urlSeed = parseExploreSeedParam(
+      new URLSearchParams(window.location.search),
+    );
+    const idea = s.currentIdea;
+    const ideaText =
+      idea === null || idea === undefined ? "" : ideaToSeedText(idea);
+    // "" is ABSENT for precedence purposes (the push effect mirrors an
+    // empty box; an empty mirror must never shadow the carried idea).
+    const storeSeed =
+      s.exploreSeedUrl === null || s.exploreSeedUrl === ""
+        ? null
+        : s.exploreSeedUrl;
+    const text = urlSeed ?? storeSeed ?? ideaText;
     if (text === "") return;
     const parsed = parseExploreSeed(text);
     setSeedText(text);
     setSeed(parsed);
     // Key at boot time (surfaceKey closes over the first render's
     // store snapshot - boot runs once, so read live state here).
-    const s = useSessionStore.getState();
     const key =
       s.composeAnalysis?.key.candidates[0] ??
       (s.etudeConstraints !== null
@@ -751,13 +777,22 @@ export const ExploreSurface: React.FC<ExploreSurfaceProps> = ({
     setCards(built);
     setHistory([{ seedText: text, cards: built }]);
     setHistoryIndex(0);
-    if (idea.melody !== null && idea.melody.length > 0) {
+    if (idea !== null && idea !== undefined && idea.melody !== null && idea.melody.length > 0) {
       setVaryInput([...idea.melody]);
       setVaryText(idea.melody.join(", "));
     }
     // Intentionally empty deps - boot resolution only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // PRD-001 Phase 8 S1 (D146): seedText -> the ephemeral store
+  // mirror the URL writer reads (skip-when-equal; the field is
+  // OUTSIDE partialize, so no localStorage per keystroke - the
+  // debounced writer is the only consumer).
+  useEffect(() => {
+    const store = useSessionStore.getState();
+    if (store.exploreSeedUrl !== seedText) store.setExploreSeedUrl(seedText);
+  }, [seedText]);
 
   // Hear state mirror (one subscription, StrictMode-safe).
   useEffect(() => {
@@ -868,6 +903,13 @@ export const ExploreSurface: React.FC<ExploreSurfaceProps> = ({
     setVaryText(card.melody.join(", "));
   };
 
+  // PRD-001 Phase 8 S1 (D149): copyShareUrl FLUSHES the debounced
+  // writer first (the anti-stale law) - mode + eseed + idea ride the
+  // URL; no explicit idea param here (the writer's synced one stays).
+  const handleShare = (): void => {
+    void copyShareUrl().then(setShareStatus);
+  };
+
   const effectiveBarCount =
     barCount ?? Math.floor((MIN_PATH_BARS + MAX_PATH_BARS) / 2);
   const planResult = planForm({ bars: effectiveBarCount, template: "aaba" });
@@ -884,15 +926,49 @@ export const ExploreSurface: React.FC<ExploreSurfaceProps> = ({
         className="surface-1 border border-[color:var(--color-border)] rounded-2xl p-4"
         data-testid="explore-seed"
       >
-        <h2 className="text-sm font-semibold text-[color:var(--color-text-1)] mb-3">
-          Explore a seed
-        </h2>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-sm font-semibold text-[color:var(--color-text-1)]">
+            Explore a seed
+          </h2>
+          <div className="flex items-center gap-2">
+            {shareStatus !== null && (
+              <span
+                role="status"
+                aria-live="polite"
+                data-testid="share-url-status"
+                className="text-[10px] t-mono text-[color:var(--color-text-3)]"
+              >
+                {shareStatusText(shareStatus)}
+              </span>
+            )}
+            <button
+              type="button"
+              data-testid="share-url-button"
+              onClick={handleShare}
+              title="Copy the current session URL (flushed fresh)"
+              className="px-2.5 py-1 rounded border border-[color:var(--color-border)] text-[11px] t-mono text-neutral-300 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400/60"
+            >
+              Share
+            </button>
+          </div>
+        </div>
         <SeedPicker
           value={seedText}
           onChange={setSeedText}
           onCommit={(parsed) => commitSeed(parsed.raw)}
           autoFocus={false}
         />
+        {/* PRD-001 Phase 8 S1 (D146): the governor honesty notice (the
+            shipped compose-url-notice pattern) - the writer SKIPS the
+            eseed key past 200 chars; the link opens without it. */}
+        {seedText.length > ESEED_URL_MAX && (
+          <p
+            className="mt-2 rounded border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-300"
+            data-testid="explore-url-notice"
+          >
+            {`Seed too long for the share URL (${ESEED_URL_MAX} chars max) - the link opens without it.`}
+          </p>
+        )}
         {ops.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3" role="group" aria-label="Explore operations">
             {ops.map((op) => (

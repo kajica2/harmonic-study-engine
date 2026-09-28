@@ -81,6 +81,73 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Session sharing: every session is a link + the /play idea page
+  (PRD-001 Phase 8 slice 1, D145-D151).** (1) PRACTICE URL: the
+  study surface now serializes its musical session on the ONE
+  debounced writer - `path` (the path ID, never the index;
+  generated `etu-*` paths NEVER ride - the 13 etude keys already
+  carry their regeneration), `bpm` (deleted at the default 60),
+  `persona`, `voicing`; boot merges FIELD-WISE (URL wins only for
+  PRESENT keys, HIGH-001 doctrine; restore runs AFTER the etude
+  prepend, resolved by ID against the live list). Playheads, drill
+  mechanics, detection/note-input gates and latency stay
+  device-local on purpose (D145's itemized OUT table). (2)
+  EXPLORE URL: the seed text rides as `eseed` - the seed IS the
+  session (cards regenerate deterministically; the op-history
+  strip is a playhead and stays local); the 200-char governor
+  skips the key ONLY, with an honest surface notice; the bare
+  `seed` key was rejected (etude integer-domain collision - the
+  shipped `tmode` precedent, D146). (3) FLUSH-BEFORE-COPY (D149):
+  the pagehide law relocated to `src/lib/urlSyncBus.ts`
+  (register/schedule/flush - a SCHEDULER, not a second writer;
+  ADR-015's single `write()` stays singular, now registered) so a
+  Share click milliseconds after a change never copies a stale
+  URL; `src/lib/shareUrl.ts` is the ONLY sanctioned copy seam
+  (three status strings byte-identical to the shipped IdeaBar
+  contract). Share buttons land on FOUR surfaces - practice
+  header, etude composer (shares the last APPLIED constraints,
+  the draft stays local - documented honesty), compose (4th honest
+  status when the 6000-governor fires: "Share link copied -
+  session too large, compose keys omitted.") and explore. The
+  IdeaBar refactored onto the same seam: its link upgraded from
+  the search-dropping origin+pathname base to the FULL session
+  URL, and the stale "Share: not yet implemented -- Phase 8" warn
+  after every successful copy is GONE - Phase 8 shipped it. (4)
+  IDEA SYNC: `?idea=` now rides the writer (1500-char governor,
+  idea-only skip; explicit copy always sets, boot decode
+  uncapped) through `src/lib/ideaShare.ts` - ONE byte-compatible
+  codec shared by App boot, IdeaBar and PlaySurface (links
+  already in the wild still land). (5) /play (D148):
+  `/play?idea=<base64>` is a real page - one pathname branch in
+  `main.tsx` (no router dep; TD-047's routing verdict: no router,
+  one branch), minimal `PlaySurface`, ARMED state = one click
+  plays (browsers keep audio asleep until you interact - the
+  REQ-IO-52 "immediately" erratum); chord/progression/melody play
+  through the shipped composePreviewPlayer machinery (ADR-020 -
+  no new AudioContext, no new transport), scale/seed get an
+  honest CTA into the app; App never mounts there, so the shared
+  link stays pristine. `vercel.json` gains `/play` + `/play/`
+  rewrites (Vercel previews 404 until this deploys) and
+  `public/serve.json` makes the route reachable for the e2e
+  static server - webServer command byte-identical. (6)
+  Back/forward exits the app BY DESIGN (D147 - the
+  replaceState-only writer creates no history entries; TD-027
+  refined, popstate stays unwired): links are the share channel,
+  history is yours. No zustand v5 (`exploreSeedUrl` is EPHEMERAL,
+  outside partialize); no new K.* keys; predicate 4 -> 6 terms
+  (currentIdea ref-compare + exploreSeedUrl primitive,
+  both-direction pins). Suite 2664 -> 2743 / 1 skipped (202 ->
+  211 files; frozen tests/ pins untouched, it( stays 362);
+  engine purity floor stays 56 (zero engine files); e2e 34 -> 41
+  tests / 14 -> 16 specs - 7 new discriminative legs (practice
+  round-trip into a FRESH context, the real-clipboard
+  flush-before-copy break-guard, eseed + governor honesty, idea
+  sync + stale-warn kill, /play armed -> playing, empty honesty +
+  CTA landing, URL pristineness). Docs: `docs/MODES.md` (session
+  sharing + key table), `docs/ARCHITECTURE.md` (six URL key
+  families), `docs/EXPLORE-MODE.md` (eseed amendment),
+  `docs/TERMINOLOGY.md` (Tier 9). Design + post-ship errata:
+  `docs/PHASE-8-S1-SHARE.md` (section 14).
 - **Ear training + SRS + practice log + drawer completion (PRD-001
   Phase 6, D102..D114)** -- the Etude surface gains a hearing gym.
   EAR DRILLS (REQ-PED-20/21/22): an "Ear training" SECTION below the

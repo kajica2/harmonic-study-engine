@@ -42,6 +42,12 @@ const JSDOM_FILES = [
   // components glob at the top - do NOT add it here twice.
   "src/lib/noteInputBus.test.ts",
   "src/hooks/useNoteInput.test.ts",
+  // PRD-001 Phase 8 S1: the URL-write scheduler (fake timers) + the
+  // copy seam (window.location / navigator.clipboard). The new
+  // component tests PlaySurface/PracticeHeader are covered by the
+  // components glob at the top - do NOT add them here twice.
+  "src/lib/urlSyncBus.test.ts",
+  "src/lib/shareUrl.test.ts",
   "src/lib/storage.test.ts",
   "src/state/sessionStore.test.ts",
   "tests/usePathGenerator.test.ts",

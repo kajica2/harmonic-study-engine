@@ -332,12 +332,45 @@ is present.
 | **Send to Etude** | Routes the Idea into the Etude surface as carried constraints (key/mode/bars/seed via `setEtudeConstraints`, NOT an accept -- no dirty; the user presses Generate). |
 | **Send to Explore** | Switches to Explore; the current Idea is already the carrier (Explore boots its seed text from it). |
 | **Save** | Persists the current Idea to `hse.ideas` (capped at 100 entries); emits `console.warn("[IdeaBar] Save: snapshot stored at hse.ideas")`. Saved ideas are accessible from any mode. |
-| **Share** | Base64-encodes the Idea as JSON and copies `<origin>/<path>?idea=<base64>` to the clipboard via `navigator.clipboard.writeText` (falls back to a status pill when the API is unavailable or blocked). Server-less per REQ-IO-50. Emits `console.warn("[IdeaBar] Share: not yet implemented -- Phase 8")`. |
+| **Share** | Copies the CURRENT session URL with the live Idea re-set on `idea=` (Phase 8 S1, D149): the copy seam flushes the debounced URL writer synchronously BEFORE reading the location, so a link copied milliseconds after a change is never stale. Falls back to a status pill when the clipboard API is unavailable or blocked. Server-less per REQ-IO-50. |
 
 The share URL is a fully self-contained snapshot: opening
 `?idea=<base64>` in a new tab seeds the Idea into the store via
 `useSessionStore.setCurrentIdea(...)` (URL sync runs once on App
-mount).
+mount). The old search-dropping `origin+pathname+?idea=` base is
+gone - the link now carries the mode/transpose/context keys the
+writer already syncs.
+
+## Session sharing (URL state, Phase 8 S1)
+
+Every session is a link. The address bar carries the musical
+session state; opening a link on any machine lands the same
+session. The ONE debounced writer (200 ms `replaceState`, never
+`pushState`) owns the URL; Share buttons on all five surfaces
+(practice header, etude composer, compose, explore, Idea bar) flush
+it synchronously before copying (D149 - flush-before-copy is law).
+
+| Family | Keys | Owner module | Governor |
+|---|---|---|---|
+| core | `mode`, `transpose` | App writer (shipped) | - |
+| idea | `idea` | `src/lib/ideaShare.ts` | 1500 chars, skips `idea` only |
+| etude | `style,key,tmode,diff,bars,seed,tempo,start,end,chrom,straight,cts,maxint` (13) | `src/lib/etudeUrl.ts` | validator |
+| compose | `cfile,chash,cchart,creq,covr,canf,cmix` (7) | `src/lib/composeUrl.ts` | 6000, wipes compose only |
+| practice | `path,bpm,persona,voicing` (4) | `src/lib/practiceUrl.ts` | small by construction |
+| explore | `eseed` | `src/lib/exploreUrl.ts` | 200, skips `eseed` only |
+
+Playheads (`activeStepIndex`, the explore history index), drill
+mechanics, detection/note-input gates, latency, and mixer ergonomics
+are deliberately NOT serialized - device continuity, not musical
+content (D145's itemized ruling). Generated etude paths (`etu-*`)
+never ride `path=`: the 13 etude keys carry their full regeneration
+(one truth per value).
+
+Browser back/forward exits the app by design (replaceState-only
+sync creates no history entries); links are the share channel
+(D147). `/play?idea=<base64>` is the minimal idea page (D148):
+armed state, one click plays - browsers keep audio asleep until you
+interact.
 
 ## Storage
 

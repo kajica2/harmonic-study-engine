@@ -1,5 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Play, Pause, Repeat, Drum, Settings2, ListChecks } from "lucide-react";
+// PRD-001 Phase 8 S1 (D149): the flush-before-copy share seam - the
+// study surface's Share button copies the CURRENT URL (path/bpm/
+// persona/voicing/transpose/idea ride it) FRESH, never stale.
+import { copyShareUrl, shareStatusText, type ShareStatus } from "../lib/shareUrl";
 import {
   formatBarReadout,
   formatGuideToneTally,
@@ -308,6 +312,15 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   // Calibrate button opens it. Escape/backdrop close = onClose; the
   // wizard's rolling effect cleans itself up on unmount (no leaks).
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // PRD-001 Phase 8 S1 (D149): the Share button's ephemeral status
+  // (the local-visibility precedent - UI state, not persisted taste).
+  const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
+  const handleShare = (): void => {
+    // copyShareUrl FLUSHES the debounced writer synchronously first
+    // (the anti-stale law), then reads the fresh location.
+    void copyShareUrl().then(setShareStatus);
+  };
 
   return (
     <div
@@ -641,6 +654,34 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
             ))}
           </select>
         </label>
+
+        {/* PRD-001 Phase 8 S1 (D149): Share - copies the CURRENT
+            session URL (flushed fresh: path/bpm/persona/voicing/
+            transpose/idea all ride the one writer). Mouse/touch
+            affordance only - NO key binding (the frozen SHORTCUTS
+            reverse pin, D143 precedent). */}
+        <div className="flex items-center gap-2">
+          {shareStatus !== null && (
+            <span
+              role="status"
+              aria-live="polite"
+              data-testid="share-url-status"
+              className="text-[10px] t-mono text-[color:var(--color-text-3)]"
+            >
+              {shareStatusText(shareStatus)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label="Share session link"
+            title="Copy the current session URL - the link reproduces this practice setup"
+            data-testid="share-url-button"
+            className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-xs t-mono border border-[color:var(--color-border)] text-neutral-400 hover:text-neutral-200 surface-1"
+          >
+            Share
+          </button>
+        </div>
       </div>
 
       {/* S3 (D134): the calibration wizard (ModalShell, mounted only

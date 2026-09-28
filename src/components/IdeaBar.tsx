@@ -14,10 +14,11 @@
  *   - Send-to-Explore: requestMode only (currentIdea is the carrier;
  *     ExploreSurface boots its seed from it).
  *   - Save button writes the current Idea to `hse.ideas` (capped 100).
- *   - Share button builds a `?idea=<base64>` URL and copies it to the
- *     clipboard. Server-less; the URL is the share channel
- *     (REQ-IO-50). Emits a console.warn for now per D6 (the warn is
- *     allowed by tests/no-debug-logs.test.ts).
+ *   - Share button copies the CURRENT session URL with the live Idea
+ *     re-set on the `idea` param (PRD-001 Phase 8 S1, D149: the
+ *     flush-before-copy seam - full context, never the old
+ *     search-dropping origin+pathname base). Server-less; the URL is
+ *     the share channel (REQ-IO-50).
  *
  * The bar's action cluster renders disabled when there is no current
  * idea (Save/Share) - matching the affordance honesty rule from D8.
@@ -33,8 +34,9 @@
 import React, { useCallback, useState } from "react";
 import { X } from "lucide-react";
 import { useSessionStore, type Mode } from "../state/sessionStore";
-import type { Idea } from "../../engine/core/idea";
 import { ideaFromChord } from "../../engine/core/idea";
+// PRD-001 Phase 8 S1 (D149): ONE codec + the flush-before-copy seam.
+import { copyShareUrl, shareStatusText } from "../lib/shareUrl";
 import {
   ideaToSeedText,
   parseExploreSeed,
@@ -64,16 +66,6 @@ const SEND_OPTIONS: ReadonlyArray<{
   { value: "etude", label: "Send to Etude" },
   { value: "explore", label: "Send to Explore", hint: "Open in Explore" },
 ];
-
-function buildShareUrl(idea: Idea): string {
-  const json = JSON.stringify(idea);
-  // base64 of UTF-8 (btoa requires latin-1; we encodeURIComponent
-  // first to escape non-ASCII bytes defensively).
-  const b64 = btoa(encodeURIComponent(json));
-  const search = `?idea=${encodeURIComponent(b64)}`;
-  const base = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
-  return `${base}${search}`;
-}
 
 export interface IdeaBarProps {
   /** The currently active step in the loaded path, or null when no
@@ -176,23 +168,16 @@ export const IdeaBar: React.FC<IdeaBarProps> = ({
 
   const handleShare = useCallback(async () => {
     if (!idea) return;
-    const url = buildShareUrl(idea);
-    try {
-      if (
-        typeof navigator !== "undefined" &&
-        navigator.clipboard &&
-        typeof navigator.clipboard.writeText === "function"
-      ) {
-        await navigator.clipboard.writeText(url);
-        setShareStatus("Share link copied to clipboard.");
-      } else {
-        setShareStatus("Share link ready (clipboard unavailable).");
-      }
-    } catch {
-      setShareStatus("Share link ready (clipboard blocked).");
-    }
-    // eslint-disable-next-line no-console
-    console.warn("[IdeaBar] Share: not yet implemented -- Phase 8");
+    // PRD-001 Phase 8 S1 (D149): the flush-before-copy seam. The
+    // copied link now carries the FULL session context (the writer's
+    // fresh URL + the live idea re-set on `idea=`) - audit #8's
+    // search-dropping origin+pathname base is gone, and the stale
+    // Phase-8-placeholder warn fired after every copy is DELETED
+    // (the copy is implemented - this slice shipped it). The three
+    // status strings are byte-identical to the shipped contract
+    // (shareUrl.shareStatusText).
+    const status = await copyShareUrl(idea);
+    setShareStatus(shareStatusText(status));
   }, [idea]);
 
   const handleClear = useCallback(() => {
@@ -284,6 +269,7 @@ export const IdeaBar: React.FC<IdeaBarProps> = ({
         </button>
         <button
           type="button"
+          data-testid="share-url-button"
           onClick={handleShare}
           disabled={!idea}
           className="px-3 py-1.5 rounded bg-neutral-900 border border-[color:var(--color-border)] text-neutral-300 text-xs font-medium hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-400/60 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -295,6 +281,7 @@ export const IdeaBar: React.FC<IdeaBarProps> = ({
         <div
           role="status"
           aria-live="polite"
+          data-testid="share-url-status"
           className="text-[10px] t-mono text-[color:var(--color-text-3)] mt-1 max-w-screen-2xl mx-auto"
         >
           {shareStatus}

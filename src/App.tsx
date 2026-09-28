@@ -174,7 +174,7 @@ import { ModeGate } from "./components/ModeGate";
 import { IdeaBar } from "./components/IdeaBar";
 import { DirtyPromptModal } from "./components/DirtyPromptModal";
 import { useSessionStore as useNewSessionStore, resolveBootTranspose, SESSION_STORAGE_KEY } from "./state/sessionStore";
-import { ideaFromChord, isIdea } from "../engine/core/idea";
+import { ideaFromChord } from "../engine/core/idea";
 // PRD-001 Phase 7 S1 (F3, D110): the pure bar<->step law for the
 // form-relative 1:1 loop windows.
 import { clampWindow, totalFormBars, windowStepRange } from "../engine/practice/windows";
@@ -265,6 +265,29 @@ import {
   composeUrlPresence,
   mergeComposeUrlWithPersisted,
 } from "./lib/composeUrl";
+// PRD-001 Phase 8 S1 (D145/D146/D149): the practice + explore URL
+// codecs, the ONE shared idea codec, and the writer's debounce bus
+// (register/schedule/flush - ADR-015 stays byte-true: write() is
+// still the only function that touches history).
+import {
+  parsePracticeParams,
+  serializePractice,
+  type PracticeStateIn,
+} from "./lib/practiceUrl";
+import {
+  parseExploreSeedParam,
+  serializeExploreSeed,
+} from "./lib/exploreUrl";
+import {
+  IDEA_URL_KEY,
+  decodeIdeaParam,
+  encodeIdeaParam,
+} from "./lib/ideaShare";
+import {
+  flushUrlWrite,
+  registerUrlWriter,
+  scheduleUrlWrite,
+} from "./lib/urlSyncBus";
 import type { Etude, EtudeConstraints } from "../engine/etude/types";
 
 // downloadText moved to src/lib/download.ts (extracted by main)
@@ -1442,23 +1465,13 @@ function AppShell() {
         legacyValue: legacyStored,
       }),
     );
-    const ideaStr = params.get("idea");
-    if (ideaStr) {
-      // Decode a shared Idea URL. Malformed payloads are warned and
-      // dropped so the rest of the URL still works.
-      try {
-        const json = decodeURIComponent(atob(ideaStr));
-        const parsed = JSON.parse(json);
-        // Use the engine's `isIdea` type guard so every IdeaKind
-        // (chord / progression / scale / melody / seed) round-trips,
-        // not just chord-kind Ideas.
-        if (isIdea(parsed)) {
-          useNewSessionStore.getState().setCurrentIdea(parsed);
-        }
-      } catch {
-        // eslint-disable-next-line no-console
-        console.warn("[App] ?idea= payload was malformed; ignoring");
-      }
+    // PRD-001 Phase 8 S1 (D149): the ?idea= decode relocated to the
+    // ONE shared codec (src/lib/ideaShare.ts) - byte-compatible with
+    // the shipped scheme (links are in the wild); malformed payloads
+    // warn + drop exactly as before so the rest of the URL works.
+    const ideaParsed = decodeIdeaParam(params.get("idea"));
+    if (ideaParsed) {
+      useNewSessionStore.getState().setCurrentIdea(ideaParsed);
     }
     // PRD-001 Phase 3 Slice 2 (D28): etude constraint params. URL >
     // persisted (this effect runs after rehydration; the debounced
@@ -1505,6 +1518,10 @@ function AppShell() {
     }
     const resolvedEtude =
       etudeParsed ?? useNewSessionStore.getState().etudeConstraints;
+    // PRD-001 Phase 8 S1 (D145): the prepended etude path (if any)
+    // joins the LIVE list the practice `path` id lookup runs against
+    // - the index-shift class REVIEWER HIGH-001 is about.
+    let prependedEtudePath: HarmonicPath | null = null;
     if (resolvedEtude) {
       // generateEtudeFor validates + memoizes: sub-ms regen, null for
       // a corrupt persisted value (never throws, REQ-NFR-5).
@@ -1525,6 +1542,12 @@ function AppShell() {
         // dedupe double-guard).
         const plan = planEtudeRestore(paths, pid);
         if (plan.prepend) {
+          if (!paths.some((p) => p.id === pid)) {
+            prependedEtudePath = {
+              ...etudeToHarmonicPath(restored),
+              name: restored.title,
+            };
+          }
           setPaths((prev) =>
             prev.some((p) => p.id === pid)
               ? prev
@@ -1534,12 +1557,72 @@ function AppShell() {
         }
       }
     }
+    // PRD-001 Phase 8 S1 (D145/D146): explore + practice keys land in
+    // THIS same one-shot, AFTER the etude prepend (the ordering law -
+    // never trust a stale index; the lookup runs against the live
+    // list, resolved BY ID). Field-wise merge: the URL wins for
+    // PRESENT valid keys only; absent / malformed / unresolvable
+    // values keep the persisted state SILENTLY (practice keys are
+    // additive context, not identity - D145's benign-drop law).
+    const eseedRaw = parseExploreSeedParam(params);
+    if (eseedRaw !== null) {
+      useNewSessionStore.getState().setExploreSeedUrl(eseedRaw);
+    }
+    const practiceParsed = parsePracticeParams(
+      params,
+      PERSONAS.map((p) => p.id),
+      Object.keys(VOICINGS),
+    );
+    if (practiceParsed.pathId !== null) {
+      const livePaths =
+        prependedEtudePath !== null
+          ? [prependedEtudePath, ...paths]
+          : paths;
+      const idx = livePaths.findIndex((p) => p.id === practiceParsed.pathId);
+      // Unknown id (an import the recipient lacks): silent drop - the
+      // persisted selection survives.
+      if (idx >= 0) setActivePathIndex(idx);
+    }
+    if (practiceParsed.bpm !== null) setTempo(practiceParsed.bpm);
+    if (practiceParsed.personaId !== null) {
+      setSelectedPersonaId(practiceParsed.personaId);
+    }
+    if (practiceParsed.voicingId !== null) {
+      // Membership-checked against Object.keys(VOICINGS) above; the
+      // cast narrows string -> VoicingId (never an unchecked any).
+      setVoicingType(practiceParsed.voicingId as VoicingId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // PRD-001 Phase 8 S1 (D149): the practice scalars live in the
+  // LEGACY HOOK (invisible to the zustand subscription - audit #6),
+  // so they ride a REF + scheduleUrlWrite() directly - the React-deps
+  // seam the design names. The ref is initialized to the first-render
+  // values; write() reads it at fire time, and the bus's idempotent
+  // re-arm makes the boot-restore sequence land on the final values
+  // (the 200ms window coalesces the transient ones - never a stale
+  // write, same cure as the pagehide flush).
+  const practiceUrlRef = useRef<PracticeStateIn>({
+    pathId: paths[activePathIndex]?.id ?? "",
+    bpm: tempo,
+    personaId: selectedPersonaId,
+    voicingId: voicingType,
+  });
+  useEffect(() => {
+    practiceUrlRef.current = {
+      pathId: paths[activePathIndex]?.id ?? "",
+      bpm: tempo,
+      personaId: selectedPersonaId,
+      voicingId: voicingType,
+    };
+    // Mount fires a harmless idempotent schedule (the URL rewrites to
+    // itself - the writer's own law, urlSyncPredicate.ts:16-18).
+    scheduleUrlWrite();
+  }, [paths, activePathIndex, tempo, selectedPersonaId, voicingType]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let timer: number | null = null;
     const write = () => {
       const params = new URLSearchParams(window.location.search);
       const state = useNewSessionStore.getState();
@@ -1567,19 +1650,49 @@ function AppShell() {
         if (v === null) params.delete(k);
         else params.set(k, v);
       }
+      // PRD-001 Phase 8 S1 (D149): the shared idea rides `idea=` -
+      // ONE codec with IdeaBar/PlaySurface (ideaShare.ts). The
+      // 1500-char governor skips THIS key only (never wipes other
+      // families - the compose discipline); explicit copyShareUrl()
+      // sets it regardless (user intent beats compactness).
+      const ideaEnc = encodeIdeaParam(state.currentIdea);
+      if (ideaEnc === null) params.delete(IDEA_URL_KEY);
+      else params.set(IDEA_URL_KEY, ideaEnc);
+      // PRD-001 Phase 8 S1 (D145): the practice scalars (legacy-hook
+      // state via the sync-effect ref above). Defaults and etu-*
+      // path ids delete their keys (generated etudes ride the 13
+      // etude keys - ADR-015 "requests not results").
+      for (const [k, v] of Object.entries(
+        serializePractice(practiceUrlRef.current),
+      )) {
+        if (v === null) params.delete(k);
+        else params.set(k, v);
+      }
+      // PRD-001 Phase 8 S1 (D146): the explore seed mirror rides
+      // `eseed` (over-cap -> the key is skipped; ExploreSurface
+      // shows the honest notice).
+      for (const [k, v] of Object.entries(
+        serializeExploreSeed(state.exploreSeedUrl),
+      )) {
+        if (v === null) params.delete(k);
+        else params.set(k, v);
+      }
       const search = params.toString();
       const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
       window.history.replaceState({}, "", next);
     };
+    // ADR-015 stays byte-true: ONE write() function, now registered
+    // into the bus (urlSyncBus.ts). The debounce timer and the
+    // pagehide flush relocated THERE unchanged (same 200ms, same
+    // clearTimeout+write semantics) so copyShareUrl can reuse the
+    // flush (D149 - the stale-copy cure).
+    const unregister = registerUrlWriter(write);
     const unsub = useNewSessionStore.subscribe((s, prev) => {
-      // TESTER GAP-1 (fix round): the three-term predicate lives in
+      // TESTER GAP-1 (fix round): the predicate lives in
       // src/lib/urlSyncPredicate.ts (pure + tested both directions -
-      // an etudeConstraints change fires, unrelated store state
-      // does not). Dropping a term there now fails CI.
-      if (shouldScheduleUrlWrite(prev, s)) {
-        if (timer !== null) window.clearTimeout(timer);
-        timer = window.setTimeout(write, 200);
-      }
+      // now SIX terms with currentIdea + exploreSeedUrl, D149).
+      // Dropping a term there now fails CI.
+      if (shouldScheduleUrlWrite(prev, s)) scheduleUrlWrite();
     });
     // HIGH-001 complement (S4 fix round): the 200ms debounce DIES on
     // reload, so a fast reload's URL carried a STALE compose payload
@@ -1588,18 +1701,13 @@ function AppShell() {
     // fires on reload AND tab close in every target browser; the
     // flush is synchronous (clearTimeout + immediate replaceState),
     // so the URL matches the store at the unload boundary. No pending
-    // write -> no write (the URL is already current).
-    const flush = () => {
-      if (timer === null) return;
-      window.clearTimeout(timer);
-      timer = null;
-      write();
-    };
-    window.addEventListener("pagehide", flush);
+    // write -> no write (the URL is already current). Phase 8 S1
+    // (D149): the law RELOCATED to urlSyncBus.flushUrlWrite unchanged.
+    window.addEventListener("pagehide", flushUrlWrite);
     return () => {
       unsub();
-      window.removeEventListener("pagehide", flush);
-      if (timer !== null) window.clearTimeout(timer);
+      window.removeEventListener("pagehide", flushUrlWrite);
+      unregister();
     };
   }, []);
 

@@ -23,6 +23,17 @@ import { analyzeFixture, buildMidiBytes, makeMidiFile } from "./composeFixtures"
 import { buildChartSession, parseChordChart } from "../../engine/compose/chordchart";
 import { EMPTY_OVERRIDES, restCell, type AnalysisOverrides, type ComposeAnalysis, type NormalizedProject } from "../../engine/compose/types";
 
+// PRD-001 Phase 8 S1 (D149): mock ONLY the copy seam (jsdom has no
+// clipboard -> the real seam would answer "unavailable" and the 4th
+// governor variant could never render). shareStatusText stays REAL.
+vi.mock("../lib/shareUrl", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/shareUrl")>();
+  return {
+    ...actual,
+    copyShareUrl: vi.fn(async () => "copied" as const),
+  };
+});
+
 const STORE = useSessionStore.getState;
 
 beforeEach(() => {
@@ -718,5 +729,29 @@ describe("TESTER F-3: oversized-session URL notice (D86/RK-S4-5 governor)", () =
     render(<ComposeSurface onOpenImportExport={() => {}} />);
     await waitFor(() => expect(screen.getByTestId("chart-summary-card")).toBeTruthy());
     expect(screen.queryByTestId("compose-url-notice")).toBeNull();
+  });
+
+  // PRD-001 Phase 8 S1 (D149): the Share button's 4th honest status -
+  // when the governor notice is showing, the copy must NOT imply the
+  // session rode (PHASE-1-02). Seam routing is pinned in
+  // shareUrl.test.ts; copyShareUrl is mocked to resolve "copied".
+  it("governor visible -> copied status says the compose keys were omitted", async () => {
+    const { copyShareUrl } = await import("../lib/shareUrl");
+    const { project, analysis } = parseChordChartFixture("C Am F G");
+    act(() => {
+      STORE().setComposeChart("C Am F G", project, analysis);
+      STORE().patchComposeOverrides(hugeOverrides());
+    });
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("compose-url-notice")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId("share-url-button"));
+    await waitFor(() =>
+      expect(screen.getByTestId("share-url-status").textContent).toBe(
+        "Share link copied - session too large, compose keys omitted.",
+      ),
+    );
+    expect(copyShareUrl).toHaveBeenCalledTimes(1);
   });
 });

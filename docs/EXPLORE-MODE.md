@@ -51,6 +51,16 @@ Landing from the Idea bar boots the seed for you: whatever Idea you
 are carrying becomes seed text (a melody Idea seeds the Vary panel
 below, not the parser -- documented where it lands).
 
+Phase 8 S1 amended the "explore state stays transient" law for the
+seed ONLY (D146): the seed text rides the URL as `eseed=` (cards
+regenerate deterministically from it -- the seed IS the session), so
+a Share click on the explore surface produces a working deep link.
+Boot precedence is `eseed` > carried idea > empty. The op-history
+back/forward strip stays local -- it is a playhead, not content.
+Seeds longer than 200 chars skip the key (writer governor) and the
+surface says so honestly: "Seed too long for the share URL (200
+chars max) - the link opens without it."
+
 ## The five operations, in plain language
 
 Which buttons appear depends on the seed kind. A chord seed offers

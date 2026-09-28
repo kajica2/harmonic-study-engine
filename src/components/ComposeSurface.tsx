@@ -54,6 +54,10 @@ import {
   exportComposeWav,
 } from "../lib/composeExport";
 import { serializeComposeSession } from "../lib/composeUrl";
+// PRD-001 Phase 8 S1 (D149): the flush-before-copy share seam + the
+// 4th honest status when the 6000-governor notice is showing (the
+// copy must NOT imply the session rode when it was wiped - PHASE-1-02).
+import { copyShareUrl, shareStatusText, type ShareStatus } from "../lib/shareUrl";
 import { readMidiFile, sha256Hex, type ReadableMidiFile } from "../lib/composeMidi";
 import { analyzeProject, generateAccompaniment } from "../../engine/compose";
 import { buildChartSession, parseChordChart, type ChordChart } from "../../engine/compose/chordchart";
@@ -140,6 +144,9 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
   // D84: the chart-paste panel (empty state + [Edit chart] round trip).
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteInitial, setPasteInitial] = useState("");
+  // PRD-001 Phase 8 S1 (D149): the Share button's status (the local-
+  // ephemeral precedent - UI state, not persisted taste).
+  const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
 
   const overrides: AnalysisOverrides = composeSession?.overrides ?? EMPTY_OVERRIDES;
   const analyzeFull = composeSession?.analyzeFull ?? false;
@@ -220,6 +227,12 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
     merged !== null && !merged.key.chromaticFallback && merged.key.candidates.length > 0
       ? merged.key.candidates[0]
       : null;
+
+  // PRD-001 Phase 8 S1 (D149): the sanctioned copy seam - flushes the
+  // debounced writer synchronously BEFORE reading the location.
+  const handleShare = (): void => {
+    void copyShareUrl().then(setShareStatus);
+  };
 
   const handleGenerate = (): void => {
     if (merged === null || effectiveProject === null) return;
@@ -621,6 +634,35 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
                   {"Session too large to share via URL."}
                 </p>
               )}
+              {/* PRD-001 Phase 8 S1 (D149): Share - flush-before-copy,
+                  so the link carries the freshest compose session the
+                  governor LET ride; with the notice showing the status
+                  gains the 4th honest variant (the copy must not
+                  imply the session rode when it was wiped). */}
+              <div className="mb-3 flex items-center gap-2">
+                {shareStatus !== null && (
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    data-testid="share-url-status"
+                    className="text-[10px] t-mono text-[color:var(--color-text-3)]"
+                  >
+                    {shareStatus === "copied" && urlTooLarge
+                      ? "Share link copied - session too large, compose keys omitted."
+                      : shareStatusText(shareStatus)}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  aria-label="Share session link"
+                  data-testid="share-url-button"
+                  title="Copy the current URL - the compose session rides it (subject to the size governor)"
+                  className="px-3 py-1 rounded border border-[color:var(--color-border)] text-xs t-mono text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)]"
+                >
+                  Share
+                </button>
+              </div>
               {isChart && pasteOpen ? (
                 // D84 [Edit chart] round trip: the panel REPLACES the
                 // summary card while editing; commit rebuilds the session.

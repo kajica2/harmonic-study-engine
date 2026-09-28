@@ -7,15 +7,29 @@
  * their files are never edited).
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { ExploreSurface } from "./ExploreSurface";
 import { useSessionStore } from "../state/sessionStore";
 import { parseChordChart } from "../../engine/compose/chordchart";
+import { ideaFromChord } from "../../engine/core/idea";
+import { copyShareUrl } from "../lib/shareUrl";
+
+// PRD-001 Phase 8 S1: the share seam is pinned at its own module
+// (shareUrl.test.ts); here we only pin that the BUTTON routes
+// through it. The mock keeps the DOM test clipboard-free.
+vi.mock("../lib/shareUrl", () => ({
+  copyShareUrl: vi.fn(async () => "copied" as const),
+  shareStatusText: (s: string) => `status:${s}`,
+}));
 
 beforeEach(() => {
   localStorage.clear();
   useSessionStore.getState().resetModeSlice();
+  // Phase 8 S1: exploreSeedUrl is EPHEMERAL (outside resetModeSlice
+  // by design) - reset it here so boot precedence is order-independent.
+  useSessionStore.getState().setExploreSeedUrl(null);
+  window.history.replaceState({}, "", "/");
 });
 
 function commitSeed(text: string): void {
@@ -82,5 +96,61 @@ describe("ExploreSurface", () => {
     const s = useSessionStore.getState();
     expect(s.mode).toBe("etude");
     expect(s.etudeConstraints?.bars).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 8 S1 (D146/D149): the eseed plumbing - push mirror, boot
+// precedence, governor notice, and the Share button seam. 4 pins.
+// ---------------------------------------------------------------------------
+
+describe("ExploreSurface Phase 8 S1: eseed push / boot / notice / share", () => {
+  it("seedText edits push the ephemeral store mirror (skip-when-equal)", () => {
+    commitSeed("Cmaj7");
+    expect(useSessionStore.getState().exploreSeedUrl).toBe("Cmaj7");
+    // Re-committing the SAME text: seedText is unchanged -> the push
+    // effect's deps are unchanged -> NO second store write (churn law).
+    let writes = 0;
+    const unsub = useSessionStore.subscribe((s, prev) => {
+      if (s.exploreSeedUrl !== prev.exploreSeedUrl) writes++;
+    });
+    fireEvent.change(screen.getByTestId("seed-input"), {
+      target: { value: "Cmaj7" },
+    });
+    fireEvent.keyDown(screen.getByTestId("seed-input"), { key: "Enter" });
+    unsub();
+    expect(writes).toBe(0);
+  });
+
+  it("boot precedence: eseed (URL deep link) wins over the carried idea", () => {
+    useSessionStore
+      .getState()
+      .setCurrentIdea(ideaFromChord("etude", "Am7", 1_700_000_000_000, 0));
+    window.history.replaceState({}, "", "/?eseed=Dm7%20G7");
+    render(<ExploreSurface />);
+    // idea-only boot would show "Am7" (the shipped channel); the deep
+    // link must win (D146 pin).
+    expect((screen.getByTestId("seed-input") as HTMLInputElement).value).toBe(
+      "Dm7 G7",
+    );
+  });
+
+  it("a >200-char seed renders the honest explore-url-notice (governor)", () => {
+    commitSeed(`Cmaj7 ${"x".repeat(200)}`);
+    const notice = screen.getByTestId("explore-url-notice");
+    expect(notice.textContent).toContain(
+      "Seed too long for the share URL (200 chars max) - the link opens without it.",
+    );
+  });
+
+  it("the Share button routes through copyShareUrl (the flush-before-copy seam)", async () => {
+    commitSeed("Cmaj7");
+    fireEvent.click(screen.getByTestId("share-url-button"));
+    await waitFor(() => {
+      expect(screen.getByTestId("share-url-status").textContent).toBe(
+        "status:copied",
+      );
+    });
+    expect(copyShareUrl).toHaveBeenCalledTimes(1);
   });
 });
