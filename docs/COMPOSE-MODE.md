@@ -23,8 +23,8 @@ User requirements traced here: REQ-COMP-1 (upload), REQ-COMP-5
 (melody preview, melody-only carve), REQ-COMP-6 (pitch-bend warning),
 REQ-COMP-20..24 (editable analysis + undo), REQ-COMP-30..36
 (accompaniment: roles, voicing, patterns, density, seed),
-REQ-COMP-37/40/41/43 (mixer, combined MIDI export, full-mix WAV,
-key-in-filename; stems ZIP REQ-COMP-42 deferred TD-046),
+REQ-COMP-37/40/41/42/43 (mixer, combined MIDI export, full-mix WAV,
+per-group stems ZIP, key-in-filename),
 REQ-COMP-50..53 (edge cases + windowing), REQ-PED-4/5 (annotations +
 concept drawer, Compose host), REQ-TRANS-3 (accompaniment-only
 transpose), REQ-IO-10..16 (chord-chart paste; grammar reference:
@@ -326,7 +326,14 @@ known encoder bug), named `song_accomp_C.mid` by the effective key
 (the key segment is omitted when no key was detected - never a
 fake). **[Export WAV]** renders the FULL MIX at the CURRENT
 mixer levels (mono, up to 10:00, peak-safe: a hot mix is turned
-down, never amplified). And the URL bar now carries the whole
+down, never amplified). **[Export Stems]** writes one ZIP with one
+WAV per mix group at the same levels (`song_accomp_C.zip` holding
+`song_accomp_C_stem-bass.wav` and friends - members for the groups
+present, absent groups omitted, muted groups silent but present).
+Stems are per mix GROUP (stem-per-role: original/bass/chords/pad),
+not per original MIDI track - REQ-IO-32 reading note. Stems are
+pre-normalize (they sum to the pre-normalize mix); the full-mix WAV
+stays the peak-safe file. And the URL bar now carries the whole
 compose session (file identity + hash, chart text, overrides,
 request, mixer): share it and reopen on another device - a chart
 loads instantly; a MIDI file asks you to re-drop the matching file
@@ -353,10 +360,8 @@ honest remainder:
   (accompaniment)] render the first 1:30 of long charts (labeled);
   the WAV export renders up to 10:00. Nothing plays or bounces a
   full song past those caps.
-- **No stems ZIP or /play route.** Exporting the four groups as a
-  ZIP of WAVs (REQ-COMP-42) and a minimal shareable play page
-  (REQ-IO-52) are deliberate P2 deferrals (TD-046/TD-047) - the
-  per-group buffers make stems nearly free later.
+- **No /play route.** A minimal shareable play page (REQ-IO-52) is
+  a deliberate P2 deferral (TD-047).
 - **No piano-roll editing and one melody line only.** The roll is a
   preview; the multi-track editor is Phase 8.
 - **The human listen check is OPEN.** Structure, determinism, gain

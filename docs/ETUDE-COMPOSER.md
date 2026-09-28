@@ -159,6 +159,13 @@ reflects the current sounding transpose. The legacy chord-only
 MusicXML button is untouched, and chord-only exports are byte-identical
 to before this feature existed.
 
+## ABC download
+
+When an etude is loaded, an **ABC** button appears in the panel result
+row next to MusicXML (with melody). One click downloads the same ABC
+notation the Staff tab renders (same transpose, same chords, same
+ties - file and view agree byte-identically), named `<etude-path-id>.abc`.
+
 ## Shareable URLs
 
 Every constraint serializes into the address bar as you accept an

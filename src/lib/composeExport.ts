@@ -47,6 +47,7 @@
 
 import { Midi } from "@tonejs/midi";
 import { parseMidi, writeMidi } from "midi-file";
+import { zipSync } from "fflate";
 import { spellTonic } from "../../engine/core/spelling";
 import {
   computeGroupGains,
@@ -66,6 +67,7 @@ import type {
   NormalizedProject,
   TrackRoleAssignment,
 } from "../../engine/compose/types";
+import { MIX_GROUPS } from "../../engine/compose/types";
 
 /** D80: the export input. project is the EFFECTIVE one (D79). */
 export interface ComposeExportInput {
@@ -378,6 +380,20 @@ export function mixGroupBuffers(
 }
 
 /**
+ * D153 PURE scale step: channel data -> a FRESH gain-baked Float32 (the
+ * stems path's per-group output; the members sum to the PRE-normalize
+ * mix). exportComposeStems calls THIS (never a second implementation -
+ * pinning this helper pins the shipped path). Zero gain -> silence
+ * (matches accumulateGroupInto's no-op); the input is never mutated.
+ */
+export function scaleGroupSamples(data: Float32Array, gain: number): Float32Array {
+  const out = new Float32Array(data.length);
+  if (gain === 0) return out;
+  for (let i = 0; i < data.length; i++) out[i] = data[i] * gain;
+  return out;
+}
+
+/**
  * D88 PURE normalize: divide by the measured peak, CLAMPED to <= 1.0
  * (never amplify - a quiet mix stays quiet; a hot dense mix stops
  * clipping). All-zero stays zero.
@@ -427,4 +443,79 @@ export async function exportComposeWav(
   const blob = encodeWav(mixed, PREVIEW_SAMPLE_RATE);
   const name = composeExportFilename(exportBaseName(input.project.fileName), key, "wav");
   downloadBlob(blob, name);
+}
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 8 Slice 2 (D152/D153): per-GROUP stems ZIP (stem-per-role).
+// FOLDED here (the S4 D81 precedent: downloadBlob folded rather than a
+// one-function file). Consumes as-is: renderMixGroupsSequential +
+// computeGroupGains (composePreview), encodeWav (loopWav),
+// composeExportFilename/exportBaseName/downloadBlob (this file),
+// zipSync (fflate, the midiBatchExport precedent).
+// ---------------------------------------------------------------------------
+
+/** Member filename: <base>_accomp[_<Key>]_stem-<group>.wav.
+ *  Group segment is the MIX_GROUPS literal (ASCII by construction);
+ *  key-omission + sanitize inherit the REQ-COMP-43 law. */
+export function composeStemFilename(
+  base: string,
+  key: KeyCandidate | null,
+  group: MixGroup,
+): string {
+  const sanitized = base
+    .replace(/[\\/:*?"<>|]/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
+  const keySeg = key === null ? "" : `_${spellTonic(key.tonicPc, key.mode, "")}`;
+  return `${sanitized}_accomp${keySeg}_stem-${group}.wav`;
+}
+
+/** REQ-COMP-42: render + download the per-group stems ZIP at the CURRENT
+ *  mixer gains (600s cap, mono 44.1k 16-bit per member).
+ *
+ *  LAWS (pinned):
+  *  - SEQUENTIAL render (MED-001): one group at a time via
+  *    renderMixGroupsSequential; each buffer is gain-baked (computeGroupGains
+  *    levels via scaleGroupSamples - the exported pure step) into a fresh
+  *    Float32, encoded via encodeWav, then FREED (peak = one
+  *    buffer + one Float32 + streaming ZIP bytes - no accumulator).
+ *  - Gain-baked UNNORMALIZED (D153): stems sum to the PRE-normalize mix;
+ *    normalizePeak is NEVER called on this path (the full-mix WAV stays
+ *    the peak-safe artifact; tooltip + docs say so).
+ *  - Present-groups contract: one member per yielded Partial<> key
+ *    (MIX_GROUPS order); absent groups omitted; present-but-muted emit
+ *    silence (stable set whenever canExport).
+ *  - Envelope: composeExportFilename(base, key, "zip") (the S4 scheme). */
+export async function exportComposeStems(
+  input: MixRenderInput,
+  mixer: MixerState,
+  hasOriginal: boolean,
+  key: KeyCandidate | null,
+): Promise<void> {
+  const gains = computeGroupGains(mixer, hasOriginal);
+  const base = exportBaseName(input.project.fileName);
+  // Encode INSIDE the sequential callback (sync): the scaled Float32 is
+  // freed as soon as encodeWav copies it into the Blob, so mid-loop the
+  // peak is one AudioBuffer + one Float32 + finished member bytes
+  // (~53MB per yielded group at the 600s cap, 16-bit mono) (D153
+  // accounting).
+  // blob.arrayBuffer() runs after the render loop (async bridge).
+  const encoded: Partial<Record<MixGroup, Blob>> = {};
+  await renderMixGroupsSequential(input, EXPORT_CAP_SEC, (group, buf) => {
+    const scaled = scaleGroupSamples(buf.getChannelData(0), gains[group]);
+    encoded[group] = encodeWav(scaled, PREVIEW_SAMPLE_RATE);
+  });
+  const members: Record<string, Uint8Array> = {};
+  for (const group of MIX_GROUPS) {
+    const blob = encoded[group];
+    if (blob === undefined) continue;
+    members[composeStemFilename(base, key, group)] = new Uint8Array(
+      await blob.arrayBuffer(),
+    );
+  }
+  const zipBytes = zipSync(members);
+  downloadBlob(
+    new Blob([zipBytes as unknown as BlobPart], { type: "application/zip" }),
+    composeExportFilename(base, key, "zip"),
+  );
 }

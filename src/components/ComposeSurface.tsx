@@ -51,6 +51,7 @@ import {
 } from "../lib/composePreview";
 import {
   downloadComposeMidi,
+  exportComposeStems,
   exportComposeWav,
 } from "../lib/composeExport";
 import { serializeComposeSession } from "../lib/composeUrl";
@@ -458,6 +459,14 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
     });
   };
 
+  const handleExportStems = (): void => {
+    if (mixInput === null) return;
+    void exportComposeStems(mixInput, mixer, hasOriginal, accompKey).catch(() => {
+      // Real failure path (render/encode/zip): warn-only, silent UI.
+      console.warn("[ComposeSurface] stems export failed");
+    });
+  };
+
   const accompLayers: readonly RollLayer[] | undefined =
     accompResult === null
       ? undefined
@@ -733,6 +742,7 @@ export const ComposeSurface: React.FC<ComposeSurfaceProps> = ({
                     onStop={() => composePreviewPlayer.stop()}
                     onExportMidi={handleExportMidi}
                     onExportWav={handleExportWav}
+                    onExportStems={handleExportStems}
                   />
                 </div>
                 {accompResult !== null && (

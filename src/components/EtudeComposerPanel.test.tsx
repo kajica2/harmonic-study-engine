@@ -199,6 +199,38 @@ describe("EtudeComposerPanel status line", () => {
   });
 });
 
+describe("EtudeComposerPanel ABC download (Phase 8 S2)", () => {
+  it("absence-gate: unloaded -> NO ABC button (mirrors the MusicXML pin shape)", () => {
+    render(<EtudeComposerPanel {...panelProps({ onDownloadAbc: vi.fn() })} />);
+    expect(screen.queryByRole("button", { name: "ABC" })).toBeNull();
+  });
+
+  it("renders when loaded + prop provided (absence, not disabled)", () => {
+    render(
+      <EtudeComposerPanel
+        {...panelProps({ loadedTitle: "X (seed 1)", onDownloadAbc: vi.fn() })}
+      />,
+    );
+    const btn = screen.getByRole("button", { name: "ABC" });
+    expect(btn).toBeTruthy();
+    expect(btn.getAttribute("title")).toBe(
+      "Download ABC source (same notation as the Staff tab)",
+    );
+    expect(btn.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("click routes onDownloadAbc once", () => {
+    const onDownloadAbc = vi.fn();
+    render(
+      <EtudeComposerPanel
+        {...panelProps({ loadedTitle: "X (seed 1)", onDownloadAbc })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "ABC" }));
+    expect(onDownloadAbc).toHaveBeenCalledTimes(1);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // PRD-001 Phase 8 S1 (D149): the Share button - routed through the ONE
 // sanctioned seam (the seam's own behavior is pinned in

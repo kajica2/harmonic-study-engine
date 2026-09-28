@@ -6,7 +6,7 @@ Harmonic Study Engine — React 19 + Vite 6 + Tailwind 4 SPA (trumpet practice e
 
 ```bash
 npm run lint        # tsc --noEmit — there is NO eslint
-npm test            # vitest run — 2743 passed / 1 skipped (211 files)
+npm test            # vitest run — 2762 passed / 1 skipped (212 files)
 npm run build       # TWO builds: vite.rnn.config.ts first, then main vite build
 npm run check:paths # tsx scripts/check-path-bars.ts — bar-count invariant (36/36 OK)
 npm run test:py     # backend pytest (prefers .venv/bin/python)

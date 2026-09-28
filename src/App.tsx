@@ -132,6 +132,7 @@ import { MelodyLane } from "./components/MelodyLane";
 import { MelodyToolbar } from "./components/MelodyToolbar";
 import { PlaySessionRail } from "./components/PlaySessionRail";
 import { downloadText } from "./lib/download";
+import { buildEtudeAbc } from "./lib/etudeAbc";
 import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
 import { BuildFooter } from "./components/BuildFooter";
@@ -2683,6 +2684,19 @@ function AppShell() {
     downloadText(`${pid}.musicxml`, xml, "application/vnd.recordare.musicxml+xml");
   }, [activeEtude, paths, soundingShift]);
 
+  // PRD-001 Phase 8 S2 (D154): "ABC" downloads the SAME pure source the
+  // Staff tab renders (buildEtudeAbc with soundingShift - file == view).
+  // The etude object IS the true form (bars/chords/melody, never the
+  // padded practice loop), so no path slice is needed - the D27 guard
+  // shape (!activeEtude return, etudePathId filename) is reused verbatim.
+  // S0 LESSON: built from the pure builder, never scraped from the DOM.
+  const handleEtudeAbcDownload = useCallback(() => {
+    if (!activeEtude) return;
+    const pid = etudePathId(activeEtude);
+    const abc = buildEtudeAbc(activeEtude, { transposeShift: soundingShift });
+    downloadText(`${pid}.abc`, abc, "text/plain");
+  }, [activeEtude, soundingShift]);
+
   const handleSelectPersona = (pId: string) => {
     setSelectedPersonaId(pId);
     const p = PERSONAS.find((x) => x.id === pId);
@@ -3502,6 +3516,7 @@ function AppShell() {
           onDownloadMusicXml={
             activeEtude ? handleEtudeMusicXmlDownload : undefined
           }
+          onDownloadAbc={activeEtude ? handleEtudeAbcDownload : undefined}
         />
 
         {/* PRD-001 Phase 6 (D104): ear-training sub-mode SECTION below

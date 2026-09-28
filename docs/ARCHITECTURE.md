@@ -136,6 +136,8 @@ HarmonicStep = one bar of audio, in playback and export alike. The
 "Each HarmonicStep is one BEAT" comment in `src/lib/paths.ts`
 (`STEPS_PER_BAR = 4`) is the bar-strip labeling / padding convention
 only; `stepsPerBar()` maps it onto real time.
+Compose stems are per mix GROUP (stem-per-role: original/bass/chords/pad via `exportComposeStems` in `src/lib/composeExport.ts`) - pre-normalize, one WAV per present group in a ZIP.
+Etude ABC download (`buildEtudeAbc` in `src/lib/etudeAbc.ts` + `downloadText`) ships the same notation the Staff tab renders, at the same transpose.
 
 ## Path metadata → behavior
 

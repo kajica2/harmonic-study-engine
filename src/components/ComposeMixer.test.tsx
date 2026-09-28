@@ -28,6 +28,7 @@ function renderMixer(over: Partial<ComposeMixerProps> = {}) {
     onStop: vi.fn(),
     onExportMidi: vi.fn(),
     onExportWav: vi.fn(),
+    onExportStems: vi.fn(),
     ...over,
   };
   render(<ComposeMixer {...props} />);
@@ -133,3 +134,55 @@ describe("transport + exports (D77/D81)", () => {
     expect(props.onExportWav).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PRD-001 Phase 8 Slice 2 (D152/D154): per-group stems button.
+// ---------------------------------------------------------------------------
+
+describe("stems export (D152/D154)", () => {
+  it("renders with the per-group title (D152 labeling obligation, verbatim)", () => {
+    renderMixer();
+    const btn = screen.getByTestId("mix-export-stems");
+    expect(btn.textContent).toContain("Export Stems");
+    expect(btn.getAttribute("title")).toBe(
+      "Per-group stems ZIP (original/bass/chords/pad as present, current levels, mono 16-bit, renders up to 10:00). Stems are pre-normalize; the full-mix WAV is peak-safe.",
+    );
+  });
+
+  it("disabled matrix: canExport false -> all three disabled; rendering -> all three disabled (sibling law)", () => {
+    const { unmount } = render(<ComposeMixer {...renderMixerProps({ canExport: false })} />);
+    expect((screen.getByTestId("mix-export-midi") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("mix-export-wav") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("mix-export-stems") as HTMLButtonElement).disabled).toBe(true);
+    unmount();
+    document.body.innerHTML = "";
+    render(<ComposeMixer {...renderMixerProps({ previewState: "rendering" })} />);
+    expect((screen.getByTestId("mix-export-midi") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("mix-export-wav") as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByTestId("mix-export-stems") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("click routes onExportStems exactly once", () => {
+    const props = renderMixerProps({});
+    render(<ComposeMixer {...props} />);
+    fireEvent.click(screen.getByTestId("mix-export-stems"));
+    expect(props.onExportStems).toHaveBeenCalledTimes(1);
+  });
+});
+
+function renderMixerProps(over: Partial<ComposeMixerProps> = {}): ComposeMixerProps {
+  return {
+    mixer: MIXER_DEFAULTS,
+    hasOriginal: true,
+    originalLabel: "Original (drums not played)",
+    previewState: "idle",
+    canExport: true,
+    onPatchMixer: vi.fn(),
+    onPlay: vi.fn(),
+    onStop: vi.fn(),
+    onExportMidi: vi.fn(),
+    onExportWav: vi.fn(),
+    onExportStems: vi.fn(),
+    ...over,
+  };
+}

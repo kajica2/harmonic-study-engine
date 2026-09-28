@@ -33,6 +33,20 @@
  *     loads with NO upload. Sub-leg: MIDI session URL (cfile+chash)
  *     -> fresh context -> hash-gate prompt carries the URL identity
  *     -> re-upload -> "edits restored" (the override survives).
+ *
+ * Phase 8 S2 legs (D155 - appended, same spec file, no new spec):
+ *  A. STEMS ZIP (REQ-COMP-42): Export Stems -> _accomp_C.zip ->
+ *     unzipSync IN-SPEC -> 3 members (original+bass+chords, NO pad -
+ *     the present-groups contract) -> RIFF/WAVE magic per member.
+ *  B. ETUDE ABC (REQ-IO-42 etude half): Etude mode -> generate pop 8
+ *     -> ABC button -> .abc download -> X:/K:/M:4/4 content pins
+ *     (the S0 pin shape) + NOT the fallback string. This leg ALSO
+ *     proves the detached-anchor downloadText fires a real download
+ *     event (audit #8) - if it ever stops, this leg fails LOUDLY.
+ *
+ * RK-S4-6 degrade (never silent): if either S2 download flakes in CI,
+ * degrade that leg to filename-regex + button-enabled matrix (the node
+ * goldens in src/lib/composeStems.test.ts carry the byte fidelity).
  */
 import { test, expect } from "@playwright/test";
 import { createRequire } from "node:module";
@@ -47,6 +61,9 @@ const { parseMidi, writeMidi } = requireCjs("midi-file") as {
     tracks: { type: string; deltaTime: number; meta?: boolean; key?: number; scale?: number }[][];
   };
   writeMidi: (data: unknown) => number[];
+};
+const { unzipSync } = requireCjs("fflate") as {
+  unzipSync: (data: Uint8Array) => Record<string, Uint8Array>;
 };
 
 test.setTimeout(120_000);
@@ -276,4 +293,64 @@ test("S4 journey: mixer state -> tempo truth -> export fidelity -> WAV -> chart 
     await expect(p3.getByTestId("tempo-input")).toHaveValue("140"); // covr restored
     await ctx.close();
   }
+});
+
+test("S2 leg A: per-group stems ZIP (REQ-COMP-42, D152/D153)", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Compose mode (shortcut 1)" }).click();
+  await expect(page.getByText("Drop a .mid file to get started.")).toBeVisible({ timeout: 10_000 });
+
+  await uploadFixture(page);
+  await page.getByTestId("accomp-generate").click();
+  await expect(page.getByTestId("accomp-meta")).toContainText("seed 42", { timeout: 5_000 });
+
+  const stemsDl = await grabDownload(page, () => page.getByTestId("mix-export-stems").click());
+  // REQ-COMP-43 envelope (key-present fixture -> _accomp_C.zip).
+  expect(stemsDl.name).toMatch(/_accomp(_[A-G][#b]?m?)?\.zip$/);
+  expect(stemsDl.name).toMatch(/_accomp_C\.zip$/);
+  const members = unzipSync(new Uint8Array(stemsDl.bytes));
+  const names = Object.keys(members).sort();
+  // Present-groups contract: the S4 fixture generates bass+chords (2
+  // roles) so the ZIP has 3 members - pad is ABSENT (correct, not a
+  // failure).
+  expect(names).toEqual([
+    "s4-fixture_accomp_C_stem-bass.wav",
+    "s4-fixture_accomp_C_stem-chords.wav",
+    "s4-fixture_accomp_C_stem-original.wav",
+  ]);
+  expect(names.some((n) => n.includes("stem-pad"))).toBe(false);
+  for (const n of names) {
+    expect(n).toMatch(/^.+_accomp_C_stem-(original|bass|chords|pad)\.wav$/);
+    const bytes = members[n] as Uint8Array;
+    expect(Buffer.from(bytes.subarray(0, 4)).toString()).toBe("RIFF");
+    expect(Buffer.from(bytes.subarray(8, 12)).toString()).toBe("WAVE");
+  }
+});
+
+test("S2 leg B: etude ABC download (REQ-IO-42 etude half, D154)", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Choose a mastermind")).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.getByRole("tab", { name: "Etude mode (shortcut 2)" }).click();
+  await expect(page.getByText("Etude Composer")).toBeVisible({ timeout: 5_000 });
+
+  await page.locator('select[aria-label="Etude style"]').selectOption("pop");
+  await page.locator('input[aria-label="Bars"]').fill("8");
+  await page.getByRole("button", { name: "Generate etude" }).click();
+  await expect(page.locator("#etude-composer-status")).toContainText("Loaded:", {
+    timeout: 5_000,
+  });
+
+  // Absence-gate positive: loaded -> the ABC button renders.
+  const abcBtn = page.getByRole("button", { name: "ABC", exact: true });
+  await expect(abcBtn).toBeVisible({ timeout: 5_000 });
+  const abcDl = await grabDownload(page, () => abcBtn.click());
+  expect(abcDl.name).toMatch(/.+\.abc$/);
+  // The S0 pin shape, browser-proven (never the fallback string).
+  const text = abcDl.bytes.toString("utf-8");
+  expect(text.startsWith("X:")).toBe(true);
+  expect(text).toContain("K:");
+  expect(text).toContain("M:4/4");
+  expect(text).not.toContain("ABC source unavailable");
 });

@@ -81,6 +81,54 @@ bottom-sheet command bar.
 ## [Unreleased]
 
 ### Added
+- **Export finishing: per-group stems ZIP + etude ABC download (PRD-001
+  Phase 8 slice 2, D152-D157).** (1) STEMS (REQ-COMP-42; TD-046
+  CLOSED): the compose mixer gains a third button "Export Stems"
+  (`mix-export-stems`, sibling disabled law `!canExport || rendering`)
+  wired through `handleExportStems` (mixInput-null guard, warn-only
+  catch) to `exportComposeStems` in `src/lib/composeExport.ts`
+  (folded, the S4 D81 file-count honesty): SEQUENTIAL per-group render
+  at the CURRENT mixer gains (MED-001, not the parallel variant),
+  gain-baked via the SHARED `computeGroupGains`/`accumulateGroupInto`
+  primitives, UNNORMALIZED (stems sum to the pre-normalize mix; the
+  full-mix WAV stays the peak-safe artifact), one member per PRESENT
+  group in MIX_GROUPS order (absent omitted, muted silent-but-present),
+  `encodeWav` per group + `blob.arrayBuffer()` bridge + fflate `zipSync`
+  (the midiBatchExport precedent), envelope
+  `composeExportFilename(base, key, "zip")`, members
+  `<base>_accomp[_<Key>]_stem-<group>.wav` (the REQ-COMP-43
+  extension). Per-GROUP honesty per the D152 reading:
+  ORIGINAL/bass/chords/pad (all uploaded tracks merge into the one
+  "original" group per the shipped W1/D78 mixer contract), labeled
+  stem-per-role in the verbatim tooltip + filenames + docs; REQ-IO-32's
+  "(one WAV per track)" parenthetical is satisfied as
+  one-WAV-per-mix-group (Kai erratum on docs/PRD-001.md). (2) ETUDE ABC
+  (REQ-IO-42 etude half): the `EtudeComposerPanel` result row gains an
+  "ABC" button next to "MusicXML (with melody)" (the D27 absence-gate
+  shape: renders only when loaded AND `onDownloadAbc` provided; always
+  enabled when shown); App `handleEtudeAbcDownload` builds from the
+  PURE builder `buildEtudeAbc(activeEtude, { transposeShift:
+  soundingShift })` - byte-identical to the Staff tab source (same
+  etude, same shift; App passes soundingShift to EtudeViews) - via
+  `downloadText(`${pid}.abc`, abc, "text/plain")`; the TD-033
+  `etu-etu-<hash>` double prefix rides UNCHANGED. S0 doctrine
+  throughout: builder source, never DOM-scraped; content pins
+  (X:/K:/M:4/4, NOT the fallback string). Scope keeps (D156):
+  REQ-IO-31 stereo/SR carved (mono 44.1k rides), REQ-IO-61 ABC parse
+  OUT, practice/masterclass/explore stems OUT. Suite 2743 -> 2762 / 1
+  skipped (211 -> 212 files; +12 node stems goldens incl. the
+  UNNORMALIZED discriminative pin + ASCII pin, +3 mixer sibling-law
+  pins, +1 surface routing pin, +3 panel absence-gate pins; frozen
+  tests/ pins untouched, it( stays 362); engine purity floor stays 56
+  (zero engine files); e2e 41 -> 43 tests / 16 specs UNCHANGED (legs A+B
+  extend the shipped compose-mixer-export journey: A pins the 3-member
+  present-groups ZIP + RIFF/WAVE magic, B pins the .abc content shape +
+  proves the detached-anchor downloadText fires a real download event;
+  break-guard-FAIL pre-S2). Docs: `docs/COMPOSE-MODE.md` (stems section
+  + Export Stems paragraph + D152 line), `docs/ARCHITECTURE.md` (two
+  one-liners), `docs/ETUDE-COMPOSER.md` (ABC section),
+  `docs/TERMINOLOGY.md` (Tier 10). Design + post-ship errata:
+  `docs/PHASE-8-S2-EXPORT.md` (section 14).
 - **Session sharing: every session is a link + the /play idea page
   (PRD-001 Phase 8 slice 1, D145-D151).** (1) PRACTICE URL: the
   study surface now serializes its musical session on the ONE

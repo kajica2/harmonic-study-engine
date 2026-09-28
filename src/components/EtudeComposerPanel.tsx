@@ -55,6 +55,9 @@ export interface EtudeComposerPanelProps {
   /** Optional "MusicXML (with melody)" download trigger (D27); the
    *  button renders only when provided AND an etude is loaded. */
   onDownloadMusicXml?: () => void;
+  /** Optional "ABC" download trigger (Phase 8 S2); the button renders
+   *  only when provided AND an etude is loaded (absence, not disabled). */
+  onDownloadAbc?: () => void;
 }
 
 const KEY_OPTIONS: readonly string[] = Array.from({ length: 12 }, (_, pc) =>
@@ -75,6 +78,7 @@ export function EtudeComposerPanel({
   loadedTitle,
   onAccept,
   onDownloadMusicXml,
+  onDownloadAbc,
 }: EtudeComposerPanelProps): React.ReactElement {
   const [draft, setDraft] = useState<EtudeConstraints>(
     () => committed ?? DEFAULT_ETUDE_CONSTRAINTS,
@@ -332,6 +336,17 @@ export function EtudeComposerPanel({
               title="Download MusicXML with the melody as a second part (opens in MuseScore)"
             >
               MusicXML (with melody)
+            </button>
+          )}
+
+          {loadedTitle !== null && onDownloadAbc && (
+            <button
+              type="button"
+              onClick={onDownloadAbc}
+              className="px-3 py-1.5 rounded-[var(--radius-sm)] text-xs font-mono border border-emerald-800/50 bg-emerald-900/30 text-emerald-200 hover:bg-emerald-900/50"
+              title="Download ABC source (same notation as the Staff tab)"
+            >
+              ABC
             </button>
           )}
 

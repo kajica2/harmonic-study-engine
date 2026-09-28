@@ -34,6 +34,17 @@ vi.mock("../lib/shareUrl", async (importOriginal) => {
   };
 });
 
+// PRD-001 Phase 8 S2: mock ONLY the stems render (jsdom has no
+// OfflineAudioContext -> the real path would reject; the routing pin
+// below asserts the handler calls it, the browser proves the audio).
+vi.mock("../lib/composeExport", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/composeExport")>();
+  return {
+    ...actual,
+    exportComposeStems: vi.fn(async () => {}),
+  };
+});
+
 const STORE = useSessionStore.getState;
 
 beforeEach(() => {
@@ -590,6 +601,19 @@ describe("Phase 4 Slice 4: mixer host (ComposeMixer below AccompanimentPanel)", 
     expect(screen.getAllByTestId("roll-barline").length).toBe(
       screen.getAllByTestId(/^chord-row-/).length,
     );
+  });
+
+  it("Phase 8 S2: stems button routes handleExportStems -> exportComposeStems; empty state has no mixer (mixInput-null guard by absence)", async () => {
+    const { exportComposeStems } = await import("../lib/composeExport");
+    render(<ComposeSurface onOpenImportExport={() => {}} />);
+    // Empty: no mixer at all (mixInput null -> no affordance).
+    expect(screen.queryByTestId("compose-mixer")).toBeNull();
+    expect(screen.queryByTestId("mix-export-stems")).toBeNull();
+    await uploadToLoaded("song.mid");
+    const stems = screen.getByTestId("mix-export-stems");
+    expect((stems as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(stems);
+    await waitFor(() => expect(exportComposeStems).toHaveBeenCalledTimes(1));
   });
 });
 

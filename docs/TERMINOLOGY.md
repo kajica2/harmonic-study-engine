@@ -161,6 +161,14 @@ the pedagogy practice log.
 | eseed | `src/lib/exploreUrl.ts` | The explore seed text as URL key. Named to dodge the etude integer-`seed` collision, exactly per the shipped `tmode` precedent (D146). |
 | Armed state | `PlaySurface` (`src/components/PlaySurface.tsx`) | The honest `/play` contract: the idea is shown with ONE big Play button; the click IS the gesture browsers require before audio (no autoplay attempt - D148). |
 
+## Tier 10: export vocabulary (Phase 8 S2, D152-D154)
+
+| Term | Identifier | Notes |
+|---|---|---|
+| stem-per-role | `composeStemFilename()` (`src/lib/composeExport.ts`) | A stem is one WAV per MIX GROUP (original/bass/chords/pad), not per original MIDI track - the group name is in every filename (`_stem-<group>`), so no recipient can mistake a stem for a track (D152, REQ-IO-32 reading note). |
+| present-groups contract | `exportComposeStems()` (`src/lib/composeExport.ts`) | One ZIP member per group the renderer actually yielded (MIX_GROUPS order); absent groups are omitted, present-but-muted groups emit silence - the file set is stable whenever export is enabled (D153). |
+| pre-normalize stems | `exportComposeStems()` (`src/lib/composeExport.ts`) | Stems are gain-baked but UNNORMALIZED (they sum to the pre-normalize mix); the full-mix WAV stays the peak-safe artifact via `normalizePeak` (D153). |
+
 ## Naming patterns (your proposal)
 
 Use these patterns for new code:

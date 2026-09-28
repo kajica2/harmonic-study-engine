@@ -44,6 +44,8 @@ export interface ComposeMixerProps {
   onStop: () => void;
   onExportMidi: () => void;
   onExportWav: () => void;
+  /** PRD-001 Phase 8 S2 (D154): per-group stems ZIP trigger. */
+  onExportStems: () => void;
 }
 
 const ROW_LABEL: Readonly<Record<MixGroup, string>> = {
@@ -68,6 +70,7 @@ export function ComposeMixer({
   onStop,
   onExportMidi,
   onExportWav,
+  onExportStems,
 }: ComposeMixerProps): React.ReactElement {
   const anySolo = MIX_GROUPS.some((g) => mixer[g].solo);
   const rendering = previewState === "rendering";
@@ -110,6 +113,16 @@ export function ComposeMixer({
             onClick={onExportWav}
           >
             Export WAV
+          </button>
+          <button
+            type="button"
+            data-testid="mix-export-stems"
+            disabled={!canExport || rendering}
+            className="rounded border border-[color:var(--color-border)] px-3 py-1 text-sm text-[color:var(--color-text-2)] hover:text-[color:var(--color-text-1)] disabled:opacity-40"
+            title="Per-group stems ZIP (original/bass/chords/pad as present, current levels, mono 16-bit, renders up to 10:00). Stems are pre-normalize; the full-mix WAV is peak-safe."
+            onClick={onExportStems}
+          >
+            Export Stems
           </button>
         </div>
       </div>
