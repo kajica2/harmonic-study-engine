@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { HarmonicPath } from "../lib/paths";
 import { InstrumentPitch } from "../lib/scoreGenerator";
-import { renderLeadSheet } from "../lib/leadSheet";
+import { buildLeadSheetAbc, renderLeadSheet } from "../lib/leadSheet";
+import { downloadText } from "../lib/download";
 import { toMusicXml } from "../lib/scoreExport";
 import { loadOSMD, renderOSMD } from "../lib/osmd";
 import { Download, FileText, Music } from "lucide-react";
@@ -80,8 +81,13 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
   };
 
   const downloadAbc = () => {
-    const abc = (abcRef.current?.querySelector("textarea") as HTMLTextAreaElement | null)?.value ?? "";
-    handleDownload(`${path.id}_${instrument}.abc`, "text/plain", abc || "ABC source unavailable");
+    // buildLeadSheetAbc is the SAME pure source that renderLeadSheet
+    // feeds to abcjs.renderAbc above. abcjs never emits a textarea in
+    // its rendered output (the EditArea is a separate opt-in class),
+    // so scraping the DOM for one always fell through to the old
+    // "ABC source unavailable" stub. Generate from the path directly.
+    const abc = buildLeadSheetAbc(path, instrument);
+    downloadText(`${path.id}_${instrument}.abc`, abc, "text/plain");
   };
 
   const downloadXml = () => {
