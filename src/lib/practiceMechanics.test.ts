@@ -45,8 +45,8 @@ function isValid(c: ReturnType<typeof normalizePracticeMechanics>): void {
   expect(c.detect.passThreshold).toBeLessThanOrEqual(1);
   // S4 (D143): the noteInput slice is TOTAL after normalize too.
   expect(typeof c.noteInput.enabled).toBe("boolean");
-  expect(c.noteInput.rootOctave).toBeGreaterThanOrEqual(2);
-  expect(c.noteInput.rootOctave).toBeLessThanOrEqual(5);
+  expect(c.noteInput.rootOctave).toBeGreaterThanOrEqual(3);
+  expect(c.noteInput.rootOctave).toBeLessThanOrEqual(4);
 }
 
 describe("normalizePracticeMechanics - total-shape guard", () => {
@@ -265,14 +265,18 @@ describe("S4 noteInput slice (D143): defaults-at-read, no v5", () => {
     expect(c.mode).toBe("loop");
   });
 
-  it("octave garbage -> clamped 2..5 (string/float/wild/negative all resolve)", () => {
+  it("octave garbage -> clamped 3..4 (string/float/wild/negative all resolve)", () => {
     expect(normalizePracticeMechanics({ noteInput: { rootOctave: "4" } }).noteInput.rootOctave).toBe(4);
-    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 99 } }).noteInput.rootOctave).toBe(5);
-    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 0 } }).noteInput.rootOctave).toBe(2);
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 99 } }).noteInput.rootOctave).toBe(4);
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 0 } }).noteInput.rootOctave).toBe(3);
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 2 } }).noteInput.rootOctave).toBe(3); // legacy 2 clamps up at read, no migration
+    expect(normalizePracticeMechanics({ noteInput: { rootOctave: 5 } }).noteInput.rootOctave).toBe(4); // legacy 5 clamps down at read, no migration
     expect(normalizePracticeMechanics({ noteInput: { rootOctave: 3.7 } }).noteInput.rootOctave).toBe(4); // non-int -> default
     expect(normalizePracticeMechanics({ noteInput: { rootOctave: null } }).noteInput.rootOctave).toBe(4);
-    const hi = normalizePracticeMechanics({ noteInput: { enabled: true, rootOctave: 5 } });
-    expect(hi.noteInput).toEqual({ enabled: true, rootOctave: 5 });
+    const hi = normalizePracticeMechanics({ noteInput: { enabled: true, rootOctave: 4 } });
+    expect(hi.noteInput).toEqual({ enabled: true, rootOctave: 4 });
+    const lo = normalizePracticeMechanics({ noteInput: { enabled: true, rootOctave: 3 } });
+    expect(lo.noteInput).toEqual({ enabled: true, rootOctave: 3 });
   });
 
   it("enabled non-boolean -> false (strict === true law, mirrors detect)", () => {

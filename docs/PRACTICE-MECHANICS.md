@@ -285,7 +285,7 @@ note sources on the study surface:
 
 - Computer keyboard: A W S E D F T G Y H U J K play one octave from a
   movable root (position-based by physical key, layout-proof); Z / X
-  shift the root octave (2..5, persisted). The mapping is a SEPARATE
+  shift the root octave (3..4, persisted). The mapping is a SEPARATE
   listener with the full guard stack (typing fields first,
   Cmd/Ctrl/Alt yield to the browser, no auto-repeat), armed only in
   the study view and never while a blocking modal is open (the

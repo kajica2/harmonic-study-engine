@@ -41,11 +41,11 @@ import { emitNoteInput } from "../lib/noteInputBus";
 export interface UseNoteInputArgs {
   /** Caller-composed activation gate (D139): the hook just obeys. */
   enabled: boolean;
-  /** Root octave 2..5 (persisted); root MIDI = (rootOctave + 1) * 12. */
+  /** Root octave 3..4 (persisted); root MIDI = (rootOctave + 1) * 12. */
   rootOctave: number;
   /** Play/stop audio + recorder + live-note visuals (App-owned). */
   onNote: (midi: number, down: boolean) => void;
-  /** Z / X octave shift (store write upstream, clamped 2..5). */
+  /** Z / X octave shift (store write upstream, clamped 3..4). */
   onOctaveShift: (delta: 1 | -1) => void;
 }
 
@@ -80,7 +80,7 @@ export function useNoteInput(args: UseNoteInputArgs): void {
     if (!args.enabled) return;
 
     const rootMidi = (): number => {
-      const o = Math.min(5, Math.max(2, Math.trunc(rootOctaveRef.current)));
+      const o = Math.min(4, Math.max(3, Math.trunc(rootOctaveRef.current)));
       return (o + 1) * 12;
     };
 

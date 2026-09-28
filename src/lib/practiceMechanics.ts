@@ -48,7 +48,7 @@ export interface NoteInputConfig {
    *  (REQ-IO-4/5). Default OFF: no letter ever sounds without the
    *  user turning this on (D139 anti-regression law). */
   enabled: boolean;
-  /** Root octave for the A-W-S-E mapping, 2..5 (root MIDI =
+  /** Root octave for the A-W-S-E mapping, 3..4 (root MIDI =
    *  (rootOctave + 1) * 12; default 4 = C4 = 60). Persisted. */
   rootOctave: number;
 }
@@ -185,14 +185,14 @@ export function normalizePracticeMechanics(raw: unknown): PracticeMechanicsConfi
   // S4 (D143/D126 lineage): the noteInput sub-field DEFAULTS AT READ -
   // a legacy payload without the key resolves to the shipped default
   // (NO v5, no migration; the no-v5 pin is the missing-key case in
-  // practiceMechanics.test.ts). rootOctave clamps 2..5 (D139).
+  // practiceMechanics.test.ts). rootOctave clamps 3..4 (D139).
   const noteInputRaw = (typeof r.noteInput === "object" && r.noteInput !== null ? r.noteInput : {}) as Record<string, unknown>;
   const noteInput: NoteInputConfig = {
     enabled: noteInputRaw.enabled === true,
     rootOctave: intInRange(
       noteInputRaw.rootOctave,
-      2,
-      5,
+      3,
+      4,
       DEFAULT_MECHANICS.noteInput.rootOctave,
     ),
   };

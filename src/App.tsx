@@ -68,6 +68,7 @@ import { useGeneratorPanel } from "./hooks/useGeneratorPanel";
 import { useScaleDrill } from "./hooks/useScaleDrill";
 import { useExportFlow } from "./hooks/useExportFlow";
 import { backingEngine, BackingStyle } from "./lib/backingEngine";
+import { composePreviewPlayer } from "./lib/composePreview";
 import { midiOut } from "./lib/midiOut";
 import { midiIn } from "./lib/midiIn";
 import { MidiClockFollower } from "./lib/midiClock";
@@ -727,6 +728,12 @@ function AppShell() {
     null,
   );
   const [backingTrackMuted, setBackingTrackMuted] = useState(false);
+  // Mute-all monitor switch (session-only, default UNMUTED: the page must
+  // never boot silent). App useState beside backingTrackMuted (same
+  // precedent): NOT zustand sessionStore (prefs-aren-t-session-state),
+  // NOT persisted (no K.* key, storage.ts untouched). Fans out via the
+  // sync effect below. External MIDI gear + offline export stay loud.
+  const [muted, setMuted] = useState(false);
   // Revoke the previous object URL when the track is replaced or on
   // unmount, so we don't leak blob URLs.
   useEffect(() => {
@@ -1743,10 +1750,12 @@ function AppShell() {
   // Sync the practice-header "Click" toggle into the rhythm engine.
   // Without this, metronomeOn only updates UI state and the engine's
   // metronomeEnabled stays at its default true — muting the click in
-  // the header would have no audible effect.
+  // the header would have no audible effect. Mute-all composes here:
+  // the click scheduler is gated off while muted (the audio click bus
+  // is additionally zeroed by the fan-out effect below).
   useEffect(() => {
-    rhythmEngine.setMetronomeEnabled(metronomeOn);
-  }, [metronomeOn]);
+    rhythmEngine.setMetronomeEnabled(metronomeOn && !muted);
+  }, [metronomeOn, muted]);
 
   // PRD-001 Phase 3 Slice 3 (D34): the AGENTS.md sync pattern,
   // extended - subdivision + per-beat accents ride ONE atomic setter
@@ -2199,12 +2208,12 @@ function AppShell() {
     [handleNoteInput],
   );
 
-  // Z / X + the piano's "-"/"+" buttons: clamp 2..5, persist through
+  // Z / X + the piano's "-"/"+" buttons: clamp 3..4, persist through
   // the store's normalize-at-read guard (D139; no new K keys).
   const handleNoteOctaveShift = useCallback(
     (delta: 1 | -1) => {
       const cur = practiceMechanics.noteInput.rootOctave;
-      const next = Math.min(5, Math.max(2, cur + delta));
+      const next = Math.min(4, Math.max(3, cur + delta));
       if (next === cur) return;
       setPracticeMechanicsStore({
         noteInput: { ...practiceMechanics.noteInput, rootOctave: next },
@@ -2523,6 +2532,19 @@ function AppShell() {
       pianoMuted,
     });
   }, [drumsMuted, bassMuted, pianoMuted]);
+
+  // Mute-all fan-out (session-only monitor switch): ONE boolean drives
+  // every WebAudio source. audioEngine zeros masterGain + metronomeGain
+  // (restorable) and gates HD voices; backingEngine zeros masterBus
+  // (fourth factor, independent of the rest-mute bus law); compose
+  // previews mute via mixMaster / single-source gate. Rhythm click rides
+  // the metronomeOn && !muted composition above. MIDI out + offline
+  // loopWav export stay loud by design (see chip tooltip).
+  useEffect(() => {
+    audioEngine.setMasterMuted(muted);
+    backingEngine.setMasterMuted(muted);
+    composePreviewPlayer.setMuted(muted);
+  }, [muted]);
 
   // Each tick: schedule a window of backing-track beats ahead so
   // the rhythm section stays in phase with the melody playback
@@ -4601,6 +4623,21 @@ function AppShell() {
                     />
                   </ToolGroup>
 
+                  <ToolGroup label="Monitor">
+                    <ToolChip
+                      active={muted}
+                      onClick={() => setMuted((m) => !m)}
+                      title={
+                        muted
+                          ? "Unmute all audio (monitor switch)"
+                          : "Mute all audio (monitor switch; external MIDI gear unaffected)"
+                      }
+                      aria-pressed={muted}
+                    >
+                      {muted ? "○ Mute" : "● Mute"}
+                    </ToolChip>
+                  </ToolGroup>
+
                   <ToolGroup label="Transport">
                     <ToolChip
                       // FIX ROUND (DOCS M2 / REVIEWER L5): the 4TH
@@ -4646,7 +4683,7 @@ function AppShell() {
                       onLoaded={handleBackingTrackLoaded}
                       onUnloaded={handleBackingTrackUnloaded}
                       isPlayingAuto={isPlayingAuto}
-                      muted={backingTrackMuted}
+                      muted={backingTrackMuted || muted}
                       onToggleMuted={() => setBackingTrackMuted((m) => !m)}
                     />
                     <ToolChip
