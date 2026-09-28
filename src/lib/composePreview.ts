@@ -368,6 +368,14 @@ class ComposePreviewPlayer {
   private mixSources: AudioBufferSourceNode[] = [];
   private mixGains: Partial<Record<MixGroup, GainNode>> = {};
   private mixMaster: GainNode | null = null;
+  /** Mute-all monitor switch (session-only, default UNMUTED). Additive:
+   *  the mix path keeps playing silently under a zeroed mixMaster (unmute
+   *  reveals mid-buffer; group gains + lastGains untouched). The
+   *  single-buffer S3 path is direct-to-destination with NO gain stage
+   *  (D72 byte-identical pin), so it is stopped and future play() calls
+   *  gate to no-op while muted. Offline WAV export never touches this
+   *  flag (must stay loud). */
+  private previewMuted = false;
   private lastGains: Readonly<Record<MixGroup, number>> | null = null;
   private listeners = new Set<(s: PreviewState) => void>();
 
@@ -393,6 +401,7 @@ class ComposePreviewPlayer {
   }
 
   play(buffer: AudioBuffer): void {
+    if (this.previewMuted) return;
     this.stopSource(); // re-render/re-play: stop any current source
     if (typeof AudioContext === "undefined") {
       this.transition("idle");
@@ -440,7 +449,7 @@ class ComposePreviewPlayer {
     const ctx = this.ctx;
     void ctx.resume();
     const master = ctx.createGain();
-    master.gain.value = 0.9; // D88: own master, conservative recipe peaks
+    master.gain.value = this.previewMuted ? 0 : 0.9; // D88: own master, conservative recipe peaks
     master.connect(ctx.destination);
     this.mixMaster = master;
     const start = ctx.currentTime + 0.05;
@@ -488,6 +497,28 @@ class ComposePreviewPlayer {
     this.stopSource();
     this.teardownMix();
     if (this.state !== "idle") this.transition("idle");
+  }
+
+  /** Mute-all fan-out target for the audition player. Zeros mixMaster
+   *  (restorable to 0.9) without touching group gains or lastGains;
+   *  stops a ringing single-buffer source (no gain stage to zero).
+   *  Pre-ctx calls only stash the flag so the next play/playMix honors it. */
+  setMuted(muted: boolean): void {
+    this.previewMuted = muted;
+    if (this.ctx && this.mixMaster) {
+      const target = muted ? 0 : 0.9;
+      this.mixMaster.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
+    }
+    if (muted && this.source) {
+      this.stopSource();
+      if (this.mixSources.length === 0 && this.state !== "idle") {
+        this.transition("idle");
+      }
+    }
+  }
+
+  isMuted(): boolean {
+    return this.previewMuted;
   }
 
   private stopSource(): void {

@@ -115,6 +115,13 @@ class BackingEngine {
    * (REQ-PRAC-3 by construction).
    */
   private restMuted = false;
+  /** Mute-all monitor switch (session-only, default UNMUTED). Fourth gain
+   *  factor on masterBus, INDEPENDENT of the rest-mute + per-track bus law
+   *  in applyBusGains (which owns the drum/bass/piano buses only).
+   *  Zeroing the master silences all three lanes together without touching
+   *  their bus targets, so unmute restores instantly and the duty-cycle
+   *  rest bookkeeping stays intact. */
+  private masterMuted = false;
   private bassPlayer: any = null;
   private pianoPlayer: any = null;
   private isPlaying = false;
@@ -151,7 +158,7 @@ class BackingEngine {
     this.ctx = newAudioContext();
 
     this.masterBus = this.ctx.createGain();
-    this.masterBus.gain.value = 0.6;
+    this.masterBus.gain.value = this.masterMuted ? 0 : 0.6;
 
     this.drumBus = this.ctx.createGain();
     this.drumBus.gain.value = this.levels.drums;
@@ -209,6 +216,24 @@ class BackingEngine {
   setRestMuted(on: boolean) {
     this.restMuted = on;
     this.applyBusGains();
+  }
+
+  /** Mute-all fan-out target: 0 on masterBus, restore to the nominal 0.6
+   *  mix level on unmute (same 0.05 smoothing as applyBusGains). NEVER
+   *  touches the drum/bass/piano buses and never reads restMuted or the
+   *  per-track mutes: independence is the contract (unmuting the master
+   *  must not clear a rest, resting must not clear the master). Do NOT
+   *  reuse setRestMuted here: it would conflate the duty-cycle law. */
+  setMasterMuted(on: boolean) {
+    this.masterMuted = on;
+    if (this.masterBus && this.ctx) {
+      const target = on ? 0 : 0.6;
+      this.masterBus.gain.setTargetAtTime(target, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  isMasterMuted(): boolean {
+    return this.masterMuted;
   }
 
   /** The shared gain law for setLevels + setRestMuted: one wobble pass,

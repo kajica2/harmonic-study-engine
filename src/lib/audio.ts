@@ -98,6 +98,11 @@ class AudioEngine {
    *  their own instrument along with the backing track. Backing
    *  track (drums, bass, piano) keeps playing. */
   public melodyMuted: boolean = false;
+  /** Mute-all monitor switch (session-only, default UNMUTED). When true,
+   *  masterGain AND metronomeGain are driven to 0 (additive, restorable),
+   *  new notes are gated, and ringing HD voices are stopped. External
+   *  MIDI gear (midiOut) and offline loopWav export stay loud by design. */
+  public masterMuted: boolean = false;
   public useHDSounds: boolean = readHDSetting();
   public onHDFailure?: (msg: string) => void;
 
@@ -136,6 +141,43 @@ class AudioEngine {
     if (muted) this.stopAll();
   }
 
+  /** Mute-all fan-out target (additive, restorable). Zeros masterGain
+   *  AND metronomeGain via setTargetAtTime (same 0.05 smoothing as
+   *  setVolume), gates new notes (see playNote), and stops ringing
+   *  voices including HD soundfonts. Unmute reapplies the stored
+   *  targetVolume / metronomeVolume so slider positions survive the
+   *  round-trip. The click bypass contract (D33) is untouched: the click
+   *  still routes to its own bus, only the bus gain is zeroed. */
+  setMasterMuted(muted: boolean) {
+    this.masterMuted = muted;
+    if (this.ctx) {
+      if (this.masterGain) {
+        const target = muted ? 0 : this.targetVolume;
+        this.masterGain.gain.setTargetAtTime(
+          target,
+          this.ctx.currentTime,
+          0.05,
+        );
+      }
+      if (this.metronomeGain) {
+        const target = muted ? 0 : this.metronomeVolume;
+        this.metronomeGain.gain.setTargetAtTime(
+          target,
+          this.ctx.currentTime,
+          0.05,
+        );
+      }
+    }
+    if (muted) {
+      this.stopAll();
+      stopAllSoundfonts();
+    }
+  }
+
+  isMasterMuted(): boolean {
+    return this.masterMuted;
+  }
+
   setHDSounds(enabled: boolean) {
     this.useHDSounds = enabled;
     storageSet(K.hdSounds, enabled ? "1" : "0");
@@ -148,6 +190,7 @@ class AudioEngine {
 
   setVolume(vol: number) {
     this.targetVolume = vol;
+    if (this.masterMuted) return;
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.05);
     }
@@ -192,7 +235,7 @@ class AudioEngine {
       this.ctx = newAudioContext();
 
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = this.targetVolume; // Gain headroom
+      this.masterGain.gain.value = this.masterMuted ? 0 : this.targetVolume; // Gain headroom
 
       // Melody bus — sits between the master and the compressor.
       // The playalong toggle drops this to 0 so the synth melody
@@ -223,7 +266,7 @@ class AudioEngine {
 
       // Dedicated metronome gain -> compressor (REQ-PRAC-2, D33).
       this.metronomeGain = this.ctx.createGain();
-      this.metronomeGain.gain.value = this.metronomeVolume;
+      this.metronomeGain.gain.value = this.masterMuted ? 0 : this.metronomeVolume;
       this.metronomeGain.connect(this.compressor);
 
       this.reverb = this.ctx.createConvolver();
@@ -246,6 +289,7 @@ class AudioEngine {
   }
 
   playNote(midi: number, velocity: number = 0.85) {
+    if (this.masterMuted) return;
     if (!this.ctx || !this.masterGain) return;
 
     if (this.ctx.state === "suspended") {
@@ -561,6 +605,7 @@ class AudioEngine {
   setMetronomeVolume(v01: number) {
     const v = Number.isFinite(v01) ? Math.min(1, Math.max(0, v01)) : 0.8;
     this.metronomeVolume = v;
+    if (this.masterMuted) return;
     if (this.metronomeGain && this.ctx) {
       this.metronomeGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.05);
     }
