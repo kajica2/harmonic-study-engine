@@ -18,6 +18,10 @@ interface Props {
    *  chord + degree sequence from path.key + path.steps[].notes
    *  histogram when no initialConfig is supplied. */
   path?: HarmonicPath;
+  /** Test seam: pass a pre-populated session (e.g. with closed
+   *  attempts) so the "Last" panel state can be pinned without
+   *  running the full mic-capture loop. */
+  sessionOverride?: StageSession;
 }
 
 function defaultConfig(): StageConfig {
@@ -69,6 +73,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
   onClose,
   initialConfig,
   path,
+  sessionOverride,
 }) => {
   // Resolve config: explicit initialConfig > path-derived > hardcoded
   // default. Memoized per path identity so changing steps but not
@@ -79,8 +84,8 @@ export const TrumpetStageModal: React.FC<Props> = ({
     return defaultConfig();
   }, [initialConfig, path]);
 
-  const [session, setSession] = useState<StageSession>(() =>
-    createStageSession(resolvedConfig),
+  const [session, setSession] = useState<StageSession>(
+    () => sessionOverride ?? createStageSession(resolvedConfig),
   );
   const cleanupRef = useRef<(() => void) | null>(null);
   const sessionRef = useRef(session);
@@ -182,17 +187,47 @@ export const TrumpetStageModal: React.FC<Props> = ({
           )}
         </div>
 
-        {active && (() => {
-          const stats = liveStats(active.centsSamples);
-          const cents = stats.median;
+        {(() => {
+          // Always show the panel. During an attempt, show the live
+          // cents + stdev + n. Between attempts, show the LAST closed
+          // attempt's median + stdev (so the player still sees their
+          // last reading while waiting for the next target). Before
+          // any attempt has happened, show em-dashes at center.
+          const liveCents = active
+            ? liveStats(active.centsSamples)
+            : null;
+          const lastAttempt =
+            !active && attempts.length > 0
+              ? attempts[attempts.length - 1]
+              : null;
+          const cents =
+            active && liveCents
+              ? liveCents.median
+              : lastAttempt
+                ? lastAttempt.avgCents
+                : null;
+          const stdev =
+            active && liveCents
+              ? liveCents.stdev
+              : lastAttempt
+                ? lastAttempt.centsStdev
+                : null;
+          const n =
+            active && liveCents
+              ? liveCents.n
+              : lastAttempt
+                ? null // closed attempt — no live sample count
+                : 0;
           const tolerance = session.config.perNoteToleranceCents;
-          // Pitch bar: 0% = -50¢, 100% = +50¢. The colored band in the
-          // middle (±tolerance) is "in tune"; edges are sharp/flat.
           const barPct =
-            cents === null
+            cents === null || cents === undefined
               ? 50
               : Math.max(0, Math.min(100, 50 + cents));
-          const inTune = cents !== null && Math.abs(cents) <= tolerance;
+          const inTune =
+            cents !== null &&
+            cents !== undefined &&
+            Math.abs(cents) <= tolerance;
+          const label = active ? "Live" : lastAttempt ? "Last" : "Idle";
           return (
             <div
               data-testid="live-readout"
@@ -200,31 +235,31 @@ export const TrumpetStageModal: React.FC<Props> = ({
             >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-[color:var(--color-text-3)] text-[10px] uppercase tracking-wider">
-                  Live
+                  {label}
                 </span>
                 <span
                   className={`t-mono text-sm font-bold ${
                     inTune
                       ? "text-emerald-300"
-                      : cents !== null
+                      : cents !== null && cents !== undefined
                         ? cents > 0
                           ? "text-rose-300"
                           : "text-amber-300"
                         : "text-neutral-500"
                   }`}
                 >
-                  {cents !== null
+                  {cents !== null && cents !== undefined
                     ? `${cents >= 0 ? "+" : ""}${cents.toFixed(1)}¢`
                     : "—"}
                 </span>
                 <span className="text-[10px] t-mono text-[color:var(--color-text-3)]">
                   ±
-                  {stats.stdev !== null
-                    ? `${stats.stdev.toFixed(1)}¢`
+                  {stdev !== null
+                    ? `${stdev.toFixed(1)}¢`
                     : "—"}
                 </span>
                 <span className="text-[10px] t-mono text-[color:var(--color-text-3)]">
-                  n={stats.n}
+                  {active ? `n=${n}` : "—"}
                 </span>
               </div>
               {/* Pitch bar — visual feedback for cents deviation. */}
@@ -244,7 +279,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
                   className={`absolute top-1/2 -translate-y-1/2 w-1 h-3 rounded ${
                     inTune
                       ? "bg-emerald-300"
-                      : cents !== null
+                      : cents !== null && cents !== undefined
                         ? cents > 0
                           ? "bg-rose-300"
                           : "bg-amber-300"

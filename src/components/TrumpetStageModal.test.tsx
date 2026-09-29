@@ -1,4 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
+import React from "react";
+import { TrumpetStageModal } from "./TrumpetStageModal";
+import { createStageSession } from "../lib/trumpetStageTrainer";
 
 // We re-export liveStats indirectly via internal — for unit pinning,
 // import the liveStats helper from the modal file. Since it isn't
@@ -21,6 +25,8 @@ function liveStats(cents: number[]): {
   );
   return { median, stdev, n };
 }
+
+afterEach(() => cleanup());
 
 describe("TrumpetStageModal live readout (liveStats)", () => {
   it("empty series returns null median + null stdev", () => {
@@ -57,5 +63,40 @@ describe("TrumpetStageModal live readout (liveStats)", () => {
     // Mean = 21.4 — heavily skewed by the outlier.
     // Stdev should also be high (steady tone would never see 100¢).
     expect(r.stdev!).toBeGreaterThan(30);
+  });
+});
+
+describe("TrumpetStageModal — panel always renders", () => {
+  it("shows 'Idle' state before any attempt", () => {
+    const session = createStageSession({
+      chordRoot: "C",
+      chordQuality: "maj7",
+      degreeSequence: ["1", "3", "5"],
+    });
+    render(<TrumpetStageModal initialConfig={undefined} path={undefined} sessionOverride={session} onClose={() => {}} />);
+    // The data-testid panel must be present even with no active attempt.
+    expect(screen.getByTestId("live-readout")).toBeTruthy();
+    expect(screen.getByText(/Idle/i)).toBeTruthy();
+  });
+
+  it("shows 'Last' state between attempts (after a closed attempt)", () => {
+    const session = createStageSession({
+      chordRoot: "C",
+      chordQuality: "maj7",
+      degreeSequence: ["1", "3", "5"],
+    });
+    // Simulate a closed attempt by pushing directly into attempts.
+    session.attempts.push({
+      degree: "1",
+      targetPc: "C",
+      targetOctave: 4,
+      outcome: "hit",
+      avgCents: 2.3,
+      meanCents: 2.5,
+      centsStdev: 1.4,
+      maxAmp: 0.4,
+    });
+    render(<TrumpetStageModal initialConfig={undefined} path={undefined} sessionOverride={session} onClose={() => {}} />);
+    expect(screen.getByText(/Last/i)).toBeTruthy();
   });
 });
