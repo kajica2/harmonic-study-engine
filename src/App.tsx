@@ -161,6 +161,8 @@ import { LeadSheet } from "./components/LeadSheet";
 import { ModalShell, useModalLabel } from "./components/ModalShell";
 import { ChordInspector, makeInspectorHistory } from "./components/ChordInspector";
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
+import { TrumpetStageBanner } from "./components/TrumpetStageBanner";
+import type { StageConfig } from "./lib/trumpetStage";
 import { TransposeControls } from "./components/TransposeControls";
 import { EffectiveKeyBadge } from "./components/EffectiveKeyBadge";
 import { BackingTrackPicker } from "./components/BackingTrackPicker";
@@ -848,6 +850,17 @@ function AppShell() {
   const [isPathsFolded, setIsPathsFolded] = useState(false);
   // Trumpet Stage tuner modal (mic capture + cents grading).
   const [showTrumpetStage, setShowTrumpetStage] = useState(false);
+  // Stage banner collapse — sits at the very top of the page.
+  const [stageBannerCollapsed, setStageBannerCollapsed] = useState(false);
+
+  const DEFAULT_STAGE_CONFIG: StageConfig = {
+    chordRoot: "C",
+    chordQuality: "maj7",
+    degreeSequence: ["1", "3", "5", "7", "9"],
+    perNoteToleranceCents: 7,
+    sustainSeconds: 0.6,
+    timeoutSeconds: 15,
+  };
 
   const handlePathCatalogSelect = useCallback(
     (id: string) => {
@@ -2870,6 +2883,22 @@ function AppShell() {
       >
         Skip to main content
       </a>
+
+      {/* Trumpet Stage banner — the literal topmost element of every
+          page. Brand-tinted so the tuner is unmissable; collapses on
+          user demand but always reserves the brand-colored strip so the
+          player remembers it lives here. Click anywhere to open the
+          full modal. */}
+      <TrumpetStageBanner
+        defaultConfig={DEFAULT_STAGE_CONFIG}
+        activeTarget={null}
+        isRunning={false}
+        collapsed={stageBannerCollapsed}
+        onToggleCollapsed={() =>
+          setStageBannerCollapsed((v) => !v)
+        }
+        onOpen={() => setShowTrumpetStage(true)}
+      />
 
       {/* Signature brass strip — single deliberate accent */}
       <div className="brass-strip" aria-hidden="true" />
