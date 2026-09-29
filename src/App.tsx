@@ -163,6 +163,7 @@ import { ChordInspector, makeInspectorHistory } from "./components/ChordInspecto
 import { StageFrame, ToolGroup, ToolChip } from "./components/StageFrame";
 import { TrumpetStageBanner } from "./components/TrumpetStageBanner";
 import type { StageConfig } from "./lib/trumpetStage";
+import { autoStageConfig } from "./lib/autoStage";
 import { TransposeControls } from "./components/TransposeControls";
 import { EffectiveKeyBadge } from "./components/EffectiveKeyBadge";
 import { BackingTrackPicker } from "./components/BackingTrackPicker";
@@ -852,15 +853,6 @@ function AppShell() {
   const [showTrumpetStage, setShowTrumpetStage] = useState(false);
   // Stage banner collapse — sits at the very top of the page.
   const [stageBannerCollapsed, setStageBannerCollapsed] = useState(false);
-
-  const DEFAULT_STAGE_CONFIG: StageConfig = {
-    chordRoot: "C",
-    chordQuality: "maj7",
-    degreeSequence: ["1", "3", "5", "7", "9"],
-    perNoteToleranceCents: 7,
-    sustainSeconds: 0.6,
-    timeoutSeconds: 15,
-  };
 
   const handlePathCatalogSelect = useCallback(
     (id: string) => {
@@ -2888,9 +2880,12 @@ function AppShell() {
           page. Brand-tinted so the tuner is unmissable; collapses on
           user demand but always reserves the brand-colored strip so the
           player remembers it lives here. Click anywhere to open the
-          full modal. */}
+          full modal.
+          autoStageConfig derives chord + degree sequence from the
+          active path's key + step notes — the banner announces what
+          the modal will drill. */}
       <TrumpetStageBanner
-        defaultConfig={DEFAULT_STAGE_CONFIG}
+        defaultConfig={autoStageConfig(path)}
         activeTarget={null}
         isRunning={false}
         collapsed={stageBannerCollapsed}
@@ -5403,7 +5398,10 @@ function AppShell() {
             <h2 id="trumpet-stage-title" className="sr-only">
               Trumpet Stage Tuner
             </h2>
-            <TrumpetStageModal onClose={() => setShowTrumpetStage(false)} />
+            <TrumpetStageModal
+              path={path}
+              onClose={() => setShowTrumpetStage(false)}
+            />
           </ModalShell>
         )}
       </Suspense>

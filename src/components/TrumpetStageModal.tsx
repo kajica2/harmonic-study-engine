@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Mic, Square, Trophy } from "lucide-react";
 import { StageFrame } from "./StageFrame";
 import {
@@ -8,20 +8,28 @@ import {
   type StageSession,
 } from "../lib/trumpetStageTrainer";
 import type { StageConfig } from "../lib/trumpetStage";
+import type { HarmonicPath } from "../lib/paths";
+import { autoStageConfig } from "../lib/autoStage";
 
 interface Props {
   onClose: () => void;
   initialConfig?: StageConfig;
+  /** Optional active path — when provided, the modal auto-derives a
+   *  chord + degree sequence from path.key + path.steps[].notes
+   *  histogram when no initialConfig is supplied. */
+  path?: HarmonicPath;
 }
 
-const DEFAULT_CONFIG: StageConfig = {
-  chordRoot: "C",
-  chordQuality: "maj7",
-  degreeSequence: ["1", "3", "5", "7", "9"],
-  perNoteToleranceCents: 7,
-  sustainSeconds: 0.6,
-  timeoutSeconds: 15,
-};
+function defaultConfig(): StageConfig {
+  return {
+    chordRoot: "C",
+    chordQuality: "maj7",
+    degreeSequence: ["1", "3", "5", "7", "9"],
+    perNoteToleranceCents: 7,
+    sustainSeconds: 0.6,
+    timeoutSeconds: 15,
+  };
+}
 
 /**
  * TrumpetStageModal — live mic tuner that walks the player through a
@@ -35,10 +43,20 @@ const DEFAULT_CONFIG: StageConfig = {
  */
 export const TrumpetStageModal: React.FC<Props> = ({
   onClose,
-  initialConfig = DEFAULT_CONFIG,
+  initialConfig,
+  path,
 }) => {
+  // Resolve config: explicit initialConfig > path-derived > hardcoded
+  // default. Memoized per path identity so changing steps but not
+  // chord doesn't reset the session.
+  const resolvedConfig = useMemo<StageConfig>(() => {
+    if (initialConfig) return initialConfig;
+    if (path) return autoStageConfig(path);
+    return defaultConfig();
+  }, [initialConfig, path]);
+
   const [session, setSession] = useState<StageSession>(() =>
-    createStageSession(initialConfig),
+    createStageSession(resolvedConfig),
   );
   const cleanupRef = useRef<(() => void) | null>(null);
   const sessionRef = useRef(session);
@@ -56,7 +74,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
   const start = async () => {
     setError(null);
     try {
-      const fresh = createStageSession(initialConfig);
+      const fresh = createStageSession(resolvedConfig);
       fresh.status = "running";
       setSession({ ...fresh });
       sessionRef.current = fresh;
@@ -104,7 +122,11 @@ export const TrumpetStageModal: React.FC<Props> = ({
       accent
       eyebrow="Trumpet Stage"
       title={`${session.config.chordRoot}${session.config.chordQuality}`}
-      meta={`${attempts.length} attempts · ${hits} hit · ±${session.config.perNoteToleranceCents}¢`}
+      meta={
+        path && !initialConfig
+          ? `auto-detected from "${path.title}" · ${attempts.length} attempts · ${hits} hit · ±${session.config.perNoteToleranceCents}¢`
+          : `${attempts.length} attempts · ${hits} hit · ±${session.config.perNoteToleranceCents}¢`
+      }
       actions={
         <button
           onClick={isRunning ? stop : start}
