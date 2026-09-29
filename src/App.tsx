@@ -182,7 +182,7 @@ import { useSessionStore as useNewSessionStore, resolveBootTranspose, SESSION_ST
 import { ideaFromChord } from "../engine/core/idea";
 // PRD-001 Phase 7 S1 (F3, D110): the pure bar<->step law for the
 // form-relative 1:1 loop windows.
-import { clampWindow, totalFormBars, windowStepRange } from "../engine/practice/windows";
+import { clampWindow, totalFormBars, wholeFormNextStep, windowStepRange } from "../engine/practice/windows";
 // PRD-001 Phase 7 S2 (D123): the pure duty scheduler (pause/AB/loop) +
 // the pure tempo ladder (D121). windows.ts stays geometry-only (the
 // ratified D123 deviation); duty.ts owns the per-firing decision.
@@ -1812,13 +1812,19 @@ function AppShell() {
 
   // The GRANDFATHERED legacy loop window (D122/D126: stays
   // synesthesia_loop* useState, never migrated) is the pause/loop
-  // SPAN. toBar resolves to the form tail exactly like the shipped F3
-  // call site; the scheduler clamps again at read.
+  // SPAN. With NO user selection the span IS the WHOLE FORM (form bar
+  // 1 .. formLen) - the shipped default (2026-09: "always repeat
+  // indefinitely the whole form"), never a partial window and never
+  // the padded path (whose trailing repeat is truncated). A
+  // shift-click selection still narrows it. duty.spanFor resolves
+  // null to the same span, so this states the law explicitly; the
+  // scheduler clamps again at read.
   useEffect(() => {
+    const formTail = totalFormBars(formLen) - 1;
     loopWindowRef.current =
       loopStartBar !== null
-        ? { fromBar: loopStartBar, toBar: loopEndBar ?? totalFormBars(formLen) - 1 }
-        : null;
+        ? { fromBar: loopStartBar, toBar: loopEndBar ?? formTail }
+        : { fromBar: 0, toBar: formTail };
   }, [loopStartBar, loopEndBar, formLen]);
 
   // Bar 1 after the count-in is ALWAYS a play bar (D122): the duty
@@ -2394,7 +2400,10 @@ function AppShell() {
       // updater functions; a decision inside would fire twice). The
       // ref mirrors activeStepIndex and is written through below.
       const prev = activeStepIndexRef.current;
-      // Sub-range loop wins when active and a start bar is set.
+      // Sub-range loop wins when armed (Loop chip ON) and a start bar
+      // is set. The Loop chip now means "repeat MY selection"; with it
+      // off - or with no selection - the transport still cycles the
+      // whole form (the branch below), never the padded path.
       const useLoopFallback = isLoopingRef.current && loopStartBar !== null;
       const mechanics = mechanicsActiveRef.current;
       let next: number;
@@ -2445,14 +2454,21 @@ function AppShell() {
         if (prev + 1 >= toStep) next = fromStep;
         else if (prev < fromStep) next = fromStep;
         else next = prev + 1;
-      } else if (prev >= path.steps.length - 1) {
-        if (!isLoopingRef.current) {
-          setTimeout(() => setIsPlayingAuto(false), 0);
-          return;
-        }
-        next = 0;
       } else {
-        next = prev + 1;
+        // 2026-09 (requirement: "always repeat indefinitely the whole
+        // form"): the DEFAULT steady state. windows.ts law: one step =
+        // one BAR, so cycling the tune's FORM (detectFormPeriod) is
+        // wrapping at the form tail - form bar 1 after the last form
+        // bar, forever (wholeFormNextStep). Two things die here:
+        //   - the old halt (setIsPlayingAuto(false) at the padded-path
+        //     tail): practice NEVER stops on its own;
+        //   - the old padded-path wrap (next = 0 at steps.length): the
+        //     pad's trailing repeat is TRUNCATED (24 bars of a 16-bar
+        //     form = 1.5 passes), i.e. a partial form. The form tail is
+        //     the only honest wrap point.
+        // Mechanics modes / the practice-set runner keep their own
+        // branches above; a user-selected window wraps inside itself.
+        next = wholeFormNextStep(prev, formLen);
       }
       activeStepIndexRef.current = next;
       setActiveStepIndex(next);
@@ -4743,9 +4759,11 @@ function AppShell() {
                         isLooping
                           ? loopStartBar !== null
                             ? // F3 (#2): form bars, not ceil(steps/4).
-                              `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1} — click to stop`
-                            : "Looping whole path — click to stop"
-                          : "Loop playback"
+                              `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1} — click to play the whole form instead`
+                            : `The whole form (bars 1–${formLen}) repeats — shift-click two strip bars to loop a section`
+                          : loopStartBar !== null
+                            ? `Whole form (bars 1–${formLen}) repeats — click to loop bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1}`
+                            : "Loop the bar selection you make in the strip"
                       }
                       aria-pressed={isLooping}
                     >

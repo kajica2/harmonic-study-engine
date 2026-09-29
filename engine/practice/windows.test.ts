@@ -9,6 +9,7 @@ import {
   barOfStep,
   clampWindow,
   totalFormBars,
+  wholeFormNextStep,
   windowStepRange,
   type BarWindow,
 } from "./windows";
@@ -121,5 +122,47 @@ describe("handler-law regression (the F3 bug class)", () => {
     expect(toStep - fromStep).toBe(4);
     // The legacy math (startBar * 4 .. (endBar + 1) * 4) spanned 16.
     expect(4 * 4).not.toBe(fromStep);
+  });
+});
+
+describe("wholeFormNextStep - the DEFAULT whole-form repeat (2026-09)", () => {
+  it("advances one form bar per step inside the form", () => {
+    for (let s = 0; s < 15; s++) expect(wholeFormNextStep(s, 16)).toBe(s + 1);
+  });
+
+  it("wraps at the FORM tail, not the padded-path tail", () => {
+    expect(wholeFormNextStep(15, 16)).toBe(0);
+    // The padded view keeps the SAME law: 24 padded bars of a 16-bar
+    // form still wrap to 0 at the form tail. The retired branch did
+    // next = 0 at steps.length - 1 (23), i.e. it played a truncated
+    // 1.5-pass form and (with the Loop chip off) halted there.
+    expect(wholeFormNextStep(23, 16)).toBe(0);
+  });
+
+  it("repeats the whole form forever: one wrap per pass, always in range", () => {
+    const formLen = 16;
+    let step = 0;
+    const walked: number[] = [];
+    for (let i = 0; i < formLen * 3; i++) {
+      step = wholeFormNextStep(step, formLen);
+      walked.push(step);
+    }
+    const onePass = Array.from({ length: formLen }, (_, i) =>
+      i === formLen - 1 ? 0 : i + 1,
+    );
+    expect(walked.slice(0, formLen)).toEqual(onePass);
+    expect(walked.slice(formLen).slice(0, formLen)).toEqual(onePass);
+    expect(walked.filter((s) => s === 0).length).toBe(3); // 3 passes, 3 wraps
+    expect(walked.every((s) => s >= 0 && s < formLen)).toBe(true);
+  });
+
+  it("a degenerate form (0 / NaN) stays on its single bar", () => {
+    expect(wholeFormNextStep(0, 0)).toBe(0);
+    expect(wholeFormNextStep(3, Number.NaN)).toBe(0);
+  });
+
+  it("negative / NaN prev snaps back to form bar 1 (stale persist)", () => {
+    expect(wholeFormNextStep(-3, 16)).toBe(0);
+    expect(wholeFormNextStep(Number.NaN, 16)).toBe(1);
   });
 });

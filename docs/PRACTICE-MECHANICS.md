@@ -159,6 +159,18 @@ per firing, so **1 step = 1 bar of audio** for every path and every
 meter. F3 (Phase 7 S1, D110 in `docs/PHASE-7-PRACTICE.md`) made every
 user-facing bar number honest to that truth:
 
+- **The whole form repeats indefinitely -- the shipped default.** With
+  no selection the transport cycles form bars 1..formLen and wraps to
+  bar 1 at the FORM tail, forever: practice never stops on its own.
+  The wrap point is the tune's last bar, never the padded path's last
+  step -- the pad's trailing repeat is often a TRUNCATED pass (a
+  16-bar form padded to 24 bars is 1.5 passes), which is exactly what
+  the retired `next = 0` at `steps.length` played (and it halted there
+  once the Loop chip was off). Law in code: `wholeFormNextStep()`,
+  `engine/practice/windows.ts`.
+- The Loop chip (ON at first boot) now means **"repeat my selection"**:
+  a shift-click range loops inside itself; with the chip off -- or with
+  no range set -- the whole form still repeats.
 - Shift-click bars 5 and 8 in the bar strip and the loop plays bars
   5-8 -- four bars, not the sixteen the legacy `* 4` math played.
 - The strip and Position line show TRUE form bars (a 32-bar standard

@@ -78,3 +78,28 @@ export function windowStepRange(
   const c = clampWindow(w, formLen);
   return { fromStep: c.fromBar, toStep: c.toBar + 1 };
 }
+
+/**
+ * The DEFAULT transport law (2026-09, "always repeat indefinitely the
+ * whole form"): the step after the last FORM bar is form bar 1 (index
+ * 0), forever - practice never stops on its own.
+ *
+ * 1 step = 1 bar (the law above), so this is the whole-form repeat
+ * every path runs out of the box. It replaces two older behaviours:
+ * the HALT at the padded-path tail (playback stopped after one pass)
+ * and the padded-path wrap (next = 0 at steps.length), which played a
+ * TRUNCATED form whenever the pad was not a whole number of passes
+ * (24 padded bars of a 16-bar tune = 1.5 passes).
+ *
+ * Same law as duty.loopStep over the span [0, totalFormBars): advance
+ * inside the form, wrap at its tail; an out-of-range prev (stale
+ * persist) snaps back to form bar 1. A user-selected window is
+ * unaffected - it still wraps inside itself via windowStepRange.
+ */
+export function wholeFormNextStep(prevStep: number, formLen: number): number {
+  const total = totalFormBars(formLen);
+  const prev = safeInt(prevStep);
+  if (prev + 1 >= total) return 0;
+  if (prev < 0) return 0;
+  return prev + 1;
+}

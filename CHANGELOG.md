@@ -541,6 +541,15 @@ bottom-sheet command bar.
   (8 for variations, 6 for the batch planner / ZIP packer).
 
 ### Changed
+- **The whole form now repeats indefinitely -- the shipped default.**
+  The transport wraps at the FORM tail (form bar 1 after the last form
+  bar) instead of at the padded path's tail, and the old halt after
+  one pass is retired: practice never stops on its own, with no setup
+  and no configuration. The new law is `wholeFormNextStep()`
+  (`engine/practice/windows.ts`); the padded wrap also used to play a
+  truncated pass (a 16-bar form padded to 24 bars = 1.5 passes). A
+  shift-click bar range still loops inside itself -- with the Loop
+  chip off, or with no range set, the whole form repeats.
 - **Input surfaces: computer-keyboard playing + on-screen piano
   (PRD-001 Phase 7 slice 4, D137-D144).** (1) COMPUTER-KEYBOARD
   PLAYING: the "Keyboard / piano input" toggle in the Drills panel

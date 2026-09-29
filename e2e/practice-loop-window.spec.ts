@@ -32,6 +32,12 @@
  *     1:1 chords (cell 2 = steps[1].name, not steps[4].name) and the
  *     highlight reaches Bar 2 after one bar of slow transport -
  *     killing the stepIdx=barIdx*4 regression class on the mapping.
+ *   - Fourth test (2026-09, "always repeat indefinitely the WHOLE
+ *     form"): the fresh-boot default - no selection, no config -
+ *     completes TWO whole-form passes and is still playing at the
+ *     end. Discriminator: every completed pass must contain the LAST
+ *     form bar; the retired padded-path wrap played 1..16 then 1..8
+ *     (the pad's truncated repeat) and halted there with Loop off.
  *
  * Path + formLen are DERIVED from source (TD-033e precedent: the
  * e2e runner transpiles the pure-data import, so a data rename or
@@ -222,6 +228,62 @@ test("F3: strip cells carry TRUE chord labels (kills stepIdx=barIdx*4)", async (
     .poll(() => activeCellBar(page), { timeout: 30_000, intervals: [150] })
     .toBe(2);
   await expect(stripCell(page, 2)).toContainText(NAME_2);
+
+  await railStop(page).click();
+});
+
+test("2026-09: the DEFAULT repeats the WHOLE form forever (no config)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "Play path" });
+  await expect(play).toBeVisible({ timeout: 15_000 });
+
+  // The shipped default already reports the honest form total.
+  await expect(positionLine(page)).toHaveText(`Bar 1 / ${FORM_LEN}`);
+
+  // 240 BPM -> one 4/4 bar per second (the doc's compression trick).
+  await page
+    .getByRole("region", { name: "Practice loop" })
+    .getByRole("slider", { name: "Tempo" })
+    .fill("240");
+
+  // Fresh boot: NO shift-click selection, no drill mode, no settings.
+  await play.click();
+
+  // Walk the Position line. Every COMPLETED pass (form bar 1 -> ... ->
+  // the wrap back to bar 1) must contain the LAST form bar: the
+  // retired padded-path wrap played 1..16 then 1..8 (24 padded bars of
+  // a 16-bar form = 1.5 passes) and its second pass never reaches bar
+  // 16 - so it fails this assertion. Build time is absorbed OUTSIDE
+  // the walk (the loop simply starts sampling later).
+  const passes: number[][] = [];
+  let run: number[] = [];
+  const deadline = Date.now() + (FORM_LEN * 3 + 10) * 1000;
+  while (Date.now() < deadline && passes.length < 2) {
+    const bar = await currentBar(page);
+    if (bar !== null && bar !== run[run.length - 1]) {
+      if (bar === 1 && run.length > 0) {
+        passes.push(run);
+        run = [];
+      }
+      run.push(bar);
+    }
+    await page.waitForTimeout(120);
+  }
+  expect(
+    passes.length,
+    "the default must complete at least two whole-form passes",
+  ).toBeGreaterThanOrEqual(2);
+  for (const [i, pass] of passes.entries()) {
+    expect(
+      pass,
+      `pass ${i + 1} never reached form bar ${FORM_LEN}: ${pass.join(",")}`,
+    ).toContain(FORM_LEN);
+  }
+
+  // Never halts at the end of a pass: still playing after two passes.
+  await expect(page.getByRole("button", { name: "Pause practice" })).toBeVisible();
 
   await railStop(page).click();
 });
