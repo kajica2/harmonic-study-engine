@@ -2883,6 +2883,7 @@ function AppShell() {
         pathLength={path.steps.length}
         onShowInspector={handleShowInspector}
         onShowExport={handleShowExport}
+        onShowTrumpetStage={() => setShowTrumpetStage(true)}
         onTogglePlayAlong={handleTogglePlayAlong}
         onToggleLoop={handleToggleLoop}
         melodyMuted={audioEngine.melodyMuted}
@@ -2928,6 +2929,21 @@ function AppShell() {
         )}
 
         <div className="hidden md:flex items-center gap-2 lg:gap-3 t-mono text-[color:var(--color-text-2)]">
+          {/* Trumpet stage tuner — top of the toolbar, brand-tinted so it
+              stands out from the dim device-control chrome. The mic-icon
+              cue + "cents" hint differentiate it from the record/export
+              buttons below. */}
+          <button
+            onClick={() => setShowTrumpetStage(true)}
+            aria-label="Open trumpet stage tuner"
+            title="Trumpet stage tuner — drill a chord-tone sequence with cents grading"
+            data-trumpet-stage-launcher="header"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded border bg-[color:var(--color-brand)]/15 border-[color:var(--color-brand)]/50 text-[color:var(--color-brand)] hover:bg-[color:var(--color-brand)]/25 hover:border-[color:var(--color-brand)]/70 transition-colors shadow-[0_0_12px_rgba(212,168,87,0.18)] font-medium"
+          >
+            <Mic size={14} />
+            <span>Trumpet stage</span>
+            <span className="hidden xl:inline t-mono text-[10px] opacity-70">·cents</span>
+          </button>
           <button
             onClick={() => setShowCheatsheet(true)}
             title="Keyboard shortcuts (?)"
@@ -2960,15 +2976,6 @@ function AppShell() {
                   ? "Sheet music ✓"
                   : "Sheet music"}
             </span>
-          </button>
-          <button
-            onClick={() => setShowTrumpetStage(true)}
-            aria-label="Open trumpet stage tuner"
-            title="Trumpet stage tuner — drill a chord-tone sequence with cents grading"
-            className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 px-3 py-1.5 rounded border border-neutral-800 transition-colors text-neutral-300 hover:text-white"
-          >
-            <Mic size={14} className="text-amber-400" />
-            <span>Trumpet stage</span>
           </button>
           <button
             onClick={() => setShowImportExport(true)}

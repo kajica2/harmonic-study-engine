@@ -11,6 +11,7 @@ interface Props {
   onShowInspector: () => void;
   onShowExport: () => void;
   onCommit: () => void;
+  onShowTrumpetStage?: () => void;
   onTogglePlayAlong?: () => void;
   onToggleLoop?: () => void;
   melodyMuted?: boolean;
@@ -39,6 +40,7 @@ export const MobileCommandBar = React.memo(function MobileCommandBar({
   activeStepIndex, setActiveStepIndex,
   pathLength,
   onShowInspector, onShowExport, onCommit,
+  onShowTrumpetStage,
   onTogglePlayAlong,
   onToggleLoop,
   melodyMuted = false,
@@ -123,6 +125,16 @@ export const MobileCommandBar = React.memo(function MobileCommandBar({
           >
             <h2 className="sr-only">More playback options</h2>
             <div className="grid grid-cols-3 gap-2">
+              {onShowTrumpetStage && (
+                <button
+                  onClick={() => { onShowTrumpetStage(); setMoreOpen(false); }}
+                  data-trumpet-stage-launcher="mobile"
+                  className="flex flex-col items-center gap-1 py-3 border border-[color:var(--color-brand)]/50 rounded-[var(--radius-md)] bg-[color:var(--color-brand)]/10 text-[color:var(--color-brand)] active:bg-[color:var(--color-brand)]/20"
+                >
+                  <Mic size={18} />
+                  <span className="text-[10px] t-mono font-medium">Trumpet stage</span>
+                </button>
+              )}
               <button
                 onClick={() => { onShowInspector(); setMoreOpen(false); }}
                 className="flex flex-col items-center gap-1 py-3 surface-2 border border-[color:var(--color-border)] rounded-[var(--radius-md)] active:bg-[color:var(--color-bg-3)]"
