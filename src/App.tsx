@@ -308,6 +308,14 @@ const RecordingModal = lazy(() =>
     default: m.RecordingModal,
   })),
 );
+// Trumpet Stage tuner — heavy because the modal pulls the
+// mic-capture Web Audio stack; code-split so it doesn't ship with
+// the eager chunk.
+const TrumpetStageModal = lazy(() =>
+  import("./components/TrumpetStageModal").then((m) => ({
+    default: m.TrumpetStageModal,
+  })),
+);
 
 /** Suspense fallback for the lazily-loaded modals in this file. */
 function ModalFallback() {
@@ -838,6 +846,8 @@ function AppShell() {
   const [isGenFolded, setIsGenFolded] = useState(true);
   const [activePanel, setActivePanel] = useState<"paths" | "practice" | "catalog">("paths");
   const [isPathsFolded, setIsPathsFolded] = useState(false);
+  // Trumpet Stage tuner modal (mic capture + cents grading).
+  const [showTrumpetStage, setShowTrumpetStage] = useState(false);
 
   const handlePathCatalogSelect = useCallback(
     (id: string) => {
@@ -2950,6 +2960,15 @@ function AppShell() {
                   ? "Sheet music ✓"
                   : "Sheet music"}
             </span>
+          </button>
+          <button
+            onClick={() => setShowTrumpetStage(true)}
+            aria-label="Open trumpet stage tuner"
+            title="Trumpet stage tuner — drill a chord-tone sequence with cents grading"
+            className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 px-3 py-1.5 rounded border border-neutral-800 transition-colors text-neutral-300 hover:text-white"
+          >
+            <Mic size={14} className="text-amber-400" />
+            <span>Trumpet stage</span>
           </button>
           <button
             onClick={() => setShowImportExport(true)}
@@ -5335,6 +5354,21 @@ function AppShell() {
               }
             }}
           />
+        )}
+      </Suspense>
+
+      <Suspense fallback={<ModalFallback />}>
+        {showTrumpetStage && (
+          <ModalShell
+            labelledBy="trumpet-stage-title"
+            onDismiss={() => setShowTrumpetStage(false)}
+            className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl p-0"
+          >
+            <h2 id="trumpet-stage-title" className="sr-only">
+              Trumpet Stage Tuner
+            </h2>
+            <TrumpetStageModal onClose={() => setShowTrumpetStage(false)} />
+          </ModalShell>
         )}
       </Suspense>
 
