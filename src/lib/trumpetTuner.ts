@@ -533,26 +533,21 @@ export function detectPitch(
           .filter((f) => f > 0)
           .map((f) => Math.abs(1200 * Math.log2(f / yinFreq))),
       );
-    // With a hint, YIN only gets to override when its period is
-    // within 50 cents of the hinted fundamental. Otherwise the hint
-    // wins — we KNOW which note is being played; a wild YIN
-    // ambiguity should never produce a wrong pitch class.
+    // With a hint, YIN only overrides when its period is within
+    // 50 cents of the hinted fundamental (or its first harmonics).
+    // When YIN reads a CLEARLY different pitch (e.g. the player blew
+    // the wrong note), we trust YIN — the hint biases the ambiguous
+    // cases, it must never hide a wrong note.
     const yinCloseToHint =
       hintFreq === 0 ||
       Math.abs(1200 * Math.log2(yinFreq / hintFreq)) < 50 ||
       Math.abs(1200 * Math.log2(yinFreq / hintH2)) < 50 ||
       Math.abs(1200 * Math.log2(yinFreq / hintH3)) < 50;
-    if (minDeltaCents > 5 && yinCloseToHint) {
-      // Spectral estimators don't agree with YIN. Trust YIN's
-      // sub-sample period when clarity is high.
+    if (minDeltaCents > 5 && (yinCloseToHint || hintFreq === 0)) {
+      // Spectral estimators don't agree with YIN; clarity is high.
+      // Trust YIN's sub-sample period.
       chosenFreq = yinFreq;
       bestSource = "yin";
-    } else if (!yinCloseToHint && hintFreq > 0) {
-      // YIN disagrees with the hint — the spectral hint bonus
-      // already pulled chosenFreq toward hintFreq. Snap to it
-      // explicitly so the modal sees the right note.
-      chosenFreq = hintFreq;
-      bestSource = "blend";
     }
   }
 

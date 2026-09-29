@@ -208,6 +208,22 @@ describe("detectPitch (multi-strategy: YIN + HPS + SHS + octave correction)", ()
     const cents = 1200 * Math.log2(est.freq / 92.5);
     expect(Math.abs(cents)).toBeLessThan(30);
   });
+
+  it("hint does NOT hide a wrong note — E4 read as E, not forced to hinted C4", () => {
+    // Player blows E4 (329.63 Hz) when the modal expects C4 (261.63).
+    // The detector must report E4 so the trainer can mark it 'wrong';
+    // a hint that suppresses this would let the player play anything.
+    const block = trumpetBlock(329.63, 120);
+    const est = detectPitch(block, SR, undefined, {
+      pitchClass: "C",
+      octave: 4,
+    });
+    const centsFromE4 = 1200 * Math.log2(est.freq / 329.63);
+    expect(Math.abs(centsFromE4)).toBeLessThan(20);
+    // And it must be nowhere near the hinted C4.
+    const centsFromC4 = 1200 * Math.log2(est.freq / 261.63);
+    expect(Math.abs(centsFromC4)).toBeGreaterThan(300);
+  });
 });
 
 describe("freqToNote (unchanged contract)", () => {

@@ -61,6 +61,12 @@ export interface ActiveAttempt {
   startedAt: number;
   centsSamples: number[];
   maxAmp: number;
+  /** Consecutive blocks with no confident pitch (silence / breath /
+   *  noise). Reset to 0 on any confident block. The attempt only
+   *  closes as a `miss` once this hits SILENT_BLOCKS_TO_MISS in a
+   *  row — a single dropout mid-note is ignored instead of killing
+   *  the attempt. */
+  silentBlocks: number;
 }
 
 export interface StageSession {
@@ -81,6 +87,13 @@ export interface StageSession {
 
 export const SAMPLE_RATE = 44100;
 export const BLOCK_SIZE = 8192;
+
+/** Consecutive unconfident / silent blocks required before an attempt
+ *  is abandoned as a `miss`. At ~186 ms per 8192-sample block this is
+ *  ~560 ms of true silence — long enough that a mid-note breath,
+ *  a transient mic dropout, or one noisy block does NOT kill a held
+ *  note. */
+export const SILENT_BLOCKS_TO_MISS = 3;
 
 export function createStageSession(cfg: StageConfig): StageSession {
   return {
@@ -190,6 +203,7 @@ export function processBlock(
       startedAt: now,
       centsSamples: [],
       maxAmp: 0,
+      silentBlocks: 0,
     };
     return session;
   }
@@ -215,13 +229,21 @@ export function processBlock(
       : undefined,
   );
 
-  // Silence OR low-confidence detection: cancel (treat as miss).
+  // Silence OR low-confidence detection: count consecutive dropouts.
+  // A single bad block (breath, transient, mic blip) is ignored —
+  // only sustained silence (SILENT_BLOCKS_TO_MISS in a row) ends the
+  // attempt as a miss. Reset the counter on any confident block.
   if (freq <= 0 || confidence < 0.45) {
-    if (session.active && now - session.active.startedAt > 200) {
+    session.active.silentBlocks += 1;
+    if (
+      session.active.silentBlocks >= SILENT_BLOCKS_TO_MISS &&
+      now - session.active.startedAt > 200
+    ) {
       finalizeAttempt(session, "miss", null, now);
     }
     return session;
   }
+  session.active.silentBlocks = 0;
 
   const note = freqToNote(freq);
   if (!note) return session;
