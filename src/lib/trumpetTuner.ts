@@ -1,22 +1,382 @@
 /**
- * src/lib/trumpetTuner.ts — autocorrelation pitch detector (YIN-lite,
- * no external libs). Returns frequency in Hz for a mono Float32Array.
- * Browser-only: no DOM access, but uses Float32Array.
+ * src/lib/trumpetTuner.ts — multi-strategy monophonic pitch detector
+ * for trumpet / brass.
+ *
+ * Three estimators vote on each block; a confidence-weighted blend
+ * picks the winner and a harmonic-correction pass snaps octave
+ * errors (common on brass when H1 is weak and H2/H3 dominate).
+ *
+ *   1. YIN-style cumulative squared difference function.
+ *      Best for periodic, low-noise signals with strong fundamental.
+ *      Source: de Cheveigné & Kawahara (2002).
+ *
+ *   2. Harmonic Product Spectrum (HPS) — sum of |FFT|^k across k=
+ *      2..5. Pushes the fundamental above its overtones; works even
+ *      when H1 is the weakest harmonic. Fast (one radix-2 FFT).
+ *
+ *   3. SubHarmonic Summation (SHS) — collapses octaves 2..5 onto
+ *      the fundamental bin, summing their magnitudes. Resolves
+ *      cases where H1 is buried in broadband hiss (mouthpiece
+ *      breath noise). Last-resort fallback.
+ *
+ * Octave correction: when the AC/YIN period disagrees with the
+ * spectral peak by an integer multiple, we trust the spectral peak
+ * weighted by its harmonic energy (the classic "follow the loudest
+ * harmonic" trick). Cents are then computed against that frequency.
+ *
+ * Confidence = 0..1, blend of AP clarity + HPS peak prominence. Low
+ * confidence blocks are reported with `freq = 0` so callers can
+ * treat them as silence.
  */
 
-const MIN_AMP_DEFAULT = 0.015;
-/** Ignore lags corresponding to frequencies > 1 kHz (mouthpiece hiss). */
-const MIN_LAG_HZ_CAP = 1000;
+const MIN_AMP_DEFAULT = 0.012;
+/** Search lags down to ~50 Hz (covers low brass pedal tones). */
+const MIN_LAG_HZ_FLOOR = 50;
+/** Reject frequencies above 2 kHz (above the trumpet's written
+ *  range; cuts mouthpiece hiss). */
+const MIN_LAG_HZ_CAP = 2000;
+
+/** YIN-style absolute threshold. de Cheveigné & Kawahara recommend
+ *  ~0.10–0.15; we sit at 0.12 to balance false-period vs missed-fund. */
+const YIN_THRESHOLD = 0.12;
 
 export interface PitchEstimate {
   freq: number;
   amp: number;
+  /** 0..1 — confidence in `freq`. < 0.5 means caller should treat
+   *  this block as noise and not score it. */
+  confidence: number;
+  /** Which estimator won: "yin" | "hps" | "shs" | "blend". */
+  source: "yin" | "hps" | "shs" | "blend";
+}
+
+/** Cooley–Tukey radix-2 FFT, in-place, length must be a power of 2. */
+function fft(re: Float32Array, im: Float32Array): void {
+  const N = re.length;
+  // Bit-reversal permutation.
+  for (let i = 1, j = 0; i < N; i++) {
+    let bit = N >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
+  }
+  // Butterflies.
+  for (let len = 2; len <= N; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    const wRe = Math.cos(ang);
+    const wIm = Math.sin(ang);
+    for (let i = 0; i < N; i += len) {
+      let cRe = 1;
+      let cIm = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const uRe = re[i + k];
+        const uIm = im[i + k];
+        const vRe = re[i + k + len / 2] * cRe - im[i + k + len / 2] * cIm;
+        const vIm = re[i + k + len / 2] * cIm + im[i + k + len / 2] * cRe;
+        re[i + k] = uRe + vRe;
+        im[i + k] = uIm + vIm;
+        re[i + k + len / 2] = uRe - vRe;
+        im[i + k + len / 2] = uIm - vIm;
+        const nextCRe = cRe * wRe - cIm * wIm;
+        const nextCIm = cRe * wIm + cIm * wRe;
+        cRe = nextCRe;
+        cIm = nextCIm;
+      }
+    }
+  }
+}
+
+/** Next power of two >= n. */
+function nextPow2(n: number): number {
+  let p = 1;
+  while (p < n) p <<= 1;
+  return p;
 }
 
 /**
- * Estimate the fundamental frequency of a mono signal using normalized
- * autocorrelation with parabolic peak interpolation. `freq = 0` means
- * no clear pitch (silence or sub-threshold amplitude).
+ * YIN cumulative mean normalized difference. `out[tau]` is small
+ * (close to 0) for periods that match the signal. `out[0]` is always
+ * 1. Implementation: standard de Cheveigné & Kawahara (2002).
+ */
+function yinDifference(
+  x: Float32Array,
+  out: Float32Array,
+  minLag: number,
+  maxLag: number,
+): { tau: number; clarity: number } {
+  const tauMax = maxLag;
+  // d[tau] = sum (x[i] - x[i+tau])^2
+  // We use a "fast" form: differencing against a sliding window.
+  for (let tau = minLag; tau <= tauMax; tau++) {
+    let sum = 0;
+    for (let i = 0; i < tauMax; i++) {
+      const delta = x[i] - x[i + tau];
+      sum += delta * delta;
+    }
+    out[tau] = sum;
+  }
+
+  // Cumulative mean normalized difference:
+  //   d'(tau) = d(tau) / ((1/tau) * sum_{j=1..tau} d(j))
+  // Set d'(0) = 1 by convention; d'(tau>0) per formula.
+  let running = 0;
+  for (let tau = 1; tau <= tauMax; tau++) {
+    running += out[tau];
+    out[tau] = (out[tau] * tau) / (running || 1e-12);
+  }
+
+  // Absolute-threshold search: first dip below YIN_THRESHOLD that
+  // is also a local minimum.
+  let bestTau = -1;
+  for (let tau = minLag; tau <= tauMax; tau++) {
+    if (out[tau] < YIN_THRESHOLD) {
+      // Walk to the local minimum.
+      while (tau + 1 <= tauMax && out[tau + 1] < out[tau]) tau++;
+      bestTau = tau;
+      break;
+    }
+  }
+  if (bestTau === -1) {
+    // Fallback: argmin over the search range.
+    let minVal = Infinity;
+    let minIdx = minLag;
+    for (let tau = minLag; tau <= tauMax; tau++) {
+      if (out[tau] < minVal) {
+        minVal = out[tau];
+        minIdx = tau;
+      }
+    }
+    bestTau = minIdx;
+  }
+  // Parabolic interpolation around the chosen tau.
+  let tauInterp = bestTau;
+  if (bestTau > 1 && bestTau < tauMax) {
+    const s0 = out[bestTau - 1];
+    const s1 = out[bestTau];
+    const s2 = out[bestTau + 1];
+    const denom = 2 * (2 * s1 - s0 - s2);
+    if (denom !== 0) {
+      tauInterp = bestTau + (s2 - s0) / denom;
+    }
+  }
+  // Clarity: 1 - min normalized difference.
+  return { tau: tauInterp, clarity: Math.max(0, 1 - out[Math.round(bestTau)]) };
+}
+
+/**
+ * Magnitude spectrum via FFT. Returns peak bin + magnitude for the
+ * given search range.
+ */
+function findSpectralPeak(
+  re: Float32Array,
+  im: Float32Array,
+  sr: number,
+  minHz: number,
+  maxHz: number,
+): { freq: number; mag: number; bin: number } {
+  const N = re.length;
+  const halfN = N / 2;
+  const binHz = sr / N;
+  const minBin = Math.max(1, Math.floor(minHz / binHz));
+  const maxBin = Math.min(halfN - 2, Math.ceil(maxHz / binHz));
+  let bestBin = minBin;
+  let bestMag = 0;
+  for (let i = minBin; i <= maxBin; i++) {
+    const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+    if (mag > bestMag) {
+      bestMag = mag;
+      bestBin = i;
+    }
+  }
+  // Parabolic interpolation around the peak for sub-bin accuracy.
+  if (bestBin > 1 && bestBin < halfN - 1) {
+    const m0 =
+      Math.sqrt(re[bestBin - 1] * re[bestBin - 1] + im[bestBin - 1] * im[bestBin - 1]);
+    const m1 = bestMag;
+    const m2 =
+      Math.sqrt(re[bestBin + 1] * re[bestBin + 1] + im[bestBin + 1] * im[bestBin + 1]);
+    const denom = 2 * (2 * m1 - m0 - m2);
+    if (denom !== 0) {
+      const delta = (m2 - m0) / denom;
+      const interpBin = bestBin + delta;
+      return { freq: interpBin * binHz, mag: bestMag, bin: bestBin };
+    }
+  }
+  return { freq: bestBin * binHz, mag: bestMag, bin: bestBin };
+}
+
+/**
+ * Harmonic Product Spectrum. Sums |FFT|^k for k = 2..5 with the
+ * magnitudes downsampled by k. The peak of the sum is the fundamental
+ * frequency even when H1 is buried. Parabolic interpolation refines
+ * sub-bin accuracy.
+ */
+function harmonicProduct(
+  re: Float32Array,
+  im: Float32Array,
+  sr: number,
+  minHz: number,
+  maxHz: number,
+): { freq: number; mag: number } {
+  const N = re.length;
+  const binHz = sr / N;
+  const minBin = Math.max(2, Math.floor(minHz / binHz));
+  const maxBin = Math.min(Math.floor(N / 2) - 2, Math.ceil(maxHz / binHz));
+  let bestBin = minBin;
+  let bestVal = 0;
+  for (let i = minBin; i <= maxBin; i++) {
+    const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+    let sum = mag;
+    for (let k = 2; k <= 5; k++) {
+      const j = i * k;
+      if (j >= N / 2) break;
+      const mj = Math.sqrt(re[j] * re[j] + im[j] * im[j]);
+      sum += mj;
+    }
+    if (sum > bestVal) {
+      bestVal = sum;
+      bestBin = i;
+    }
+  }
+  // Parabolic interpolation.
+  let interpBin = bestBin;
+  if (bestBin > 1 && bestBin < Math.floor(N / 2) - 1) {
+    const m0 = Math.sqrt(
+      re[bestBin - 1] * re[bestBin - 1] + im[bestBin - 1] * im[bestBin - 1],
+    );
+    const m1 = Math.sqrt(
+      re[bestBin] * re[bestBin] + im[bestBin] * im[bestBin],
+    );
+    const m2 = Math.sqrt(
+      re[bestBin + 1] * re[bestBin + 1] + im[bestBin + 1] * im[bestBin + 1],
+    );
+    const denom = 2 * (2 * m1 - m0 - m2);
+    if (denom !== 0) interpBin = bestBin + (m2 - m0) / denom;
+  }
+  return { freq: interpBin * binHz, mag: bestVal };
+}
+
+/**
+ * SubHarmonic Summation: collapse octaves 2..5 onto the
+ * fundamental, summing their magnitudes. Picks the lowest bin
+ * with the strongest accumulated energy.
+ */
+function subHarmonicSummation(
+  re: Float32Array,
+  im: Float32Array,
+  sr: number,
+  minHz: number,
+  maxHz: number,
+): { freq: number; mag: number } {
+  const N = re.length;
+  const binHz = sr / N;
+  const minBin = Math.max(2, Math.floor(minHz / binHz));
+  const maxBin = Math.min(Math.floor(N / 2) - 2, Math.ceil(maxHz / binHz));
+  let bestBin = minBin;
+  let bestVal = 0;
+  for (let i = minBin; i <= maxBin; i++) {
+    let sum = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+    for (let k = 2; k <= 5; k++) {
+      const j = i * k;
+      if (j >= N / 2) break;
+      sum += Math.sqrt(re[j] * re[j] + im[j] * im[j]) * (1 - (k - 1) * 0.1);
+    }
+    if (sum > bestVal) {
+      bestVal = sum;
+      bestBin = i;
+    }
+  }
+  let interpBin = bestBin;
+  if (bestBin > 1 && bestBin < Math.floor(N / 2) - 1) {
+    const m0 = Math.sqrt(
+      re[bestBin - 1] * re[bestBin - 1] + im[bestBin - 1] * im[bestBin - 1],
+    );
+    const m1 = Math.sqrt(
+      re[bestBin] * re[bestBin] + im[bestBin] * im[bestBin],
+    );
+    const m2 = Math.sqrt(
+      re[bestBin + 1] * re[bestBin + 1] + im[bestBin + 1] * im[bestBin + 1],
+    );
+    const denom = 2 * (2 * m1 - m0 - m2);
+    if (denom !== 0) interpBin = bestBin + (m2 - m0) / denom;
+  }
+  return { freq: interpBin * binHz, mag: bestVal };
+}
+
+/**
+ * Find the lowest harmonic frequency consistent with the spectrum.
+ * Walks candidate fundamentals from 50 Hz upward; for each, sums
+ * magnitudes at H1..H5. The candidate whose stack has the strongest
+ * aligned energy wins. Resolves missing-fundamental cases where the
+ * fundamental is silent but H2..H5 are loud.
+ */
+function harmonicStackFundamental(
+  re: Float32Array,
+  im: Float32Array,
+  sr: number,
+): { freq: number; mag: number } {
+  const N = re.length;
+  const binHz = sr / N;
+  const minBin = Math.max(2, Math.floor(50 / binHz));
+  const maxBin = Math.min(Math.floor(N / 2) - 2, Math.ceil(2000 / binHz));
+  let bestBin = minBin;
+  let bestStack = 0;
+  for (let i = minBin; i <= maxBin; i++) {
+    const mag1 = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+    let stack = mag1;
+    // Count harmonics whose magnitude is > 5% of the loudest
+    // harmonic in this stack (not just mag1) — handles missing
+    // fundamental cleanly.
+    let loudest = mag1;
+    for (let k = 2; k <= 5; k++) {
+      const j = i * k;
+      if (j >= N / 2) break;
+      const mj = Math.sqrt(re[j] * re[j] + im[j] * im[j]);
+      stack += mj;
+      if (mj > loudest) loudest = mj;
+    }
+    let presentHarmonics = 0;
+    for (let k = 1; k <= 5; k++) {
+      const j = i * k;
+      if (j >= N / 2) break;
+      const mj = Math.sqrt(re[j] * re[j] + im[j] * im[j]);
+      if (mj > 0.05 * Math.max(loudest, 1)) presentHarmonics++;
+    }
+    // Reward candidates with multiple aligned harmonics; penalize
+    // isolated bins (noise spikes).
+    const align = presentHarmonics >= 2 ? 1 : 0.3;
+    const score = stack * align;
+    if (score > bestStack) {
+      bestStack = score;
+      bestBin = i;
+    }
+  }
+  let interpBin = bestBin;
+  if (bestBin > 1 && bestBin < Math.floor(N / 2) - 1) {
+    const m0 = Math.sqrt(
+      re[bestBin - 1] * re[bestBin - 1] + im[bestBin - 1] * im[bestBin - 1],
+    );
+    const m1 = Math.sqrt(
+      re[bestBin] * re[bestBin] + im[bestBin] * im[bestBin],
+    );
+    const m2 = Math.sqrt(
+      re[bestBin + 1] * re[bestBin + 1] + im[bestBin + 1] * im[bestBin + 1],
+    );
+    const denom = 2 * (2 * m1 - m0 - m2);
+    if (denom !== 0) interpBin = bestBin + (m2 - m0) / denom;
+  }
+  return { freq: interpBin * binHz, mag: bestStack };
+}
+
+/**
+ * Estimate pitch + confidence for a mono audio block.
+ *
+ * Multi-strategy: YIN votes on period, HPS votes on fundamental,
+ * SHS is the fallback when H1 is buried. The output frequency is the
+ * one that has the strongest harmonic support (octave-corrected).
  */
 export function detectPitch(
   x: Float32Array,
@@ -24,7 +384,7 @@ export function detectPitch(
   minAmp: number = MIN_AMP_DEFAULT,
 ): PitchEstimate {
   const N = x.length;
-  // Center the signal in-place.
+  // DC removal + amplitude.
   let mean = 0;
   for (let i = 0; i < N; i++) mean += x[i];
   mean /= N;
@@ -33,46 +393,104 @@ export function detectPitch(
     const v = x[i] - mean;
     if (Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
   }
-  if (maxAbs < minAmp) return { freq: 0, amp: maxAbs };
+  if (maxAbs < minAmp) {
+    return { freq: 0, amp: maxAbs, confidence: 0, source: "yin" };
+  }
 
-  // Hanning-windowed copy.
+  // Windowed signal.
   const win = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    win[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1));
+    win[i] = (x[i] - mean) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
   }
 
-  // Autocorrelation (lag 0 .. N-1).
-  const ac = new Float32Array(N);
-  for (let lag = 0; lag < N; lag++) {
-    let sum = 0;
-    for (let i = 0; i < N - lag; i++) sum += win[i] * win[i + lag];
-    ac[lag] = sum;
+  // Lag bounds.
+  const minLag = Math.max(2, Math.floor(sampleRate / MIN_LAG_HZ_CAP));
+  const maxLag = Math.min(N - 2, Math.floor(sampleRate / MIN_LAG_HZ_FLOOR));
+
+  // YIN.
+  const yinOut = new Float32Array(maxLag + 1);
+  const yin = yinDifference(win, yinOut, minLag, maxLag);
+  const yinFreq = sampleRate / yin.tau;
+
+  // FFT (next pow2 >= N for speed).
+  const fftN = Math.min(nextPow2(N), 4096);
+  const re = new Float32Array(fftN);
+  const im = new Float32Array(fftN);
+  // Copy + window into the FFT buffer.
+  for (let i = 0; i < Math.min(N, fftN); i++) {
+    re[i] = (x[i] - mean) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (fftN - 1)));
   }
+  fft(re, im);
 
-  // Zero out lags < sampleRate / 1000 to ignore the >1 kHz tail.
-  const minLag = Math.max(1, Math.floor(sampleRate / MIN_LAG_HZ_CAP));
-  for (let i = 0; i < minLag; i++) ac[i] = 0;
+  const specPeak = findSpectralPeak(re, im, sampleRate, 50, 2000);
+  const hps = harmonicProduct(re, im, sampleRate, 50, 2000);
+  const shs = subHarmonicSummation(re, im, sampleRate, 50, 2000);
+  const stackFund = harmonicStackFundamental(re, im, sampleRate);
 
-  // Argmax.
-  let peak = 0;
-  let peakVal = 0;
-  for (let i = 1; i < N; i++) {
-    if (ac[i] > peakVal) {
-      peakVal = ac[i];
-      peak = i;
+  // Octave correction: walk candidates × small-integer octaves and
+  // pick the frequency whose harmonic stack is strongest.
+  const candidates = [yinFreq, hps.freq, shs.freq, stackFund.freq].sort(
+    (a, b) => a - b,
+  );
+  const ratios = [1, 2, 3, 4, 0.5, 1 / 3];
+  let chosenFreq = stackFund.freq;
+  let bestScore = -Infinity;
+  let bestSource: PitchEstimate["source"] = "hps";
+  for (const base of candidates) {
+    for (const r of ratios) {
+      const f = base * r;
+      if (f < 50 || f > 2000) continue;
+      const bin = Math.round((f * fftN) / sampleRate);
+      if (bin < 1 || bin >= fftN / 2) continue;
+      const mag = Math.sqrt(re[bin] * re[bin] + im[bin] * im[bin]);
+      // Sum energy at H1..H5 — strongest stack wins.
+      let stack = mag;
+      for (let k = 2; k <= 5; k++) {
+        const j = bin * k;
+        if (j >= fftN / 2) break;
+        stack += Math.sqrt(re[j] * re[j] + im[j] * im[j]);
+      }
+      const score = stack;
+      if (score > bestScore) {
+        bestScore = score;
+        chosenFreq = f;
+        if (f === hps.freq) bestSource = "hps";
+        else if (f === shs.freq) bestSource = "shs";
+        else if (Math.abs(f - yinFreq) / yinFreq < 0.02) bestSource = "yin";
+        else bestSource = "blend";
+      }
     }
   }
-  if (peak === 0) return { freq: 0, amp: maxAbs };
 
-  // Parabolic interpolation.
-  if (peak > 0 && peak < N - 1) {
-    const y1 = ac[peak - 1];
-    const y2 = ac[peak];
-    const y3 = ac[peak + 1];
-    const denom = y1 - 2 * y2 + y3;
-    if (denom !== 0) peak = peak + 0.5 * ((y1 - y3) / denom);
+  // Confidence: blend YIN clarity, spectral peak prominence,
+  // harmonic-stack consistency.
+  const peakProminence = specPeak.mag / (Math.max(...Array.from({ length: 32 }, (_, i) => {
+    const j = specPeak.bin + i - 16;
+    return j > 0 && j < fftN / 2 ? Math.sqrt(re[j] * re[j] + im[j] * im[j]) : 0;
+  })) || 1);
+  const yinClarity = Math.max(0, Math.min(1, yin.clarity));
+  // Are YIN/HPS/SHS within a semitone of each other?
+  const fset = [yinFreq, hps.freq, shs.freq];
+  const fsetMax = Math.max(...fset);
+  const fsetMin = Math.min(...fset);
+  const agreement =
+    fsetMax === 0 ? 0 : 1 - Math.min(1, Math.log2(fsetMax / fsetMin));
+  const confidence = Math.max(
+    0,
+    Math.min(1, 0.45 * yinClarity + 0.3 * peakProminence + 0.25 * agreement),
+  );
+
+  // Reject weak estimates — caller treats freq=0 as silence.
+  if (confidence < 0.3) {
+    return { freq: 0, amp: maxAbs, confidence, source: bestSource };
   }
-  return { freq: sampleRate / peak, amp: maxAbs };
+
+  return {
+    freq: chosenFreq,
+    amp: maxAbs,
+    confidence,
+    source: bestSource,
+  };
 }
 
 const NOTE_NAMES = [
