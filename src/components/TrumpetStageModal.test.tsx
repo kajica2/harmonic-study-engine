@@ -99,4 +99,27 @@ describe("TrumpetStageModal — panel always renders", () => {
     render(<TrumpetStageModal initialConfig={undefined} path={undefined} sessionOverride={session} onClose={() => {}} />);
     expect(screen.getByText(/Last/i)).toBeTruthy();
   });
+
+  it("shows 'In tune ✓' state within 1s of a HIT attempt", () => {
+    const session = createStageSession({
+      chordRoot: "C",
+      chordQuality: "maj7",
+      degreeSequence: ["1", "3", "5"],
+    });
+    session.attempts.push({
+      degree: "1",
+      targetPc: "C",
+      targetOctave: 4,
+      outcome: "hit",
+      avgCents: 1.2,
+      meanCents: 1.4,
+      centsStdev: 0.8,
+      maxAmp: 0.4,
+    });
+    session.lastHitAt = performance.now();
+    render(<TrumpetStageModal initialConfig={undefined} path={undefined} sessionOverride={session} onClose={() => {}} />);
+    expect(screen.getByText(/In tune/i)).toBeTruthy();
+    // The check mark confirms the celebration label.
+    expect(screen.getByText(/✓/)).toBeTruthy();
+  });
 });

@@ -69,6 +69,11 @@ export interface StageSession {
   active: ActiveAttempt | null;
   index: number;
   status: "idle" | "running" | "stopped";
+  /** Timestamp of the last successful HIT attempt. UI uses this to
+   *  keep the green "in-tune" indicator lit for ~1s after close
+   *  so the player sees the celebration before the next target
+   *  takes over the panel. */
+  lastHitAt?: number;
   /** Internal throttle hint used by the React binding. Not part of
    * the public surface; consumers should treat it as opaque. */
   _lastRender?: number;
@@ -112,6 +117,7 @@ function finalizeAttempt(
   session: StageSession,
   outcome: Outcome,
   medianCents: number | null = null,
+  now: number = Date.now(),
 ): void {
   if (!session.active) return;
   const { degree, targetPc, targetOctave, maxAmp, centsSamples } =
@@ -143,6 +149,13 @@ function finalizeAttempt(
     centsStdev: stdev,
     maxAmp,
   });
+  // When the attempt is a HIT, record the timestamp so the UI can
+  // keep the green "in-tune" needle lit for `holdInTuneMs` past the
+  // close — gives the player visual confirmation that they nailed
+  // it before the next target takes over.
+  if (outcome === "hit") {
+    session.lastHitAt = now;
+  }
   session.active = null;
   session.index += 1;
 }
@@ -186,7 +199,7 @@ export function processBlock(
     now - session.active.startedAt >
     session.config.timeoutSeconds * 1000
   ) {
-    finalizeAttempt(session, "timeout");
+    finalizeAttempt(session, "timeout", null, now);
     return session;
   }
 
@@ -205,7 +218,7 @@ export function processBlock(
   // Silence OR low-confidence detection: cancel (treat as miss).
   if (freq <= 0 || confidence < 0.45) {
     if (session.active && now - session.active.startedAt > 200) {
-      finalizeAttempt(session, "miss");
+      finalizeAttempt(session, "miss", null, now);
     }
     return session;
   }
@@ -230,7 +243,7 @@ export function processBlock(
   // plausibly the target with bad intonation; beyond that it's almost
   // certainly a different note (the closest adjacent semitone).
   if (note.name !== session.active.targetPc || Math.abs(centsFromTarget) > 75) {
-    finalizeAttempt(session, "wrong");
+    finalizeAttempt(session, "wrong", null, now);
     return session;
   }
 
@@ -262,7 +275,7 @@ export function processBlock(
       Math.abs(mid) <= session.config.perNoteToleranceCents
         ? "hit"
         : "miss";
-    finalizeAttempt(session, outcome, mid);
+    finalizeAttempt(session, outcome, mid, now);
     // avg is recorded but not used for grading; could be surfaced
     // later as a "smoothness" metric.
     void avg;

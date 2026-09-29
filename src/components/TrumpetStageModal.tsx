@@ -35,6 +35,11 @@ function defaultConfig(): StageConfig {
   };
 }
 
+/** How long the green "in tune" needle stays lit after a successful
+ *  HIT. 1000 ms is enough for the player to register the visual
+ *  confirmation before the next target takes over the panel. */
+const HOLD_MS = 1000;
+
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 1) + "…";
 }
@@ -91,6 +96,11 @@ export const TrumpetStageModal: React.FC<Props> = ({
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const [error, setError] = useState<string | null>(null);
+  // Tick that increments whenever a HIT happens — used by the panel
+  // to keep the green in-tune indicator lit for ~1s past the close.
+  // The panel reads session.lastHitAt AND this tick to decide
+  // whether to display the hold state.
+  const [holdTick, setHoldTick] = useState(0);
 
   useEffect(
     () => () => {
@@ -99,6 +109,23 @@ export const TrumpetStageModal: React.FC<Props> = ({
     },
     [],
   );
+
+  // Tick the panel during the post-hit "hold in tune" window so the
+  // green needle stays lit visibly for `HOLD_MS`. Self-clears when
+  // the window expires.
+  useEffect(() => {
+    if (!session.lastHitAt) return;
+    const startMs = performance.now();
+    const id = window.setInterval(() => {
+      if (performance.now() - startMs >= HOLD_MS) {
+        setHoldTick((t) => t + 1);
+        window.clearInterval(id);
+        return;
+      }
+      setHoldTick((t) => t + 1);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [session.lastHitAt]);
 
   const start = async () => {
     setError(null);
@@ -188,11 +215,17 @@ export const TrumpetStageModal: React.FC<Props> = ({
         </div>
 
         {(() => {
-          // Always show the panel. During an attempt, show the live
-          // cents + stdev + n. Between attempts, show the LAST closed
-          // attempt's median + stdev (so the player still sees their
-          // last reading while waiting for the next target). Before
-          // any attempt has happened, show em-dashes at center.
+          // Always show the panel. Four states:
+          //   - HitHold: the most recent attempt just HIT and we're
+          //     still inside the HOLD_MS window. Lock the panel to the
+          //     hit attempt's values + green "in tune" indicator so the
+          //     player sees the celebration before the next target.
+          //   - Live: an active attempt is in flight.
+          //   - Last: between attempts, after at least one close.
+          //   - Idle: no attempts yet.
+          const holdActive =
+            session.lastHitAt !== undefined &&
+            performance.now() - session.lastHitAt < HOLD_MS;
           const liveCents = active
             ? liveStats(active.centsSamples)
             : null;
@@ -200,14 +233,20 @@ export const TrumpetStageModal: React.FC<Props> = ({
             !active && attempts.length > 0
               ? attempts[attempts.length - 1]
               : null;
-          const cents =
-            active && liveCents
+          // During HitHold we lock to the hit attempt's values.
+          const holdAttempt = holdActive
+            ? attempts[attempts.length - 1]
+            : null;
+          const cents = holdAttempt
+            ? holdAttempt.avgCents
+            : active && liveCents
               ? liveCents.median
               : lastAttempt
                 ? lastAttempt.avgCents
                 : null;
-          const stdev =
-            active && liveCents
+          const stdev = holdAttempt
+            ? holdAttempt.centsStdev
+            : active && liveCents
               ? liveCents.stdev
               : lastAttempt
                 ? lastAttempt.centsStdev
@@ -216,7 +255,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
             active && liveCents
               ? liveCents.n
               : lastAttempt
-                ? null // closed attempt — no live sample count
+                ? null
                 : 0;
           const tolerance = session.config.perNoteToleranceCents;
           const barPct =
@@ -227,15 +266,32 @@ export const TrumpetStageModal: React.FC<Props> = ({
             cents !== null &&
             cents !== undefined &&
             Math.abs(cents) <= tolerance;
-          const label = active ? "Live" : lastAttempt ? "Last" : "Idle";
+          const label = holdActive
+            ? "In tune"
+            : active
+              ? "Live"
+              : lastAttempt
+                ? "Last"
+                : "Idle";
           return (
             <div
               data-testid="live-readout"
-              className="surface-2 border rounded-[var(--radius-sm)] px-3 py-2 text-xs space-y-1.5"
+              className={`surface-2 border rounded-[var(--radius-sm)] px-3 py-2 text-xs space-y-1.5 transition-shadow ${
+                holdActive
+                  ? "border-emerald-500/60 shadow-[0_0_18px_rgba(52,211,153,0.35)]"
+                  : ""
+              }`}
             >
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-[color:var(--color-text-3)] text-[10px] uppercase tracking-wider">
+                <span
+                  className={`text-[10px] uppercase tracking-wider font-bold ${
+                    holdActive
+                      ? "text-emerald-300"
+                      : "text-[color:var(--color-text-3)]"
+                  }`}
+                >
                   {label}
+                  {holdActive && " ✓"}
                 </span>
                 <span
                   className={`t-mono text-sm font-bold ${
