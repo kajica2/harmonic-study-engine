@@ -5393,7 +5393,7 @@ function AppShell() {
           <ModalShell
             labelledBy="trumpet-stage-title"
             onDismiss={() => setShowTrumpetStage(false)}
-            className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl p-0"
+            className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl p-0"
           >
             <h2 id="trumpet-stage-title" className="sr-only">
               Trumpet Stage Tuner

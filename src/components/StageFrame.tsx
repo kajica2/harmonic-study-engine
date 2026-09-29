@@ -91,7 +91,7 @@ export const StageFrame: React.FC<StageFrameProps> = ({
         )}
       </div>
       {meta && (
-        <div className="t-small text-[color:var(--color-text-2)] whitespace-nowrap">
+        <div className="t-small text-[color:var(--color-text-2)] whitespace-nowrap truncate max-w-[60vw]">
           {meta}
         </div>
       )}
@@ -117,7 +117,7 @@ export const StageFrame: React.FC<StageFrameProps> = ({
         )}
       </div>
       {meta && (
-        <div className="t-small text-[color:var(--color-text-2)] whitespace-nowrap">
+        <div className="t-small text-[color:var(--color-text-2)] whitespace-nowrap truncate max-w-[60vw]">
           {meta}
         </div>
       )}

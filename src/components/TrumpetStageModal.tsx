@@ -31,6 +31,10 @@ function defaultConfig(): StageConfig {
   };
 }
 
+function truncate(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max - 1) + "…";
+}
+
 /**
  * TrumpetStageModal — live mic tuner that walks the player through a
  * scale-degree sequence over a chosen chord. Each played note is
@@ -124,7 +128,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
       title={`${session.config.chordRoot}${session.config.chordQuality}`}
       meta={
         path && !initialConfig
-          ? `auto-detected from "${path.title}" · ${attempts.length} attempts · ${hits} hit · ±${session.config.perNoteToleranceCents}¢`
+          ? `auto: "${truncate(path.title, 24)}" · ${attempts.length} attempts · ${hits} hit · ±${session.config.perNoteToleranceCents}¢`
           : `${attempts.length} attempts · ${hits} hit · ±${session.config.perNoteToleranceCents}¢`
       }
       actions={
