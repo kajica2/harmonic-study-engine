@@ -35,7 +35,7 @@ const pcToMidi: Record<string, number> = {
   B: 11,
 };
 
-export type Outcome = "hit" | "wrong" | "miss" | "timeout";
+export type Outcome = "hit" | "wrong" | "miss" | "timeout" | "skip";
 
 export interface AttemptRecord {
   degree: string;
@@ -171,6 +171,19 @@ function finalizeAttempt(
   }
   session.active = null;
   session.index += 1;
+}
+
+/**
+ * Advance past the current target without waiting for the timeout.
+ * Records the attempt as `skip` (honest: the player chose not to
+ * play it) and moves the index forward. No-op when nothing is
+ * active.
+ */
+export function skipAttempt(session: StageSession, now: number): StageSession {
+  if (session.active) {
+    finalizeAttempt(session, "skip", null, now);
+  }
+  return session;
 }
 
 /**

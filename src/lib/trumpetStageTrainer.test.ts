@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   createStageSession,
   processBlock,
+  skipAttempt,
   SAMPLE_RATE,
   SILENT_BLOCKS_TO_MISS,
 } from "./trumpetStageTrainer";
@@ -125,5 +126,47 @@ describe("processBlock — dropout resilience", () => {
     expect(session.attempts.length).toBe(1);
     expect(session.attempts[0].outcome).toBe("wrong");
     expect(session.index).toBe(1);
+  });
+});
+
+describe("skipAttempt — manual advance", () => {
+  it("closes the active attempt as 'skip' and advances the index", () => {
+    const session = createStageSession(CONFIG);
+    session.status = "running";
+    processBlock(session, SILENCE, 0); // create attempt (target C4)
+    expect(session.active).not.toBeNull();
+    skipAttempt(session, 100);
+    expect(session.active).toBeNull();
+    expect(session.attempts.length).toBe(1);
+    expect(session.attempts[0].outcome).toBe("skip");
+    expect(session.attempts[0].targetPc).toBe("C");
+    expect(session.index).toBe(1);
+  });
+
+  it("is a no-op when nothing is active", () => {
+    const session = createStageSession(CONFIG);
+    session.status = "running";
+    skipAttempt(session, 100);
+    expect(session.attempts.length).toBe(0);
+    expect(session.index).toBe(0);
+  });
+
+  it("a skip does NOT light the in-tune hold indicator", () => {
+    const session = createStageSession(CONFIG);
+    session.status = "running";
+    processBlock(session, SILENCE, 0);
+    skipAttempt(session, 100);
+    expect(session.lastHitAt).toBeUndefined();
+  });
+
+  it("advances to the next degree in the sequence after a skip", () => {
+    const session = createStageSession(CONFIG);
+    session.status = "running";
+    processBlock(session, SILENCE, 0); // attempts "1" (C4)
+    skipAttempt(session, 100);
+    // Next block creates the second attempt: degree "3" (E4).
+    processBlock(session, SILENCE, 200);
+    expect(session.active!.targetPc).toBe("E");
+    expect(session.active!.degree).toBe("3");
   });
 });

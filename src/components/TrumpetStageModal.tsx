@@ -4,6 +4,7 @@ import { StageFrame } from "./StageFrame";
 import {
   createStageSession,
   processBlock,
+  skipAttempt as skipActiveAttempt,
   startAudioCapture,
   type StageSession,
 } from "../lib/trumpetStageTrainer";
@@ -42,6 +43,37 @@ const HOLD_MS = 1000;
 
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 1) + "…";
+}
+
+/** Pitch-class name -> MIDI offset within an octave. */
+const PC_TO_SEMITONE: Record<string, number> = {
+  C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
+  "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+};
+
+const NOTE_NAMES_SHARP = [
+  "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+] as const;
+
+/**
+ * Convert a CONCERT pitch (the frequency actually sounded, which is
+ * what the detector hears) into the WRITTEN pitch for a transposing
+ * instrument. `semitones` is the instrument's read offset from
+ * TRANSPOSITIONS: Bb trumpet = +2 (reads a whole step higher), F horn
+ * = +7. A concert Bb4 on a Bb trumpet is written C5 — the player
+ * fingers/reads C, hears Bb.
+ */
+export function writtenPitch(
+  pc: string,
+  octave: number,
+  semitones: number,
+): { name: string; octave: number } {
+  const midi =
+    (octave + 1) * 12 + (PC_TO_SEMITONE[pc] ?? 0) + semitones;
+  return {
+    name: NOTE_NAMES_SHARP[((midi % 12) + 12) % 12],
+    octave: Math.floor(midi / 12) - 1,
+  };
 }
 
 /** Compute live median + stdev of an in-flight cents series. Used by
@@ -96,6 +128,13 @@ export const TrumpetStageModal: React.FC<Props> = ({
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const [error, setError] = useState<string | null>(null);
+  // Which instrument the player is reading for. Concert = no
+  // transposition; Bb = trumpet (reads +2 semitones); F = horn (+7).
+  // The DETECTOR always works in concert pitch (that's what the mic
+  // hears); this only changes what the target is DISPLAYED as.
+  const [instrument, setInstrument] = useState<"Concert" | "Bb" | "F">(
+    "Concert",
+  );
   // Tick that increments whenever a HIT happens — used by the panel
   // to keep the green in-tune indicator lit for ~1s past the close.
   // The panel reads session.lastHitAt AND this tick to decide
@@ -165,6 +204,14 @@ export const TrumpetStageModal: React.FC<Props> = ({
     setSession((s) => ({ ...s, status: "stopped" }));
   };
 
+  // Manual advance past the current target. Mutates a copy so React
+  // re-renders; the mic callback keeps using sessionRef.
+  const skipAttempt = () => {
+    const next = skipActiveAttempt(sessionRef.current, performance.now());
+    sessionRef.current = next;
+    setSession({ ...next });
+  };
+
   const isRunning = session.status === "running";
   const active = session.active;
   const attempts = session.attempts;
@@ -172,6 +219,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
   const wrongs = attempts.filter((a) => a.outcome === "wrong").length;
   const misses = attempts.filter((a) => a.outcome === "miss").length;
   const timeouts = attempts.filter((a) => a.outcome === "timeout").length;
+  const skips = attempts.filter((a) => a.outcome === "skip").length;
 
   return (
     <StageFrame
@@ -199,19 +247,69 @@ export const TrumpetStageModal: React.FC<Props> = ({
           <div className="text-[11px] text-red-400 t-mono">{error}</div>
         )}
 
-        <div className="surface-2 border rounded-[var(--radius-sm)] px-3 py-2 text-xs flex items-center justify-between">
-          <span className="text-[color:var(--color-text-3)]">Next target:</span>
-          {active ? (
-            <span className="t-mono">
-              {active.targetPc}
-              {active.targetOctave}{" "}
-              <span className="text-[color:var(--color-text-3)]">
-                ({active.degree})
-              </span>
+        <div className="surface-2 border rounded-[var(--radius-sm)] px-3 py-2 text-xs space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[color:var(--color-text-3)]">
+              Next target:
             </span>
-          ) : (
-            <span className="text-[color:var(--color-text-3)]">—</span>
-          )}
+            {active ? (() => {
+              const SEMI = { Concert: 0, Bb: 2, F: 7 } as const;
+              const w = writtenPitch(
+                active.targetPc,
+                active.targetOctave,
+                SEMI[instrument],
+              );
+              return (
+                <span className="t-mono flex items-center gap-2">
+                  <span className="font-bold">
+                    {w.name}
+                    {w.octave}
+                  </span>
+                  {instrument !== "Concert" && (
+                    <span className="text-[10px] text-[color:var(--color-text-3)]">
+                      written for {instrument} · sounds{" "}
+                      {active.targetPc}
+                      {active.targetOctave}
+                    </span>
+                  )}
+                  <span className="text-[color:var(--color-text-3)]">
+                    ({active.degree})
+                  </span>
+                </span>
+              );
+            })() : (
+              <span className="text-[color:var(--color-text-3)]">—</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-[color:var(--color-text-3)]">
+              Reading for
+            </span>
+            {(["Concert", "Bb", "F"] as const).map((inst) => (
+              <button
+                key={inst}
+                type="button"
+                onClick={() => setInstrument(inst)}
+                aria-pressed={instrument === inst}
+                className={`text-[10px] t-mono px-1.5 py-0.5 rounded-[var(--radius-sm)] border transition-colors ${
+                  instrument === inst
+                    ? "bg-[color:var(--color-brand)]/15 border-[color:var(--color-brand)]/40 text-[color:var(--color-text-1)]"
+                    : "surface-1 border-[color:var(--color-border)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)]"
+                }`}
+              >
+                {inst}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={skipAttempt}
+              disabled={!active}
+              title="Skip this note and move to the next"
+              className="ml-auto text-[10px] t-mono px-1.5 py-0.5 rounded-[var(--radius-sm)] surface-1 border border-[color:var(--color-border)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Skip →
+            </button>
+          </div>
         </div>
 
         {(() => {
@@ -378,6 +476,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
                 wrong: "text-rose-300",
                 miss: "text-amber-300",
                 timeout: "text-neutral-500",
+                skip: "text-sky-300",
               } as const
             )[a.outcome];
             return (
@@ -412,6 +511,9 @@ export const TrumpetStageModal: React.FC<Props> = ({
           <span className="text-rose-300">Wrong: {wrongs}</span>
           <span className="text-amber-300">Miss: {misses}</span>
           <span className="text-neutral-500">Timeout: {timeouts}</span>
+          {skips > 0 && (
+            <span className="text-sky-300">Skip: {skips}</span>
+          )}
         </div>
 
         <button

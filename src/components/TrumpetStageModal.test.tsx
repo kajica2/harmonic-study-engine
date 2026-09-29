@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import React from "react";
-import { TrumpetStageModal } from "./TrumpetStageModal";
+import { TrumpetStageModal, writtenPitch } from "./TrumpetStageModal";
 import { createStageSession } from "../lib/trumpetStageTrainer";
 
 // We re-export liveStats indirectly via internal — for unit pinning,
@@ -121,5 +121,31 @@ describe("TrumpetStageModal — panel always renders", () => {
     expect(screen.getByText(/In tune/i)).toBeTruthy();
     // The check mark confirms the celebration label.
     expect(screen.getByText(/✓/)).toBeTruthy();
+  });
+});
+
+describe("writtenPitch (concert -> written for transposing instruments)", () => {
+  it("Concert: no shift", () => {
+    expect(writtenPitch("Bb", 4, 0)).toEqual({ name: "A#", octave: 4 });
+  });
+
+  it("Bb trumpet reads a whole step higher: concert Bb4 -> written C5", () => {
+    expect(writtenPitch("Bb", 4, 2)).toEqual({ name: "C", octave: 5 });
+  });
+
+  it("Bb trumpet: concert F4 -> written G4", () => {
+    expect(writtenPitch("F", 4, 2)).toEqual({ name: "G", octave: 4 });
+  });
+
+  it("Bb trumpet: concert C4 -> written D4", () => {
+    expect(writtenPitch("C", 4, 2)).toEqual({ name: "D", octave: 4 });
+  });
+
+  it("F horn reads a fifth higher: concert C4 -> written G4", () => {
+    expect(writtenPitch("C", 4, 7)).toEqual({ name: "G", octave: 4 });
+  });
+
+  it("handles octave rollover: concert B4 -> written C#6 for Bb", () => {
+    expect(writtenPitch("B", 4, 2)).toEqual({ name: "C#", octave: 5 });
   });
 });
