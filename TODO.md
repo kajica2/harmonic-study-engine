@@ -104,11 +104,11 @@ is the source of truth for what comes next. `FUTURE_PLANNING.md`
 already has a PRD-aware "Recommended first moves" section listing the
 five cheapest unblockers:
 
-  - Idea type stub (REQ-IDEA-1)
-  - Privacy statement on MIDI import (REQ-IO-70)
-  - Engine modules audit for `Math.random` (REQ-FND-7)
-  - Effective key display in the header (REQ-TRANS-4)
-  - Per-exercise transpose stub (REQ-TRANS-2)
+  - [x] SHIPPED (`engine/core/idea.ts`, `src/lib/ideaShare.ts`) — Idea type stub (REQ-IDEA-1)
+  - [x] SHIPPED (`src/components/ComposeSurface.tsx:861-867`, `src/components/AnalysisCard.tsx:676-678`) — Privacy statement on MIDI import (REQ-IO-70)
+  - [x] SHIPPED (`engine/purity.test.ts`, `engine/core/rng.ts`) — Engine modules audit for `Math.random` (REQ-FND-7)
+  - [x] SHIPPED (`src/components/EffectiveKeyBadge.tsx`, `src/App.tsx:4401-4405`) — Effective key display in the header (REQ-TRANS-4)
+  - [x] SHIPPED (`src/state/sessionStore.ts:106-124`, `src/components/TransposeControls.tsx`) — Per-exercise transpose stub (REQ-TRANS-2)
 
 Each is one PR. The first three are pure logic / one-line UI; the
 fourth and fifth are visible UI additions. Tackle in that order.

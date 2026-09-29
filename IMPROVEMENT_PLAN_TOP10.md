@@ -75,6 +75,20 @@ Practice Header naturally.
 
 ### 3. Guide-tone feedback on MIDI input (option C)
 
+**Status: SHIPPED** — `classifyGuideTone()` (in `src/lib/guideTones.ts`,
+not `theory.ts` as originally planned) classifies a played MIDI note
+against the active chord's root / 3rd / 5th / 7th / 9th / color slots,
+and `src/components/GuideToneFeedback.tsx` renders the result inline
+(green "✓ 3rd" / "✓ 7th", amber "9th (common tone or resolve)", neutral
+non-chord tone), including the "Connect MIDI / Computer keyboard /
+Practice without input" three-button fallback when no input device is
+connected. Wired into the practice loop at
+`src/components/PracticeHeader.tsx:351`. Companion surfaces also ship:
+per-bar targets (`src/lib/gtTargets.ts`), the coverage row
+(`src/components/GtCoverageRow.tsx`), and the live tally
+(`src/lib/guideToneTrail.ts`, `src/hooks/useGuideToneTrail.ts`). Tests:
+`tests/guideTones.test.ts`.
+
 **What:** When MIDI input arrives, classify the played note against
 the current chord's 3rd / 7th / root / 5th / 9th. Render the result
 inline next to the live score:
@@ -203,6 +217,27 @@ per hook.
 ---
 
 ### 7. Display modes for the live score
+
+**Status: PARTIAL — 2 of the 4 named modes ship; guide-tone,
+trumpet-transposition and rhythm-first do not.** Lead-sheet mode:
+SHIPPED as the default `full` mode — `src/lib/displayMode.ts`
+(`ScoreDisplayMode = "full" | "zoom"`) + chord symbols and the 4-bar
+form window in `src/components/LiveScoreDisplay.tsx`, plus full-form ABC
+via `src/components/LeadSheet.tsx`. Guide-tone mode: NOT SHIPPED as a
+score mode — guide tones render only as separate surfaces
+(`src/components/GtCoverageRow.tsx`, `src/components/GuideToneFeedback.tsx`),
+never as a `LiveScoreDisplay` branch (`displayMode.ts` union is
+`"full" | "zoom"`). Trumpet-transposition mode: NOT SHIPPED in the live
+score — the machinery exists (`src/lib/chordTranspose.ts`,
+`src/components/TransposeControls.tsx`, Concert/Bb/F selector in
+`src/components/LeadSheet.tsx`) but `LiveScoreDisplay` has no
+instrument/Bb/Eb display mode. Rhythm-first mode: NOT SHIPPED — no
+one-note rhythmic rendering path exists anywhere. Active-bar zoom (the
+"Plus" line): SHIPPED as the `zoom` mode (`src/lib/displayMode.ts`
+`isZoomMode`, ring/larger container at
+`src/components/LiveScoreDisplay.tsx:554`, picker at
+`src/components/PracticeHeader.tsx:650`); note the intended per-bar dim
+is documented as out of scope in the `LiveScoreDisplay` prop comment.
 
 **What:** Four named modes for `<LiveScoreDisplay>`:
 
