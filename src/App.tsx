@@ -248,6 +248,7 @@ import { EtudeComposerPanel } from "./components/EtudeComposerPanel";
 import { EarTrainingPanel } from "./components/EarTrainingPanel";
 import { ConceptSearch } from "./components/ConceptSearch";
 import { ConceptDrawer } from "./components/ConceptDrawer";
+import { TunerWidget } from "./components/TunerWidget";
 import {
   etudeActiveBarFor,
   etudePathId,
@@ -851,6 +852,8 @@ function AppShell() {
   const [isPathsFolded, setIsPathsFolded] = useState(false);
   // Trumpet Stage tuner modal (mic capture + cents grading).
   const [showTrumpetStage, setShowTrumpetStage] = useState(false);
+  // Persistent tuner widget (always visible, bottom-right).
+  const [tunerOn, setTunerOn] = useState(false);
   // Stage banner collapse — sits at the very top of the page.
   const [stageBannerCollapsed, setStageBannerCollapsed] = useState(false);
 
@@ -2983,6 +2986,19 @@ function AppShell() {
             <Mic size={14} />
             <span>Trumpet stage</span>
             <span className="hidden xl:inline t-mono text-[10px] opacity-70">·cents</span>
+          </button>
+          <button
+            onClick={() => setTunerOn((v) => !v)}
+            aria-label={tunerOn ? "Disable persistent tuner" : "Enable persistent tuner"}
+            title="Persistent tuner — always-visible note + cents display"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors font-medium ${
+              tunerOn
+                ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/25"
+                : "bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-400 hover:text-white"
+            }`}
+          >
+            <Mic size={14} />
+            <span>Tuner</span>
           </button>
           <button
             onClick={() => setShowCheatsheet(true)}
@@ -5510,6 +5526,9 @@ function AppShell() {
       <DirtyPromptModal />
 
       <BuildFooter />
+
+      {/* Persistent tuner widget — always visible, fixed bottom-right. */}
+      <TunerWidget isOn={tunerOn} onToggle={() => setTunerOn((v) => !v)} />
     </div>
   );
 }
