@@ -35,6 +35,26 @@ function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max - 1) + "…";
 }
 
+/** Compute live median + stdev of an in-flight cents series. Used by
+ *  the modal to display the running tuning reading as the song plays
+ *  — not just at the sustain-window close. */
+function liveStats(cents: number[]): {
+  median: number | null;
+  stdev: number | null;
+  n: number;
+} {
+  const n = cents.length;
+  if (n === 0) return { median: null, stdev: null, n: 0 };
+  const sorted = [...cents].sort((a, b) => a - b);
+  const median = sorted[Math.floor(n / 2)];
+  if (n < 2) return { median, stdev: null, n };
+  const mean = cents.reduce((a, b) => a + b, 0) / n;
+  const stdev = Math.sqrt(
+    cents.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1),
+  );
+  return { median, stdev, n };
+}
+
 /**
  * TrumpetStageModal — live mic tuner that walks the player through a
  * scale-degree sequence over a chosen chord. Each played note is
@@ -161,6 +181,90 @@ export const TrumpetStageModal: React.FC<Props> = ({
             <span className="text-[color:var(--color-text-3)]">—</span>
           )}
         </div>
+
+        {active && (() => {
+          const stats = liveStats(active.centsSamples);
+          const cents = stats.median;
+          const tolerance = session.config.perNoteToleranceCents;
+          // Pitch bar: 0% = -50¢, 100% = +50¢. The colored band in the
+          // middle (±tolerance) is "in tune"; edges are sharp/flat.
+          const barPct =
+            cents === null
+              ? 50
+              : Math.max(0, Math.min(100, 50 + cents));
+          const inTune = cents !== null && Math.abs(cents) <= tolerance;
+          return (
+            <div
+              data-testid="live-readout"
+              className="surface-2 border rounded-[var(--radius-sm)] px-3 py-2 text-xs space-y-1.5"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[color:var(--color-text-3)] text-[10px] uppercase tracking-wider">
+                  Live
+                </span>
+                <span
+                  className={`t-mono text-sm font-bold ${
+                    inTune
+                      ? "text-emerald-300"
+                      : cents !== null
+                        ? cents > 0
+                          ? "text-rose-300"
+                          : "text-amber-300"
+                        : "text-neutral-500"
+                  }`}
+                >
+                  {cents !== null
+                    ? `${cents >= 0 ? "+" : ""}${cents.toFixed(1)}¢`
+                    : "—"}
+                </span>
+                <span className="text-[10px] t-mono text-[color:var(--color-text-3)]">
+                  ±
+                  {stats.stdev !== null
+                    ? `${stats.stdev.toFixed(1)}¢`
+                    : "—"}
+                </span>
+                <span className="text-[10px] t-mono text-[color:var(--color-text-3)]">
+                  n={stats.n}
+                </span>
+              </div>
+              {/* Pitch bar — visual feedback for cents deviation. */}
+              <div className="relative h-2 rounded-full bg-neutral-800 overflow-hidden">
+                <div
+                  className={`absolute inset-y-0 ${
+                    inTune
+                      ? "bg-emerald-400/30"
+                      : "bg-rose-400/20"
+                  }`}
+                  style={{
+                    left: `${Math.max(0, 50 - tolerance / 1)}%`,
+                    right: `${Math.max(0, 50 - tolerance / 1)}%`,
+                  }}
+                />
+                <div
+                  className={`absolute top-1/2 -translate-y-1/2 w-1 h-3 rounded ${
+                    inTune
+                      ? "bg-emerald-300"
+                      : cents !== null
+                        ? cents > 0
+                          ? "bg-rose-300"
+                          : "bg-amber-300"
+                        : "bg-neutral-500"
+                  }`}
+                  style={{
+                    left: `calc(${barPct}% - 2px)`,
+                    transition: "left 80ms linear",
+                  }}
+                />
+                <div className="absolute inset-y-0 left-1/2 w-px bg-neutral-600" />
+              </div>
+              <div className="flex items-center justify-between text-[9px] t-mono text-[color:var(--color-text-3)]">
+                <span>-50¢ flat</span>
+                <span>0¢</span>
+                <span>+50¢ sharp</span>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="flex flex-wrap gap-3 text-[10px] t-mono text-[color:var(--color-text-3)]">
           <span>Degrees: {session.config.degreeSequence.join(" ")}</span>
