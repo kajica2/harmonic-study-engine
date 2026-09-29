@@ -25,7 +25,8 @@ import {
   zipBatchExport,
   downloadBatchZip,
 } from "../lib/midiBatchExport";
-import { MASTERCLASS_TUNES, availableTunes } from "../data/masterclass";
+import { MASTERCLASS_TUNES } from "../data/masterclass";
+import { buildBatchGroups } from "../lib/batchGroups";
 import { ModalShell, useModalLabel } from "./ModalShell";
 
 type Tab = "url" | "chart" | "json" | "realbook";
@@ -49,22 +50,31 @@ export const ImportExportModal: React.FC<Props> = ({
   const fileRef = useRef<HTMLInputElement>(null);
 
   // --- Batch export state -------------------------------------------------
-  // Default the path selection to every in-app tune (masterclass catalog
-  // entries where inApp: true, resolved to actual HarmonicPath objects).
-  // `selectedPaths` is the user-edited subset (starts equal to the
-  // default, drops anything the user unchecks).
-  const inAppMasterclassPaths = useMemo(() => {
-    return MASTERCLASS_TUNES.filter((t) => t.inApp)
-      .map((t) => ALL_PATHS.find((p) => p.id === t.id))
-      .filter((p): p is HarmonicPath => Boolean(p));
-  }, []);
+  // Group every ALL_PATHS path by source (masterclass-in-app, curated,
+  // standards, composer demos). Default selection = masterclass-in-app
+  // (the legacy v1 default — no surprise 100-file ZIP for new users).
+  // The user can expand groups via "All"/"None" mini buttons.
+  const batchGroups = useMemo(
+    () =>
+      buildBatchGroups(
+        new Set(MASTERCLASS_TUNES.filter((t) => t.inApp).map((t) => t.id)),
+      ),
+    [],
+  );
+  const allBatchPaths = useMemo(
+    () => batchGroups.flatMap((g) => g.paths),
+    [batchGroups],
+  );
 
   const [selectedPathIds, setSelectedPathIds] = useState<Set<string>>(
-    () => new Set(inAppMasterclassPaths.map((p) => p.id)),
+    () =>
+      new Set(
+        batchGroups[0]?.paths.map((p) => p.id) ?? [],
+      ),
   );
 
   const includeCurrentPath =
-    !inAppMasterclassPaths.some((p) => p.id === currentPath.id);
+    !allBatchPaths.some((p) => p.id === currentPath.id);
   const isCurrentSelected = selectedPathIds.has(currentPath.id);
 
   const [transposeSemitones, setTransposeSemitones] = useState(5);
@@ -83,6 +93,24 @@ export const ImportExportModal: React.FC<Props> = ({
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  // Add every path id in a group to the selection.
+  const selectGroupAll = (ids: readonly string[]) => {
+    setSelectedPathIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      return next;
+    });
+  };
+
+  // Remove every path id in a group from the selection.
+  const selectGroupNone = (ids: readonly string[]) => {
+    setSelectedPathIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
       return next;
     });
   };
@@ -128,10 +156,10 @@ export const ImportExportModal: React.FC<Props> = ({
 
   const selectedPaths: HarmonicPath[] = useMemo(() => {
     const all = includeCurrentPath && isCurrentSelected
-      ? [...inAppMasterclassPaths, currentPath]
-      : inAppMasterclassPaths;
+      ? [...allBatchPaths, currentPath]
+      : allBatchPaths;
     return all.filter((p) => selectedPathIds.has(p.id));
-  }, [selectedPathIds, inAppMasterclassPaths, currentPath, includeCurrentPath, isCurrentSelected]);
+  }, [selectedPathIds, allBatchPaths, currentPath, includeCurrentPath, isCurrentSelected]);
 
   const totalFiles = selectedPaths.length * enabledVariations.size;
 
@@ -395,7 +423,7 @@ export const ImportExportModal: React.FC<Props> = ({
               <PackageOpen size={14} />
               <span>Batch export ▾</span>
               <span className="ml-auto t-mono text-[10px] text-[color:var(--color-text-3)]">
-                {availableTunes().length} in-app · {totalFiles} files
+                {selectedPathIds.size} paths · {totalFiles} files
               </span>
               <ChevronDown size={12} className="opacity-60" />
             </summary>
@@ -484,18 +512,18 @@ export const ImportExportModal: React.FC<Props> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="t-label text-[color:var(--color-text-3)]">
-                    Paths ({selectedPathIds.size} of {inAppMasterclassPaths.length + (includeCurrentPath ? 1 : 0)})
+                    Paths ({selectedPathIds.size} of {allBatchPaths.length + (includeCurrentPath ? 1 : 0)})
                   </span>
                   <div className="flex gap-1.5 text-[10px] t-mono">
                     <button
-                      onClick={() =>
+                      onClick={() => {
                         setSelectedPathIds(
                           new Set([
-                            ...inAppMasterclassPaths.map((p) => p.id),
+                            ...allBatchPaths.map((p) => p.id),
                             ...(includeCurrentPath ? [currentPath.id] : []),
                           ]),
-                        )
-                      }
+                        );
+                      }}
                       className="px-1.5 py-0.5 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)] transition-colors"
                     >
                       All
@@ -508,41 +536,83 @@ export const ImportExportModal: React.FC<Props> = ({
                     </button>
                   </div>
                 </div>
-                <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1">
-                  {inAppMasterclassPaths.map((p) => (
-                    <label
-                      key={p.id}
-                      className="flex items-center gap-2 px-2 py-1 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] cursor-pointer text-[11px] hover:border-[color:var(--color-brand)]/40 transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedPathIds.has(p.id)}
-                        onChange={() => togglePath(p.id)}
-                        className="accent-[color:var(--color-brand)]"
-                      />
-                      <span className="truncate text-[color:var(--color-text-1)]">
-                        {p.title}
-                      </span>
-                    </label>
-                  ))}
+                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                  {batchGroups.map((g) => {
+                    const groupIds = g.paths.map((p) => p.id);
+                    return (
+                      <div
+                        key={g.label}
+                        className="rounded-[var(--radius-sm)] border border-[color:var(--color-border)] surface-1"
+                      >
+                        <div className="flex items-center justify-between px-2 py-1 text-[10px] t-mono">
+                          <span className="text-[color:var(--color-text-2)] uppercase tracking-wider">
+                            {g.label}{" "}
+                            <span className="text-[color:var(--color-text-3)]">
+                              ({g.paths.length})
+                            </span>
+                          </span>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => selectGroupAll(groupIds)}
+                              className="px-1.5 py-0.5 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)] transition-colors"
+                              aria-label={`Select all in ${g.label}`}
+                            >
+                              All
+                            </button>
+                            <button
+                              onClick={() => selectGroupNone(groupIds)}
+                              className="px-1.5 py-0.5 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] text-[color:var(--color-text-3)] hover:text-[color:var(--color-text-1)] transition-colors"
+                              aria-label={`Clear ${g.label}`}
+                            >
+                              None
+                            </button>
+                          </div>
+                        </div>
+                        <div className="max-h-40 overflow-y-auto custom-scrollbar px-1.5 pb-1.5 space-y-1">
+                          {g.paths.map((p) => (
+                            <label
+                              key={p.id}
+                              className="flex items-center gap-2 px-2 py-1 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] cursor-pointer text-[11px] hover:border-[color:var(--color-brand)]/40 transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedPathIds.has(p.id)}
+                                onChange={() => togglePath(p.id)}
+                                className="accent-[color:var(--color-brand)]"
+                                aria-label={`Toggle ${p.title}`}
+                              />
+                              <span className="truncate flex-1 text-[color:var(--color-text-1)]">
+                                {p.title}
+                              </span>
+                              <span className="t-mono text-[10px] text-[color:var(--color-text-3)]">
+                                {p.steps.length} ch
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                   {includeCurrentPath && (
-                    <label
-                      key={currentPath.id}
-                      className="flex items-center gap-2 px-2 py-1 surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-sm)] cursor-pointer text-[11px] hover:border-[color:var(--color-brand)]/40 transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isCurrentSelected}
-                        onChange={() => togglePath(currentPath.id)}
-                        className="accent-[color:var(--color-brand)]"
-                      />
-                      <span className="truncate text-[color:var(--color-text-1)]">
-                        {currentPath.title}{" "}
-                        <span className="t-mono text-[10px] text-[color:var(--color-text-3)]">
-                          (current)
+                    <div className="rounded-[var(--radius-sm)] border border-[color:var(--color-border)] surface-1">
+                      <label
+                        key={currentPath.id}
+                        className="flex items-center gap-2 px-2 py-1.5 cursor-pointer text-[11px] hover:border-[color:var(--color-brand)]/40 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isCurrentSelected}
+                          onChange={() => togglePath(currentPath.id)}
+                          className="accent-[color:var(--color-brand)]"
+                        />
+                        <span className="truncate flex-1 text-[color:var(--color-text-1)]">
+                          {currentPath.title}{" "}
+                          <span className="t-mono text-[10px] text-[color:var(--color-text-3)]">
+                            (current, outside groups)
+                          </span>
                         </span>
-                      </span>
-                    </label>
+                      </label>
+                    </div>
                   )}
                 </div>
               </div>

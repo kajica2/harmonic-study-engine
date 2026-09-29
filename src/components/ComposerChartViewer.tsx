@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import type {
   ComposerChart,
   BarChart,
@@ -11,6 +11,18 @@ import type {
   ComposerId,
 } from "../lib/composerCatalog";
 import { getComposerChart } from "../lib/composerCatalog";
+import { chartChordSequence } from "../lib/composerChartAudio";
+import { audioEngine } from "../lib/audio";
+import { downloadText } from "../lib/download";
+import type { HarmonicPath } from "../lib/paths";
+
+// Lazy: pulls abcjs into the bundle only when the user opens the
+// Notation toggle. App.tsx already imports this viewer eagerly
+// (App.tsx:141), so the abcjs dependency must stay code-split via
+// this dynamic import.
+const ComposerChartNotation = lazy(
+  () => import("./ComposerChartNotation"),
+);
 
 /**
  * ComposerChartViewer — renders any chart from the composer-harmonic-
@@ -25,11 +37,20 @@ import { getComposerChart } from "../lib/composerCatalog";
  *   - LayerStack → numbered layer list.
  *   - GenericSectionChart → raw lines as bullet list.
  *
+ * Controls (right-aligned, `text-[10px]` matching the existing
+ * palette):
+ *   - Play / Stop — schedules chartChordSequence(chart) at one
+ *     chord per 900ms via audioEngine.playChord. No-op when the
+ *     sequence is empty (duration/layer/section kinds).
+ *   - Notation — toggles a <Suspense>-wrapped abcjs render below
+ *     the visual panel. Lazy-loads abcjs.
+ *   - ABC — downloads buildComposerChartAbc(chart) as .abc.
+ *   - MIDI — downloads a one-track SMF built from the chord
+ *     sequence (NOT from COMPOSER_PATHS — those are seeded 96-step
+ *     padded paths, not the catalog shape).
+ *
  * Defaults to BarChart renderer if no chart is found (renders nothing
  * meaningful — just a fallback header).
- *
- * v1: visual-only. No audio playback, no MIDI, no interactivity
- * beyond hover titles. Future work: play through the chart.
  */
 
 interface ComposerChartViewerProps {
@@ -185,7 +206,85 @@ export const ComposerChartViewer: React.FC<ComposerChartViewerProps> = ({
   title,
 }) => {
   const chart = getComposerChart(composerId);
+  const [playing, setPlaying] = useState(false);
+  const [showNotation, setShowNotation] = useState(false);
+  const timersRef = useRef<number[]>([]);
+
+  // Cleanup any in-flight play timers on unmount or chart change so
+  // the AudioContext doesn't keep firing after the panel closes.
+  useEffect(() => {
+    return () => {
+      for (const t of timersRef.current) {
+        window.clearTimeout(t);
+      }
+      timersRef.current = [];
+      audioEngine.stopAll();
+    };
+  }, [chart]);
+
   if (!chart) return null;
+
+  const seq = chartChordSequence(chart);
+  const hasPitchContent = seq.length > 0;
+
+  const stopPlayback = () => {
+    for (const t of timersRef.current) {
+      window.clearTimeout(t);
+    }
+    timersRef.current = [];
+    audioEngine.stopAll();
+    setPlaying(false);
+  };
+
+  const startPlayback = () => {
+    if (!hasPitchContent) return;
+    setPlaying(true);
+    const STEP_MS = 900;
+    seq.forEach((notes, i) => {
+      timersRef.current.push(
+        window.setTimeout(() => {
+          audioEngine.playChord(notes);
+        }, i * STEP_MS),
+      );
+    });
+    timersRef.current.push(
+      window.setTimeout(() => {
+        stopPlayback();
+      }, seq.length * STEP_MS),
+    );
+  };
+
+  const handleDownloadAbc = () => {
+    // Lazy-import keeps the .abc builder + abcjs out of the eager
+    // module graph until the user asks for one.
+    void import("../lib/composerChartAbc").then((mod) => {
+      const abc = mod.buildComposerChartAbc(chart);
+      downloadText(`${composerId}_chart.abc`, abc, "text/plain");
+    });
+  };
+
+  const handleDownloadMidi = () => {
+    if (!hasPitchContent) return;
+    void import("../lib/midiExport").then((mod) => {
+      const stub: HarmonicPath = {
+        id: composerId,
+        title: chart.composerName,
+        description: kindLabel(chart.kind),
+        steps: seq.map((notes, i) => ({
+          name: String(i + 1),
+          notes,
+          descriptions: "",
+        })),
+      };
+      const dataUri = mod.exportMidiWithVariation(stub, { kind: "asWritten" });
+      const a = document.createElement("a");
+      a.href = dataUri;
+      a.download = `${composerId}_chart.mid`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  };
 
   // Per-kind body renderer
   let body: React.ReactNode;
@@ -223,14 +322,101 @@ export const ComposerChartViewer: React.FC<ComposerChartViewerProps> = ({
         <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400">
           {title ?? chart.composerName}
         </span>
-        <span className="text-[10px] font-mono text-neutral-500 italic">
-          {chart.kind === "bar" ? "Bar-by-bar" : chart.kind}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-mono text-neutral-500 italic">
+            {chart.kind === "bar" ? "Bar-by-bar" : chart.kind}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={playing ? stopPlayback : startPlayback}
+              disabled={!hasPitchContent}
+              title={
+                hasPitchContent
+                  ? playing
+                    ? "Stop playback"
+                    : "Play chart"
+                  : "No pitch content for this chart kind"
+              }
+              aria-label={playing ? "Stop chart playback" : "Play chart"}
+              className="text-[10px] t-mono px-1.5 py-0.5 rounded-[var(--radius-sm)] surface-1 border border-[color:var(--color-border)] text-neutral-300 hover:text-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {playing ? "Stop" : "Play"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNotation((s) => !s)}
+              title="Toggle abcjs notation"
+              aria-label="Toggle notation"
+              className={`text-[10px] t-mono px-1.5 py-0.5 rounded-[var(--radius-sm)] border transition-colors ${
+                showNotation
+                  ? "bg-[color:var(--color-brand)]/15 border-[color:var(--color-brand)]/40 text-neutral-100"
+                  : "surface-1 border-[color:var(--color-border)] text-neutral-300 hover:text-neutral-100"
+              }`}
+            >
+              Notation
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadAbc}
+              title="Download ABC source"
+              aria-label="Download ABC"
+              className="text-[10px] t-mono px-1.5 py-0.5 rounded-[var(--radius-sm)] surface-1 border border-[color:var(--color-border)] text-neutral-300 hover:text-neutral-100 transition-colors"
+            >
+              ABC
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadMidi}
+              disabled={!hasPitchContent}
+              title={
+                hasPitchContent
+                  ? "Download MIDI"
+                  : "No pitch content for this chart kind"
+              }
+              aria-label="Download MIDI"
+              className="text-[10px] t-mono px-1.5 py-0.5 rounded-[var(--radius-sm)] surface-1 border border-[color:var(--color-border)] text-neutral-300 hover:text-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              MIDI
+            </button>
+          </div>
+        </div>
       </header>
       {body}
+      {showNotation && (
+        <Suspense
+          fallback={
+            <div className="text-[10px] text-neutral-500">
+              Loading notation…
+            </div>
+          }
+        >
+          <ComposerChartNotation chart={chart} />
+        </Suspense>
+      )}
     </section>
   );
 };
+
+/** Local helper: same kind-label vocabulary as buildComposerChartAbc. */
+function kindLabel(kind: ComposerChart["kind"]): string {
+  switch (kind) {
+    case "bar":
+      return "Harmonic chart";
+    case "bitonal":
+      return "Bitonal block";
+    case "row":
+      return "Twelve-tone row";
+    case "axis":
+      return "Axis system";
+    case "duration":
+      return "Duration structure";
+    case "layer":
+      return "Layer stack";
+    case "section":
+      return "Section chart";
+  }
+}
 
 /** Default export for convenience — same as the named export. */
 export default ComposerChartViewer;

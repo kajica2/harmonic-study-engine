@@ -8,9 +8,20 @@
  * print the practice path they're working on right now. This module
  * exposes that path directly.
  *
- * Scope: one path at a time, single-bar-per-line layout, A4 portrait,
- * 24-bar maximum (the engine's bar-invariant cap). Multi-page handling
- * is automatic — jsPDF adds pages as the SVG grows.
+ * Multi-page handling: jsPDF clips content outside the page bounds,
+ * so we draw the full score SVG into one `svg2pdf()` call per page
+ * with the SVG shifted up by `offsetY * scale` on each successive
+ * page. Page breaks snap to the Y coordinate of the next staff
+ * system group (`<g transform="translate(x, y)">`) so we never slice
+ * a staff mid-line. This produces real multi-page output where the
+ * legacy "Multi-page handling is automatic" claim was wishful — that
+ * implementation simply drew the full score into one page and let
+ * the user print across pages.
+ *
+ * Scope: one path at a time, single-bar-per-line layout (one ABC bar
+ * per HarmonicStep), A4 portrait. The cover page (page 1) and the
+ * rendered score (page 2+) are produced here; the landscape PDF
+ * export in `RecordingModal` is a separate flow and untouched.
  *
  * The output:
  *   - Page 1: title, composer, key, form, total bars
@@ -47,6 +58,65 @@ export interface SheetMusicExportArgs {
 /** A4 portrait in points — 595.28 × 841.89 */
 const A4_W = 595.28;
 const A4_H = 841.89;
+
+/** Top/bottom margins (pts) — both 20pt, leaving A4_H - 40 usable. */
+const MARGIN_TOP = 20;
+const MARGIN_BOTTOM = 20;
+
+/**
+ * Compute the SVG-space Y offsets where each successive score page
+ * should start. The first page is always at offset 0; subsequent pages
+ * snap to the largest candidate staff-system Y that's <= the raw fold
+ * line `(i + 1) * usableH / scale`, falling back to the raw fold when
+ * no candidate is available.
+ *
+ * Exported for direct unit pinning. Pure DOM operation: it reads the
+ * `<g transform="translate(x, y)">` attributes abcjs emits for each
+ * staff system — no rendering, no mutation.
+ */
+export function pageBreakOffsets(
+  svg: Element,
+  scale: number,
+  usableH: number,
+  targetH: number,
+): number[] {
+  const candidates: number[] = [];
+  for (const child of Array.from(svg.children)) {
+    if (!(child instanceof Element)) continue;
+    const transform = child.getAttribute("transform");
+    if (!transform) continue;
+    const match = transform.match(/translate\(\s*[-\d.]+\s*,\s*([-\d.]+)/);
+    if (!match) continue;
+    const y = parseFloat(match[1]);
+    if (Number.isFinite(y)) candidates.push(y);
+  }
+  candidates.sort((a, b) => a - b);
+
+  const offsets: number[] = [0];
+  const usableSvg = usableH / scale;
+  const stopAt = targetH / scale;
+  let i = 1;
+  let lastOffset = 0;
+  while (true) {
+    const rawFold = i * usableSvg;
+    // Largest candidate <= rawFold (or 0 if none).
+    let snap = 0;
+    for (const c of candidates) {
+      if (c <= rawFold) snap = c;
+      else break;
+    }
+    // If no candidate was <= rawFold, snap = rawFold (legacy fallback).
+    const offset = snap > 0 ? snap : rawFold;
+    // Stop when we've reached the bottom of the SVG OR when we can't
+    // make further progress (offset didn't advance).
+    if (offset >= stopAt) break;
+    if (offset <= lastOffset) break;
+    offsets.push(offset);
+    lastOffset = offset;
+    i++;
+  }
+  return offsets;
+}
 
 /**
  * Render a HarmonicPath to a PDF Blob.
@@ -135,11 +205,6 @@ export async function exportSheetMusicPDF(
     A4_H - 40,
   );
 
-  // Page 2 — the rendered score. svg2pdf.js handles pagination if the
-  // SVG is taller than one page; for now it draws the full SVG into
-  // one page and lets the user print across pages.
-  doc.addPage();
-
   // Capture the SVG's intrinsic size; svg2pdf.js uses these as the
   // bounding box for the PDF page.
   const svgRect = svgElem.getBoundingClientRect();
@@ -150,15 +215,24 @@ export async function exportSheetMusicPDF(
   const targetW = A4_W - 40;
   const scale = targetW / svgW;
   const targetH = svgH * scale;
+  const usableH = A4_H - MARGIN_TOP - MARGIN_BOTTOM;
 
-  // If the scaled SVG is taller than one page, svg2pdf.js will draw it
-  // across multiple pages automatically when given the page dimensions.
-  await svg2pdf(svgElem as unknown as SVGElement, doc, {
-    x: 20,
-    y: 20,
-    width: targetW,
-    height: targetH,
-  });
+  // Compute page-tile offsets. Each tile is the full SVG shifted up
+  // so the visible window on the PDF page falls on the next system.
+  const offsets = pageBreakOffsets(svgElem, scale, usableH, targetH);
+
+  // Page 2 — the rendered score. svg2pdf.js draws the full SVG into
+  // the page; we shift Y by `-offset * scale` to bring the next page's
+  // portion into view. jsPDF clips off-page SVG content automatically.
+  for (let i = 0; i < offsets.length; i++) {
+    doc.addPage();
+    await svg2pdf(svgElem as unknown as SVGElement, doc, {
+      x: MARGIN_TOP,
+      y: MARGIN_TOP - offsets[i] * scale,
+      width: targetW,
+      height: targetH,
+    });
+  }
 
   return doc.output("blob");
 }

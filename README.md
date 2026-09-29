@@ -71,10 +71,14 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   "Batch export ▾" disclosure that picks N paths × M variations
   (as written, transpose by N semitones, split bass / upper
   voices, melody-only, rhythm-only, closed / open voicing) and
-  downloads the lot as a single ZIP. Pure-logic
-  `planBatchExport` + `zipBatchExport` live in
-  `src/lib/midiBatchExport.ts` (fflate-backed); the single-path
-  "Download MIDI" button keeps its one-click behavior.
+  downloads the lot as a single ZIP. The picker is grouped by
+  source (Masterclass in-app, Curated & concept, Standards,
+  Composer demos) and covers every path in `ALL_PATHS`; the
+  default selection is the masterclass in-app subset so a new
+  user doesn't get a 100-file ZIP. Pure-logic `planBatchExport`
+  + `zipBatchExport` live in `src/lib/midiBatchExport.ts`
+  (fflate-backed); the single-path "Download MIDI" button
+  keeps its one-click behavior.
 - **Mobile-first**: fixed bottom-sheet command bar,
   safe-area padding.
 - **Audio quality**: warm soft-knee saturation on the melody

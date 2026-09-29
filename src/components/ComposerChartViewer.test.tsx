@@ -87,4 +87,51 @@ describe("ComposerChartViewer", () => {
     );
     expect(screen.getByText(/Symphony No\. 5 — opening/)).toBeTruthy();
   });
+
+  it("v2 controls: schoenberg shows enabled Play / Notation / ABC / MIDI buttons", () => {
+    render(<ComposerChartViewer composerId="schoenberg" />);
+    expect(
+      screen.getByRole("button", { name: "Play chart" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Toggle notation" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Download ABC" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Download MIDI" }),
+    ).toBeTruthy();
+    // All four enabled (schoenberg has a 12-tone row → seq.length > 0).
+    expect(
+      screen.getByRole("button", { name: "Play chart" }).hasAttribute(
+        "disabled",
+      ),
+    ).toBe(false);
+    expect(
+      screen.getByRole("button", { name: "Download MIDI" }).hasAttribute(
+        "disabled",
+      ),
+    ).toBe(false);
+  });
+
+  it("v2 controls: cage (duration) disables Play and MIDI but keeps ABC enabled", () => {
+    render(<ComposerChartViewer composerId="cage" />);
+    expect(
+      screen.getByRole("button", { name: "Play chart" }).hasAttribute(
+        "disabled",
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Download MIDI" }).hasAttribute(
+        "disabled",
+      ),
+    ).toBe(true);
+    // ABC is still enabled — every chart kind yields a buildable .abc.
+    expect(
+      screen.getByRole("button", { name: "Download ABC" }).hasAttribute(
+        "disabled",
+      ),
+    ).toBe(false);
+  });
 });
