@@ -250,3 +250,182 @@ describe("freqToNote (unchanged contract)", () => {
     expect(freqToNote(-1)).toBeNull();
   });
 });
+
+/** Deterministic 32-bit LCG (Numerical Recipes constants). The noise
+ *  floor tests must be byte-reproducible, so Math.random is never
+ *  used. */
+function lcg(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+/** White noise at `fraction` of the block's own RMS. */
+function withNoise(
+  block: Float32Array,
+  fraction: number,
+  seed: number,
+): Float32Array {
+  let sum = 0;
+  for (let i = 0; i < block.length; i++) sum += block[i] * block[i];
+  const rms = Math.sqrt(sum / block.length);
+  const rnd = lcg(seed);
+  const out = new Float32Array(block.length);
+  for (let i = 0; i < block.length; i++) {
+    out[i] = block[i] + (rnd() * 2 - 1) * rms * fraction;
+  }
+  return out;
+}
+
+/** Trumpet-like harmonic stack under sinusoidal vibrato:
+ *  instantaneous frequency = f0 * 2^((cents/1200) * sin(2*pi*rate*t)).
+ *  The phase is the integral of that frequency, as a real player's
+ *  air column produces it. */
+function vibratoBlock(
+  freq: number,
+  durationMs: number = 300,
+  cents: number = 25,
+  rateHz: number = 5.5,
+  sampleRate: number = SR,
+): Float32Array {
+  const N = Math.floor((durationMs / 1000) * sampleRate);
+  const block = new Float32Array(N);
+  const amps = [1.0, 0.55, 0.3, 0.18, 0.1];
+  let phase = 0;
+  for (let i = 0; i < N; i++) {
+    const t = i / sampleRate;
+    const instHz = freq * Math.pow(2, (cents / 1200) * Math.sin(2 * Math.PI * rateHz * t));
+    phase += (2 * Math.PI * instHz) / sampleRate;
+    let v = 0;
+    for (let h = 0; h < amps.length; h++) v += amps[h] * Math.sin((h + 1) * phase);
+    block[i] = v * 0.3;
+  }
+  return block;
+}
+
+/** Notes spread across the horn: two below C4, the middle register,
+ *  two above C5. Shared by the vibrato and noise-floor suites. */
+const SPREAD_NOTES: Array<[number, string]> = [
+  [110.0, "A2"], // below C4
+  [233.08, "Bb3"], // below C4 (low brass pedal)
+  [311.13, "Eb4"], // middle register
+  [440.0, "A4"], // middle register
+  [523.25, "C5"],
+  [698.46, "F5"], // above C5
+  [739.99, "F#5"], // above C5
+  [1046.5, "C6"], // above C5
+];
+
+describe("register sweep (F#2 -> C6, full trumpet range)", () => {
+  it("every chromatic step reads the right pitch class within 15 cents", () => {
+    let worstCents = 0;
+    let worstLabel = "";
+    for (let n = 0; n <= 42; n++) {
+      const truth = 92.5 * Math.pow(2, n / 12);
+      const est = detectPitch(trumpetBlock(truth, 200), SR);
+      const expected = freqToNote(truth);
+      const label = `${expected?.name}${expected?.octave} (${truth.toFixed(2)} Hz)`;
+      const cents = 1200 * Math.log2(est.freq / truth);
+      if (Math.abs(cents) > Math.abs(worstCents)) {
+        worstCents = cents;
+        worstLabel = label;
+      }
+      const got = freqToNote(est.freq);
+      expect(est.freq, label).toBeGreaterThan(0);
+      expect(got?.name, label).toBe(expected?.name);
+      expect(got?.octave, label).toBe(expected?.octave);
+      expect(Math.abs(cents), label).toBeLessThan(15);
+    }
+    // Aggregate drift guard: the per-step pin is 15 cents (one FFT bin
+    // is ~100 cents wide at F#2), but the sweep currently lands within
+    // ~5 cents everywhere. Worst case observed: ~4.7 cents at G#2.
+    expect(worstLabel).not.toBe("");
+    expect(Math.abs(worstCents)).toBeLessThan(8);
+  });
+});
+
+describe("vibrato (+/-25 cents at 5.5 Hz)", () => {
+  it("tracks the pitch class of every spread note within 25 cents", () => {
+    for (const [hz, label] of SPREAD_NOTES) {
+      const est = detectPitch(vibratoBlock(hz), SR);
+      const expected = freqToNote(hz);
+      const cents = 1200 * Math.log2(est.freq / hz);
+      const got = freqToNote(est.freq);
+      expect(got?.name, `${label} with vibrato`).toBe(expected?.name);
+      expect(got?.octave, `${label} with vibrato`).toBe(expected?.octave);
+      expect(Math.abs(cents), `${label} with vibrato`).toBeLessThan(25);
+    }
+  });
+
+  it("holds the octave as the vibrato rate rises (no half-octave drops)", () => {
+    // Wider vibrato smears the spectrum: at 6.5-7 Hz the octave
+    // correction used to collapse onto a sub-octave artefact
+    // (C5 -> C4, F#5 -> F#4, both ~-1212 cents off).
+    for (const [hz, label] of SPREAD_NOTES) {
+      for (const rateHz of [5.5, 6.5, 7]) {
+        const est = detectPitch(vibratoBlock(hz, 300, 25, rateHz), SR);
+        const expected = freqToNote(hz);
+        const got = freqToNote(est.freq);
+        const cents = 1200 * Math.log2(est.freq / hz);
+        const ctx = `${label} with ${rateHz} Hz vibrato`;
+        expect(got?.name, ctx).toBe(expected?.name);
+        expect(got?.octave, ctx).toBe(expected?.octave);
+        expect(Math.abs(cents), ctx).toBeLessThan(25);
+      }
+    }
+  });
+
+  it("stays on the note frame-by-frame at production block size (8192)", () => {
+    // Production feeds 8192-sample frames (trumpetStageTrainer
+    // BLOCK_SIZE). A live vibrato note must never make the readout
+    // jump octaves between consecutive frames.
+    const BLOCK = 8192;
+    for (const [hz, label] of SPREAD_NOTES) {
+      const signal = vibratoBlock(hz, 1200);
+      const expected = freqToNote(hz);
+      for (let start = 0; start + BLOCK <= signal.length; start += BLOCK / 2) {
+        const est = detectPitch(signal.subarray(start, start + BLOCK), SR);
+        const got = freqToNote(est.freq);
+        const ctx = `${label} frame @${start}`;
+        const cents = 1200 * Math.log2(est.freq / hz);
+        expect(got?.name, ctx).toBe(expected?.name);
+        expect(got?.octave, ctx).toBe(expected?.octave);
+        expect(Math.abs(cents), ctx).toBeLessThan(30);
+      }
+    }
+  });
+});
+
+describe("noise floor (10% of signal RMS, deterministic LCG)", () => {
+  it("recovers every spread note's pitch class within 15 cents", () => {
+    for (const [hz, label] of SPREAD_NOTES) {
+      const est = detectPitch(withNoise(trumpetBlock(hz, 200), 0.1, 0x51ed), SR);
+      const expected = freqToNote(hz);
+      const got = freqToNote(est.freq);
+      const cents = 1200 * Math.log2(est.freq / hz);
+      expect(got?.name, `${label} + 10% noise`).toBe(expected?.name);
+      expect(got?.octave, `${label} + 10% noise`).toBe(expected?.octave);
+      expect(Math.abs(cents), `${label} + 10% noise`).toBeLessThan(15);
+    }
+  });
+
+  it("survives the whole F#2 -> C6 sweep under noise", () => {
+    let worstCents = 0;
+    for (let n = 0; n <= 42; n++) {
+      const truth = 92.5 * Math.pow(2, n / 12);
+      const est = detectPitch(withNoise(trumpetBlock(truth, 200), 0.1, 0xbeef + n), SR);
+      const expected = freqToNote(truth);
+      const label = `${expected?.name}${expected?.octave} (${truth.toFixed(2)} Hz) + noise`;
+      const cents = 1200 * Math.log2(est.freq / truth);
+      const got = freqToNote(est.freq);
+      if (Math.abs(cents) > Math.abs(worstCents)) worstCents = cents;
+      expect(got?.name, label).toBe(expected?.name);
+      expect(got?.octave, label).toBe(expected?.octave);
+      expect(Math.abs(cents), label).toBeLessThan(15);
+    }
+    // Worst case observed: ~4.8 cents.
+    expect(Math.abs(worstCents)).toBeLessThan(8);
+  });
+});

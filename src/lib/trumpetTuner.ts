@@ -40,6 +40,14 @@ const MIN_LAG_HZ_CAP = 2000;
  *  ~0.10–0.15; we sit at 0.12 to balance false-period vs missed-fund. */
 const YIN_THRESHOLD = 0.12;
 
+/** Octave-correction guard: a sub-octave candidate (base/2, base/3)
+ *  whose own fundamental bin holds less than this fraction of its
+ *  loudest harmonic is matching H2/H4 by accident, not a real
+ *  fundamental. */
+const SUB_OCTAVE_FUND_FLOOR = 0.15;
+/** Score multiplier applied to such artefact candidates. */
+const SUB_OCTAVE_FUND_DAMP = 0.6;
+
 export interface PitchEstimate {
   freq: number;
   amp: number;
@@ -491,10 +499,22 @@ export function detectPitch(
       const mag = Math.sqrt(re[bin] * re[bin] + im[bin] * im[bin]);
       // Sum energy at H1..H5 — strongest stack wins.
       let stack = mag;
+      let stackMax = mag;
       for (let k = 2; k <= 5; k++) {
         const j = bin * k;
         if (j >= fftN / 2) break;
-        stack += Math.sqrt(re[j] * re[j] + im[j] * im[j]);
+        const hMag = Math.sqrt(re[j] * re[j] + im[j] * im[j]);
+        stack += hMag;
+        if (hMag > stackMax) stackMax = hMag;
+      }
+      // Sub-octave candidates (base/2, base/3) only line up with the
+      // odd harmonics by accident when their own fundamental bin is
+      // empty — they match H2/H4 of the real note. Vibrato smears the
+      // spectrum into near-ties and that artefact then wins (C5 read
+      // as C4, F#5 as F#4, both ~1212 cents off). Damp it unless the
+      // candidate's fundamental bin carries real energy.
+      if (r < 1 && mag < SUB_OCTAVE_FUND_FLOOR * stackMax) {
+        stack *= SUB_OCTAVE_FUND_DAMP;
       }
       // Hint bonus: if `f` is within 50 cents of the hinted
       // fundamental or any of its first 3 harmonics, add a 1.5x
