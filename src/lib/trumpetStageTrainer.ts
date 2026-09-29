@@ -145,10 +145,10 @@ export function processBlock(
     return session;
   }
 
-  const { freq, amp } = detectPitch(block, SAMPLE_RATE);
+  const { freq, amp, confidence, source } = detectPitch(block, SAMPLE_RATE);
 
-  // Silence mid-attempt: cancel.
-  if (freq <= 0) {
+  // Silence OR low-confidence detection: cancel (treat as miss).
+  if (freq <= 0 || confidence < 0.45) {
     if (session.active && now - session.active.startedAt > 200) {
       finalizeAttempt(session, "miss");
     }

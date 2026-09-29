@@ -413,7 +413,10 @@ export function detectPitch(
   const yinFreq = sampleRate / yin.tau;
 
   // FFT (next pow2 >= N for speed).
-  const fftN = Math.min(nextPow2(N), 4096);
+  // FFT length: use the full block size up to 8192 (covers low brass
+  // pedal tones down to 5.4 Hz, gives sub-bin resolution of ~5 Hz
+  // at F#2 = 92.5 Hz — vs ~10 Hz/bin at the previous 4096 cap).
+  const fftN = Math.min(nextPow2(N), 8192);
   const re = new Float32Array(fftN);
   const im = new Float32Array(fftN);
   // Copy + window into the FFT buffer.
@@ -459,6 +462,26 @@ export function detectPitch(
         else if (Math.abs(f - yinFreq) / yinFreq < 0.02) bestSource = "yin";
         else bestSource = "blend";
       }
+    }
+  }
+  // YIN refinement: at low FFT bin resolution (i.e. low freq
+  // detection) the spectral peak is coarse — YIN's sub-sample
+  // parabolic interpolation is much sharper. When YIN is confident
+  // AND no spectral candidate agrees to within half a cent, snap to
+  // YIN. Also handles cases where the spectral stack is misaligned
+  // (e.g. two-octave ambiguity from strong H2).
+  if (yin.clarity > 0.85) {
+    const minDeltaCents =
+      Math.min(
+        ...[yinFreq, hps.freq, shs.freq, stackFund.freq]
+          .filter((f) => f > 0)
+          .map((f) => Math.abs(1200 * Math.log2(f / yinFreq))),
+      );
+    if (minDeltaCents > 5) {
+      // Spectral estimators don't agree with YIN. Trust YIN's
+      // sub-sample period when clarity is high.
+      chosenFreq = yinFreq;
+      bestSource = "yin";
     }
   }
 
