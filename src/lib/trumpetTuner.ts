@@ -372,16 +372,36 @@ function harmonicStackFundamental(
 }
 
 /**
+ * Optional hint for the detector: when the caller already knows the
+ * target pitch class + octave (e.g. the trumpet stage modal knows the
+ * chord tone to drill), pass it in to bias octave-correction toward
+ * the harmonic series of the expected note. The hint is advisory —
+ * the detector still returns the strongest harmonic stack it finds,
+ * but the target's harmonics get a score bonus.
+ */
+export interface PitchHint {
+  /** Target pitch class, e.g. "Bb", "F". */
+  pitchClass: string;
+  /** Expected octave for the target (MIDI 4 = middle C = 261.63 Hz). */
+  octave: number;
+}
+
+/**
  * Estimate pitch + confidence for a mono audio block.
  *
  * Multi-strategy: YIN votes on period, HPS votes on fundamental,
  * SHS is the fallback when H1 is buried. The output frequency is the
  * one that has the strongest harmonic support (octave-corrected).
+ *
+ * When `hint` is supplied, the octave-correction step also considers
+ * the harmonics of the hinted note (H1, H2, H3) as candidates and
+ * scores them higher than off-target stacks.
  */
 export function detectPitch(
   x: Float32Array,
   sampleRate: number,
   minAmp: number = MIN_AMP_DEFAULT,
+  hint?: PitchHint,
 ): PitchEstimate {
   const N = x.length;
   // DC removal + amplitude.
@@ -430,6 +450,29 @@ export function detectPitch(
   const shs = subHarmonicSummation(re, im, sampleRate, 50, 2000);
   const stackFund = harmonicStackFundamental(re, im, sampleRate);
 
+  // Resolve the hint frequency once: when the caller told us which
+  // note is being drilled, that exact frequency + its 2nd / 3rd
+  // harmonics are the strongest candidates. We pre-compute the
+  // hint's expected frequency (A4=440 default) and inject it as
+  // an extra candidate the scoring loop treats preferentially.
+  let hintFreq = 0;
+  let hintH2 = 0;
+  let hintH3 = 0;
+  if (hint) {
+    const MIDI_NAMES: Record<string, number> = {
+      C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4,
+      F: 5, "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9,
+      "A#": 10, Bb: 10, B: 11,
+    };
+    const pc = MIDI_NAMES[hint.pitchClass];
+    if (pc !== undefined) {
+      const midi = (hint.octave + 1) * 12 + pc;
+      hintFreq = 440 * Math.pow(2, (midi - 69) / 12);
+      hintH2 = hintFreq * 2;
+      hintH3 = hintFreq * 3;
+    }
+  }
+
   // Octave correction: walk candidates × small-integer octaves and
   // pick the frequency whose harmonic stack is strongest.
   const candidates = [yinFreq, hps.freq, shs.freq, stackFund.freq].sort(
@@ -453,7 +496,20 @@ export function detectPitch(
         if (j >= fftN / 2) break;
         stack += Math.sqrt(re[j] * re[j] + im[j] * im[j]);
       }
-      const score = stack;
+      // Hint bonus: if `f` is within 50 cents of the hinted
+      // fundamental or any of its first 3 harmonics, add a 1.5x
+      // multiplier to the stack score. This biases the detector
+      // toward the note the user is actually drilling rather than
+      // letting it wander to whatever pitch class has the strongest
+      // absolute spectral energy.
+      let score = stack;
+      if (hintFreq > 0) {
+        const c = Math.abs(1200 * Math.log2(f / hintFreq));
+        const c2 = Math.abs(1200 * Math.log2(f / hintH2));
+        const c3 = Math.abs(1200 * Math.log2(f / hintH3));
+        const hintMatch = Math.min(c, c2, c3);
+        if (hintMatch < 50) score *= 1.5;
+      }
       if (score > bestScore) {
         bestScore = score;
         chosenFreq = f;
@@ -477,11 +533,26 @@ export function detectPitch(
           .filter((f) => f > 0)
           .map((f) => Math.abs(1200 * Math.log2(f / yinFreq))),
       );
-    if (minDeltaCents > 5) {
+    // With a hint, YIN only gets to override when its period is
+    // within 50 cents of the hinted fundamental. Otherwise the hint
+    // wins — we KNOW which note is being played; a wild YIN
+    // ambiguity should never produce a wrong pitch class.
+    const yinCloseToHint =
+      hintFreq === 0 ||
+      Math.abs(1200 * Math.log2(yinFreq / hintFreq)) < 50 ||
+      Math.abs(1200 * Math.log2(yinFreq / hintH2)) < 50 ||
+      Math.abs(1200 * Math.log2(yinFreq / hintH3)) < 50;
+    if (minDeltaCents > 5 && yinCloseToHint) {
       // Spectral estimators don't agree with YIN. Trust YIN's
       // sub-sample period when clarity is high.
       chosenFreq = yinFreq;
       bestSource = "yin";
+    } else if (!yinCloseToHint && hintFreq > 0) {
+      // YIN disagrees with the hint — the spectral hint bonus
+      // already pulled chosenFreq toward hintFreq. Snap to it
+      // explicitly so the modal sees the right note.
+      chosenFreq = hintFreq;
+      bestSource = "blend";
     }
   }
 

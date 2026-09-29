@@ -6,11 +6,34 @@
  * unit tests with synthetic blocks.
  */
 
-import { detectPitch, freqToNote } from "./trumpetTuner";
+import { detectPitch, freqToNote, type PitchHint } from "./trumpetTuner";
 import {
   degreeToPitchClass,
   type StageConfig,
 } from "./trumpetStage";
+
+/** Map pitch-class name -> MIDI offset within an octave. Used to
+ *  convert (pc, octave) into the expected frequency for cents-
+ *  deviation comparisons. */
+const pcToMidi: Record<string, number> = {
+  C: 0,
+  "C#": 1,
+  Db: 1,
+  D: 2,
+  "D#": 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  "F#": 6,
+  Gb: 6,
+  G: 7,
+  "G#": 8,
+  Ab: 8,
+  A: 9,
+  "A#": 10,
+  Bb: 10,
+  B: 11,
+};
 
 export type Outcome = "hit" | "wrong" | "miss" | "timeout";
 
@@ -145,7 +168,17 @@ export function processBlock(
     return session;
   }
 
-  const { freq, amp, confidence, source } = detectPitch(block, SAMPLE_RATE);
+  const { freq, amp, confidence, source } = detectPitch(
+    block,
+    SAMPLE_RATE,
+    undefined,
+    session.active
+      ? ({
+          pitchClass: session.active.targetPc,
+          octave: session.active.targetOctave,
+        } satisfies PitchHint)
+      : undefined,
+  );
 
   // Silence OR low-confidence detection: cancel (treat as miss).
   if (freq <= 0 || confidence < 0.45) {
@@ -158,8 +191,23 @@ export function processBlock(
   const note = freqToNote(freq);
   if (!note) return session;
 
-  // Wrong pitch class: close immediately.
-  if (note.name !== session.active.targetPc) {
+  // Compute the deviation from the EXPECTED frequency for the
+  // target MIDI note (not the nearest semitone — a 50-cent flat
+  // detector read of Bb4 still rounds to Bb4 but should be
+  // discarded as wrong when it's > 75 cents off target).
+  const expectedMidi =
+    (session.active.targetOctave + 1) * 12 +
+    pcToMidi[session.active.targetPc];
+  const expectedFreq =
+    expectedMidi >= 0 ? 440 * Math.pow(2, (expectedMidi - 69) / 12) : 0;
+  const centsFromTarget =
+    expectedFreq > 0 ? 1200 * Math.log2(freq / expectedFreq) : 0;
+
+  // Wrong pitch class OR wildly out-of-tune: close immediately.
+  // ±75 cents is the right cutoff — anything within a quarter-tone is
+  // plausibly the target with bad intonation; beyond that it's almost
+  // certainly a different note (the closest adjacent semitone).
+  if (note.name !== session.active.targetPc || Math.abs(centsFromTarget) > 75) {
     finalizeAttempt(session, "wrong");
     return session;
   }

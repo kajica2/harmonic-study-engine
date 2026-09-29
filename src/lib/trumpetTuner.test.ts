@@ -162,6 +162,52 @@ describe("detectPitch (multi-strategy: YIN + HPS + SHS + octave correction)", ()
       }
     }
   });
+
+  it("hint biases the detector toward the target harmonic series", () => {
+    // Synthesize F#4 (370 Hz) and tell the detector we're expecting
+    // F#4 — it should pick F#4 within 5 cents.
+    const block = trumpetBlock(370, 100);
+    const est = detectPitch(block, SR, undefined, {
+      pitchClass: "F#",
+      octave: 4,
+    });
+    const cents = 1200 * Math.log2(est.freq / 370);
+    expect(Math.abs(cents)).toBeLessThan(5);
+  });
+
+  it("hint biases octave: C5 target when input is closer to C4+C5", () => {
+    // 523 Hz (C5) with some C4 leakage in the noise — hint forces C5.
+    const block = trumpetBlock(523.25, 100);
+    const est = detectPitch(block, SR, undefined, {
+      pitchClass: "C",
+      octave: 5,
+    });
+    const ratio = est.freq / 523.25;
+    // The detector must pick C5 (ratio ~1.0), not C4 (ratio ~0.5).
+    expect(ratio).toBeGreaterThan(0.9);
+    expect(ratio).toBeLessThan(1.1);
+  });
+
+  it("hint prevents wildcard octave-up: weak H1 still resolves to hint", () => {
+    // 92.5 Hz (F#2) with very weak H1 — hint pins it. We synthesize
+    // directly because trumpetBlock's 3rd arg is sampleRate, not amps.
+    const N = Math.floor((200 / 1000) * SR);
+    const block = new Float32Array(N);
+    const amps = [0.05, 1.0, 0.6, 0.3, 0.1];
+    for (let i = 0; i < N; i++) {
+      let v = 0;
+      for (let h = 0; h < amps.length; h++) {
+        v += amps[h] * Math.sin(2 * Math.PI * 92.5 * (h + 1) * (i / SR));
+      }
+      block[i] = v * 0.3;
+    }
+    const est = detectPitch(block, SR, undefined, {
+      pitchClass: "F#",
+      octave: 2,
+    });
+    const cents = 1200 * Math.log2(est.freq / 92.5);
+    expect(Math.abs(cents)).toBeLessThan(30);
+  });
 });
 
 describe("freqToNote (unchanged contract)", () => {
