@@ -203,6 +203,9 @@ export const TrumpetStageModal: React.FC<Props> = ({
                     ? `${a.avgCents >= 0 ? "+" : ""}${a.avgCents.toFixed(1)}¢`
                     : "—"}
                 </span>
+                <span className="text-[color:var(--color-text-3)] text-[9px]">
+                  {a.centsStdev !== null ? `±${a.centsStdev.toFixed(1)}¢` : ""}
+                </span>
               </li>
             );
           })}

@@ -42,7 +42,15 @@ export interface AttemptRecord {
   targetPc: string;
   targetOctave: number;
   outcome: Outcome;
+  /** Median cents from the target's expected MIDI frequency
+   *  (robust intonation signal). */
   avgCents: number | null;
+  /** Mean cents (sensitive to outliers; surfaces "shakiness" in the
+   *  UI). Median - mean gap is the jitter metric. */
+  meanCents: number | null;
+  /** Standard deviation of cents across the attempt's blocks.
+   *  Lower = steadier intonation. */
+  centsStdev: number | null;
   maxAmp: number;
 }
 
@@ -103,22 +111,36 @@ function expectedTarget(
 function finalizeAttempt(
   session: StageSession,
   outcome: Outcome,
-  avgCents: number | null = null,
+  medianCents: number | null = null,
 ): void {
   if (!session.active) return;
   const { degree, targetPc, targetOctave, maxAmp, centsSamples } =
     session.active;
-  const avg =
-    avgCents ??
-    (centsSamples.length > 0
-      ? centsSamples.reduce((a, b) => a + b, 0) / centsSamples.length
-      : null);
+  const n = centsSamples.length;
+  const mean =
+    n > 0 ? centsSamples.reduce((a, b) => a + b, 0) / n : null;
+  const median =
+    medianCents ??
+    (() => {
+      if (n === 0) return null;
+      const s = [...centsSamples].sort((a, b) => a - b);
+      return s[Math.floor(n / 2)];
+    })();
+  const stdev =
+    mean !== null && n > 1
+      ? Math.sqrt(
+          centsSamples.reduce((a, b) => a + (b - (mean ?? 0)) ** 2, 0) /
+            (n - 1),
+        )
+      : null;
   session.attempts.push({
     degree,
     targetPc,
     targetOctave,
     outcome,
-    avgCents: avg,
+    avgCents: median,
+    meanCents: mean,
+    centsStdev: stdev,
     maxAmp,
   });
   session.active = null;
@@ -212,19 +234,38 @@ export function processBlock(
     return session;
   }
 
-  session.active.centsSamples.push(note.cents);
+  // Track cents-from-target directly (not the rounded-nearest-semitone
+  // cents). This is the intonation signal we actually care about:
+  // a 15-cent-flat Bb4 reading shows up as 15 here (truthful) instead
+  // of being folded back to 0 by the nearest-semitone rounding.
+  if (expectedFreq > 0) {
+    session.active.centsSamples.push(centsFromTarget);
+  } else {
+    session.active.centsSamples.push(note.cents);
+  }
   session.active.maxAmp = Math.max(session.active.maxAmp, amp);
 
   const sustainMs = session.config.sustainSeconds * 1000;
   if (now - session.active.startedAt >= sustainMs) {
-    const avg =
-      session.active.centsSamples.reduce((a, b) => a + b, 0) /
-      Math.max(1, session.active.centsSamples.length);
+    // Median, not mean — robust to the occasional wild spectral
+    // jitter block (residual harmonics, room noise). A held Bb4
+    // might produce 30 samples: 28 within ±2 cents and 2 at
+    // ±15 cents. Mean says "5 cents off"; median says "1.5 cents
+    // off" — and that's the right verdict.
+    const samples = session.active.centsSamples;
+    const sorted = [...samples].sort((a, b) => a - b);
+    const mid = sorted[Math.floor(sorted.length / 2)];
+    const avg = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+    // Score against the median (robust to outliers) but report
+    // both in the attempt record so the UI can show live jitter.
     const outcome: Outcome =
-      Math.abs(avg) <= session.config.perNoteToleranceCents
+      Math.abs(mid) <= session.config.perNoteToleranceCents
         ? "hit"
         : "miss";
-    finalizeAttempt(session, outcome, avg);
+    finalizeAttempt(session, outcome, mid);
+    // avg is recorded but not used for grading; could be surfaced
+    // later as a "smoothness" metric.
+    void avg;
   }
   return session;
 }
