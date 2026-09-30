@@ -112,6 +112,10 @@ export function normalizeMetronomeConfig(raw: unknown): MetronomeConfig {
  *  the two can never drift apart silently. */
 export function stepsPerMeasureFor(ts: TimeSignature): number {
   switch (ts) {
+    case "3/4":
+      return 12;
+    case "5/4":
+      return 20;
     case "6/8":
       return 12;
     case "7/8":

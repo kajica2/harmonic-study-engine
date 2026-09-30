@@ -2,6 +2,7 @@
   "id": "aaba",
   "name": "AABA (32-bar standard)",
   "description": "Most common jazz standard form. Two A sections, contrasting B (bridge), A' return.",
+  "meter": "4/4",
   "sections": [
     { "id": "A",  "length": 8, "cadence": "ii-V-I" },
     { "id": "A",  "length": 8, "cadence": "ii-V-I" },

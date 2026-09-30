@@ -28,7 +28,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormPlanner } from "./FormPlanner";
 import { FormTemplatePicker } from "./FormTemplatePicker";
-import { planForm, MIN_PATH_BARS, MAX_PATH_BARS } from "../lib/formPlanner";
+import { planForm, MIN_PATH_BARS, MAX_PATH_BARS, type FormTemplateId } from "../lib/formPlanner";
+import { templateMeter } from "../lib/arpRhythm";
+import { useSessionStore as usePracticeSession } from "../hooks/useSessionStore";
 import { SeedPicker } from "./SeedPicker";
 import { IdeaCard } from "./IdeaCard";
 import { ConceptDrawer } from "./ConceptDrawer";
@@ -562,6 +564,8 @@ export const ExploreSurface: React.FC<ExploreSurfaceProps> = ({
   barCount,
   className = "",
 }) => {
+  const setTimeSignature = usePracticeSession().setTimeSignature;
+  const [formTemplateId, setFormTemplateId] = useState<FormTemplateId | null>(null);
   const composeAnalysis = useSessionStore((s) => s.composeAnalysis);
   const etudeConstraints = useSessionStore((s) => s.etudeConstraints);
 
@@ -1091,9 +1095,10 @@ export const ExploreSurface: React.FC<ExploreSurfaceProps> = ({
       )}
 
       <FormTemplatePicker
-        activeId={null}
-        onPick={() => {
-          /* Explore keeps the form chrome read-only (no plan edits). */
+        activeId={formTemplateId}
+        onPick={(id) => {
+          setFormTemplateId(id);
+          setTimeSignature(templateMeter(id));
         }}
       />
       <FormPlanner plan={plan} />

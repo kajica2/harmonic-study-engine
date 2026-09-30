@@ -6,7 +6,9 @@ import {
 } from "./metronomePatterns";
 
 export type TimeSignature =
+  | "3/4"
   | "4/4"
+  | "5/4"
   | "6/8"
   | "7/8"
   | "11/4"
@@ -70,8 +72,14 @@ export class RhythmEngine {
   setTimeSignature(ts: TimeSignature) {
     this.timeSignature = ts;
     switch (ts) {
+      case "3/4":
+        this.stepsPerMeasure = 12;
+        break;
       case "4/4":
         this.stepsPerMeasure = 16;
+        break;
+      case "5/4":
+        this.stepsPerMeasure = 20;
         break;
       case "6/8":
         this.stepsPerMeasure = 12;
