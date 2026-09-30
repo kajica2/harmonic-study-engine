@@ -101,3 +101,55 @@ export function noteKeyChipsForRoot(
   }
   return out;
 }
+
+/**
+ * Global letter shortcuts (T/N/L/P/C). PURE classifier - the App.tsx
+ * handler consults it so the guard laws are unit-testable in
+ * isolation (same pattern as classifyTransposeKey).
+ *
+ * Guard order (PHASE-1-01): meta/ctrl/alt yield FIRST (the browser's
+ * native Cmd/Ctrl+letter behavior survives); then match by e.code
+ * (the D14 law - NEVER e.key, layouts shift). Shift passes (no
+ * mapping key uses shift semantics).
+ *
+ * T is gated on the piano-armed flag: KeyT is the +6 semitone piano
+ * key (NOTE_KEY_SEMITONES_BY_CODE), so the tuner toggle must yield
+ * while the computer-keyboard piano is armed (the useNoteInput
+ * listener owns KeyT in that state).
+ */
+export type GlobalShortcutKey =
+  | "tuner"
+  | "metronome"
+  | "loop"
+  | "play"
+  | "countIn";
+
+export function classifyGlobalShortcutKey(
+  e: Pick<KeyboardEvent, "code" | "metaKey" | "ctrlKey" | "altKey">,
+  opts: { pianoArmed: boolean },
+): GlobalShortcutKey | null {
+  if (e.metaKey || e.ctrlKey || e.altKey) return null;
+  if (e.code === "KeyT" && !opts.pianoArmed) return "tuner";
+  if (e.code === "KeyN") return "metronome";
+  if (e.code === "KeyL") return "loop";
+  if (e.code === "KeyP") return "play";
+  if (e.code === "KeyC") return "countIn";
+  return null;
+}
+
+/**
+ * Cmd/Ctrl+Z undo / Cmd/Ctrl+Shift+Z redo intent. PURE classifier for
+ * the App.tsx global undo branch (the compose surface keeps its own
+ * local handler; the global branch covers the etude surface and
+ * yields when a compose project is loaded so the two never
+ * double-fire). Returns null when the chord is not a modifier+Z.
+ */
+export type UndoRedoIntent = "undo" | "redo";
+
+export function classifyUndoRedoKey(
+  e: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "shiftKey">,
+): UndoRedoIntent | null {
+  if (!(e.metaKey || e.ctrlKey)) return null;
+  if (e.key.toLowerCase() !== "z") return null;
+  return e.shiftKey ? "redo" : "undo";
+}

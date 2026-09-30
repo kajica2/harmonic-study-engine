@@ -32,8 +32,13 @@ const HANDLED_KEYS: ReadonlyArray<{ key: string; description: string }> = [
   { key: "ArrowUp", description: "path -1 (resets to step 1)" },
   { key: "Space", description: "toggle Auto-playback" },
   { key: "M", description: "toggle Play Along (mute synth melody)" },
-  { key: "[", description: "tempo -5 BPM" },
-  { key: "]", description: "tempo +5 BPM" },
+  { key: "T", description: "toggle tuner (off while piano keys are armed)" },
+  { key: "N", description: "toggle metronome click" },
+  { key: "L", description: "toggle loop (repeat whole form)" },
+  { key: "P", description: "toggle Auto-playback (Space alias)" },
+  { key: "C", description: "cycle count-in (0 / 1 / 2 bars)" },
+  { key: "[", description: "transpose down 1 semitone" },
+  { key: "]", description: "transpose up 1 semitone" },
 ];
 
 // Keys the cheatsheet documents, in canonical form. The data
@@ -58,6 +63,11 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
       ArrowUp: "↑",
       "?": "?",
       M: "M",
+      T: "T",
+      N: "N",
+      L: "L",
+      P: "P",
+      C: "C",
       "[": "[",
       "]": "]",
     };
@@ -87,6 +97,11 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
       Esc: "Escape",
       "?": "?",
       M: "M",
+      T: "T",
+      N: "N",
+      L: "L",
+      P: "P",
+      C: "C",
       "[": "[",
       "]": "]",
     };
@@ -108,11 +123,13 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
     // is that the keymap only includes non-character keys + Space +
     // ? + M, and that no alphanumeric key overlaps with a likely
     // form field value. (M is OK because the handler explicitly
-    // toggles Play Along — there's no conflict with typing.)
+    // toggles Play Along — there's no conflict with typing. The
+    // T/N/L/P/C global shortcuts are likewise explicit toggles; T
+    // additionally yields while the computer-keyboard piano is armed.)
     for (const { key } of HANDLED_KEYS) {
-      // Acceptable single-character shortcuts: ?, [, ], M
+      // Acceptable single-character shortcuts: ?, [, ], M, T, N, L, P, C
       // (and "Space" — the alternate name for the spacebar)
-      const acceptable = ["?", "[", "]", "M", "Space"];
+      const acceptable = ["?", "[", "]", "M", "T", "N", "L", "P", "C", "Space"];
       const isArrow = key.startsWith("Arrow");
       const isSpecial =
         key === "Escape" || key === " " || key === "Space" || isArrow || acceptable.includes(key);

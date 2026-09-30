@@ -37,8 +37,33 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Playback",
   },
   {
+    keys: ["P"],
+    description: "Toggle Auto-playback (Space alias)",
+    group: "Playback",
+  },
+  {
     keys: ["M"],
     description: "Toggle Play Along (mute synth melody)",
+    group: "Playback",
+  },
+  {
+    keys: ["N"],
+    description: "Toggle metronome click",
+    group: "Playback",
+  },
+  {
+    keys: ["L"],
+    description: "Toggle loop (repeat whole form)",
+    group: "Playback",
+  },
+  {
+    keys: ["C"],
+    description: "Cycle count-in (0 / 1 / 2 bars)",
+    group: "Playback",
+  },
+  {
+    keys: ["T"],
+    description: "Toggle tuner (off while piano keys are armed)",
     group: "Playback",
   },
 
@@ -151,7 +176,9 @@ export const KeyboardShortcutsCheatsheet: React.FC<{ onClose: () => void }> = ({
 
       <div className="px-5 py-3 border-t border-white/10 text-[10px] t-mono text-[color:var(--color-text-3)]">
         Shortcuts are inactive when a text field is focused. Tempo down /
-        up by 5 BPM: comma / period. Piano keys (study view, when
+        up by 5 BPM: comma / period. Cmd/Ctrl+Z undoes the last change
+        on the active surface (compose project or etude); Cmd/Ctrl+Shift+Z
+        redoes on the compose surface. Piano keys (study view, when
         Keyboard / piano input is on): A W S E D F T G Y H U J K play one
         octave from the root; Z / X shift the octave.
       </div>
