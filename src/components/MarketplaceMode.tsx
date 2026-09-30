@@ -1,9 +1,10 @@
 /**
  * src/components/MarketplaceMode.tsx - marketplace surface.
  *
- * Lists published backing tracks from the FastAPI backend and lets
- * the user preview one: selecting a card plays its audio_url through
- * a local HTMLAudioElement and runs the beat-timed <Slideshow />.
+ * Lists published backing tracks from the same-origin Vercel
+ * serverless catalog (/api/listings) and lets the user preview one:
+ * selecting a card plays its audio_url through a local
+ * HTMLAudioElement and runs the beat-timed <Slideshow />.
  *
  * Standalone by design (per the architect spec): the preview does NOT
  * couple to playbackClock or the practice audio engine. The beat
@@ -12,10 +13,10 @@
  * starts on play, stops on pause / audio end / unmount.
  *
  * Degraded states:
- *   - Backend unreachable / non-ok -> "Marketplace backend offline"
- *     mirroring the checkDDSPStatus pattern (typed failure, never
- *     throw).
- *   - Backend reachable but zero listings -> honest empty state.
+ *   - Serverless API unreachable / non-ok -> "Marketplace backend
+ *     offline" mirroring the checkDDSPStatus pattern (typed failure,
+ *     never throw).
+ *   - API reachable but zero listings -> honest empty state.
  *
  * Accessibility:
  *   - Listing cards are real buttons with aria-labels + aria-pressed.
@@ -26,13 +27,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Slideshow } from "./Slideshow";
 import {
-  MARKETPLACE_SERVER,
-  fetchListings,
+  MARKETPLACE_SERVERLESS_BASE,
+  fetchListingsFromGithub,
   beatAtElapsed,
   buildSlideshowLayers,
   isActiveAudio,
   deriveSlug,
+  midiDataUriToBlob,
   publishListing,
+  wavBlobToMp3,
   type Listing,
 } from "../lib/marketplace";
 import { renderPathToWav } from "../lib/loopWav";
@@ -88,11 +91,12 @@ export const MarketplaceMode: React.FC<MarketplaceModeProps> = ({
 
   // Fetch listings once on mount. StrictMode double-invoke is safe:
   // the cancelled flag drops the first result and the GET is
-  // idempotent.
+  // idempotent. The catalog is served by the same-origin Vercel
+  // serverless endpoint (/api/listings).
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const result = await fetchListings(MARKETPLACE_SERVER);
+      const result = await fetchListingsFromGithub(MARKETPLACE_SERVERLESS_BASE);
       if (cancelled) return;
       if (result.ok) {
         setListings(result.listings);
@@ -187,11 +191,14 @@ export const MarketplaceMode: React.FC<MarketplaceModeProps> = ({
         meter,
         instrument,
       });
-      const midiDataUri = exportToMidiFile(path);
+      // The deployed flow has no ffmpeg, so the browser encodes the
+      // MP3 (lamejs) before uploading to the serverless function.
+      const mp3Blob = await wavBlobToMp3(wavBlob);
+      const midiBlob = midiDataUriToBlob(exportToMidiFile(path));
       const slug = deriveSlug(path.title);
-      const result = await publishListing(MARKETPLACE_SERVER, {
-        wavBlob,
-        midiDataUri,
+      const result = await publishListing(MARKETPLACE_SERVERLESS_BASE, {
+        mp3Blob,
+        midiBlob,
         slug,
         title: path.title,
         composer: path.composer,
@@ -199,9 +206,11 @@ export const MarketplaceMode: React.FC<MarketplaceModeProps> = ({
       if (result.ok) {
         setPublishedSlug(slug);
         setPublishState("success");
-        // The backend syncs after the commit, so refresh the catalog
-        // to surface the new listing immediately.
-        const refresh = await fetchListings(MARKETPLACE_SERVER);
+        // The serverless function commits to GitHub, so refresh the
+        // catalog to surface the new listing immediately.
+        const refresh = await fetchListingsFromGithub(
+          MARKETPLACE_SERVERLESS_BASE,
+        );
         if (refresh.ok) {
           setListings(refresh.listings);
           setLoadState("ready");
@@ -293,8 +302,9 @@ export const MarketplaceMode: React.FC<MarketplaceModeProps> = ({
             Marketplace backend offline
           </p>
           <p className="t-small text-[color:var(--color-text-2)]">
-            Start the local backend (npm run dev:backend) to browse
-            published backing tracks.
+            The catalog is served by the deployed /api/listings
+            endpoint. Run the app on Vercel (or a local serverless
+            emulator) to browse published backing tracks.
           </p>
           {loadError.length > 0 && (
             <p className="t-mono text-[10px] text-[color:var(--color-text-3)]">

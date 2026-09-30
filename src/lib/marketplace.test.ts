@@ -2,9 +2,12 @@
  * src/lib/marketplace.test.ts - PIN-001.
  *
  * The marketplace surface's pure logic: parseListing validation,
- * buildSlideshowLayers mapping, beatAtElapsed math, and fetchListings
- * error handling with a mocked fetch. Pure logic - runs in the node
- * project (no DOM), so NO JSDOM_FILES change is needed.
+ * buildSlideshowLayers mapping, beatAtElapsed math, fetchListings
+ * error handling with a mocked fetch, the wavBlobToMp3 wrapper
+ * contract with a mocked lamejs, and the serverless
+ * fetchListingsFromGithub / parseGithubListing pins. Pure logic -
+ * runs in the node project (no DOM), so NO JSDOM_FILES change is
+ * needed.
  *
  * Pinned laws:
  *   - parseListing accepts a well-formed listing and rejects payloads
@@ -15,13 +18,28 @@
  *     BPMs, and returns 0 for non-finite / non-positive inputs.
  *   - fetchListings never throws: non-ok status, rejected fetch and
  *     malformed payloads all resolve to { ok: false, error }.
+ *   - wavBlobToMp3 takes a WAV Blob and returns an MP3 Blob with the
+ *     audio/mpeg MIME, driving lamejs Mp3Encoder with the parsed
+ *     channel count / sample rate (lamejs is mocked - the encoder
+ *     internals are not pinned, only the wrapper contract).
+ *   - publishListing POSTs mp3 + midi + slug to /api/publish and
+ *     never throws.
+ *   - fetchListingsFromGithub GETs /api/listings, maps the serverless
+ *     {slug, title, mp3_url, midi_url} shape into Listing, and never
+ *     throws.
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { Mp3Encoder } from "@breezystack/lamejs";
 import {
   MARKETPLACE_SERVER,
+  MARKETPLACE_SERVERLESS_BASE,
   fetchListings,
+  fetchListingsFromGithub,
   parseListing,
+  parseGithubListing,
+  parseWavBuffer,
+  wavSamplesToInt16,
   buildSlideshowLayers,
   beatAtElapsed,
   isActiveAudio,
@@ -29,8 +47,18 @@ import {
   midiDataUriToBlob,
   buildPublishFormData,
   publishListing,
+  wavBlobToMp3,
   type Listing,
 } from "./marketplace";
+
+// lamejs is dynamically imported inside wavBlobToMp3; the mock keeps
+// the encoder out of the node test env and lets the wrapper contract
+// be pinned without exercising the real MP3 math.
+vi.mock("@breezystack/lamejs", () => ({
+  Mp3Encoder: vi.fn(),
+}));
+
+const Mp3EncoderMock = vi.mocked(Mp3Encoder);
 
 const validListing: Listing = {
   id: "lst-1",
@@ -47,8 +75,56 @@ const validListing: Listing = {
   updated_at: "2026-01-01T00:00:00Z",
 };
 
+/**
+ * Build a real 16-bit PCM WAV Blob for the wavBlobToMp3 wrapper pins.
+ * Mirrors the RIFF layout produced by src/lib/loopWav.ts encodeWav.
+ */
+function makeWavBlob(
+  opts: {
+    channels?: number;
+    sampleRate?: number;
+    bits?: number;
+    samples?: number[];
+  } = {},
+): Blob {
+  const channels = opts.channels ?? 1;
+  const sampleRate = opts.sampleRate ?? 44100;
+  const bits = opts.bits ?? 16;
+  const samples = opts.samples ?? [0, 1000, -1000, 500];
+  const bytesPerSample = bits / 8;
+  const dataSize = samples.length * channels * bytesPerSample;
+  const buf = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buf);
+  const writeStr = (o: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i));
+  };
+  let o = 0;
+  writeStr(o, "RIFF"); o += 4;
+  view.setUint32(o, 36 + dataSize, true); o += 4;
+  writeStr(o, "WAVE"); o += 4;
+  writeStr(o, "fmt "); o += 4;
+  view.setUint32(o, 16, true); o += 4;
+  view.setUint16(o, 1, true); o += 2;
+  view.setUint16(o, channels, true); o += 2;
+  view.setUint32(o, sampleRate, true); o += 4;
+  view.setUint32(o, sampleRate * channels * bytesPerSample, true); o += 4;
+  view.setUint16(o, channels * bytesPerSample, true); o += 2;
+  view.setUint16(o, bits, true); o += 2;
+  writeStr(o, "data"); o += 4;
+  view.setUint32(o, dataSize, true); o += 4;
+  for (let i = 0; i < samples.length; i++) {
+    for (let c = 0; c < channels; c++) {
+      if (bits === 16) view.setInt16(o, samples[i], true);
+      else view.setUint8(o, samples[i]);
+      o += bytesPerSample;
+    }
+  }
+  return new Blob([buf], { type: "audio/wav" });
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  Mp3EncoderMock.mockReset();
 });
 
 describe("parseListing", () => {
@@ -301,6 +377,10 @@ describe("fetchListings", () => {
     // node test env VITE_DDSP_API is unset, so the default must hold.
     expect(MARKETPLACE_SERVER).toBe("http://127.0.0.1:8765");
   });
+
+  it("MARKETPLACE_SERVERLESS_BASE is same-origin (empty string)", () => {
+    expect(MARKETPLACE_SERVERLESS_BASE).toBe("");
+  });
 });
 
 describe("deriveSlug", () => {
@@ -338,13 +418,13 @@ describe("midiDataUriToBlob", () => {
 });
 
 describe("buildPublishFormData", () => {
-  const wavBlob = new Blob(["wav"], { type: "audio/wav" });
-  const midiDataUri = "data:audio/midi;base64,TVRoZAAAAA==";
+  const mp3Blob = new Blob(["mp3"], { type: "audio/mpeg" });
+  const midiBlob = new Blob(["midi"], { type: "audio/midi" });
 
-  it("appends audio, midi, slug and optional metadata", () => {
+  it("appends mp3, midi, slug and optional metadata", () => {
     const form = buildPublishFormData({
-      wavBlob,
-      midiDataUri,
+      mp3Blob,
+      midiBlob,
       slug: "autumn-leaves",
       title: "Autumn Leaves",
       composer: "Joseph Kosma",
@@ -352,14 +432,14 @@ describe("buildPublishFormData", () => {
     expect(form.get("slug")).toBe("autumn-leaves");
     expect(form.get("title")).toBe("Autumn Leaves");
     expect(form.get("composer")).toBe("Joseph Kosma");
-    expect(form.get("audio")).toBeInstanceOf(Blob);
+    expect(form.get("mp3")).toBeInstanceOf(Blob);
     expect(form.get("midi")).toBeInstanceOf(Blob);
   });
 
   it("omits empty optional metadata", () => {
     const form = buildPublishFormData({
-      wavBlob,
-      midiDataUri,
+      mp3Blob,
+      midiBlob,
       slug: "autumn-leaves",
     });
     expect(form.get("title")).toBeNull();
@@ -367,72 +447,166 @@ describe("buildPublishFormData", () => {
   });
 });
 
-describe("publishListing", () => {
-  const wavBlob = new Blob(["wav"], { type: "audio/wav" });
-  const midiDataUri = "data:audio/midi;base64,TVRoZAAAAA==";
+describe("wavBlobToMp3", () => {
+  it("encodes a mono WAV to an MP3 blob with the audio/mpeg MIME", async () => {
+    const encodeBuffer = vi.fn().mockReturnValue(new Uint8Array([1, 2, 3]));
+    const flush = vi.fn().mockReturnValue(new Uint8Array([4, 5]));
+    class FakeEncoder {
+      encodeBuffer = encodeBuffer;
+      flush = flush;
+    }
+    Mp3EncoderMock.mockImplementation(FakeEncoder as unknown as typeof Mp3Encoder);
 
-  it("returns the parsed listing on a 200 publish", async () => {
+    const wav = makeWavBlob({ channels: 1, sampleRate: 44100 });
+    const mp3 = await wavBlobToMp3(wav);
+
+    expect(mp3.type).toBe("audio/mpeg");
+    expect(mp3.size).toBeGreaterThan(0);
+    expect(Mp3EncoderMock).toHaveBeenCalledWith(1, 44100, 192);
+    expect(encodeBuffer).toHaveBeenCalled();
+    expect(flush).toHaveBeenCalled();
+  });
+
+  it("passes stereo channels to the encoder", async () => {
+    const encodeBuffer = vi.fn().mockReturnValue(new Uint8Array([9]));
+    const flush = vi.fn().mockReturnValue(new Uint8Array([8]));
+    class FakeEncoder {
+      encodeBuffer = encodeBuffer;
+      flush = flush;
+    }
+    Mp3EncoderMock.mockImplementation(FakeEncoder as unknown as typeof Mp3Encoder);
+
+    const wav = makeWavBlob({ channels: 2, sampleRate: 22050 });
+    await wavBlobToMp3(wav);
+
+    expect(Mp3EncoderMock).toHaveBeenCalledWith(2, 22050, 192);
+    expect(encodeBuffer).toHaveBeenCalledWith(
+      expect.any(Int16Array),
+      expect.any(Int16Array),
+    );
+  });
+
+  it("throws on a malformed WAV (not a RIFF container)", async () => {
+    const bad = new Blob(["not a wav file at all"], { type: "audio/wav" });
+    await expect(wavBlobToMp3(bad)).rejects.toThrow();
+  });
+
+  it("throws on an empty data chunk", async () => {
+    const empty = makeWavBlob({ samples: [] });
+    await expect(wavBlobToMp3(empty)).rejects.toThrow(/no audio samples/);
+  });
+});
+
+describe("parseWavBuffer / wavSamplesToInt16", () => {
+  it("parses a mono 16-bit WAV layout", async () => {
+    const wav = makeWavBlob({ channels: 1, sampleRate: 44100 });
+    const buffer = await wav.arrayBuffer();
+    const info = parseWavBuffer(buffer);
+    expect(info.channels).toBe(1);
+    expect(info.sampleRate).toBe(44100);
+    expect(info.bitsPerSample).toBe(16);
+    expect(info.audioFormat).toBe(1);
+    expect(info.dataLength).toBeGreaterThan(0);
+    const channels = wavSamplesToInt16(buffer, info);
+    expect(channels).toHaveLength(1);
+    expect(channels[0].length).toBeGreaterThan(0);
+  });
+
+  it("parses a stereo 16-bit WAV into two channels", async () => {
+    const wav = makeWavBlob({ channels: 2, sampleRate: 22050 });
+    const buffer = await wav.arrayBuffer();
+    const info = parseWavBuffer(buffer);
+    expect(info.channels).toBe(2);
+    expect(info.sampleRate).toBe(22050);
+    const channels = wavSamplesToInt16(buffer, info);
+    expect(channels).toHaveLength(2);
+    expect(channels[0].length).toBe(channels[1].length);
+  });
+
+  it("rejects a non-RIFF buffer", async () => {
+    const buffer = new ArrayBuffer(64);
+    expect(() => parseWavBuffer(buffer)).toThrow();
+  });
+});
+
+describe("parseGithubListing", () => {
+  it("maps the serverless shape into a Listing", () => {
+    const parsed = parseGithubListing({
+      slug: "autumn-leaves",
+      title: "Autumn Leaves",
+      mp3_url: "https://raw.githubusercontent.com/kajica2/harmonic-study-engine/main/marketplace/autumn-leaves.mp3",
+      midi_url: "https://raw.githubusercontent.com/kajica2/harmonic-study-engine/main/marketplace/autumn-leaves.mid",
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.id).toBe("autumn-leaves");
+    expect(parsed?.title).toBe("Autumn Leaves");
+    expect(parsed?.composer).toBe("harmonic-study-engine");
+    expect(parsed?.audio_url).toContain("autumn-leaves.mp3");
+    expect(parsed?.status).toBe("published");
+  });
+
+  it("rejects payloads missing slug / title / mp3_url / midi_url", () => {
+    const base = {
+      slug: "x",
+      title: "X",
+      mp3_url: "https://example.com/x.mp3",
+      midi_url: "https://example.com/x.mid",
+    };
+    expect(parseGithubListing({ ...base, slug: "" })).toBeNull();
+    expect(parseGithubListing({ ...base, title: "" })).toBeNull();
+    expect(parseGithubListing({ ...base, mp3_url: "" })).toBeNull();
+    expect(parseGithubListing({ ...base, midi_url: "" })).toBeNull();
+    expect(parseGithubListing(null)).toBeNull();
+    expect(parseGithubListing("nope")).toBeNull();
+  });
+});
+
+describe("fetchListingsFromGithub", () => {
+  it("GETs /api/listings and maps the serverless shape", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({
-        published: true,
-        slug: "autumn-leaves",
-        listing: validListing,
-      }),
+      json: async () => [
+        {
+          slug: "autumn-leaves",
+          title: "Autumn Leaves",
+          mp3_url: "https://raw.githubusercontent.com/kajica2/harmonic-study-engine/main/marketplace/autumn-leaves.mp3",
+          midi_url: "https://raw.githubusercontent.com/kajica2/harmonic-study-engine/main/marketplace/autumn-leaves.mid",
+        },
+        { slug: "bad", title: "", mp3_url: "x", midi_url: "y" },
+      ],
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await publishListing("http://127.0.0.1:8765", {
-      wavBlob,
-      midiDataUri,
-      slug: "autumn-leaves",
-    });
+    const result = await fetchListingsFromGithub("");
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.listing?.id).toBe("lst-1");
+      expect(result.listings).toHaveLength(1);
+      expect(result.listings[0].id).toBe("autumn-leaves");
     }
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:8765/marketplace/publish",
-      expect.objectContaining({
-        method: "POST",
-        signal: expect.any(AbortSignal),
-      }),
+      "/api/listings",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
-  it("accepts a null listing (sync raced) as a successful publish", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ published: true, slug: "x", listing: null }),
-      }),
+  it("strips a trailing slash from the base URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchListingsFromGithub("https://example.com/");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.com/api/listings",
+      expect.anything(),
     );
-    const result = await publishListing("http://127.0.0.1:8765", {
-      wavBlob,
-      midiDataUri,
-      slug: "x",
-    });
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.listing).toBeNull();
   });
 
-  it("returns a typed failure with the backend detail on a non-ok response", async () => {
+  it("returns a typed failure on a non-ok response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 422,
-        json: async () => ({ detail: "slug must match ^[a-z0-9-]+$" }),
-      }),
+      vi.fn().mockResolvedValue({ ok: false, status: 502 }),
     );
-    const result = await publishListing("http://127.0.0.1:8765", {
-      wavBlob,
-      midiDataUri,
-      slug: "Bad Slug!",
-    });
+    const result = await fetchListingsFromGithub("");
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain("slug must match");
+    if (!result.ok) expect(result.error).toContain("502");
   });
 
   it("returns a typed failure when fetch rejects (offline)", async () => {
@@ -440,9 +614,129 @@ describe("publishListing", () => {
       "fetch",
       vi.fn().mockRejectedValue(new TypeError("fetch failed")),
     );
-    const result = await publishListing("http://127.0.0.1:8765", {
-      wavBlob,
-      midiDataUri,
+    const result = await fetchListingsFromGithub("");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("fetch failed");
+  });
+
+  it("returns a typed failure on a non-array payload", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ nope: true }) }),
+    );
+    const result = await fetchListingsFromGithub("");
+    expect(result.ok).toBe(false);
+  });
+
+  it("never throws - a malformed JSON body is a typed failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("bad json");
+        },
+      }),
+    );
+    const result = await fetchListingsFromGithub("");
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("publishListing", () => {
+  const mp3Blob = new Blob(["mp3"], { type: "audio/mpeg" });
+  const midiBlob = new Blob(["midi"], { type: "audio/midi" });
+
+  it("POSTs mp3 + midi + slug to /api/publish on a 200 publish", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ published: true, slug: "autumn-leaves" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await publishListing("https://example.com", {
+      mp3Blob,
+      midiBlob,
+      slug: "autumn-leaves",
+      title: "Autumn Leaves",
+      composer: "Joseph Kosma",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.listing).toBeNull();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.com/api/publish",
+      expect.objectContaining({
+        method: "POST",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    const [, init] = fetchMock.mock.calls[0];
+    const form = init.body as FormData;
+    expect(form.get("slug")).toBe("autumn-leaves");
+    expect(form.get("title")).toBe("Autumn Leaves");
+    expect(form.get("composer")).toBe("Joseph Kosma");
+    expect(form.get("mp3")).toBeInstanceOf(Blob);
+    expect(form.get("midi")).toBeInstanceOf(Blob);
+  });
+
+  it("uses the same-origin base when given an empty string", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ published: true, slug: "x" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await publishListing("", { mp3Blob, midiBlob, slug: "x" });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/publish",
+      expect.anything(),
+    );
+  });
+
+  it("returns a typed failure with the serverless error on a non-ok response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({ error: "slug must match ^[a-z0-9-]+$" }),
+      }),
+    );
+    const result = await publishListing("https://example.com", {
+      mp3Blob,
+      midiBlob,
+      slug: "Bad Slug!",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("slug must match");
+  });
+
+  it("returns a typed failure with the detail field when present", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: async () => ({ detail: "GITHUB_TOKEN not configured" }),
+      }),
+    );
+    const result = await publishListing("https://example.com", {
+      mp3Blob,
+      midiBlob,
+      slug: "autumn-leaves",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("GITHUB_TOKEN");
+  });
+
+  it("returns a typed failure when fetch rejects (offline)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+    );
+    const result = await publishListing("https://example.com", {
+      mp3Blob,
+      midiBlob,
       slug: "autumn-leaves",
     });
     expect(result.ok).toBe(false);
@@ -457,9 +751,9 @@ describe("publishListing", () => {
         json: async () => ({ published: false }),
       }),
     );
-    const result = await publishListing("http://127.0.0.1:8765", {
-      wavBlob,
-      midiDataUri,
+    const result = await publishListing("https://example.com", {
+      mp3Blob,
+      midiBlob,
       slug: "autumn-leaves",
     });
     expect(result.ok).toBe(false);
@@ -475,9 +769,9 @@ describe("publishListing", () => {
         },
       }),
     );
-    const result = await publishListing("http://127.0.0.1:8765", {
-      wavBlob,
-      midiDataUri,
+    const result = await publishListing("https://example.com", {
+      mp3Blob,
+      midiBlob,
       slug: "autumn-leaves",
     });
     expect(result.ok).toBe(false);
