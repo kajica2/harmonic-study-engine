@@ -135,7 +135,7 @@ describe("shouldScheduleUrlWrite - untracked churn stays quiet (GAP-1)", () => {
     // pendingModeRequest, ...) are outside the tracked slice and must
     // never schedule a write. (A whole-state comparison like
     // `s !== prev` would fail this pin.)
-    const next = { ...prev, dirty: { compose: "none", etude: "pending", explore: "none" } };
+    const next = { ...prev, dirty: { compose: "none", etude: "pending", explore: "none", marketplace: "none" } };
     expect(shouldScheduleUrlWrite(prev, next)).toBe(false);
   });
 
@@ -164,7 +164,7 @@ describe("shouldScheduleUrlWrite - untracked churn stays quiet (GAP-1)", () => {
     const prev = snap({ currentIdea: IDEA_C, exploreSeedUrl: "Cmaj7" });
     const next = {
       ...prev,
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "compose",
     };
     expect(shouldScheduleUrlWrite(prev, next)).toBe(false);

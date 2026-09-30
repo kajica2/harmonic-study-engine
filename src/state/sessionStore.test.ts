@@ -107,7 +107,7 @@ describe("requestMode / resolveDirty state machine", () => {
     // setHarmonicStep will dispatch the event in App.tsx). For state
     // machine testing we can poke the slice directly.
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
     });
     STORE_API().requestMode("explore");
     expect(STORE_API().mode).toBe("etude");
@@ -119,7 +119,7 @@ describe("requestMode / resolveDirty state machine", () => {
     const idea = ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0);
     STORE_API().setCurrentIdea(idea);
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "explore",
     });
     STORE_API().resolveDirty("save");
@@ -137,7 +137,7 @@ describe("requestMode / resolveDirty state machine", () => {
   it("resolveDirty(cancel) -> stays on current mode, clears pending", () => {
     STORE_API().setMode("etude");
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "explore",
     });
     STORE_API().resolveDirty("cancel");
@@ -150,7 +150,7 @@ describe("requestMode / resolveDirty state machine", () => {
     const idea = ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0);
     STORE_API().setCurrentIdea(idea);
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "explore",
     });
     let fired = 0;
@@ -174,7 +174,7 @@ describe("requestMode / resolveDirty state machine", () => {
     // (we always read the CURRENT mode's dirty slot, which is Compose
     // = 'none' in Phase 1). requestMode from Compose still commits.
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
     });
     STORE_API().requestMode("etude");
     expect(STORE_API().mode).toBe("etude");
@@ -253,16 +253,17 @@ describe("persistence", () => {
 });
 
 describe("isMode / MODES / resolveEffectiveMode helpers", () => {
-  it("isMode accepts the 3 known literals only", () => {
+  it("isMode accepts the 4 known literals only", () => {
     expect(isMode("compose")).toBe(true);
     expect(isMode("etude")).toBe(true);
     expect(isMode("explore")).toBe(true);
+    expect(isMode("marketplace")).toBe(true);
     expect(isMode("wat")).toBe(false);
     expect(isMode("")).toBe(false);
   });
 
   it("MODES preserves display order", () => {
-    expect(MODES).toEqual(["compose", "etude", "explore"]);
+    expect(MODES).toEqual(["compose", "etude", "explore", "marketplace"]);
   });
 
   it("resolveEffectiveMode falls back to etude for legacy / null", () => {
@@ -312,7 +313,7 @@ describe("Phase 2: exercise transpose clamp (D10)", () => {
   it("advanceKeyCycle NEVER touches dirty (D13 structural pin)", () => {
     STORE_API().setMode("etude");
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
     });
     STORE_API().setExerciseTranspose(2);
     STORE_API().advanceKeyCycle();
@@ -327,7 +328,7 @@ describe("Phase 2: exercise transpose clamp (D10)", () => {
     // (view transform, not a composition edit).
     STORE_API().setMode("etude");
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "none", explore: "none" },
+      dirty: { compose: "none", etude: "none", explore: "none", marketplace: "none" },
     });
     STORE_API().advanceKeyCycle();
     // The rotation itself happened (0 -> 1), so the action ran.
@@ -336,6 +337,7 @@ describe("Phase 2: exercise transpose clamp (D10)", () => {
       compose: "none",
       etude: "none",
       explore: "none",
+      marketplace: "none",
     });
   });
 
@@ -444,7 +446,7 @@ describe("Phase 2: v2 persistence round-trip", () => {
     STORE_API().setExerciseTranspose(6);
     STORE_API().setKeyCycleActive(true);
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "compose",
     });
     // Let zustand persist's async write settle.
@@ -532,11 +534,12 @@ describe("Phase 3 Slice 2: acceptEtude dirty semantics (D30)", () => {
     const s = STORE_API();
     expect(s.etudeConstraints).toEqual(c);
     // The literal below is grep-identical to App.tsx handleCoComposeAccept's
-    // setState (compose/explore pinned to "none", etude pending accept).
+    // setState (compose/explore/marketplace pinned to "none", etude pending accept).
     expect(s.dirty).toEqual({
       compose: "none",
       etude: "etude-pending-accept",
       explore: "none",
+      marketplace: "none",
     });
   });
 

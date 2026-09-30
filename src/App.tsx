@@ -863,6 +863,7 @@ function AppShell() {
           compose: "none",
           etude: "etude-pending-accept",
           explore: "none",
+          marketplace: "none",
         },
       });
     },
@@ -1478,6 +1479,10 @@ function AppShell() {
         useNewSessionStore.getState().requestMode("explore");
         e.preventDefault();
         return;
+      } else if (e.key === "4") {
+        useNewSessionStore.getState().requestMode("marketplace");
+        e.preventDefault();
+        return;
       }
 
       // PRD-001 Phase 2 (D14): brackets transpose the GLOBAL offset -
@@ -1591,7 +1596,7 @@ function AppShell() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const m = params.get("mode");
-    if (m === "compose" || m === "etude" || m === "explore") {
+    if (m === "compose" || m === "etude" || m === "explore" || m === "marketplace") {
       useNewSessionStore.getState().setMode(m);
     }
     // PRD-001 Phase 2 (D10): global transpose boot precedence, strictly

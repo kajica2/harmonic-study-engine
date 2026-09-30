@@ -3,7 +3,7 @@
  *
  * Pins the tablist ARIA shape, click -> requestMode routing, the
  * default Etude highlight when the store is null (legacy), and the
- * 1/2/3 keyboard shortcuts (delegated to the document handler in
+ * 1/2/3/4 keyboard shortcuts (delegated to the document handler in
  * App.tsx; tested here via the store's requestMode action directly
  * because the document-level keyboard handler lives outside React).
  *
@@ -21,15 +21,16 @@ beforeEach(() => {
 });
 
 describe("ModeSelector markup", () => {
-  it("renders a tablist with 3 tabs (Compose / Etude / Explore)", () => {
+  it("renders a tablist with 4 tabs (Compose / Etude / Explore / Marketplace)", () => {
     render(<ModeSelector />);
     const list = screen.getByRole("tablist", { name: /Mode/i });
     expect(list).toBeTruthy();
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(4);
     expect(tabs[0].textContent).toContain("Compose");
     expect(tabs[1].textContent).toContain("Etude");
     expect(tabs[2].textContent).toContain("Explore");
+    expect(tabs[3].textContent).toContain("Marketplace");
   });
 
   it("marks Etude as aria-selected when the store mode is null (legacy)", () => {
@@ -38,6 +39,7 @@ describe("ModeSelector markup", () => {
     expect(tabs[0].getAttribute("aria-selected")).toBe("false");
     expect(tabs[1].getAttribute("aria-selected")).toBe("true");
     expect(tabs[2].getAttribute("aria-selected")).toBe("false");
+    expect(tabs[3].getAttribute("aria-selected")).toBe("false");
   });
 
   it("reflects the current store mode in aria-selected", () => {
@@ -47,6 +49,7 @@ describe("ModeSelector markup", () => {
     expect(tabs[0].getAttribute("aria-selected")).toBe("true");
     expect(tabs[1].getAttribute("aria-selected")).toBe("false");
     expect(tabs[2].getAttribute("aria-selected")).toBe("false");
+    expect(tabs[3].getAttribute("aria-selected")).toBe("false");
   });
 
   it("honors a value override (test-only escape hatch)", () => {
@@ -60,15 +63,16 @@ describe("ModeSelector markup", () => {
     expect(document.getElementById("t-tab-compose")).toBeTruthy();
     expect(document.getElementById("t-tab-etude")).toBeTruthy();
     expect(document.getElementById("t-tab-explore")).toBeTruthy();
+    expect(document.getElementById("t-tab-marketplace")).toBeTruthy();
   });
 
   it("renders compact icons-only buttons when compact=true", () => {
     render(<ModeSelector compact />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(4);
     // Labels should be aria-label only, not visible text.
     tabs.forEach((t) => {
-      expect(t.textContent?.trim()).toMatch(/^[123]$/);
+      expect(t.textContent?.trim()).toMatch(/^[1234]$/);
     });
   });
 });
@@ -133,9 +137,9 @@ describe("ModeSelector keyboard (tablist-level only)", () => {
   it("ArrowRight past the last tab is a no-op (no wrap)", () => {
     render(<ModeSelector />);
     const tabs = screen.getAllByRole("tab");
-    (tabs[2] as HTMLButtonElement).focus();
-    fireEvent.keyDown(tabs[2], { key: "ArrowRight" });
-    expect(document.activeElement).toBe(tabs[2]);
+    (tabs[3] as HTMLButtonElement).focus();
+    fireEvent.keyDown(tabs[3], { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tabs[3]);
   });
 });
 
@@ -143,7 +147,7 @@ describe("ModeSelector + dirty state interaction", () => {
   it("clicking Compose from a dirty Etude parks on pendingModeRequest", () => {
     useSessionStore.getState().setMode("etude");
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
     });
     render(<ModeSelector />);
     fireEvent.click(screen.getByRole("tab", { name: /Compose mode/i }));

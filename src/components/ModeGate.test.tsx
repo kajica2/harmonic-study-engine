@@ -13,7 +13,7 @@
  * store mode and revert the surface).
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import { ModeGate } from "./ModeGate";
 import { DirtyPromptModal } from "./DirtyPromptModal";
@@ -70,6 +70,30 @@ describe("ModeGate surface selection", () => {
     );
     expect(screen.getByText(/Explore a seed/i)).toBeTruthy();
     expect(screen.queryByTestId("app-main")).toBeNull();
+  });
+
+  it("renders MarketplaceMode when mode is marketplace", async () => {
+    useSessionStore.getState().setMode("marketplace");
+    // The marketplace surface fetches on mount; stub fetch so the
+    // test never touches the network. An empty array resolves to the
+    // honest "no listings" state.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => [] }),
+    );
+    try {
+      render(
+        <ModeGate
+          AppMain={<div data-testid="app-main">should-not-show</div>}
+          onOpenImportExport={() => {}}
+        />,
+      );
+      expect(screen.getByText(/Marketplace/i)).toBeTruthy();
+      expect(await screen.findByText(/No published listings yet/i)).toBeTruthy();
+      expect(screen.queryByTestId("app-main")).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("Compose surface wires onOpenImportExport to the button click", () => {
@@ -241,7 +265,7 @@ describe("ModeGate + DirtyPromptModal end-to-end (REQ-MODE-4 fix round 2)", () =
       ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0),
     );
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
     });
   };
 

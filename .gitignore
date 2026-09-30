@@ -12,6 +12,10 @@ coverage/
 __pycache__/
 *.pyc
 
+# Marketplace sqlite database (created at server import)
+marketplace.db
+*.db
+
 # Playwright e2e
 playwright-report/
 test-results/
