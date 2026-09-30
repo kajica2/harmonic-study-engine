@@ -103,3 +103,48 @@ export function wholeFormNextStep(prevStep: number, formLen: number): number {
   if (prev < 0) return 0;
   return prev + 1;
 }
+
+/**
+ * Auto-advance decision (2026-09, "loop OFF -> play once then advance
+ * to the next path"): the transport law for the Loop chip OFF state.
+ *
+ * Loop ON keeps the historical whole-form repeat (wrap forever). With
+ * loop OFF the form still cycles mid-pass, but the wrap at the form
+ * tail (wholeFormNextStep returning 0) is the pass-completion signal:
+ * advance to the next path (and keep playing) when one exists,
+ * otherwise stop at the last path.
+ *
+ * Pure (ADR-003): params in, decision out - no clock, no DOM, no rng.
+ */
+export type AutoAdvanceDecision = "wrap" | "advance" | "stop";
+
+export interface AutoAdvanceParams {
+  /** Loop chip state: ON repeats the current path forever. */
+  loopOn: boolean;
+  /** The step index wholeFormNextStep computed for this measure. */
+  nextStep: number;
+  /** Index of the active path within the practice set. */
+  activePathIndex: number;
+  /** Total number of paths in the practice set. */
+  pathCount: number;
+}
+
+export function decideAutoAdvance({
+  loopOn,
+  nextStep,
+  activePathIndex,
+  pathCount,
+}: AutoAdvanceParams): AutoAdvanceDecision {
+  if (loopOn) return "wrap";
+  // A wrap to form bar 1 (nextStep 0) is the pass-completion signal;
+  // mid-form steps keep the whole-form cycle. Strict equality (not
+  // safeInt) so a NaN / fractional nextStep is never mistaken for a
+  // wrap. The wrap signal is fully encoded in nextStep === 0: a 1-bar
+  // form completes a pass every measure (wholeFormNextStep returns 0
+  // from its only bar), so the decision needs no form length.
+  if (nextStep !== 0) return "wrap";
+  const idx = safeInt(activePathIndex);
+  const count = safeInt(pathCount);
+  if (idx < count - 1) return "advance";
+  return "stop";
+}

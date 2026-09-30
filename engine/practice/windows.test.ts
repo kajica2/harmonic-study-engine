@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   barOfStep,
   clampWindow,
+  decideAutoAdvance,
   totalFormBars,
   wholeFormNextStep,
   windowStepRange,
@@ -164,5 +165,135 @@ describe("wholeFormNextStep - the DEFAULT whole-form repeat (2026-09)", () => {
   it("negative / NaN prev snaps back to form bar 1 (stale persist)", () => {
     expect(wholeFormNextStep(-3, 16)).toBe(0);
     expect(wholeFormNextStep(Number.NaN, 16)).toBe(1);
+  });
+});
+
+describe("decideAutoAdvance - loop OFF -> play once then advance (2026-09)", () => {
+  it("loop ON always wraps (the historical whole-form repeat)", () => {
+    // Mid-form, form tail, last path: loop wins regardless.
+    expect(
+      decideAutoAdvance({
+        loopOn: true,
+        nextStep: 5,
+        activePathIndex: 0,
+        pathCount: 3,
+      }),
+    ).toBe("wrap");
+    expect(
+      decideAutoAdvance({
+        loopOn: true,
+        nextStep: 0,
+        activePathIndex: 2,
+        pathCount: 3,
+      }),
+    ).toBe("wrap");
+  });
+
+  it("loop OFF mid-form keeps the whole-form cycle (wrap)", () => {
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 5,
+        activePathIndex: 0,
+        pathCount: 3,
+      }),
+    ).toBe("wrap");
+    // The last form bar before the wrap is still mid-form.
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 15,
+        activePathIndex: 0,
+        pathCount: 3,
+      }),
+    ).toBe("wrap");
+  });
+
+  it("loop OFF form pass complete advances to the next path", () => {
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: 0,
+        pathCount: 3,
+      }),
+    ).toBe("advance");
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: 1,
+        pathCount: 3,
+      }),
+    ).toBe("advance");
+  });
+
+  it("loop OFF form pass complete on the LAST path stops", () => {
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: 2,
+        pathCount: 3,
+      }),
+    ).toBe("stop");
+  });
+
+  it("a single-path set stops at its one pass completion", () => {
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: 0,
+        pathCount: 1,
+      }),
+    ).toBe("stop");
+  });
+
+  it("a 1-bar form completes a pass every measure (honest law)", () => {
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: 0,
+        pathCount: 2,
+      }),
+    ).toBe("advance");
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: 1,
+        pathCount: 2,
+      }),
+    ).toBe("stop");
+  });
+
+  it("degenerate / NaN inputs never advance past the set", () => {
+    // A NaN nextStep is not a wrap signal, so the form keeps cycling.
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: Number.NaN,
+        activePathIndex: 0,
+        pathCount: 3,
+      }),
+    ).toBe("wrap");
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: Number.NaN,
+        pathCount: 3,
+      }),
+    ).toBe("advance"); // NaN index snaps to 0 -> not the last path
+    expect(
+      decideAutoAdvance({
+        loopOn: false,
+        nextStep: 0,
+        activePathIndex: 0,
+        pathCount: Number.NaN,
+      }),
+    ).toBe("stop"); // NaN count snaps to 0 -> single-path set
   });
 });
