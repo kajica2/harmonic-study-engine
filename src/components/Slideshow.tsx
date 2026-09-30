@@ -19,7 +19,8 @@
  * Accessibility:
  *   - aria-live="polite" announces layer transitions to screen
  *     readers.
- *   - Focus-visible ring on the wrapper.
+ *   - Focus-within ring on the wrapper (no dead tab stop; the
+ *     wrapper is not interactive itself).
  *   - Compositor-only transforms/opacity (no layout thrash).
  *
  * MVP scope: 2-3 default layers per practice session ("Chord
@@ -52,22 +53,18 @@ export interface SlideshowProps {
 }
 
 /**
- * Read `prefers-reduced-motion: reduce` once per mount. Returns
- * false during SSR (no `window`) so the first render uses the
- * full animation; an effect upgrades to reduced-motion if the
- * user has it set. Cheap, no listener subscription — the slideshow
- * is mounted for a session, the user's setting rarely changes.
+ * Read `prefers-reduced-motion: reduce` synchronously on first
+ * render so reduced-motion users never see a flash of animated
+ * content on first paint. Returns false during SSR (no `window`)
+ * or when matchMedia is missing. No listener subscription — the
+ * slideshow is mounted for a session and remounts refresh the
+ * value; the user's setting rarely changes mid-session.
  */
 function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setReduced(mq.matches);
-    // No listener — slideshow lifetime is short, refreshes pick
-    // up the new value. Adding a listener here would need a
-    // teardown, more code for a marginal UX gain.
-  }, []);
+  const [reduced] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  });
   return reduced;
 }
 
@@ -150,8 +147,7 @@ export const Slideshow: React.FC<SlideshowProps> = ({
     <section
       aria-label="Practice slideshow"
       aria-live="polite"
-      className={`relative surface-2 border border-[color:var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--color-brand)] ${className}`}
-      tabIndex={0}
+      className={`relative surface-2 border border-[color:var(--color-border)] rounded-[var(--radius-lg)] overflow-hidden focus-within:ring-1 focus-within:ring-[color:var(--color-brand)] ${className}`}
     >
       {/* Eyebrow / status row — what layer is on top, and how
           many beats until the swap. Uses the same t-label rhythm
@@ -248,7 +244,7 @@ const LayerCard: React.FC<LayerCardProps> = ({
         // visibility:hidden at alpha 0 lets the browser skip
         // hit-testing but keeps the layer painted for the
         // compositor to flip back without a reflow.
-        visibility: opacity <= 0.001 ? "hidden" : "visible",
+        visibility: opacity <= 0.01 ? "hidden" : "visible",
       }}
       data-layer-id={layer.id}
     >

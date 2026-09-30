@@ -143,6 +143,7 @@ import { downloadText } from "./lib/download";
 import { buildEtudeAbc } from "./lib/etudeAbc";
 import { PathBriefing } from "./components/PathBriefing";
 import { PracticeHeader } from "./components/PracticeHeader";
+import { formatBarReadout } from "./lib/practiceHeader";
 import { BuildFooter } from "./components/BuildFooter";
 import { PersonaLensBanner } from "./components/PersonaLensBanner";
 import { ComposerChartViewer } from "./components/ComposerChartViewer";
@@ -278,6 +279,7 @@ import { TunerWidget } from "./components/TunerWidget";
 // pure math lives in src/lib/slideshow.ts; this is just the
 // presentation surface wired into AppMain.
 import { Slideshow } from "./components/Slideshow";
+import type { SlideLayer } from "./lib/slideshow";
 import {
   etudeActiveBarFor,
   etudePathId,
@@ -3100,6 +3102,41 @@ function AppShell() {
     }
   };
 
+  // Beat-timed slideshow layers. Memoized so the array isn't
+  // re-allocated on every App render (the slideshow re-renders on
+  // every beat tick). The chord-chart subtitle is the live bar
+  // readout (same formatBarReadout law as the PracticeHeader), so
+  // activeStepIndex + formLen are deps too; the other layers only
+  // change with path / voicing / take count.
+  const slideshowLayers = useMemo<SlideLayer[]>(() => {
+    const chordName = path.steps[activeStepIndex]?.name ?? "";
+    return [
+      {
+        id: "chord-chart",
+        title: "Chord chart",
+        subtitle: chordName
+          ? formatBarReadout(formLen, activeStepIndex, chordName)
+          : `Now reading ${path.title}`,
+        accent: "var(--color-brand)",
+      },
+      {
+        id: "voicing-inspector",
+        title: "Voicing inspector",
+        subtitle: `${VOICINGS[voicingType]?.label ?? voicingType} voicing`,
+        accent: "var(--color-accent)",
+      },
+      {
+        id: "take-recent",
+        title: "Take recent",
+        subtitle:
+          performance.takes.length > 0
+            ? `${performance.takes.length} take${performance.takes.length === 1 ? "" : "s"} logged`
+            : "No takes yet",
+        accent: "var(--color-accent-2)",
+      },
+    ];
+  }, [path.title, path.steps, voicingType, performance.takes.length, activeStepIndex, formLen]);
+
   return (
     <div className="min-h-screen surface-0 text-[color:var(--color-text-1)] font-sans selection:bg-[color:var(--color-brand-muted)] selection:text-[color:var(--color-brand-strong)] flex flex-col">
       {/* Skip-to-main link for keyboard users */}
@@ -3475,29 +3512,7 @@ function AppShell() {
             (chord chart / voicing inspector / take recent) so the
             surface has content on first render. */}
         <Slideshow
-          layers={[
-            {
-              id: "chord-chart",
-              title: "Chord chart",
-              subtitle: `Now reading ${path.title}`,
-              accent: "var(--color-brand)",
-            },
-            {
-              id: "voicing-inspector",
-              title: "Voicing inspector",
-              subtitle: `${VOICINGS[voicingType]?.label ?? voicingType} voicing`,
-              accent: "var(--color-accent)",
-            },
-            {
-              id: "take-recent",
-              title: "Take recent",
-              subtitle:
-                performance.takes.length > 0
-                  ? `${performance.takes.length} take${performance.takes.length === 1 ? "" : "s"} logged`
-                  : "No takes yet",
-              accent: "var(--color-accent-2)",
-            },
-          ]}
+          layers={slideshowLayers}
           barsPerLayer={4}
           isPlaying={isPlayingAuto}
           beat={activeStepIndex}
