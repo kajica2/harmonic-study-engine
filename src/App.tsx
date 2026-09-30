@@ -5723,6 +5723,10 @@ function AppShell() {
             </>
           }
           onOpenImportExport={() => setShowImportExport(true)}
+          marketplacePath={path}
+          marketplaceTempo={tempo}
+          marketplaceMeter={timeSignature}
+          marketplaceInstrument={instrument}
         />
         {/* PRD-001 Phase 1: Idea bar (sticky inside <main>, z-10). */}
         <IdeaBar

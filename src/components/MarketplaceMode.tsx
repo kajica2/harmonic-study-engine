@@ -31,13 +31,28 @@ import {
   beatAtElapsed,
   buildSlideshowLayers,
   isActiveAudio,
+  deriveSlug,
+  publishListing,
   type Listing,
 } from "../lib/marketplace";
+import { renderPathToWav } from "../lib/loopWav";
+import { exportToMidiFile } from "../lib/midiExport";
+import type { HarmonicPath } from "../lib/paths";
+import type { InstrumentType } from "../lib/audio";
 
 type LoadState = "loading" | "ready" | "offline";
+type PublishState = "idle" | "publishing" | "success" | "error";
 
 const TICKER_MS = 100;
 const FALLBACK_BPM = 120;
+
+export interface MarketplaceModeProps {
+  /** Active practice path to publish. Null hides the publish action. */
+  path?: HarmonicPath | null;
+  tempo?: number;
+  meter?: string;
+  instrument?: InstrumentType;
+}
 
 const cardClass =
   "surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-lg)] " +
@@ -51,13 +66,21 @@ const chipClass =
   "text-[10px] t-mono px-2 py-0.5 rounded-full border border-[color:var(--color-border)] " +
   "text-[color:var(--color-text-3)]";
 
-export const MarketplaceMode: React.FC = () => {
+export const MarketplaceMode: React.FC<MarketplaceModeProps> = ({
+  path = null,
+  tempo = 80,
+  meter = "4/4",
+  instrument = "epiano",
+}) => {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadError, setLoadError] = useState<string>("");
   const [listings, setListings] = useState<Listing[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [beat, setBeat] = useState(0);
+  const [publishState, setPublishState] = useState<PublishState>("idle");
+  const [publishError, setPublishError] = useState("");
+  const [publishedSlug, setPublishedSlug] = useState("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tickerRef = useRef<number | null>(null);
@@ -153,6 +176,46 @@ export const MarketplaceMode: React.FC = () => {
     [listings, selectedId],
   );
 
+  const handlePublish = useCallback(async () => {
+    if (path === null) return;
+    setPublishState("publishing");
+    setPublishError("");
+    try {
+      const wavBlob = await renderPathToWav(path, {
+        mode: "block",
+        tempo,
+        meter,
+        instrument,
+      });
+      const midiDataUri = exportToMidiFile(path);
+      const slug = deriveSlug(path.title);
+      const result = await publishListing(MARKETPLACE_SERVER, {
+        wavBlob,
+        midiDataUri,
+        slug,
+        title: path.title,
+        composer: path.composer,
+      });
+      if (result.ok) {
+        setPublishedSlug(slug);
+        setPublishState("success");
+        // The backend syncs after the commit, so refresh the catalog
+        // to surface the new listing immediately.
+        const refresh = await fetchListings(MARKETPLACE_SERVER);
+        if (refresh.ok) {
+          setListings(refresh.listings);
+          setLoadState("ready");
+        }
+      } else {
+        setPublishError(result.error);
+        setPublishState("error");
+      }
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : String(e));
+      setPublishState("error");
+    }
+  }, [path, tempo, meter, instrument]);
+
   const slideshow = useMemo(
     () => (selected !== null ? buildSlideshowLayers(selected) : null),
     [selected],
@@ -176,6 +239,44 @@ export const MarketplaceMode: React.FC = () => {
           </span>
         )}
       </header>
+
+      {path !== null && (
+        <section
+          aria-label="Publish to marketplace"
+          className="surface-1 border border-[color:var(--color-border)] rounded-[var(--radius-lg)] p-4 flex flex-col gap-2"
+        >
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              aria-label={`Publish ${path.title} to the marketplace`}
+              onClick={handlePublish}
+              disabled={publishState === "publishing"}
+              className="px-3 py-1.5 rounded border border-[color:var(--color-border)] text-xs font-semibold text-neutral-300 hover:text-white disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--color-brand)]"
+            >
+              {publishState === "publishing"
+                ? "Publishing..."
+                : "Publish current path"}
+            </button>
+            {publishState === "publishing" && (
+              <span
+                role="status"
+                aria-label="Publishing"
+                className="inline-block h-4 w-4 rounded-full border-2 border-[color:var(--color-border)] border-t-transparent animate-spin"
+              />
+            )}
+          </div>
+          {publishState === "success" && (
+            <p role="status" className="t-small text-[color:var(--color-text-2)]">
+              Published {publishedSlug} to the marketplace.
+            </p>
+          )}
+          {publishState === "error" && (
+            <p role="alert" className="t-small text-[color:var(--color-warn)]">
+              {publishError}
+            </p>
+          )}
+        </section>
+      )}
 
       {loadState === "loading" && (
         <p role="status" className="t-small text-[color:var(--color-text-2)]">

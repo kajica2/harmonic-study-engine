@@ -300,13 +300,83 @@ def get_marketplace_listing(listing_id: str):
     return listing
 
 
+@app.post("/marketplace/sync")
+def sync_marketplace_from_github():
+    """Pull the marketplace catalog from the GitHub repo tree and upsert.
+
+    The repo tree is the source of truth: marketplace/<slug>.mp3 +
+    marketplace/<slug>.mid pairs become published listings with raw
+    download URLs. Returns {"created": n, "updated": n, "skipped": n,
+    "errors": [...]}. Raises 502 if the GitHub tree cannot be fetched.
+    """
+    try:
+        return marketplace.sync_from_github_repo()
+    except marketplace.SyncError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+def _is_wav_upload(audio: UploadFile, raw: bytes) -> bool:
+    """True when the upload looks like a WAV file.
+
+    Accepts a WAV content-type OR the RIFF/WAVE magic bytes, so a
+    browser that sends application/octet-stream still passes when the
+    payload is a real WAV.
+    """
+    content_type = (audio.content_type or "").lower()
+    if "wav" in content_type or content_type in ("audio/wave", "audio/x-wav"):
+        return True
+    return len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WAVE"
+
+
+@app.post("/marketplace/publish")
+async def publish_marketplace_listing(
+    audio: UploadFile = File(...),
+    midi: UploadFile = File(...),
+    slug: str = Form(...),
+    title: str = Form(""),
+    composer: str = Form(""),
+):
+    """Publish the current path to the marketplace.
+
+    Accepts a WAV render + MIDI file, encodes the WAV to MP3 via
+    ffmpeg, commits marketplace/<slug>.mp3 + marketplace/<slug>.mid to
+    the HSE GitHub repo (update-if-exists), then syncs the catalog so
+    the listing appears immediately. The GitHub token stays server-side
+    (GITHUB_TOKEN env) and is never exposed to the client.
+
+    Returns {"published": True, "slug": slug, "listing": {...}}.
+    """
+    if not marketplace.SLUG_RE.match(slug):
+        raise HTTPException(status_code=422, detail="slug must match ^[a-z0-9-]+$")
+    wav_bytes = await audio.read()
+    if not wav_bytes:
+        raise HTTPException(status_code=422, detail="audio is empty")
+    if not _is_wav_upload(audio, wav_bytes):
+        raise HTTPException(status_code=422, detail="audio must be a WAV file")
+    midi_bytes = await midi.read()
+    if not midi_bytes:
+        raise HTTPException(status_code=422, detail="midi is required")
+    try:
+        return marketplace.publish_listing(
+            slug,
+            wav_bytes,
+            midi_bytes,
+            title=title or None,
+            composer=composer or None,
+        )
+    except marketplace.PublishError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
 @app.post("/webhooks/github")
 async def github_webhook(request: Request):
     """Ingest a GitHub push event for marketplace listings.
 
     Verifies X-Hub-Signature-256 (HMAC-SHA256) against
     MARKETPLACE_WEBHOOK_SECRET, gates on MARKETPLACE_WEBHOOK_BRANCH,
-    parses the commit message, and upserts the listing.
+    and for marketplace: commits triggers a full repo-tree sync
+    (sync_from_github_repo). The repo tree is the source of truth, so
+    the webhook no longer parses per-commit listing fields.
 
     Precedence is 503 -> 401 -> 400: the secret check (503) runs
     before any payload-size rejection so an unconfigured server never

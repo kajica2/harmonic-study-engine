@@ -44,17 +44,31 @@ import {
 import { ComposeSurface } from "./ComposeSurface";
 import { ExploreSurface } from "./ExploreSurface";
 import { MarketplaceMode } from "./MarketplaceMode";
+import type { HarmonicPath } from "../lib/paths";
+import type { InstrumentType } from "../lib/audio";
 
 export interface ModeGateProps {
   /** Etude surface. Whatever App.tsx renders today for the legacy mode. */
   AppMain: React.ReactNode;
   /** Triggered by the Compose surface's "Open import / export" button. */
   onOpenImportExport: () => void;
+  /** Marketplace publish context: the active practice path + render
+   *  opts (tempo / meter / instrument) so the surface can publish the
+   *  path the user is currently practicing. Optional - the surface
+   *  hides the publish action when no path is available. */
+  marketplacePath?: HarmonicPath | null;
+  marketplaceTempo?: number;
+  marketplaceMeter?: string;
+  marketplaceInstrument?: InstrumentType;
 }
 
 export const ModeGate: React.FC<ModeGateProps> = ({
   AppMain,
   onOpenImportExport,
+  marketplacePath = null,
+  marketplaceTempo = 80,
+  marketplaceMeter = "4/4",
+  marketplaceInstrument = "epiano",
 }) => {
   // LIVE subscription to the store's mode. Pre-boot it may still be
   // null (legacy first-run); the render below resolves that through
@@ -95,7 +109,14 @@ export const ModeGate: React.FC<ModeGateProps> = ({
     return <ExploreSurface />;
   }
   if (mode === "marketplace") {
-    return <MarketplaceMode />;
+    return (
+      <MarketplaceMode
+        path={marketplacePath}
+        tempo={marketplaceTempo}
+        meter={marketplaceMeter}
+        instrument={marketplaceInstrument}
+      />
+    );
   }
   // Etude (default) - render the existing legacy main surface.
   return <>{AppMain}</>;

@@ -25,6 +25,10 @@ import {
   buildSlideshowLayers,
   beatAtElapsed,
   isActiveAudio,
+  deriveSlug,
+  midiDataUriToBlob,
+  buildPublishFormData,
+  publishListing,
   type Listing,
 } from "./marketplace";
 
@@ -296,5 +300,186 @@ describe("fetchListings", () => {
     // The constant is read from import.meta.env at module load; in the
     // node test env VITE_DDSP_API is unset, so the default must hold.
     expect(MARKETPLACE_SERVER).toBe("http://127.0.0.1:8765");
+  });
+});
+
+describe("deriveSlug", () => {
+  it("lowercases and dashes spaces", () => {
+    expect(deriveSlug("Autumn Leaves")).toBe("autumn-leaves");
+  });
+
+  it("collapses runs of non-alphanumeric characters into one dash", () => {
+    expect(deriveSlug("Blue in Green (take 2)!")).toBe("blue-in-green-take-2");
+  });
+
+  it("trims leading and trailing dashes", () => {
+    expect(deriveSlug("  --Stella by Starlight--  ")).toBe(
+      "stella-by-starlight",
+    );
+  });
+
+  it("falls back to untitled for empty or symbol-only titles", () => {
+    expect(deriveSlug("")).toBe("untitled");
+    expect(deriveSlug("   ")).toBe("untitled");
+    expect(deriveSlug("!!!")).toBe("untitled");
+  });
+});
+
+describe("midiDataUriToBlob", () => {
+  it("decodes a base64 data URI into a Blob with the declared mime", () => {
+    const blob = midiDataUriToBlob("data:audio/midi;base64,TVRoZAAAAA==");
+    expect(blob.type).toBe("audio/midi");
+    expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it("throws on a malformed data URI", () => {
+    expect(() => midiDataUriToBlob("not-a-data-uri")).toThrow();
+  });
+});
+
+describe("buildPublishFormData", () => {
+  const wavBlob = new Blob(["wav"], { type: "audio/wav" });
+  const midiDataUri = "data:audio/midi;base64,TVRoZAAAAA==";
+
+  it("appends audio, midi, slug and optional metadata", () => {
+    const form = buildPublishFormData({
+      wavBlob,
+      midiDataUri,
+      slug: "autumn-leaves",
+      title: "Autumn Leaves",
+      composer: "Joseph Kosma",
+    });
+    expect(form.get("slug")).toBe("autumn-leaves");
+    expect(form.get("title")).toBe("Autumn Leaves");
+    expect(form.get("composer")).toBe("Joseph Kosma");
+    expect(form.get("audio")).toBeInstanceOf(Blob);
+    expect(form.get("midi")).toBeInstanceOf(Blob);
+  });
+
+  it("omits empty optional metadata", () => {
+    const form = buildPublishFormData({
+      wavBlob,
+      midiDataUri,
+      slug: "autumn-leaves",
+    });
+    expect(form.get("title")).toBeNull();
+    expect(form.get("composer")).toBeNull();
+  });
+});
+
+describe("publishListing", () => {
+  const wavBlob = new Blob(["wav"], { type: "audio/wav" });
+  const midiDataUri = "data:audio/midi;base64,TVRoZAAAAA==";
+
+  it("returns the parsed listing on a 200 publish", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        published: true,
+        slug: "autumn-leaves",
+        listing: validListing,
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await publishListing("http://127.0.0.1:8765", {
+      wavBlob,
+      midiDataUri,
+      slug: "autumn-leaves",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.listing?.id).toBe("lst-1");
+    }
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:8765/marketplace/publish",
+      expect.objectContaining({
+        method: "POST",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("accepts a null listing (sync raced) as a successful publish", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ published: true, slug: "x", listing: null }),
+      }),
+    );
+    const result = await publishListing("http://127.0.0.1:8765", {
+      wavBlob,
+      midiDataUri,
+      slug: "x",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.listing).toBeNull();
+  });
+
+  it("returns a typed failure with the backend detail on a non-ok response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: async () => ({ detail: "slug must match ^[a-z0-9-]+$" }),
+      }),
+    );
+    const result = await publishListing("http://127.0.0.1:8765", {
+      wavBlob,
+      midiDataUri,
+      slug: "Bad Slug!",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("slug must match");
+  });
+
+  it("returns a typed failure when fetch rejects (offline)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+    );
+    const result = await publishListing("http://127.0.0.1:8765", {
+      wavBlob,
+      midiDataUri,
+      slug: "autumn-leaves",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("fetch failed");
+  });
+
+  it("returns a typed failure when published is not true", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ published: false }),
+      }),
+    );
+    const result = await publishListing("http://127.0.0.1:8765", {
+      wavBlob,
+      midiDataUri,
+      slug: "autumn-leaves",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("never throws - a malformed JSON body is a typed failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => {
+          throw new SyntaxError("bad json");
+        },
+      }),
+    );
+    const result = await publishListing("http://127.0.0.1:8765", {
+      wavBlob,
+      midiDataUri,
+      slug: "autumn-leaves",
+    });
+    expect(result.ok).toBe(false);
   });
 });

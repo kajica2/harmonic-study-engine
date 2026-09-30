@@ -208,3 +208,126 @@ export function isActiveAudio(
 ): boolean {
   return current === candidate;
 }
+
+/**
+ * Derive a marketplace slug from a path title: lowercase, collapse
+ * runs of non-alphanumeric characters into a single dash, and trim
+ * leading/trailing dashes. Empty or symbol-only titles fall back to
+ * "untitled" so the publish button always has a valid slug (the
+ * backend validates ^[a-z0-9-]+$).
+ */
+export function deriveSlug(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug.length > 0 ? slug : "untitled";
+}
+
+/**
+ * Convert a `data:audio/midi;base64,...` data URI (the shape
+ * exportToMidiFile returns) into a Blob for the multipart upload.
+ * Throws on a malformed URI; publishListing wraps the call so the
+ * surface never sees the throw.
+ */
+export function midiDataUriToBlob(dataUri: string): Blob {
+  const comma = dataUri.indexOf(",");
+  if (comma === -1) {
+    throw new Error("Invalid MIDI data URI");
+  }
+  const meta = dataUri.slice(0, comma);
+  const mimeMatch = /^data:([^;]+);/.exec(meta);
+  const mime = mimeMatch !== null ? mimeMatch[1] : "audio/midi";
+  const binary = atob(dataUri.slice(comma + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
+export interface PublishListingInput {
+  /** WAV render of the active path (renderPathToWav output). */
+  wavBlob: Blob;
+  /** MIDI data URI (exportToMidiFile output). */
+  midiDataUri: string;
+  /** Backend-validated slug (^[a-z0-9-]+$). */
+  slug: string;
+  title?: string;
+  composer?: string;
+}
+
+/**
+ * Build the multipart FormData for POST /marketplace/publish. The
+ * audio field carries the WAV render, midi carries the decoded MIDI
+ * blob, and slug/title/composer ride as form fields. Empty optional
+ * metadata is omitted so the backend defaults apply.
+ */
+export function buildPublishFormData(input: PublishListingInput): FormData {
+  const form = new FormData();
+  form.append("audio", input.wavBlob, "render.wav");
+  form.append("midi", midiDataUriToBlob(input.midiDataUri), "render.mid");
+  form.append("slug", input.slug);
+  if (input.title !== undefined && input.title.length > 0) {
+    form.append("title", input.title);
+  }
+  if (input.composer !== undefined && input.composer.length > 0) {
+    form.append("composer", input.composer);
+  }
+  return form;
+}
+
+export type PublishListingResult =
+  | { ok: true; listing: Listing | null }
+  | { ok: false; error: string };
+
+/**
+ * Publish the current path to the marketplace: POST the WAV render +
+ * MIDI to /marketplace/publish. The backend encodes MP3, commits
+ * marketplace/<slug>.mp3 + <slug>.mid to the HSE GitHub repo and
+ * syncs the catalog. Never throws: offline, non-ok status and
+ * malformed payloads all resolve to a typed failure.
+ *
+ * Uses AbortSignal.timeout(30000) - publishing renders + uploads can
+ * take much longer than the 3s listing fetch.
+ */
+export async function publishListing(
+  baseUrl: string,
+  input: PublishListingInput,
+): Promise<PublishListingResult> {
+  try {
+    const base = baseUrl.replace(/\/$/, "");
+    const form = buildPublishFormData(input);
+    const res = await fetch(`${base}/marketplace/publish`, {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+      let detail = `Marketplace publish failed (${res.status})`;
+      try {
+        const data = (await res.json()) as { detail?: unknown };
+        if (typeof data.detail === "string" && data.detail.length > 0) {
+          detail = data.detail;
+        }
+      } catch {
+        // Non-JSON error body - keep the status-based message.
+      }
+      return { ok: false, error: detail };
+    }
+    const data = (await res.json()) as unknown;
+    if (typeof data !== "object" || data === null) {
+      return { ok: false, error: "Marketplace returned a non-object payload" };
+    }
+    const record = data as Record<string, unknown>;
+    if (record.published !== true) {
+      return { ok: false, error: "Marketplace did not confirm the publish" };
+    }
+    return { ok: true, listing: parseListing(record.listing) };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Marketplace publish failed";
+    return { ok: false, error: message };
+  }
+}

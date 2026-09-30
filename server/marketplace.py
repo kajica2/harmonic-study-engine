@@ -1,23 +1,34 @@
-"""Marketplace backend: sqlite3 storage, CRUD, and GitHub webhook ingestion.
+"""Marketplace backend: sqlite3 storage, CRUD, GitHub repo-tree sync, and
+webhook-triggered refresh.
 
 Listings are stored in a sqlite database at MARKETPLACE_DB_PATH (default
 ./marketplace.db). The schema is created at module import. All env vars
 are read at call time (not import time) so tests can monkeypatch them
 per-test. The webhook secret and signature are never logged.
+
+The catalog's source of truth is the HSE GitHub repo's marketplace/
+folder: each package is a <slug>.mp3 + <slug>.mid pair.
+sync_from_github_repo() pulls the repo tree via the GitHub API and
+upserts one listing per complete pair. The webhook stays for
+auto-refresh on push.
 """
 
+import base64
 import hashlib
 import hmac
 import json
 import os
+import re
 import sqlite3
 import uuid
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterator, List, Optional, Tuple
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS marketplace_listings (
@@ -39,6 +50,20 @@ CREATE TABLE IF NOT EXISTS marketplace_listings (
 
 # Hard cap for webhook request bodies (1 MB).
 MAX_WEBHOOK_BODY_BYTES = 1_000_000
+
+# Slug rule for marketplace publishes: lowercase letters, digits and
+# dashes only (matches the file names the repo tree sync expects).
+SLUG_RE = re.compile(r"^[a-z0-9-]+$")
+
+# GitHub API endpoints for the repo-tree sync. The repo, branch, and
+# marketplace folder are env-overridable at call time so tests and
+# deployments can point elsewhere without code changes.
+GITHUB_API_BASE = "https://api.github.com"
+GITHUB_RAW_BASE = "https://raw.githubusercontent.com"
+GITHUB_TREE_FETCH_TIMEOUT_SECONDS = 15
+# Publish uploads (base64 file bodies) can be larger than a tree
+# fetch, so the contents-API calls get a longer timeout.
+GITHUB_PUBLISH_TIMEOUT_SECONDS = 30
 
 
 def webhook_secret_configured() -> bool:
@@ -73,6 +98,24 @@ class DuplicateListingError(Exception):
 
 class WebhookError(Exception):
     """Raised for webhook failures that map to an HTTP status code."""
+
+    def __init__(self, status_code: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+class SyncError(Exception):
+    """Raised when the GitHub repo tree cannot be fetched or parsed."""
+
+
+class PublishError(Exception):
+    """Raised for marketplace publish failures that map to an HTTP status.
+
+    status_code is the HTTP status the route should return (422 for
+    validation, 500 for ffmpeg failures, 502 for GitHub API failures,
+    503 when GITHUB_TOKEN is unset).
+    """
 
     def __init__(self, status_code: int, detail: str) -> None:
         super().__init__(detail)
@@ -314,6 +357,356 @@ def upsert_listing(listing: MarketplaceListing) -> Tuple[str, MarketplaceListing
         )
 
 
+def _github_repo() -> str:
+    """Resolve the GitHub repo (owner/name) from env at call time."""
+    return os.environ.get("MARKETPLACE_GITHUB_REPO", "kajica2/harmonic-study-engine")
+
+
+def _github_branch() -> str:
+    """Resolve the GitHub branch to sync from env at call time."""
+    return os.environ.get("MARKETPLACE_GITHUB_BRANCH", "main")
+
+
+def _marketplace_dir() -> str:
+    """Resolve the marketplace folder path inside the repo from env."""
+    return os.environ.get("MARKETPLACE_GITHUB_DIR", "marketplace")
+
+
+def _fetch_github_tree() -> Dict[str, Any]:
+    """Fetch the recursive git tree for the configured repo and branch.
+
+    GET /repos/{repo}/git/trees/{branch}?recursive=1 via stdlib urllib.
+    An optional GITHUB_TOKEN env var is sent as a Bearer header when
+    present (public repos work without it, but the rate limit is lower).
+    The token is never logged. Raises SyncError on transport or HTTP
+    errors and on malformed JSON.
+    """
+    repo = _github_repo()
+    branch = _github_branch()
+    url = "{}/repos/{}/git/trees/{}?recursive=1".format(
+        GITHUB_API_BASE, repo, branch
+    )
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "harmonic-study-engine-marketplace-sync",
+    }
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = "Bearer {}".format(token)
+    request = Request(url, headers=headers)
+    try:
+        with urlopen(request, timeout=GITHUB_TREE_FETCH_TIMEOUT_SECONDS) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise SyncError(
+            "GitHub API returned HTTP {} for {}".format(exc.code, url)
+        )
+    except URLError as exc:
+        raise SyncError("GitHub API request failed: {}".format(exc.reason))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise SyncError("GitHub API returned malformed JSON")
+
+
+def _humanize_slug(slug: str) -> str:
+    """Turn a file slug into a display title.
+
+    Replaces dashes and underscores with spaces and title-cases the
+    result, so "autumn-leaves" becomes "Autumn Leaves".
+    """
+    return slug.replace("-", " ").replace("_", " ").strip().title()
+
+
+def sync_from_github_repo() -> Dict[str, Any]:
+    """Pull the marketplace catalog from the GitHub repo tree and upsert.
+
+    Fetches the recursive git tree, finds marketplace/<slug>.mp3 and
+    marketplace/<slug>.mid entries, groups them by slug, and upserts one
+    listing per slug that has BOTH files. Slugs missing either file are
+    skipped. The tree sha is stored as source_commit.
+
+    Returns {"created": n, "updated": n, "skipped": n, "errors": [...]}.
+    Raises SyncError if the GitHub tree cannot be fetched.
+    """
+    tree = _fetch_github_tree()
+    if tree.get("truncated"):
+        raise SyncError("GitHub tree response was truncated")
+    tree_sha = tree.get("sha")
+    repo = _github_repo()
+    branch = _github_branch()
+    prefix = _marketplace_dir() + "/"
+
+    mp3_slugs = set()
+    mid_slugs = set()
+    for entry in tree.get("tree", []):
+        path = entry.get("path", "")
+        if not path.startswith(prefix):
+            continue
+        name = path[len(prefix):]
+        if "/" in name:
+            continue  # nested subdirectories are not catalog entries
+        if name.endswith(".mp3"):
+            mp3_slugs.add(name[:-len(".mp3")])
+        elif name.endswith(".mid"):
+            mid_slugs.add(name[:-len(".mid")])
+
+    created = 0
+    updated = 0
+    skipped = 0
+    errors: List[str] = []
+    for slug in sorted(mp3_slugs | mid_slugs):
+        if slug not in mp3_slugs or slug not in mid_slugs:
+            skipped += 1
+            continue
+        listing = MarketplaceListing(
+            title=_humanize_slug(slug),
+            composer="harmonic-study-engine",
+            audio_url="{}/{}/{}/{}/{}.mp3".format(
+                GITHUB_RAW_BASE, repo, branch, _marketplace_dir(), slug
+            ),
+            cover_url=None,
+            status="published",
+            source_commit=tree_sha,
+        )
+        try:
+            action, _ = upsert_listing(listing)
+        except Exception as exc:  # one bad slug must not kill the sync
+            errors.append("{}: {}".format(slug, exc))
+            continue
+        if action == "created":
+            created += 1
+        else:
+            updated += 1
+
+    return {
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+    }
+
+
+def _github_token() -> str:
+    """Resolve the GitHub token from env at call time (never logged)."""
+    return os.environ.get("GITHUB_TOKEN", "").strip()
+
+
+def _github_request(
+    method: str,
+    url: str,
+    body: Optional[Dict[str, Any]] = None,
+    timeout: int = GITHUB_PUBLISH_TIMEOUT_SECONDS,
+) -> Tuple[int, Any]:
+    """Perform a GitHub API request with the server-side token.
+
+    Returns (status_code, parsed JSON or raw bytes). Raises
+    PublishError(503) when GITHUB_TOKEN is unset and PublishError(502)
+    on transport failures. The token is never logged.
+    """
+    token = _github_token()
+    if not token:
+        raise PublishError(503, "GITHUB_TOKEN not configured")
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "harmonic-study-engine-marketplace-publish",
+        "Authorization": "Bearer {}".format(token),
+    }
+    data = None
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(body).encode("utf-8")
+    request = Request(url, data=data, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=timeout) as resp:
+            raw = resp.read()
+            try:
+                return resp.status, json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return resp.status, raw
+    except HTTPError as exc:
+        raw = exc.read()
+        try:
+            return exc.code, json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return exc.code, raw
+    except URLError as exc:
+        raise PublishError(502, "GitHub API request failed: {}".format(exc.reason))
+
+
+def _github_contents_url(path: str) -> str:
+    """Build the contents-API URL for a repo-relative file path."""
+    return "{}/repos/{}/contents/{}".format(GITHUB_API_BASE, _github_repo(), path)
+
+
+def _github_get_file_sha(path: str) -> Optional[str]:
+    """Fetch the current sha of a repo file, or None when it does not exist.
+
+    Used by the update-if-exists path: a PUT without a sha returns 409
+    when the file already exists, and the retry needs the current sha.
+    """
+    url = _github_contents_url(path)
+    status, payload = _github_request("GET", url)
+    if status == 404:
+        return None
+    if status != 200:
+        raise PublishError(
+            502, "GitHub API returned HTTP {} for {}".format(status, url)
+        )
+    if isinstance(payload, dict):
+        sha = payload.get("sha")
+        if isinstance(sha, str) and sha:
+            return sha
+    raise PublishError(
+        502, "GitHub API returned an unexpected payload for {}".format(url)
+    )
+
+
+def _github_put_file(
+    path: str, content: bytes, message: str, sha: Optional[str] = None
+) -> None:
+    """Create or update a file in the repo via the contents API.
+
+    A 409 (file already exists) is handled by fetching the current sha
+    and retrying with it, so re-publishing a slug updates the files
+    instead of failing. Raises PublishError on any other failure.
+    """
+    url = _github_contents_url(path)
+    body = {
+        "message": message,
+        "content": base64.b64encode(content).decode("ascii"),
+    }
+    if sha is not None:
+        body["sha"] = sha
+    status, _ = _github_request("PUT", url, body=body)
+    if status in (200, 201):
+        return
+    if status == 409:
+        existing_sha = _github_get_file_sha(path)
+        if existing_sha is None:
+            raise PublishError(
+                502,
+                "GitHub API conflict but file sha could not be read for {}".format(
+                    path
+                ),
+            )
+        retry_body = dict(body)
+        retry_body["sha"] = existing_sha
+        status2, _ = _github_request("PUT", url, body=retry_body)
+        if status2 in (200, 201):
+            return
+        raise PublishError(
+            502, "GitHub API returned HTTP {} for {}".format(status2, url)
+        )
+    raise PublishError(502, "GitHub API returned HTTP {} for {}".format(status, url))
+
+
+def encode_wav_to_mp3(wav_bytes: bytes) -> bytes:
+    """Encode a WAV blob to MP3 via ffmpeg (libmp3lame, 192k).
+
+    Same subprocess pattern as /recordings/upload in server/app.py:
+    write the input to a temp file, run ffmpeg, read the output.
+    Raises PublishError(500) when ffmpeg is missing or fails.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if not shutil.which("ffmpeg"):
+        raise PublishError(500, "ffmpeg is not available on the server")
+    with tempfile.TemporaryDirectory() as td:
+        in_path = os.path.join(td, "in.wav")
+        out_path = os.path.join(td, "out.mp3")
+        with open(in_path, "wb") as f:
+            f.write(wav_bytes)
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", in_path,
+            "-codec:a", "libmp3lame",
+            "-b:a", "192k",
+            out_path,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            stderr = getattr(e, "stderr", b"")
+            detail = (
+                stderr.decode("utf-8", errors="ignore")[-500:]
+                if stderr
+                else str(e)
+            )
+            raise PublishError(500, "ffmpeg failed: {}".format(detail))
+        with open(out_path, "rb") as f:
+            return f.read()
+
+
+def find_listing_by_slug(slug: str) -> Optional[MarketplaceListing]:
+    """Find the published listing for a slug via its raw audio URL.
+
+    The repo-tree sync builds audio_url as
+    .../marketplace/<slug>.mp3, so a suffix match on the slug is the
+    stable lookup key (titles are humanized and not unique).
+    """
+    suffix = "/{}.mp3".format(slug)
+    with closing(_connect()) as conn:
+        rows = conn.execute(
+            "SELECT * FROM marketplace_listings WHERE audio_url LIKE ?",
+            ("%" + suffix,),
+        ).fetchall()
+    if not rows:
+        return None
+    return _row_to_listing(rows[0])
+
+
+def publish_listing(
+    slug: str,
+    wav_bytes: bytes,
+    midi_bytes: bytes,
+    title: Optional[str] = None,
+    composer: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Publish a rendered path to the marketplace.
+
+    Encodes the WAV render to MP3 via ffmpeg, commits
+    marketplace/<slug>.mp3 + marketplace/<slug>.mid to the HSE GitHub
+    repo (update-if-exists), then syncs the catalog so the listing
+    appears immediately. When title/composer are provided they override
+    the slug-derived metadata on the synced listing.
+
+    Returns {"published": True, "slug": slug, "listing": {...}}.
+    Raises PublishError on any failure (mapped to HTTP by the route).
+    """
+    if not SLUG_RE.match(slug):
+        raise PublishError(422, "slug must match ^[a-z0-9-]+$")
+    if not _github_token():
+        raise PublishError(503, "GITHUB_TOKEN not configured")
+    mp3_bytes = encode_wav_to_mp3(wav_bytes)
+    folder = _marketplace_dir()
+    message = "marketplace: publish {}".format(slug)
+    _github_put_file("{}/{}.mp3".format(folder, slug), mp3_bytes, message)
+    _github_put_file("{}/{}.mid".format(folder, slug), midi_bytes, message)
+    try:
+        sync_from_github_repo()
+    except SyncError as exc:
+        # The commit landed but the catalog refresh failed; surface a
+        # clear 502 so the client knows the files are in the repo.
+        raise PublishError(502, str(exc))
+    listing = find_listing_by_slug(slug)
+    if listing is not None and (title or composer):
+        updated = listing.model_copy(
+            update={
+                "title": title or listing.title,
+                "composer": composer or listing.composer,
+            }
+        )
+        try:
+            listing = update_listing(listing.id, updated) or updated
+        except DuplicateListingError:
+            # Another listing already uses the requested (title,
+            # composer); keep the slug-derived metadata.
+            pass
+    return {"published": True, "slug": slug, "listing": listing}
+
+
 def hmac_verify(
     raw_body: bytes, signature_header: Optional[str], secret: str
 ) -> bool:
@@ -379,27 +772,16 @@ def _extract_commit_message(payload: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _extract_commit_sha(payload: Dict[str, Any]) -> Optional[str]:
-    """Pull the commit sha from a GitHub push event payload."""
-    head = payload.get("head_commit")
-    if isinstance(head, dict) and isinstance(head.get("id"), str):
-        return head["id"]
-    commits = payload.get("commits")
-    if isinstance(commits, list) and commits:
-        last = commits[-1]
-        if isinstance(last, dict) and isinstance(last.get("id"), str):
-            return last["id"]
-    return None
-
-
 def handle_github_push(
     raw_body: bytes, signature_header: Optional[str], ref: Optional[str]
 ) -> Dict[str, Any]:
     """Verify and ingest a GitHub push event.
 
     Order: secret check (503), signature check (401), body-size cap
-    (400), JSON parse (400), branch gate (ignored), commit parse
-    (ignored), upsert (created/updated).
+    (400), JSON parse (400), branch gate (ignored), marketplace commit
+    gate (ignored), repo-tree sync (synced). The repo tree is the
+    source of truth, so a marketplace: commit triggers a full
+    sync_from_github_repo() rather than a per-commit upsert.
     """
     secret = os.environ.get("MARKETPLACE_WEBHOOK_SECRET", "").strip()
     if not secret:
@@ -420,13 +802,10 @@ def handle_github_push(
     message = _extract_commit_message(payload)
     if message is None:
         return {"ignored": True}
-    parsed = parse_commit_message(message)
-    if parsed is None:
+    if not message.lstrip().lower().startswith("marketplace:"):
         return {"ignored": True}
-    parsed["source_commit"] = _extract_commit_sha(payload)
     try:
-        listing = MarketplaceListing(**parsed)
-    except ValidationError:
-        return {"ignored": True}
-    action, saved = upsert_listing(listing)
-    return {action: True, "listing": saved.model_dump()}
+        summary = sync_from_github_repo()
+    except SyncError as exc:
+        raise WebhookError(502, str(exc))
+    return {"synced": True, **summary}
