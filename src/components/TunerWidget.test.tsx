@@ -4,7 +4,7 @@
  *
  *   1. Renders the Mic icon when isOn = false.
  *   2. Renders the note display when isOn = true (with mocked
- *      startAudioCapture returning a no-op cleanup).
+ *      subscribeTuner returning a no-op handle).
  *   3. The toggle button calls onToggle when clicked.
  *
  * Audio capture is mocked at the module boundary — the widget
@@ -14,11 +14,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TunerWidget } from "./TunerWidget";
-import * as trumpetStageTrainer from "../lib/trumpetStageTrainer";
+import * as tunerCapture from "../lib/tunerCapture";
 
-vi.mock("../lib/trumpetStageTrainer", () => ({
-  startAudioCapture: vi.fn(async () => () => {}),
-}));
+vi.mock("../lib/tunerCapture", async () => {
+  const actual = await vi.importActual<typeof tunerCapture>(
+    "../lib/tunerCapture",
+  );
+  return {
+    ...actual,
+    subscribeTuner: vi.fn(async () => ({
+      stop: () => {},
+      sampleRate: () => 44100,
+    })),
+  };
+});
 
 describe("TunerWidget", () => {
   beforeEach(() => {
@@ -47,8 +56,8 @@ describe("TunerWidget", () => {
     // Initial state shows "--" while waiting for the first block.
     expect(screen.getByText("--")).toBeTruthy();
 
-    // startAudioCapture was invoked exactly once.
-    expect(trumpetStageTrainer.startAudioCapture).toHaveBeenCalledTimes(1);
+    // subscribeTuner was invoked exactly once.
+    expect(tunerCapture.subscribeTuner).toHaveBeenCalledTimes(1);
   });
 
   it("calls onToggle when the toggle button is clicked (off state)", () => {
