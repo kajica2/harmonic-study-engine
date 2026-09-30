@@ -227,7 +227,7 @@ export function buildLeadSheetAbc(
  * notes. Anything outside this is shifted up/down by an octave to the
  * nearest playable pitch.
  */
-function clampToPlayableRange(midi: number): number {
+export function clampToPlayableRange(midi: number): number {
   const MIN = 48; // C3 (written low end)
   const MAX = 84; // C6 (written high end)
   let n = midi;
