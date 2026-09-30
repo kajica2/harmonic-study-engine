@@ -9,6 +9,8 @@ import {
   barOfStep,
   clampWindow,
   decideAutoAdvance,
+  isLoopPresetActive,
+  loopPresetWindow,
   totalFormBars,
   wholeFormNextStep,
   windowStepRange,
@@ -295,5 +297,134 @@ describe("decideAutoAdvance - loop OFF -> play once then advance (2026-09)", () 
         pathCount: Number.NaN,
       }),
     ).toBe("stop"); // NaN count snaps to 0 -> single-path set
+  });
+});
+
+describe("loopPresetWindow - one-click loop presets anchored at currentBar", () => {
+  it("mid-form: the requested span lands cleanly inside the form", () => {
+    // The happy path: a 4-bar loop anchored at bar 4 of a 16-bar form
+    // spans bars 4..7 (inclusive 0-based; display 5..8).
+    expect(loopPresetWindow(4, 4, 16)).toEqual({ fromBar: 4, toBar: 7 });
+    // 1-bar preset: anchored at bar 4 spans exactly bar 4.
+    expect(loopPresetWindow(4, 1, 16)).toEqual({ fromBar: 4, toBar: 4 });
+    // 2-bar preset: anchored at bar 0 spans bars 0..1.
+    expect(loopPresetWindow(0, 2, 16)).toEqual({ fromBar: 0, toBar: 1 });
+  });
+
+  it("near-tail: end bar is clamped to the form tail (start stays anchored)", () => {
+    // 4-bar preset from bar 14 of a 16-bar form: bars 14..17 -> clamp
+    // toBar to 15. The 2-bar span stays at the user's anchor; the
+    // active-highlight helper catches the truncation (see below).
+    expect(loopPresetWindow(14, 4, 16)).toEqual({ fromBar: 14, toBar: 15 });
+    // 2-bar preset from bar 15 of a 16-bar form: bars 15..16 -> 15..15.
+    expect(loopPresetWindow(15, 2, 16)).toEqual({ fromBar: 15, toBar: 15 });
+  });
+
+  it("single-bar form: anchors on bar 0 regardless of requested bars", () => {
+    // A 1-bar form (totalFormBars(1) = 1) is degenerate but legal.
+    // currentBar 0 is the ONLY in-range anchor; any bars value is the
+    // whole form.
+    expect(loopPresetWindow(0, 1, 1)).toEqual({ fromBar: 0, toBar: 0 });
+    expect(loopPresetWindow(0, 4, 1)).toEqual({ fromBar: 0, toBar: 0 });
+    expect(loopPresetWindow(0, 16, 1)).toEqual({ fromBar: 0, toBar: 0 });
+    // currentBar outside [0, 1) is out of range -> null.
+    expect(loopPresetWindow(1, 4, 1)).toBeNull();
+    expect(loopPresetWindow(-1, 4, 1)).toBeNull();
+  });
+
+  it("bars > formLen: returns the whole form (clamped to the tail)", () => {
+    // 32-bar preset on a 16-bar form from bar 0 = whole form.
+    expect(loopPresetWindow(0, 32, 16)).toEqual({ fromBar: 0, toBar: 15 });
+    // Same overshoot from mid-form: still clamped to the form tail.
+    expect(loopPresetWindow(8, 32, 16)).toEqual({ fromBar: 8, toBar: 15 });
+  });
+
+  it("currentBar >= formLen: out of range -> null", () => {
+    // currentBar 16 of a 16-bar form is past the last bar.
+    expect(loopPresetWindow(16, 4, 16)).toBeNull();
+    // Way out of range.
+    expect(loopPresetWindow(999, 4, 16)).toBeNull();
+    // currentBar === formLen for a 1-bar form is past the only bar.
+    expect(loopPresetWindow(1, 1, 1)).toBeNull();
+  });
+
+  it("currentBar negative: out of range -> null", () => {
+    expect(loopPresetWindow(-1, 4, 16)).toBeNull();
+    expect(loopPresetWindow(-16, 4, 16)).toBeNull();
+    expect(loopPresetWindow(-0.5, 4, 16)).toBeNull();
+  });
+
+  it("bars <= 0 or non-finite: degenerate -> null", () => {
+    expect(loopPresetWindow(0, 0, 16)).toBeNull();
+    expect(loopPresetWindow(0, -1, 16)).toBeNull();
+    expect(loopPresetWindow(0, Number.NaN, 16)).toBeNull();
+    expect(loopPresetWindow(0, Number.POSITIVE_INFINITY, 16)).toBeNull();
+  });
+
+  it("currentBar / formLen non-finite or non-positive form: -> null", () => {
+    expect(loopPresetWindow(Number.NaN, 4, 16)).toBeNull();
+    // formLen 0 collapses to totalFormBars=1; currentBar outside [0,1)
+    // is out of range.
+    expect(loopPresetWindow(2, 4, 0)).toBeNull();
+    expect(loopPresetWindow(Number.NaN, 4, Number.NaN)).toBeNull();
+    // Negative formLen collapses to totalFormBars=1; same boundary.
+    expect(loopPresetWindow(1, 4, -3)).toBeNull();
+  });
+
+  it("fractional currentBar is floored (bar step is integer)", () => {
+    // 4.7 -> 4: the bar step is integer per the 1:1 law, so a
+    // fractional cursor rounds down (consistent with safeInt).
+    expect(loopPresetWindow(4.7, 4, 16)).toEqual({ fromBar: 4, toBar: 7 });
+  });
+});
+
+describe("isLoopPresetActive - active highlight for the preset chip", () => {
+  it("a stored window matching the preset span highlights (no truncation)", () => {
+    // The 4-bar preset from bar 4 of a 16-bar form: store bars 4..7.
+    const w = loopPresetWindow(4, 4, 16)!;
+    expect(isLoopPresetActive(w, 4, 16)).toBe(true);
+    // 1-bar / 2-bar variants light up their respective buttons.
+    expect(isLoopPresetActive(loopPresetWindow(4, 1, 16)!, 1, 16)).toBe(true);
+    expect(isLoopPresetActive(loopPresetWindow(0, 2, 16)!, 2, 16)).toBe(true);
+  });
+
+  it("a near-tail truncated window does NOT highlight (not a real 4-bar)", () => {
+    // bars 14..15 is the clamped result of a 4-bar preset from bar 14:
+    // only 2 form bars span the window, so isLoopPresetActive is
+    // false for bars=4 (the button knows it would land here).
+    const w = loopPresetWindow(14, 4, 16)!;
+    expect(w).toEqual({ fromBar: 14, toBar: 15 });
+    expect(isLoopPresetActive(w, 4, 16)).toBe(false);
+    // But it IS the 2-bar preset from bar 14.
+    expect(isLoopPresetActive(w, 2, 16)).toBe(true);
+  });
+
+  it("a whole-form loop (bars > formLen result) does NOT highlight any preset", () => {
+    // 32-bar preset from bar 0 collapses to the whole form. None of
+    // the 1/2/4-bar presets match the 16-bar span.
+    const w = loopPresetWindow(0, 32, 16)!;
+    expect(w).toEqual({ fromBar: 0, toBar: 15 });
+    expect(isLoopPresetActive(w, 1, 16)).toBe(false);
+    expect(isLoopPresetActive(w, 2, 16)).toBe(false);
+    expect(isLoopPresetActive(w, 4, 16)).toBe(false);
+  });
+
+  it("a null / cleared window never highlights", () => {
+    expect(isLoopPresetActive(null, 1, 16)).toBe(false);
+    expect(isLoopPresetActive(null, 4, 16)).toBe(false);
+  });
+
+  it("degenerate bars / formLen never highlight", () => {
+    const w = { fromBar: 4, toBar: 7 };
+    expect(isLoopPresetActive(w, 0, 16)).toBe(false);
+    expect(isLoopPresetActive(w, -1, 16)).toBe(false);
+    expect(isLoopPresetActive(w, Number.NaN, 16)).toBe(false);
+  });
+
+  it("the whole-form shipped default (loopStartBar null) never highlights", () => {
+    // The default loop state is null loopStartBar - no preset matches
+    // until the user clicks one. This is the "fresh session" baseline.
+    expect(isLoopPresetActive(null, 1, 16)).toBe(false);
+    expect(isLoopPresetActive(null, 4, 32)).toBe(false);
   });
 });

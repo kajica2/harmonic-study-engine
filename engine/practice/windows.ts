@@ -80,6 +80,82 @@ export function windowStepRange(
 }
 
 /**
+ * Resolve a preset loop window anchored at `currentBar` (form bar,
+ * 0-based) that spans exactly `bars` bars. The preset is the
+ * natural one-click alternative to a shift-click rail selection
+ * (PRD-001 Phase 7 S2 follow-on): "loop this bar", "loop this +
+ * next", "loop this phrase".
+ *
+ * Behavior:
+ *  - Returns `null` for any degenerate input (out-of-range or
+ *    non-positive `currentBar`, non-positive / non-finite `bars`,
+ *    non-positive / non-finite form). Caller treats `null` as
+ *    "do not change the loop window".
+ *  - When the requested span runs past the form tail, the END bar
+ *    is clamped to the form tail - the START bar is fixed at
+ *    `currentBar` so the loop still anchors where the user clicked.
+ *    A request that overshoots (e.g. 4 bars near bar 14 of a 16-bar
+ *    form) returns the truncated 2-bar window; `isLoopPresetActive`
+ *    catches the truncation and refuses to highlight the chip.
+ *  - `bars > formLen` returns the whole form (clamped into range
+ *    by the same path).
+ *
+ * Pure (ADR-003): params in, window out (or null) - no DOM.
+ */
+export function loopPresetWindow(
+  currentBar: number,
+  bars: number,
+  formLen: number,
+): BarWindow | null {
+  // Degenerate form: totalFormBars snaps non-positive / non-finite to
+  // 1, but a 1-bar form with currentBar outside [0, 1) is still out
+  // of range (return null). A 1-bar form with currentBar 0 returns
+  // { fromBar: 0, toBar: 0 } regardless of `bars` - that is the
+  // shipped single-bar-form case.
+  const total = totalFormBars(formLen);
+  if (!Number.isFinite(currentBar)) return null;
+  if (!Number.isFinite(bars)) return null;
+  const cb = Math.floor(currentBar);
+  const b = Math.floor(bars);
+  if (cb < 0 || cb >= total) return null;
+  if (b < 1) return null;
+  const from = cb;
+  const to = Math.min(cb + b - 1, total - 1);
+  return { fromBar: from, toBar: to };
+}
+
+/**
+ * Is the CURRENT loop window a clean, un-truncated preset of exactly
+ * `bars` form bars? Used by the Loop chip's preset buttons to render
+ * the active highlight (the button "looks selected" only when the
+ * stored window is the same span a fresh click would produce).
+ *
+ * A user-selected window counts only when:
+ *  - the window is set (non-null),
+ *  - the stored span equals `bars` form bars inclusive,
+ *  - AND the START + `bars` fits within the form (the "from a
+ *    click" guarantee - a near-tail truncation isn't a "4-bar loop"
+ *    even if it spans fewer bars).
+ *
+ * Pure (ADR-003). `bars <= 0` or non-finite -> false (no preset
+ * can ever be active with zero/negative bar count).
+ */
+export function isLoopPresetActive(
+  window: BarWindow | null,
+  bars: number,
+  formLen: number,
+): boolean {
+  if (window === null) return false;
+  if (!Number.isFinite(bars)) return false;
+  const total = totalFormBars(formLen);
+  const b = Math.floor(bars);
+  if (b < 1) return false;
+  return (
+    window.toBar - window.fromBar + 1 === b && window.fromBar + b <= total
+  );
+}
+
+/**
  * The DEFAULT transport law (2026-09, "always repeat indefinitely the
  * whole form"): the step after the last FORM bar is form bar 1 (index
  * 0), forever - practice never stops on its own.

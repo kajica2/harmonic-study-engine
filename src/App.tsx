@@ -57,6 +57,13 @@ import { rhythmEngine } from "./lib/rhythm";
 import { useCountIn } from "./hooks/useCountIn";
 import { CountInOverlay } from "./components/CountInOverlay";
 import { beatsPerMeasureFor } from "./lib/metronomePatterns";
+import {
+  ARP_RHYTHMS,
+  arpHitAt,
+  arpTickMs,
+  styleRhythmPreset,
+  templateMeter,
+} from "./lib/arpRhythm";
 import { playbackClock } from "./lib/playbackClock";
 import { usePlaybackState } from "./hooks/use-playback-state";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
@@ -181,8 +188,20 @@ import { DirtyPromptModal } from "./components/DirtyPromptModal";
 import { useSessionStore as useNewSessionStore, resolveBootTranspose, SESSION_STORAGE_KEY } from "./state/sessionStore";
 import { ideaFromChord } from "../engine/core/idea";
 // PRD-001 Phase 7 S1 (F3, D110): the pure bar<->step law for the
-// form-relative 1:1 loop windows.
-import { clampWindow, totalFormBars, wholeFormNextStep, windowStepRange } from "../engine/practice/windows";
+// form-relative 1:1 loop windows. loopPresetWindow + isLoopPresetActive
+// are the one-click "loop 1/2/4 bars" preset helpers pinned in the
+// same test file (FOLLOW-ON to F3: rail shift-click is still the
+// free-form way; presets are the natural alternative).
+import {
+  barOfStep,
+  clampWindow,
+  decideAutoAdvance,
+  isLoopPresetActive,
+  loopPresetWindow,
+  totalFormBars,
+  wholeFormNextStep,
+  windowStepRange,
+} from "../engine/practice/windows";
 // PRD-001 Phase 7 S2 (D123): the pure duty scheduler (pause/AB/loop) +
 // the pure tempo ladder (D121). windows.ts stays geometry-only (the
 // ratified D123 deviation); duty.ts owns the per-firing decision.
@@ -239,7 +258,12 @@ import {
   type SessionRecordV1,
   type SessionWindows,
 } from "../engine/practice/session";
-import { isModeShortcutModifierKey, classifyTransposeKey } from "./hooks/useKeyDown";
+import {
+  isModeShortcutModifierKey,
+  classifyTransposeKey,
+  classifyGlobalShortcutKey,
+  classifyUndoRedoKey,
+} from "./hooks/useKeyDown";
 // PRD-001 Phase 3 Slice 2: etude composer panel + engine adapter +
 // URL constraint serialization (D22/D24/D28).
 import { EtudeComposerPanel } from "./components/EtudeComposerPanel";
@@ -422,6 +446,10 @@ function AppShell() {
     setArpGate,
     arpOctaves,
     setArpOctaves,
+    arpRhythm,
+    setArpRhythm,
+    arpSyncopation,
+    setArpSyncopation,
     isLooping,
     setIsLooping,
     loopStartBar,
@@ -558,7 +586,12 @@ function AppShell() {
     useNewSessionStore.getState().setKeyCycleActive(false);
   }, []);
 
+  // Mirrors the live isLooping state (same inline-sync pattern as
+  // isPlayingAutoRef above): the measure handler reads this ref at
+  // fire time, so a stale value would keep the old wrap-forever law
+  // alive after the user flips the Loop chip off.
   const isLoopingRef = useRef(isLooping);
+  isLoopingRef.current = isLooping;
 
   // Ephemeral transport state — MIDI device lists, recorder status,
   // UI flags. These don't need to survive reload; the session
@@ -773,13 +806,20 @@ function AppShell() {
   const handleStylePackPick = useCallback(
     (id: StylePackId) => {
       setStylePackId(id);
+      const preset = styleRhythmPreset(id);
+      if (preset) {
+        setTimeSignature(preset.meter);
+        setArpRhythm(preset.rhythm);
+        setArpSyncopation(preset.syncopation);
+        setArpType((cur) => (cur === "none" ? "up" : cur));
+      }
       feedback.record({
         personaId: selectedPersonaId,
         suggestion: `style:${id}`,
         accepted: true,
       });
     },
-    [setStylePackId, feedback.record, selectedPersonaId],
+    [setStylePackId, setTimeSignature, setArpRhythm, setArpSyncopation, setArpType, feedback.record, selectedPersonaId],
   );
 
   const handleCoComposeAccept = useCallback(
@@ -854,6 +894,7 @@ function AppShell() {
   const [showTrumpetStage, setShowTrumpetStage] = useState(false);
   // Persistent tuner widget (always visible, bottom-right).
   const [tunerOn, setTunerOn] = useState(false);
+  const [formTemplateId, setFormTemplateId] = useState<FormTemplateId | null>(null);
   // Stage banner collapse — sits at the very top of the page.
   const [stageBannerCollapsed, setStageBannerCollapsed] = useState(false);
 
@@ -990,6 +1031,23 @@ function AppShell() {
   const handleToggleLoop = useCallback(
     () => setIsLooping(!isLooping),
     [isLooping],
+  );
+  // FOLLOW-ON to F3: one-click loop preset (1/2/4 bars) anchored at
+  // the current form bar. The form-relative anchor handles padded
+  // paths correctly (1 step = 1 bar; barOfStep wraps). Degenerate
+  // inputs (no path / out-of-range cursor) are no-ops so the chip
+  // never clears a real shift-click window by accident.
+  const handleLoopPreset = useCallback(
+    (bars: number) => {
+      const total = totalFormBars(formLen);
+      const cursor = barOfStep(activeStepIndex, total);
+      const next = loopPresetWindow(cursor, bars, total);
+      if (next === null) return; // out-of-range cursor -> no-op
+      setLoopStartBar(next.fromBar);
+      setLoopEndBar(next.toBar);
+      setIsLooping(true);
+    },
+    [formLen, activeStepIndex, setLoopStartBar, setLoopEndBar, setIsLooping],
   );
   const handleCommandCommit = useCallback(() => {
     // F4 (accepted): recorder.start() fires BEFORE the gate, so with a
@@ -1222,18 +1280,10 @@ function AppShell() {
       let lastNote = -1;
       let gateTimeout: ReturnType<typeof setTimeout>;
 
-      let divisor = 1;
-      if (arpRate === 2)
-        divisor = 2; // 8th
-      else if (arpRate === 3)
-        divisor = 3; // 8th triplet
-      else if (arpRate === 4)
-        divisor = 4; // 16th
-      else if (arpRate === 5)
-        divisor = 6; // 16th triplet
-      else if (arpRate === 6) divisor = 8; // 32nd
-
-      const realMsPerTick = 60000 / tempo / divisor;
+      const realMsPerTick = arpTickMs(tempo, timeSignature, arpRate);
+      const beats = beatsPerMeasureFor(timeSignature);
+      let rhythmStep = 0;
+      let delayTimeout: ReturnType<typeof setTimeout>;
 
       const playNextArp = () => {
         if (lastNote !== -1) {
@@ -1245,35 +1295,48 @@ function AppShell() {
 
         if (arpNotes.length === 0) return;
 
-        let noteToPlay = -1;
-        if (arpType === "random") {
-          noteToPlay = arpNotes[Math.floor(Math.random() * arpNotes.length)];
+        const hit = arpHitAt({
+          step: rhythmStep,
+          beats,
+          rhythm: arpRhythm,
+          syncopation: arpSyncopation,
+        });
+        rhythmStep++;
+        if (!hit.play) return;
+
+        const fire = () => {
+          let noteToPlay = -1;
+          if (arpType === "random") {
+            noteToPlay = arpNotes[Math.floor(Math.random() * arpNotes.length)];
+          } else {
+            noteToPlay = arpNotes[arpIndex % arpNotes.length];
+            arpIndex++;
+          }
+
+          lastNote = noteToPlay;
+          audioEngine.playNote(noteToPlay, hit.velocity);
+          midiOut.playNote(noteToPlay, hit.velocity);
+          recorder.recordNoteOn(noteToPlay);
+          setActiveMidis((prev) => Array.from(new Set([...prev, noteToPlay])));
+
+          if (arpGate < 100) {
+            gateTimeout = setTimeout(
+              () => {
+                const currentNote = noteToPlay;
+                audioEngine.stopNote(currentNote);
+                midiOut.stopNote(currentNote);
+                recorder.recordNoteOff(currentNote);
+                setActiveMidis((prev) => prev.filter((m) => m !== currentNote));
+              },
+              realMsPerTick * (arpGate / 100),
+            );
+          }
+        };
+
+        if (hit.offsetSteps > 0) {
+          delayTimeout = setTimeout(fire, realMsPerTick * hit.offsetSteps);
         } else {
-          noteToPlay = arpNotes[arpIndex % arpNotes.length];
-          arpIndex++;
-        }
-
-        // Accent every 4th step (downbeat of the next 16th group) —
-        // velocity bumps from 75 to 105. Tighter musical groove.
-        const arpVelocity = arpIndex % 4 === 0 ? 105 : 75;
-
-        lastNote = noteToPlay;
-        audioEngine.playNote(noteToPlay, arpVelocity);
-        midiOut.playNote(noteToPlay, arpVelocity);
-        recorder.recordNoteOn(noteToPlay);
-        setActiveMidis((prev) => Array.from(new Set([...prev, noteToPlay])));
-
-        if (arpGate < 100) {
-          gateTimeout = setTimeout(
-            () => {
-              const currentNote = noteToPlay;
-              audioEngine.stopNote(currentNote);
-              midiOut.stopNote(currentNote);
-              recorder.recordNoteOff(currentNote);
-              setActiveMidis((prev) => prev.filter((m) => m !== currentNote));
-            },
-            realMsPerTick * (arpGate / 100),
-          );
+          fire();
         }
       };
 
@@ -1283,6 +1346,7 @@ function AppShell() {
       return () => {
         clearInterval(intervalId);
         clearTimeout(gateTimeout);
+        clearTimeout(delayTimeout);
         if (lastNote !== -1) {
           audioEngine.stopNote(lastNote);
           midiOut.stopNote(lastNote);
@@ -1290,7 +1354,13 @@ function AppShell() {
         }
       };
     }
-  }, [currentChordNotes, arpNotes, arpType, arpRate, arpGate, tempo, windowPhase]);
+  }, [currentChordNotes, arpNotes, arpType, arpRate, arpGate, tempo, windowPhase, timeSignature, arpRhythm, arpSyncopation]);
+
+  // Live mirror of the piano-armed gate (D139). The keydown handler
+  // below binds once per path change; the T shortcut must consult the
+  // CURRENT armed state (KeyT is the +6 semitone piano key), so the
+  // ref is written every render and read at event time.
+  const noteInputArmedRef = useRef(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1355,6 +1425,31 @@ function AppShell() {
         return;
       }
 
+      // Cmd/Ctrl+Z undo / Cmd/Ctrl+Shift+Z redo. Placed BEFORE the
+      // isModeShortcutModifierKey guard (the chord carries meta/ctrl).
+      // The compose surface keeps its own local handler
+      // (ComposeSurface.tsx, D59); this global branch covers the
+      // etude surface and yields exactly when that local handler will
+      // fire (compose surface active AND a project loaded) so the two
+      // never double-fire. The typing guard at the top of this
+      // handler already returned for form fields, so native field
+      // undo/redo is untouched.
+      const undoRedoIntent = classifyUndoRedoKey(e);
+      if (undoRedoIntent !== null) {
+        const store = useNewSessionStore.getState();
+        if (store.mode === "compose" && store.composeProject !== null) {
+          return; // local ComposeSurface handler owns this
+        }
+        e.preventDefault();
+        if (undoRedoIntent === "undo") {
+          // Etude undo: revert the last accepted harmonic step
+          // (idempotent no-op when lastStepRef is empty).
+          revertLastAccept();
+        }
+        // Etude has no redo stack; Cmd/Ctrl+Shift+Z is a no-op here.
+        return;
+      }
+
       // PRD-001 Phase 1: mode shortcuts. Document-level so they fire
       // even when focus is on the canvas / a modal-trigger button.
       // The `1`/`2`/`3` shortcuts are additively slotted between
@@ -1395,6 +1490,13 @@ function AppShell() {
         return;
       }
 
+      // T/N/L/P/C global letter shortcuts (classified once, consumed
+      // in the chain below). The modifier guard lives inside the pure
+      // classifier; T yields while the piano is armed.
+      const globalShortcut = classifyGlobalShortcutKey(e, {
+        pianoArmed: noteInputArmedRef.current,
+      });
+
       if (e.key === "ArrowRight") {
         setActiveStepIndex((prev) => Math.min(prev + 1, path.steps.length - 1));
       } else if (e.key === "ArrowLeft") {
@@ -1422,6 +1524,31 @@ function AppShell() {
         // M → toggle Play Along (mute synth melody)
         e.preventDefault();
         audioEngine.setMelodyMuted(!audioEngine.melodyMuted);
+      } else if (globalShortcut !== null) {
+        // T/N/L/P/C global letter shortcuts. Classified by e.code
+        // (the D14 law) with the PHASE-1-01 modifier guard inside the
+        // pure classifier; T yields while the computer-keyboard piano
+        // is armed (KeyT is the +6 semitone piano key).
+        e.preventDefault();
+        if (globalShortcut === "tuner") {
+          setTunerOn((v) => !v);
+        } else if (globalShortcut === "metronome") {
+          setMetronomeOn((v) => !v);
+        } else if (globalShortcut === "loop") {
+          setIsLooping((v) => !v);
+        } else if (globalShortcut === "play") {
+          // P -> Space alias: the count-in gate resolves the toggle
+          // against the COMBINED playing-or-counting state (D35).
+          requestPlayState((p) => !p);
+        } else if (globalShortcut === "countIn") {
+          // C -> cycle count-in 0 -> 1 -> 2 -> 0 (REQ-PRAC-10).
+          setMetronomeConfig((cfg) => ({
+            ...cfg,
+            countInBars:
+              cfg.countInBars === 0 ? 1 : cfg.countInBars === 1 ? 2 : 0,
+          }));
+        }
+        return;
       } else if (e.code === "Comma") {
         // Phase 2 (D14): tempo -5 moved off "[" onto "," (matched by
         // code, consistent with the bracket transpose bindings).
@@ -2197,6 +2324,9 @@ function AppShell() {
     practiceMechanics.noteInput.enabled &&
     showExerciseTranspose &&
     !noteInputBlockingModal;
+  // Live mirror for the keydown handler's T gate (declared above the
+  // handler; written every render so the event-time read is fresh).
+  noteInputArmedRef.current = noteInputArmed;
   const noteInputRootMidi = (practiceMechanics.noteInput.rootOctave + 1) * 12;
 
   // The fallback audio trio: the shipped display-piano trio
@@ -2377,13 +2507,65 @@ function AppShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlayingAuto]);
 
-  // D133 rule 2: a path/refId switch ends the block; a new session
-  // may open on the next play.
+  // D133 rule 2: a path/refId switch ends the block; the effect
+  // below re-opens a fresh session on the same change IF playback
+  // is active (MED-002). When stopped, the rule-2 close stands
+  // alone and the next play opens via the [isPlayingAuto] effect.
   useEffect(() => {
     const draft = sessionDraftRef.current;
     if (draft === null || draft.refId === path.id) return;
     closeOpenSession();
   }, [path.id, closeOpenSession]);
+
+  // MED-002: re-open a fresh session when activePathIndex advances
+  // mid-playback (the loop-off auto-advance signature - App.tsx
+  // calls setActivePathIndex(p => p+1) once per form pass). The
+  // rule-2 effect above already closed the previous draft on the
+  // same path.id change; this effect opens a new one with the
+  // current refId so each path in a multi-path set records its
+  // own block. Manual path switches while PAUSED stay closed
+  // (the isPlayingAuto gate). Engagement + practice-set gates
+  // mirror the [isPlayingAuto] effect above: bare audition
+  // (no drill/ramp/detect) and active practice-set runs do NOT
+  // open a session - the runner owns its own lifecycle.
+  useEffect(() => {
+    if (!isPlayingAuto) return;
+    const engaged =
+      practiceMechanics.mode !== "off" ||
+      practiceMechanics.rampEnabled ||
+      practiceMechanics.detect.enabled;
+    if (!engaged || activePracticeSet !== null) return;
+    const draft = sessionDraftRef.current;
+    if (draft !== null && draft.refId === path.id) return;
+    const windows: SessionWindows = {
+      pause: { ...practiceMechanics.pause },
+      ab: {
+        a: { ...practiceMechanics.ab.a },
+        b: { ...practiceMechanics.ab.b },
+        swapBars: practiceMechanics.ab.swapBars,
+      },
+    };
+    if (loopStartBar !== null) {
+      windows.loop = {
+        fromBar: loopStartBar,
+        toBar: loopEndBar ?? totalFormBars(formLen) - 1,
+      };
+    }
+    if (practiceMechanics.rampEnabled) windows.ramp = { ...practiceMechanics.ramp };
+    sessionDraftRef.current = openSession({
+      startedAtMs: Date.now(),
+      refId: path.id,
+      meter: timeSignature,
+      tempoStartBpm: tempo,
+      metronome: metronomeConfig,
+      windows,
+    });
+    // Snapshot law (same as the [isPlayingAuto] effect above): the
+    // closure values are the config AT RE-OPEN. tempo / meter /
+    // windows are read once per activePathIndex change, not on every
+    // unrelated rerender.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlayingAuto, activePathIndex]);
 
   // REQ-PRAC-33 (D132): the ramp phase mirror marks the OPEN block
   // completed + persists the interim record (upsert; the close
@@ -2471,7 +2653,31 @@ function AppShell() {
         //     the only honest wrap point.
         // Mechanics modes / the practice-set runner keep their own
         // branches above; a user-selected window wraps inside itself.
+        // 2026-09 (loop OFF): the form tail is ALSO the pass-completion
+        // signal. Loop ON keeps the wrap-forever law below; loop OFF
+        // plays the path once, then advances to the next path (or
+        // stops at the last one). The decision is pure
+        // (decideAutoAdvance) and pinned in windows.test.ts.
         next = wholeFormNextStep(prev, formLen);
+        const advance = decideAutoAdvance({
+          loopOn: isLoopingRef.current,
+          nextStep: next,
+          activePathIndex,
+          pathCount: paths.length,
+        });
+        if (advance === "advance") {
+          // Keep playing: move to the next path and restart its form
+          // at bar 1. The effect re-binds on activePathIndex / path
+          // length, so the next measure runs against the new path.
+          setActivePathIndex((p) => Math.min(p + 1, paths.length - 1));
+          next = 0;
+        } else if (advance === "stop") {
+          // Last path played once: stop playback and rewind to step 1
+          // (the rail Stop contract). next = 0 flows through the
+          // activeStepIndex write below.
+          requestPlayState(false);
+          next = 0;
+        }
       }
       activeStepIndexRef.current = next;
       setActiveStepIndex(next);
@@ -2510,7 +2716,7 @@ function AppShell() {
     return () => {
       rhythmEngine.setOnMeasureStart(() => {});
     };
-  }, [path.steps.length, loopStartBar, loopEndBar, formLen, keyCycleActive, practiceMechanics.mode]);
+  }, [path.steps.length, loopStartBar, loopEndBar, formLen, keyCycleActive, practiceMechanics.mode, activePathIndex, paths.length]);
 
   useEffect(() => {
     if (isPlayingAuto) {
@@ -2531,8 +2737,12 @@ function AppShell() {
     playbackClock.setTempo(tempo);
   }, [tempo]);
   useEffect(() => {
-    const [n] = timeSignature.split("/").map(Number);
-    playbackClock.setTimeSignature(n || 4, 4);
+    if (timeSignature === "tintal") {
+      playbackClock.setTimeSignature(16, 4);
+    } else {
+      const [n, d] = timeSignature.split("/").map(Number);
+      playbackClock.setTimeSignature(n || 4, d || 4);
+    }
   }, [timeSignature]);
   useEffect(() => {
     playbackClock.setPathStepCount(path.steps.length);
@@ -3262,9 +3472,10 @@ function AppShell() {
           return (
             <>
               <FormTemplatePicker
-                activeId={null}
-                onPick={() => {
-                  /* MVP: no-op; v1 will call setPlan(planForm({...})) */
+                activeId={formTemplateId}
+                onPick={(id) => {
+                  setFormTemplateId(id);
+                  setTimeSignature(templateMeter(id));
                 }}
               />
               <FormPlanner plan={plan} />
@@ -3912,6 +4123,38 @@ function AppShell() {
                             className="flex-1 accent-purple-500"
                           />
                         </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-neutral-400">Rhythm</span>
+                          <select
+                            value={arpRhythm}
+                            onChange={(e) =>
+                              setArpRhythm(e.target.value as typeof arpRhythm)
+                            }
+                            aria-label="Arpeggio rhythm"
+                            className="bg-neutral-900 border border-neutral-700 text-xs text-neutral-300 rounded px-2 py-1 outline-none"
+                          >
+                            {ARP_RHYTHMS.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs text-neutral-400">
+                          <input
+                            type="checkbox"
+                            checked={arpSyncopation}
+                            onChange={(e) => setArpSyncopation(e.target.checked)}
+                            aria-label="Syncopation"
+                          />
+                          Syncopation
+                        </label>
+                        <p className="text-[10px] text-neutral-500 leading-snug">
+                          {timeSignature === "7/8" || timeSignature === "6/8"
+                            ? "Beat = eighth. Subdivision 2 = 16ths."
+                            : "Beat = quarter. Subdivision 2 = 8ths."}{" "}
+                          {timeSignature}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -4775,20 +5018,66 @@ function AppShell() {
                         isLooping
                           ? loopStartBar !== null
                             ? // F3 (#2): form bars, not ceil(steps/4).
-                              `Looping bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1} — click to play the whole form instead`
-                            : `The whole form (bars 1–${formLen}) repeats — shift-click two strip bars to loop a section`
+                              `Looping bars ${loopStartBar + 1} to ${(loopEndBar ?? formLen - 1) + 1} - click to play once then advance to the next path`
+                            : `Repeats the whole form (bars 1 to ${formLen}) - click to play once then advance to the next path`
                           : loopStartBar !== null
-                            ? `Whole form (bars 1–${formLen}) repeats — click to loop bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1}`
-                            : "Loop the bar selection you make in the strip"
+                            ? `Plays once then advances to the next path - click to loop bars ${loopStartBar + 1} to ${(loopEndBar ?? formLen - 1) + 1}`
+                            : "Plays once then advances to the next path (stops at the last one)"
                       }
                       aria-pressed={isLooping}
                     >
                       {isLooping
                         ? loopStartBar !== null
-                          ? `↻ Bars ${loopStartBar + 1}–${(loopEndBar ?? formLen - 1) + 1}`
+                          ? `↻ Bars ${loopStartBar + 1}-${(loopEndBar ?? formLen - 1) + 1}`
                           : "↻ Loop"
-                        : "○ Loop"}
+                        : "○ Once"}
                     </ToolChip>
+                    {/* FOLLOW-ON: one-click loop presets (1/2/4 bars)
+                        anchored at the current form bar. The active
+                        highlight only fires when the stored window is
+                        the exact, un-truncated span of `bars` form
+                        bars (isLoopPresetActive). Near-tail truncation
+                        never highlights - the chip stays honest. */}
+                    {([1, 2, 4] as const).map((bars) => {
+                      const storedWindow =
+                        loopStartBar !== null
+                          ? {
+                              fromBar: loopStartBar,
+                              toBar: loopEndBar ?? totalFormBars(formLen) - 1,
+                            }
+                          : null;
+                      const active = isLoopPresetActive(
+                        storedWindow,
+                        bars,
+                        formLen,
+                      );
+                      const cursorBar = barOfStep(
+                        activeStepIndex,
+                        totalFormBars(formLen),
+                      );
+                      const resolved = loopPresetWindow(
+                        cursorBar,
+                        bars,
+                        formLen,
+                      );
+                      const resolvedTitle = resolved
+                        ? `Loop bars ${resolved.fromBar + 1} to ${resolved.toBar + 1} (current bar ${cursorBar + 1}, ${bars}-bar preset) and turn loop ON`
+                        : `No current bar to anchor a ${bars}-bar preset (cursor is out of range)`;
+                      return (
+                        <ToolChip
+                          key={bars}
+                          active={active}
+                          onClick={() => handleLoopPreset(bars)}
+                          title={resolvedTitle}
+                          aria-label={`Loop ${bars} bars from current bar`}
+                          aria-pressed={active}
+                          data-testid={`loop-preset-${bars}`}
+                        >
+                          {active ? "●" : "○"} {bars}{" "}
+                          {bars === 1 ? "bar" : "bars"}
+                        </ToolChip>
+                      );
+                    })}
                   </ToolGroup>
                 </div>
 
@@ -4939,7 +5228,9 @@ function AppShell() {
                         className="bg-transparent text-xs text-[color:var(--color-text-1)] outline-none cursor-pointer hover:text-[color:var(--color-brand-strong)] font-medium px-1 py-1 flex-1 min-w-0"
                         aria-label="Time signature"
                       >
+                        <option value="3/4">3/4</option>
                         <option value="4/4">4/4</option>
+                        <option value="5/4">5/4</option>
                         <option value="6/8">6/8</option>
                         <option value="7/8">7/8</option>
                         <option value="11/4">11/4</option>
