@@ -273,6 +273,11 @@ import { EarTrainingPanel } from "./components/EarTrainingPanel";
 import { ConceptSearch } from "./components/ConceptSearch";
 import { ConceptDrawer } from "./components/ConceptDrawer";
 import { TunerWidget } from "./components/TunerWidget";
+// Beat-timed slideshow (PIN-001): two-layer alpha crossfade
+// driven by activeStepIndex (1 step = 1 bar per F3 D110). The
+// pure math lives in src/lib/slideshow.ts; this is just the
+// presentation surface wired into AppMain.
+import { Slideshow } from "./components/Slideshow";
 import {
   etudeActiveBarFor,
   etudePathId,
@@ -3462,6 +3467,41 @@ function AppShell() {
 
         {/* Per-path briefing — explains the practice loop for the active path. */}
         <PathBriefing pathId={path.id} />
+
+        {/* Beat-timed slideshow — two layers crossfading on the
+            bar grid. alpha curve is pure (PIN-001), driven by
+            activeStepIndex so the crossfade stays phase-locked to
+            the audio transport. Default layers are MVP stubs
+            (chord chart / voicing inspector / take recent) so the
+            surface has content on first render. */}
+        <Slideshow
+          layers={[
+            {
+              id: "chord-chart",
+              title: "Chord chart",
+              subtitle: `Now reading ${path.title}`,
+              accent: "var(--color-brand)",
+            },
+            {
+              id: "voicing-inspector",
+              title: "Voicing inspector",
+              subtitle: `${VOICINGS[voicingType]?.label ?? voicingType} voicing`,
+              accent: "var(--color-accent)",
+            },
+            {
+              id: "take-recent",
+              title: "Take recent",
+              subtitle:
+                performance.takes.length > 0
+                  ? `${performance.takes.length} take${performance.takes.length === 1 ? "" : "s"} logged`
+                  : "No takes yet",
+              accent: "var(--color-accent-2)",
+            },
+          ]}
+          barsPerLayer={4}
+          isPlaying={isPlayingAuto}
+          beat={activeStepIndex}
+        />
 
         {/* Form planner — MVP shows a default AABA plan; v1 will let the
             user pick + reorder. The picker lets the user see all 4 templates. */}
