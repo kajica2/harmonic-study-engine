@@ -62,10 +62,10 @@ import {
 } from "../lib/practiceMechanics";
 import { K } from "../lib/storage";
 
-/** The 3 modes a user can explicitly pick. `null` = legacy / first-run. */
-export type Mode = "compose" | "etude" | "explore";
+/** The 4 modes a user can explicitly pick. `null` = legacy / first-run. */
+export type Mode = "compose" | "etude" | "explore" | "marketplace";
 
-/** Per-mode dirty kind. Compose + Explore are 'none' in Phase 1
+/** Per-mode dirty kind. Compose + Explore + Marketplace are 'none'
  *  (ADR-007); only Etude carries real dirty state. */
 export type DirtyKind = "none" | "etude-pending-accept";
 
@@ -73,6 +73,7 @@ export interface DirtyMap {
   readonly compose: "none";
   readonly etude: DirtyKind;
   readonly explore: "none";
+  readonly marketplace: "none";
 }
 
 export const SESSION_STORAGE_KEY = K.session;
@@ -318,7 +319,7 @@ export const useSessionStore = create<SessionState>()(
       // D126: mechanics config taste; defaults at read for v4 payloads
       // that lack the key (zustand shallow-merges persisted over these).
       practiceMechanics: normalizePracticeMechanics(undefined),
-      dirty: { compose: "none", etude: "none", explore: "none" },
+      dirty: { compose: "none", etude: "none", explore: "none", marketplace: "none" },
       pendingModeRequest: null,
       // D146: ephemeral (outside partialize - the no-v5 law).
       exploreSeedUrl: null,
@@ -383,6 +384,7 @@ export const useSessionStore = create<SessionState>()(
             compose: "none",
             etude: "etude-pending-accept",
             explore: "none",
+            marketplace: "none",
           },
         });
       },
@@ -574,7 +576,7 @@ export const useSessionStore = create<SessionState>()(
           // `currentIdea` stays.
         }
         set({
-          dirty: { compose: "none", etude: "none", explore: "none" },
+          dirty: { compose: "none", etude: "none", explore: "none", marketplace: "none" },
         });
       },
       discardCurrent: () => {
@@ -586,7 +588,7 @@ export const useSessionStore = create<SessionState>()(
         }
         set({
           currentIdea: null,
-          dirty: { compose: "none", etude: "none", explore: "none" },
+          dirty: { compose: "none", etude: "none", explore: "none", marketplace: "none" },
         });
       },
       resetModeSlice: () =>
@@ -597,7 +599,7 @@ export const useSessionStore = create<SessionState>()(
           keyCycleActive: false,
           currentIdea: null,
           etudeConstraints: null,
-          dirty: { compose: "none", etude: "none", explore: "none" },
+          dirty: { compose: "none", etude: "none", explore: "none", marketplace: "none" },
           pendingModeRequest: null,
         }),
     }),
@@ -654,12 +656,13 @@ export const useSessionStore = create<SessionState>()(
 );
 
 /** All known Mode literals in display order. */
-export const MODES: readonly Mode[] = ["compose", "etude", "explore"] as const;
+export const MODES: readonly Mode[] = ["compose", "etude", "explore", "marketplace"] as const;
 
 export const MODE_LABELS: Readonly<Record<Mode, string>> = {
   compose: "Compose",
   etude: "Etude",
   explore: "Explore",
+  marketplace: "Marketplace",
 };
 
 /** Resolve the effective mode for the gate (D9). URL > persisted > legacy. */

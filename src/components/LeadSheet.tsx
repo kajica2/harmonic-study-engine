@@ -56,6 +56,8 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
       }
       const xml = toMusicXml(path, {
         transpose: instrument === "Concert" ? 0 : instrument === "Bb" ? 2 : 5,
+        voiceStyle: "arp",
+        trimToForm: true,
       });
       const ok = await renderOSMD(osmdRef.current!, xml);
       if (cancelled) return;
@@ -93,6 +95,8 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
   const downloadXml = () => {
     const xml = toMusicXml(path, {
       transpose: instrument === "Concert" ? 0 : instrument === "Bb" ? 2 : 5,
+      voiceStyle: "arp",
+      trimToForm: true,
     });
     handleDownload(`${path.id}_${instrument}.musicxml`, "application/vnd.recordare.musicxml+xml", xml);
   };

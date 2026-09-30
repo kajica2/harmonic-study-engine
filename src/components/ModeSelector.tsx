@@ -1,8 +1,8 @@
 /**
  * src/components/ModeSelector.tsx - PRD-001 REQ-MODE-1..7.
  *
- * Persistent top-bar segmented control with three modes:
- *   Compose / Etude / Explore
+ * Persistent top-bar segmented control with four modes:
+ *   Compose / Etude / Explore / Marketplace
  *
  * Reads `mode` from the zustand sessionStore via a slice selector (so
  * only this component re-renders on mode change). Writes go through
@@ -10,12 +10,12 @@
  * commits or opens the dirty-prompt modal.
  *
  * Document-level keyboard handler in App.tsx owns the `1` / `2` / `3`
- * shortcuts (additive to the existing handler) so the shortcuts work
- * even when focus is on the canvas or a modal-trigger button. The
+ * / `4` shortcuts (additive to the existing handler) so the shortcuts
+ * work even when focus is on the canvas or a modal-trigger button. The
  * tablist here adds WAI-ARIA-compliant roving tabindex for keyboard
  * users who land on the tablist directly (Tab cycles within).
  *
- * Visual: 3 segments separated by 1px dividers; active segment has
+ * Visual: 4 segments separated by 1px dividers; active segment has
  * brand-muted bg + brand-strong text; inactive is surface-1 text.
  *
  * Compact mode (mobile): 3 icons only, no labels, 36x36 squares.
@@ -39,6 +39,7 @@ const SHORTCUT_NUMBER: Readonly<Record<Mode, number>> = {
   compose: 1,
   etude: 2,
   explore: 3,
+  marketplace: 4,
 };
 
 const TABLIST_BASE =

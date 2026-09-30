@@ -43,6 +43,7 @@ import {
 } from "../state/sessionStore";
 import { ComposeSurface } from "./ComposeSurface";
 import { ExploreSurface } from "./ExploreSurface";
+import { MarketplaceMode } from "./MarketplaceMode";
 
 export interface ModeGateProps {
   /** Etude surface. Whatever App.tsx renders today for the legacy mode. */
@@ -92,6 +93,9 @@ export const ModeGate: React.FC<ModeGateProps> = ({
   }
   if (mode === "explore") {
     return <ExploreSurface />;
+  }
+  if (mode === "marketplace") {
+    return <MarketplaceMode />;
   }
   // Etude (default) - render the existing legacy main surface.
   return <>{AppMain}</>;

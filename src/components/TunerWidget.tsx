@@ -12,7 +12,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Mic } from "lucide-react";
-import { startAudioCapture } from "../lib/trumpetStageTrainer";
+import {
+  subscribeTuner,
+  TunerError,
+  type TunerCaptureHandle,
+} from "../lib/tunerCapture";
 import { detectPitch, freqToNote } from "../lib/trumpetTuner";
 
 interface TunerWidgetProps {
@@ -20,9 +24,22 @@ interface TunerWidgetProps {
   onToggle: () => void;
 }
 
-const SAMPLE_RATE = 44100;
 /** Cents range mapped to the bar (±50 cents = full width). */
 const CENTS_RANGE = 50;
+
+type ErrorStatus =
+  | "unsupported"
+  | "insecure"
+  | "denied"
+  | "no-mic"
+  | "suspended"
+  | "unknown";
+
+/** Mirror of the widget's error state for the pill + aria-live. */
+interface ErrorState {
+  status: ErrorStatus;
+  message: string;
+}
 
 function centsColor(cents: number): string {
   const abs = Math.abs(cents);
@@ -42,24 +59,30 @@ export function TunerWidget({ isOn, onToggle }: TunerWidgetProps) {
   const [noteName, setNoteName] = useState<string>("--");
   const [cents, setCents] = useState<number>(0);
   const [hasSignal, setHasSignal] = useState(false);
-  const stopRef = useRef<(() => void) | null>(null);
+  const [errorState, setErrorState] = useState<ErrorState>({
+    status: "unknown",
+    message: "",
+  });
+  const stopRef = useRef<TunerCaptureHandle | null>(null);
 
   useEffect(() => {
     if (!isOn) {
       setNoteName("--");
       setCents(0);
       setHasSignal(false);
+      setErrorState({ status: "unknown", message: "" });
       return;
     }
 
     let cancelled = false;
-    let stopFn: (() => void) | null = null;
+    let handle: TunerCaptureHandle | null = null;
+    let sampleRate = 44100;
 
     (async () => {
       try {
-        const stop = await startAudioCapture((block) => {
+        handle = await subscribeTuner((block) => {
           if (cancelled) return;
-          const est = detectPitch(block, SAMPLE_RATE);
+          const est = detectPitch(block, sampleRate);
           if (est.confidence < 0.5 || est.freq <= 0) {
             setHasSignal(false);
             return;
@@ -74,22 +97,42 @@ export function TunerWidget({ isOn, onToggle }: TunerWidgetProps) {
           setCents(Math.max(-CENTS_RANGE, Math.min(CENTS_RANGE, ref.cents)));
         });
         if (cancelled) {
-          stop();
+          handle.stop();
+          handle = null;
           return;
         }
-        stopFn = stop;
-        stopRef.current = stop;
-      } catch {
-        // Mic permission denied or unavailable — leave widget in
-        // "on but no signal" state; user can toggle off manually.
-        if (!cancelled) setHasSignal(false);
+        // Capture the real sample rate from the live handle now that
+        // the graph is fully wired. This is the source of truth for
+        // detectPitch; falls back to 44100 if the AudioContext was
+        // somehow constructed with a 0-rate (test seam).
+        sampleRate = handle.sampleRate() || 44100;
+        stopRef.current = handle;
+        // A successful subscribe clears any prior error.
+        setErrorState({ status: "unknown", message: "" });
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof TunerError) {
+          setErrorState({
+            status: err.kind as ErrorStatus,
+            message: err.message,
+          });
+        } else {
+          setErrorState({
+            status: "unknown",
+            message:
+              err instanceof Error
+                ? err.message
+                : "Could not start the tuner.",
+          });
+        }
+        setHasSignal(false);
       }
     })();
 
     return () => {
       cancelled = true;
-      if (stopFn) {
-        stopFn();
+      if (handle) {
+        handle.stop();
         stopRef.current = null;
       }
     };
@@ -97,6 +140,7 @@ export function TunerWidget({ isOn, onToggle }: TunerWidgetProps) {
 
   // Bar position: 50% = in tune. Map cents (-50..+50) -> 0..100%.
   const barPct = 50 + (cents / CENTS_RANGE) * 50;
+  const hasError = errorState.status !== "unknown";
 
   if (!isOn) {
     return (
@@ -116,22 +160,36 @@ export function TunerWidget({ isOn, onToggle }: TunerWidgetProps) {
     <div
       className="fixed bottom-4 right-4 z-50 flex items-stretch rounded-lg bg-neutral-900/95 border border-neutral-700 shadow-xl backdrop-blur overflow-hidden"
       role="status"
-      aria-live="polite"
+      aria-live={hasError ? "assertive" : "polite"}
       aria-label="Tuner"
     >
       <div className="flex flex-col justify-center px-3 py-2 min-w-[140px]">
         <div className="flex items-baseline gap-2">
           <span
-            className={`t-mono text-xl font-bold leading-none ${hasSignal ? centsColor(cents) : "text-neutral-500"}`}
+            className={`t-mono text-xl font-bold leading-none ${
+              hasError
+                ? "text-rose-400"
+                : hasSignal
+                  ? centsColor(cents)
+                  : "text-neutral-500"
+            }`}
           >
-            {hasSignal ? noteName : "--"}
+            {hasError ? "!" : hasSignal ? noteName : "--"}
           </span>
           <span
-            className={`t-mono text-xs leading-none ${hasSignal ? centsColor(cents) : "text-neutral-600"}`}
+            className={`t-mono text-xs leading-none ${
+              hasError
+                ? "text-rose-400"
+                : hasSignal
+                  ? centsColor(cents)
+                  : "text-neutral-600"
+            }`}
           >
-            {hasSignal
-              ? `${cents >= 0 ? "+" : ""}${Math.round(cents)}¢`
-              : "listening…"}
+            {hasError
+              ? errorState.message
+              : hasSignal
+                ? `${cents >= 0 ? "+" : ""}${Math.round(cents)}¢`
+                : "listening…"}
           </span>
         </div>
         <div
@@ -139,7 +197,7 @@ export function TunerWidget({ isOn, onToggle }: TunerWidgetProps) {
           aria-hidden="true"
         >
           <div className="absolute left-1/2 top-0 bottom-0 w-px bg-neutral-600" />
-          {hasSignal && (
+          {hasSignal && !hasError && (
             <div
               className={`absolute top-0 bottom-0 w-1.5 -ml-[3px] rounded-full ${barColor(cents)}`}
               style={{ left: `${Math.max(0, Math.min(100, barPct))}%` }}

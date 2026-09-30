@@ -9,6 +9,8 @@ import {
   isModeShortcutModifierKey,
   classifyTransposeKey,
   classifyNoteKey,
+  classifyGlobalShortcutKey,
+  classifyUndoRedoKey,
   NOTE_KEY_SEMITONES_BY_CODE,
   type NoteKeyAction,
 } from "./useKeyDown";
@@ -196,5 +198,113 @@ describe("classifyNoteKey (S4, D139)", () => {
     for (const code of ["KeyM", "KeyB", "KeyC", "KeyV", "KeyQ", "KeyR", "KeyI", "KeyO", "KeyP", "KeyL"]) {
       expect(classifyNoteKey(ev(code))).toBeNull();
     }
+  });
+});
+
+/**
+ * Global letter shortcuts (T/N/L/P/C). Pins: the PHASE-1-01 modifier
+ * guard yields BEFORE any key branch, matching is by e.code (the D14
+ * law), and the T tuner toggle yields while the computer-keyboard
+ * piano is armed (KeyT is the +6 semitone piano key).
+ */
+describe("classifyGlobalShortcutKey", () => {
+  const ev = (
+    code: string,
+    opts: Partial<{
+      key: string;
+      metaKey: boolean;
+      ctrlKey: boolean;
+      altKey: boolean;
+      shiftKey: boolean;
+    }> = {},
+  ) =>
+    ({
+      code,
+      key: opts.key ?? "?",
+      metaKey: opts.metaKey ?? false,
+      ctrlKey: opts.ctrlKey ?? false,
+      altKey: opts.altKey ?? false,
+      shiftKey: opts.shiftKey ?? false,
+    }) as KeyboardEvent;
+
+  it("T/N/L/P/C classify when the piano is NOT armed", () => {
+    expect(classifyGlobalShortcutKey(ev("KeyT"), { pianoArmed: false })).toBe("tuner");
+    expect(classifyGlobalShortcutKey(ev("KeyN"), { pianoArmed: false })).toBe("metronome");
+    expect(classifyGlobalShortcutKey(ev("KeyL"), { pianoArmed: false })).toBe("loop");
+    expect(classifyGlobalShortcutKey(ev("KeyP"), { pianoArmed: false })).toBe("play");
+    expect(classifyGlobalShortcutKey(ev("KeyC"), { pianoArmed: false })).toBe("countIn");
+  });
+
+  it("piano-armed T gate: KeyT yields to the piano (+6 semitone key)", () => {
+    // The useNoteInput listener owns KeyT while armed; the tuner
+    // toggle must NOT fire in that state.
+    expect(classifyGlobalShortcutKey(ev("KeyT"), { pianoArmed: true })).toBeNull();
+    // The other letters are piano-free and still classify while armed.
+    expect(classifyGlobalShortcutKey(ev("KeyN"), { pianoArmed: true })).toBe("metronome");
+    expect(classifyGlobalShortcutKey(ev("KeyP"), { pianoArmed: true })).toBe("play");
+  });
+
+  it("PHASE-1-01 PIN: meta/ctrl/alt held -> null BEFORE any key branch", () => {
+    expect(classifyGlobalShortcutKey(ev("KeyT", { metaKey: true }), { pianoArmed: false })).toBeNull();
+    expect(classifyGlobalShortcutKey(ev("KeyN", { ctrlKey: true }), { pianoArmed: false })).toBeNull();
+    expect(classifyGlobalShortcutKey(ev("KeyL", { altKey: true }), { pianoArmed: false })).toBeNull();
+    expect(classifyGlobalShortcutKey(ev("KeyP", { metaKey: true }), { pianoArmed: false })).toBeNull();
+    expect(classifyGlobalShortcutKey(ev("KeyC", { ctrlKey: true }), { pianoArmed: false })).toBeNull();
+  });
+
+  it("shift passes (no mapping key uses shift semantics)", () => {
+    expect(classifyGlobalShortcutKey(ev("KeyT", { shiftKey: true }), { pianoArmed: false })).toBe("tuner");
+    expect(classifyGlobalShortcutKey(ev("KeyN", { shiftKey: true }), { pianoArmed: false })).toBe("metronome");
+  });
+
+  it("e.key is NEVER consulted: mismatched key/code still classifies by code", () => {
+    // A Dvorak/COLEMAP-style mismatch: physical KeyT carrying some
+    // other glyph must still classify as the tuner toggle.
+    expect(classifyGlobalShortcutKey(ev("KeyT", { key: "y" }), { pianoArmed: false })).toBe("tuner");
+    expect(classifyGlobalShortcutKey(ev("KeyP", { key: "o" }), { pianoArmed: false })).toBe("play");
+  });
+
+  it("unmapped codes -> null (incl. piano keys + M + brackets + digits)", () => {
+    for (const code of ["KeyA", "KeyW", "KeyS", "KeyE", "KeyD", "KeyF", "KeyG", "KeyY", "KeyH", "KeyU", "KeyJ", "KeyK", "KeyZ", "KeyX", "KeyM", "BracketLeft", "Space", "Digit1", "Escape"]) {
+      expect(classifyGlobalShortcutKey(ev(code), { pianoArmed: false })).toBeNull();
+    }
+  });
+});
+
+/**
+ * Cmd/Ctrl+Z undo / Cmd/Ctrl+Shift+Z redo intent. Pins: the chord
+ * requires meta/ctrl, matches the z key case-insensitively, and
+ * shiftKey selects redo.
+ */
+describe("classifyUndoRedoKey", () => {
+  const ev = (
+    key: string,
+    opts: Partial<{ metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }> = {},
+  ) =>
+    ({
+      key,
+      metaKey: opts.metaKey ?? false,
+      ctrlKey: opts.ctrlKey ?? false,
+      shiftKey: opts.shiftKey ?? false,
+    }) as KeyboardEvent;
+
+  it("Cmd+Z -> undo, Cmd+Shift+Z -> redo", () => {
+    expect(classifyUndoRedoKey(ev("z", { metaKey: true }))).toBe("undo");
+    expect(classifyUndoRedoKey(ev("z", { metaKey: true, shiftKey: true }))).toBe("redo");
+  });
+
+  it("Ctrl+Z -> undo, Ctrl+Shift+Z -> redo", () => {
+    expect(classifyUndoRedoKey(ev("z", { ctrlKey: true }))).toBe("undo");
+    expect(classifyUndoRedoKey(ev("z", { ctrlKey: true, shiftKey: true }))).toBe("redo");
+  });
+
+  it("uppercase Z matches (Shift+Z arrives as e.key === 'Z')", () => {
+    expect(classifyUndoRedoKey(ev("Z", { metaKey: true }))).toBe("undo");
+    expect(classifyUndoRedoKey(ev("Z", { metaKey: true, shiftKey: true }))).toBe("redo");
+  });
+
+  it("no modifier or non-Z key -> null", () => {
+    expect(classifyUndoRedoKey(ev("z"))).toBeNull();
+    expect(classifyUndoRedoKey(ev("a", { metaKey: true }))).toBeNull();
   });
 });

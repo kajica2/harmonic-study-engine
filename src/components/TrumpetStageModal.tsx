@@ -5,9 +5,13 @@ import {
   createStageSession,
   processBlock,
   skipAttempt as skipActiveAttempt,
-  startAudioCapture,
   type StageSession,
 } from "../lib/trumpetStageTrainer";
+import {
+  subscribeTuner,
+  TunerError,
+  type TunerCaptureHandle,
+} from "../lib/tunerCapture";
 import type { StageConfig } from "../lib/trumpetStage";
 import type { HarmonicPath } from "../lib/paths";
 import { autoStageConfig } from "../lib/autoStage";
@@ -124,7 +128,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
   const [session, setSession] = useState<StageSession>(
     () => sessionOverride ?? createStageSession(resolvedConfig),
   );
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const cleanupRef = useRef<TunerCaptureHandle | null>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +147,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
 
   useEffect(
     () => () => {
-      cleanupRef.current?.();
+      cleanupRef.current?.stop();
       cleanupRef.current = null;
     },
     [],
@@ -173,7 +177,7 @@ export const TrumpetStageModal: React.FC<Props> = ({
       fresh.status = "running";
       setSession({ ...fresh });
       sessionRef.current = fresh;
-      const stop = await startAudioCapture((block) => {
+      const handle = await subscribeTuner((block) => {
         const next = processBlock(
           sessionRef.current,
           block,
@@ -187,19 +191,23 @@ export const TrumpetStageModal: React.FC<Props> = ({
           setSession({ ...next });
         }
       });
-      cleanupRef.current = stop;
+      cleanupRef.current = handle;
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not start the tuner.",
-      );
+      if (err instanceof TunerError) {
+        setError(err.message);
+      } else {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not start the tuner.",
+        );
+      }
       setSession((s) => ({ ...s, status: "stopped" }));
     }
   };
 
   const stop = () => {
-    cleanupRef.current?.();
+    cleanupRef.current?.stop();
     cleanupRef.current = null;
     setSession((s) => ({ ...s, status: "stopped" }));
   };

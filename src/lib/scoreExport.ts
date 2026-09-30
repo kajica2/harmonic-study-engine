@@ -13,10 +13,16 @@
 
 import { HarmonicPath } from "./paths";
 import type { EtudeNote } from "../../engine/etude/types";
+import { transposeMidiList } from "./scoreGenerator";
+import { clampToPlayableRange } from "./leadSheet";
+import { detectFormPeriod } from "./formPeriod";
+import { totalFormBars } from "../../engine/practice/windows";
 
 // ---------------------------------------------------------------------------
 // MusicXML 4.0 export
 // ---------------------------------------------------------------------------
+
+export type VoiceStyle = "block" | "arp";
 
 export interface MusicXmlOptions {
   /** Title for the <work> element */
@@ -38,6 +44,105 @@ export interface MusicXmlOptions {
    *  second part <part id="P2"> carries the melody; P1 is untouched.
    *  Notes crossing a barline split into tied segments. */
   melody?: readonly EtudeNote[];
+  /** Voice style for P1: block chord (default) or arpeggiated line.
+   *  Block output stays byte-identical to the historical export.
+   *  Arp uses divisions=2 with sequential quarters, eighths, rest. */
+  voiceStyle?: VoiceStyle;
+  /** When true, render the form once (slice steps to the detected
+   *  form period) instead of the full padded step list. Default false. */
+  trimToForm?: boolean;
+}
+
+/**
+ * Prepare arp notes for one step with a single shift rule.
+ * Steps: dedup and sort raw notes, apply transposeMidiList
+ * (which sorts ascending when shift is nonzero), map clamp to
+ * playable range, then re-sort ascending (clamp can reorder).
+ */
+export function prepareArpNotes(
+  notes: readonly number[],
+  transpose: number,
+): number[] {
+  const uniq = Array.from(new Set(notes)).sort((a, b) => a - b);
+  const shifted = transposeMidiList(uniq, transpose);
+  const clamped = shifted.map(clampToPlayableRange);
+  clamped.sort((a, b) => a - b);
+  return clamped;
+}
+
+export interface ArpAllocation {
+  readonly quarters: number;
+  readonly eighths: number;
+  readonly restDiv: number;
+  readonly totalDiv: number;
+  readonly usedNotes: number;
+  readonly truncated: boolean;
+}
+
+/**
+ * Allocate arp durations for N notes against a quarters budget Bq.
+ * Divisions are quarters*2 (divisions=2: quarter=2, eighth=1).
+ * Rules for integer budgets:
+ * - N <= Bq: N quarters plus rest fill.
+ * - Bq < N <= 2*Bq: Q=2*Bq-N quarters plus E=2*N-2*Bq eighths.
+ * - N > 2*Bq: truncate to 2*Bq notes plus console.warn.
+ * Fractional Bq (from B/S splits) is floored to integer divisions;
+ * the caller distributes totalDiv=B*2 across steps with floor plus
+ * last-step remainder so every budget here stays integral.
+ */
+export function allocateArpDurations(
+  N: number,
+  budgetQuarters: number,
+): ArpAllocation {
+  const safeN = Number.isFinite(N) ? Math.max(0, Math.floor(N)) : 0;
+  const safeBudget = Number.isFinite(budgetQuarters)
+    ? Math.max(0, budgetQuarters)
+    : 0;
+  const totalDiv = Math.floor(safeBudget * 2 + 1e-9);
+  if (safeN === 0) {
+    return {
+      quarters: 0,
+      eighths: 0,
+      restDiv: totalDiv,
+      totalDiv,
+      usedNotes: 0,
+      truncated: false,
+    };
+  }
+  const maxNotes = totalDiv;
+  if (safeN > maxNotes) {
+    console.warn(
+      `scoreExport arp overflow: N=${safeN} exceeds budget ${maxNotes}, truncating`,
+    );
+    return {
+      quarters: 0,
+      eighths: maxNotes,
+      restDiv: 0,
+      totalDiv,
+      usedNotes: maxNotes,
+      truncated: true,
+    };
+  }
+  if (safeN * 2 <= totalDiv) {
+    return {
+      quarters: safeN,
+      eighths: 0,
+      restDiv: totalDiv - safeN * 2,
+      totalDiv,
+      usedNotes: safeN,
+      truncated: false,
+    };
+  }
+  const quarters = totalDiv - safeN;
+  const eighths = 2 * safeN - totalDiv;
+  return {
+    quarters,
+    eighths,
+    restDiv: 0,
+    totalDiv,
+    usedNotes: safeN,
+    truncated: false,
+  };
 }
 
 /** Encode a numeric MIDI to a musicXML pitch string e.g. 60 → C4, 61 → D♭4 */
@@ -192,6 +297,16 @@ function buildMelodyPartXml(
   </part>`;
 }
 
+function harmonyXmlForStep(step: { name: string }): string {
+  const rootStep = escapeXml((step.name.replace(/[^A-G#b]/g, "").charAt(0) || "C"));
+  const rootAlter = /Db|Eb|Gb|Ab|Bb|[#]/.test(step.name) ? "1" : "0";
+  return `
+      <harmony>
+        <root><root-step>${rootStep}</root-step><root-alter>${rootAlter}</root-alter></root>
+        <kind text="${escapeXml(step.name)}">major</kind>
+      </harmony>`;
+}
+
 /**
  * Render a HarmonicPath to a MusicXML 4.0 string.
  *
@@ -203,6 +318,12 @@ function buildMelodyPartXml(
  * When `opts.melody` is present (D27) an ADDITIVE second part P2 is
  * appended; without it the output is byte-identical to the historical
  * single-part export.
+ *
+ * voiceStyle block (default) keeps the historical chord-per-bar
+ * rendering with divisions=1 and no <type> elements. voiceStyle arp
+ * renders sequential arpeggiated notes with divisions=2, quarters
+ * then eighths then rest, with <type> on pitched notes only.
+ * trimToForm slices steps to the detected form before the loop.
  */
 export function toMusicXml(
   path: HarmonicPath,
@@ -216,42 +337,130 @@ export function toMusicXml(
     beatsPerMeasure = 4,
     stepsPerMeasure = 1,
     melody,
+    voiceStyle = "block",
+    trimToForm = false,
   } = opts;
-  const stepCount = path.steps.length;
+  if (path.steps.length === 0) throw new Error("Cannot export empty path");
+
+  let effectiveSteps = path.steps;
+  if (trimToForm) {
+    const period = detectFormPeriod(path.steps);
+    const formLen = totalFormBars(period);
+    effectiveSteps = path.steps.slice(0, formLen);
+  }
+  const stepCount = effectiveSteps.length;
   if (stepCount === 0) throw new Error("Cannot export empty path");
+
+  const isArp = voiceStyle === "arp";
+  const divisions = isArp ? 2 : 1;
 
   const measures: string[] = [];
   let measureNumber = 1;
-  for (let i = 0; i < stepCount; i += stepsPerMeasure) {
-    const stepSlice = path.steps.slice(i, i + stepsPerMeasure);
-    const noteElements = stepSlice.flatMap((step) => {
-      const uniqueNotes = Array.from(new Set(step.notes)).sort((a, b) => a - b);
-      const rootStep = escapeXml((step.name.replace(/[^A-G#b]/g, "").charAt(0) || "C"));
-      const rootAlter = /Db|Eb|Gb|Ab|Bb|[#]/.test(step.name) ? "1" : "0";
-      const inner = uniqueNotes
-        .map(
-          (n) => `
+  if (!isArp) {
+    for (let i = 0; i < stepCount; i += stepsPerMeasure) {
+      const stepSlice = effectiveSteps.slice(i, i + stepsPerMeasure);
+      const noteElements = stepSlice.flatMap((step) => {
+        const uniqueNotes = Array.from(new Set(step.notes)).sort((a, b) => a - b);
+        const rootStep = escapeXml((step.name.replace(/[^A-G#b]/g, "").charAt(0) || "C"));
+        const rootAlter = /Db|Eb|Gb|Ab|Bb|[#]/.test(step.name) ? "1" : "0";
+        const inner = uniqueNotes
+          .map(
+            (n) => `
         <note>
           <pitch>${midiToXmlPitch(n, transpose)}</pitch>
           <duration>${4 / stepSlice.length}</duration>
           <voice>1</voice>
         </note>`,
-        )
-        .join("");
-      return `
+          )
+          .join("");
+        return `
       <harmony>
         <root><root-step>${rootStep}</root-step><root-alter>${rootAlter}</root-alter></root>
         <kind text="${escapeXml(step.name)}">major</kind>
       </harmony>${inner}`;
-    }).join("");
+      }).join("");
 
-    // compute bar duration using the formula 4 quarters per measure
-    const measureXml = `
+      // compute bar duration using the formula 4 quarters per measure
+      const measureXml = `
     <measure number="${measureNumber}">
       ${noteElements}
     </measure>`;
-    measures.push(measureXml);
-    measureNumber++;
+      measures.push(measureXml);
+      measureNumber++;
+    }
+  } else {
+    const totalDivPerMeasure = beatsPerMeasure * 2;
+    for (let i = 0; i < stepCount; i += stepsPerMeasure) {
+      const stepSlice = effectiveSteps.slice(i, i + stepsPerMeasure);
+      const sliceLen = stepSlice.length;
+      const base = Math.floor(totalDivPerMeasure / sliceLen);
+      const remainder = totalDivPerMeasure - base * sliceLen;
+      let measureSum = 0;
+      const noteElements = stepSlice
+        .map((step, stepIdx) => {
+          const budgetDiv =
+            stepIdx === sliceLen - 1 ? base + remainder : base;
+          const budgetQuarters = budgetDiv / 2;
+          const arpNotes = prepareArpNotes(step.notes, transpose);
+          const alloc = allocateArpDurations(
+            arpNotes.length,
+            budgetQuarters,
+          );
+          const used = arpNotes.slice(0, alloc.usedNotes);
+          const quarterNotes = used.slice(0, alloc.quarters);
+          const eighthNotes = used.slice(
+            alloc.quarters,
+            alloc.quarters + alloc.eighths,
+          );
+          const quarterXml = quarterNotes
+            .map(
+              (m) => `
+        <note>
+          <pitch>${midiToXmlPitch(m, 0)}</pitch>
+          <duration>2</duration>
+          <voice>1</voice>
+          <type>quarter</type>
+        </note>`,
+            )
+            .join("");
+          const eighthXml = eighthNotes
+            .map(
+              (m) => `
+        <note>
+          <pitch>${midiToXmlPitch(m, 0)}</pitch>
+          <duration>1</duration>
+          <voice>1</voice>
+          <type>eighth</type>
+        </note>`,
+            )
+            .join("");
+          const restXml =
+            alloc.restDiv > 0
+              ? `
+        <note>
+          <rest/>
+          <duration>${alloc.restDiv}</duration>
+          <voice>1</voice>
+        </note>`
+              : "";
+          measureSum +=
+            alloc.quarters * 2 + alloc.eighths * 1 + alloc.restDiv;
+          return `${harmonyXmlForStep(step)}${quarterXml}${eighthXml}${restXml}`;
+        })
+        .join("");
+      if (measureSum !== totalDivPerMeasure) {
+        throw new Error(
+          `arp measure sum ${measureSum} != budget ${totalDivPerMeasure}`,
+        );
+      }
+
+      const measureXml = `
+    <measure number="${measureNumber}">
+      ${noteElements}
+    </measure>`;
+      measures.push(measureXml);
+      measureNumber++;
+    }
   }
 
   // D27: strictly additive. With no melody (undefined OR empty grid)
@@ -282,7 +491,7 @@ export function toMusicXml(
   <part id="P1">
     <measure number="0">
       <attributes>
-        <divisions>1</divisions>
+        <divisions>${divisions}</divisions>
         <key><fifths>0</fifths></key>
         <time><beats>${beatsPerMeasure}</beats><beat-type>4</beat-type></time>
         <clef><sign>G</sign><line>2</line></clef>

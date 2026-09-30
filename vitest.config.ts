@@ -49,6 +49,11 @@ const JSDOM_FILES = [
   "src/lib/urlSyncBus.test.ts",
   "src/lib/shareUrl.test.ts",
   "src/lib/storage.test.ts",
+  // tunerCapture singleton: jsdom is required for window.AudioContext
+  // + DOMException stubs. The other audio tests (midiIn / backingEngine)
+  // use the same env. AGENTS gotcha: vitest 5 ignores per-file env
+  // comments in multi-project mode.
+  "src/lib/tunerCapture.test.ts",
   "src/state/sessionStore.test.ts",
   "tests/usePathGenerator.test.ts",
   "tests/useSessionStore.test.ts",

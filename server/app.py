@@ -2,12 +2,15 @@
 FastAPI server that exposes DDSP synthesis via a REST API.
 """
 
+import json
 import os
 import logging
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
+
+from . import marketplace
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +249,97 @@ async def recordings_upload(
             "X-Transcoded": "true",
         },
     )
+
+
+# --- Marketplace (server/marketplace.py) -----------------------------
+
+
+@app.post("/marketplace/listings", response_model=marketplace.MarketplaceListing, status_code=201)
+def create_marketplace_listing(payload: marketplace.MarketplaceListing):
+    """Create a marketplace listing. 409 if (title, composer) already exists."""
+    data = payload.model_dump(exclude={"id", "created_at", "updated_at"})
+    listing = marketplace.MarketplaceListing(**data)
+    try:
+        return marketplace.create_listing(listing)
+    except marketplace.DuplicateListingError:
+        raise HTTPException(
+            status_code=409,
+            detail="a listing with this title and composer already exists",
+        )
+
+
+@app.put("/marketplace/listings/{listing_id}", response_model=marketplace.MarketplaceListing)
+def update_marketplace_listing(listing_id: str, payload: marketplace.MarketplaceListing):
+    """Replace a listing. 404 if missing, 409 if the new (title, composer) collides."""
+    data = payload.model_dump(exclude={"id", "created_at", "updated_at"})
+    listing = marketplace.MarketplaceListing(**data)
+    try:
+        updated = marketplace.update_listing(listing_id, listing)
+    except marketplace.DuplicateListingError:
+        raise HTTPException(
+            status_code=409,
+            detail="another listing already uses this title and composer",
+        )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="listing not found")
+    return updated
+
+
+@app.get("/marketplace/listings", response_model=list[marketplace.MarketplaceListing])
+def list_marketplace_listings(status: str = "published"):
+    """List listings, newest first. Filter with ?status= (default published)."""
+    return marketplace.list_listings(status=status)
+
+
+@app.get("/marketplace/listings/{listing_id}", response_model=marketplace.MarketplaceListing)
+def get_marketplace_listing(listing_id: str):
+    """Fetch a single listing by id."""
+    listing = marketplace.get_listing(listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="listing not found")
+    return listing
+
+
+@app.post("/webhooks/github")
+async def github_webhook(request: Request):
+    """Ingest a GitHub push event for marketplace listings.
+
+    Verifies X-Hub-Signature-256 (HMAC-SHA256) against
+    MARKETPLACE_WEBHOOK_SECRET, gates on MARKETPLACE_WEBHOOK_BRANCH,
+    parses the commit message, and upserts the listing.
+
+    Precedence is 503 -> 401 -> 400: the secret check (503) runs
+    before any payload-size rejection so an unconfigured server never
+    masks its misconfiguration with a 400. The Content-Length fast-path
+    below rejects oversized bodies without buffering them; the body
+    length is re-checked inside handle_github_push for requests that
+    omit or lie about Content-Length.
+    """
+    if not marketplace.webhook_secret_configured():
+        raise HTTPException(status_code=503, detail="webhook secret not configured")
+    content_length = request.headers.get("Content-Length")
+    if content_length is not None:
+        try:
+            if int(content_length) > marketplace.MAX_WEBHOOK_BODY_BYTES:
+                raise HTTPException(status_code=400, detail="payload exceeds 1 MB limit")
+        except ValueError:
+            pass  # malformed header; the body-length check covers it
+    raw_body = await request.body()
+    signature = request.headers.get("X-Hub-Signature-256")
+    # Lenient ref extraction; strict JSON validation happens inside
+    # handle_github_push after signature verification so the 503/401/400
+    # precedence matches the spec.
+    ref = None
+    try:
+        parsed = json.loads(raw_body.decode("utf-8"))
+        if isinstance(parsed, dict):
+            ref = parsed.get("ref")
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    try:
+        return marketplace.handle_github_push(raw_body, signature, ref)
+    except marketplace.WebhookError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
 
 
 # Run with: python -m uvicorn server.app:app --host 127.0.0.1 --port 8765

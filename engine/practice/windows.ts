@@ -80,6 +80,82 @@ export function windowStepRange(
 }
 
 /**
+ * Resolve a preset loop window anchored at `currentBar` (form bar,
+ * 0-based) that spans exactly `bars` bars. The preset is the
+ * natural one-click alternative to a shift-click rail selection
+ * (PRD-001 Phase 7 S2 follow-on): "loop this bar", "loop this +
+ * next", "loop this phrase".
+ *
+ * Behavior:
+ *  - Returns `null` for any degenerate input (out-of-range or
+ *    non-positive `currentBar`, non-positive / non-finite `bars`,
+ *    non-positive / non-finite form). Caller treats `null` as
+ *    "do not change the loop window".
+ *  - When the requested span runs past the form tail, the END bar
+ *    is clamped to the form tail - the START bar is fixed at
+ *    `currentBar` so the loop still anchors where the user clicked.
+ *    A request that overshoots (e.g. 4 bars near bar 14 of a 16-bar
+ *    form) returns the truncated 2-bar window; `isLoopPresetActive`
+ *    catches the truncation and refuses to highlight the chip.
+ *  - `bars > formLen` returns the whole form (clamped into range
+ *    by the same path).
+ *
+ * Pure (ADR-003): params in, window out (or null) - no DOM.
+ */
+export function loopPresetWindow(
+  currentBar: number,
+  bars: number,
+  formLen: number,
+): BarWindow | null {
+  // Degenerate form: totalFormBars snaps non-positive / non-finite to
+  // 1, but a 1-bar form with currentBar outside [0, 1) is still out
+  // of range (return null). A 1-bar form with currentBar 0 returns
+  // { fromBar: 0, toBar: 0 } regardless of `bars` - that is the
+  // shipped single-bar-form case.
+  const total = totalFormBars(formLen);
+  if (!Number.isFinite(currentBar)) return null;
+  if (!Number.isFinite(bars)) return null;
+  const cb = Math.floor(currentBar);
+  const b = Math.floor(bars);
+  if (cb < 0 || cb >= total) return null;
+  if (b < 1) return null;
+  const from = cb;
+  const to = Math.min(cb + b - 1, total - 1);
+  return { fromBar: from, toBar: to };
+}
+
+/**
+ * Is the CURRENT loop window a clean, un-truncated preset of exactly
+ * `bars` form bars? Used by the Loop chip's preset buttons to render
+ * the active highlight (the button "looks selected" only when the
+ * stored window is the same span a fresh click would produce).
+ *
+ * A user-selected window counts only when:
+ *  - the window is set (non-null),
+ *  - the stored span equals `bars` form bars inclusive,
+ *  - AND the START + `bars` fits within the form (the "from a
+ *    click" guarantee - a near-tail truncation isn't a "4-bar loop"
+ *    even if it spans fewer bars).
+ *
+ * Pure (ADR-003). `bars <= 0` or non-finite -> false (no preset
+ * can ever be active with zero/negative bar count).
+ */
+export function isLoopPresetActive(
+  window: BarWindow | null,
+  bars: number,
+  formLen: number,
+): boolean {
+  if (window === null) return false;
+  if (!Number.isFinite(bars)) return false;
+  const total = totalFormBars(formLen);
+  const b = Math.floor(bars);
+  if (b < 1) return false;
+  return (
+    window.toBar - window.fromBar + 1 === b && window.fromBar + b <= total
+  );
+}
+
+/**
  * The DEFAULT transport law (2026-09, "always repeat indefinitely the
  * whole form"): the step after the last FORM bar is form bar 1 (index
  * 0), forever - practice never stops on its own.
@@ -102,4 +178,49 @@ export function wholeFormNextStep(prevStep: number, formLen: number): number {
   if (prev + 1 >= total) return 0;
   if (prev < 0) return 0;
   return prev + 1;
+}
+
+/**
+ * Auto-advance decision (2026-09, "loop OFF -> play once then advance
+ * to the next path"): the transport law for the Loop chip OFF state.
+ *
+ * Loop ON keeps the historical whole-form repeat (wrap forever). With
+ * loop OFF the form still cycles mid-pass, but the wrap at the form
+ * tail (wholeFormNextStep returning 0) is the pass-completion signal:
+ * advance to the next path (and keep playing) when one exists,
+ * otherwise stop at the last path.
+ *
+ * Pure (ADR-003): params in, decision out - no clock, no DOM, no rng.
+ */
+export type AutoAdvanceDecision = "wrap" | "advance" | "stop";
+
+export interface AutoAdvanceParams {
+  /** Loop chip state: ON repeats the current path forever. */
+  loopOn: boolean;
+  /** The step index wholeFormNextStep computed for this measure. */
+  nextStep: number;
+  /** Index of the active path within the practice set. */
+  activePathIndex: number;
+  /** Total number of paths in the practice set. */
+  pathCount: number;
+}
+
+export function decideAutoAdvance({
+  loopOn,
+  nextStep,
+  activePathIndex,
+  pathCount,
+}: AutoAdvanceParams): AutoAdvanceDecision {
+  if (loopOn) return "wrap";
+  // A wrap to form bar 1 (nextStep 0) is the pass-completion signal;
+  // mid-form steps keep the whole-form cycle. Strict equality (not
+  // safeInt) so a NaN / fractional nextStep is never mistaken for a
+  // wrap. The wrap signal is fully encoded in nextStep === 0: a 1-bar
+  // form completes a pass every measure (wholeFormNextStep returns 0
+  // from its only bar), so the decision needs no form length.
+  if (nextStep !== 0) return "wrap";
+  const idx = safeInt(activePathIndex);
+  const count = safeInt(pathCount);
+  if (idx < count - 1) return "advance";
+  return "stop";
 }

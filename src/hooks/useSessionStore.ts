@@ -19,6 +19,7 @@ import { HarmonicPath, HarmonicStep, ALL_PATHS } from "../lib/paths";
 import { InstrumentType } from "../lib/audio";
 import { BackingStyle } from "../lib/backingEngine";
 import { TimeSignature } from "../lib/rhythm";
+import { isArpRhythmId, type ArpRhythmId } from "../lib/arpRhythm";
 import {
   DEFAULT_METRONOME_CONFIG,
   normalizeMetronomeConfig,
@@ -164,6 +165,12 @@ export interface SessionStore {
   setArpGate: Setter<number>;
   arpOctaves: number;
   setArpOctaves: Setter<number>;
+  /** Rhythm variety mask (straight/offbeat/charleston/clave). */
+  arpRhythm: ArpRhythmId;
+  setArpRhythm: Setter<ArpRhythmId>;
+  /** Delay on-beat arp hits by half a tick. */
+  arpSyncopation: boolean;
+  setArpSyncopation: Setter<boolean>;
 
   // persona + UI prefs
   selectedPersonaId: string;
@@ -397,6 +404,13 @@ export function useSessionStore(): SessionStore {
   const [arpOctaves, setArpOctaves] = useState(() =>
     loadNumber("synesthesia_arpOctaves", 1),
   );
+  const [arpRhythm, setArpRhythm] = useState<ArpRhythmId>(() => {
+    const saved = loadJSON<string>(K.arpRhythm, "straight");
+    return isArpRhythmId(saved) ? saved : "straight";
+  });
+  const [arpSyncopation, setArpSyncopation] = useState(() =>
+    loadBool(K.arpSyncopation, false),
+  );
 
   // persona + UI prefs
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>(() =>
@@ -518,6 +532,12 @@ export function useSessionStore(): SessionStore {
     storageSet(K.stylePackId, stylePackId ?? "");
   }, [stylePackId]);
   useEffect(() => {
+    storageSet(K.arpRhythm, arpRhythm);
+  }, [arpRhythm]);
+  useEffect(() => {
+    storageSet(K.arpSyncopation, arpSyncopation ? "1" : "0");
+  }, [arpSyncopation]);
+  useEffect(() => {
     storageSet(K.quizScore, JSON.stringify(quizScore));
   }, [quizScore]);
   useEffect(() => {
@@ -594,6 +614,10 @@ export function useSessionStore(): SessionStore {
     setArpGate,
     arpOctaves,
     setArpOctaves,
+    arpRhythm,
+    setArpRhythm,
+    arpSyncopation,
+    setArpSyncopation,
     selectedPersonaId,
     setSelectedPersonaId,
     showTheoryLabels,

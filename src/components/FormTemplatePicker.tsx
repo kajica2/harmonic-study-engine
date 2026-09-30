@@ -6,6 +6,7 @@
 
 import React from "react";
 import type { FormPlan, FormTemplateId } from "../lib/formPlanner";
+import { templateMeter } from "../lib/arpRhythm";
 
 interface TemplateDef {
   id: FormTemplateId;
@@ -73,7 +74,12 @@ export const FormTemplatePicker: React.FC<FormTemplatePickerProps> = ({
               }`}
               title={t.description}
             >
-              <div className="font-mono text-[12px]">{t.name}</div>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[12px]">{t.name}</span>
+                <span className="font-mono text-[10px] text-neutral-500">
+                  {templateMeter(t.id)}
+                </span>
+              </div>
               <div className="text-[10px] text-neutral-400 mt-0.5 leading-snug">
                 {t.description}
               </div>

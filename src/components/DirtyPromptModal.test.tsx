@@ -39,7 +39,7 @@ describe("DirtyPromptModal actions", () => {
       ideaFromChord("etude", "Cmaj7", 1_700_000_000_000, 0),
     );
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "explore",
     });
     render(<DirtyPromptModal />);
@@ -52,7 +52,7 @@ describe("DirtyPromptModal actions", () => {
   it("Discard -> reverts + commits the mode switch", () => {
     useSessionStore.getState().setMode("etude");
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "compose",
     });
     let revertFired = 0;
@@ -74,7 +74,7 @@ describe("DirtyPromptModal actions", () => {
   it("Cancel -> stays on current mode + clears pending", () => {
     useSessionStore.getState().setMode("etude");
     useSessionStore.setState({
-      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none" },
+      dirty: { compose: "none", etude: "etude-pending-accept", explore: "none", marketplace: "none" },
       pendingModeRequest: "explore",
     });
     render(<DirtyPromptModal />);

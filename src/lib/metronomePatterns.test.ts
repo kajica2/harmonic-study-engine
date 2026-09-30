@@ -26,7 +26,9 @@ import type { TimeSignature } from "./rhythm";
 import { RhythmEngine } from "./rhythm";
 
 const ALL_TS: readonly TimeSignature[] = [
+  "3/4",
   "4/4",
+  "5/4",
   "6/8",
   "7/8",
   "11/4",
@@ -57,7 +59,9 @@ describe("T1 legacy-equivalence oracle", () => {
   it("stepsPerMeasureFor mirrors the IMMUTABLE rhythm.ts table", () => {
     const e = new RhythmEngine();
     const expected: Record<TimeSignature, number> = {
+      "3/4": 12,
       "4/4": 16,
+      "5/4": 20,
       "6/8": 12,
       "7/8": 14,
       "11/4": 44,
@@ -160,7 +164,9 @@ describe("T2 accents", () => {
 
 describe("T2 beatsPerMeasureFor table pin", () => {
   it("4/4 -> 4, 6/8 -> 6, 7/8 -> 7, 11/4 -> 11, tintal -> 16", () => {
+    expect(beatsPerMeasureFor("3/4")).toBe(3);
     expect(beatsPerMeasureFor("4/4")).toBe(4);
+    expect(beatsPerMeasureFor("5/4")).toBe(5);
     expect(beatsPerMeasureFor("6/8")).toBe(6);
     expect(beatsPerMeasureFor("7/8")).toBe(7);
     expect(beatsPerMeasureFor("11/4")).toBe(11);
@@ -170,6 +176,8 @@ describe("T2 beatsPerMeasureFor table pin", () => {
   it("stepsPerBeatFor: 2 in compound meters, 4 elsewhere", () => {
     expect(stepsPerBeatFor("6/8")).toBe(2);
     expect(stepsPerBeatFor("7/8")).toBe(2);
+    expect(stepsPerBeatFor("3/4")).toBe(4);
+    expect(stepsPerBeatFor("5/4")).toBe(4);
     expect(stepsPerBeatFor("4/4")).toBe(4);
     expect(stepsPerBeatFor("11/4")).toBe(4);
     expect(stepsPerBeatFor("tintal")).toBe(4);

@@ -213,8 +213,12 @@ export function beatsPerBar(meter: string): number {
  */
 export function stepsPerBar(timeSignature: string): number {
   switch (timeSignature) {
+    case "3/4":
+      return 3;
     case "4/4":
       return 4;
+    case "5/4":
+      return 5;
     case "6/8":
       return 6;
     case "7/8":
