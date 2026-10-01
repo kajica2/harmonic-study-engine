@@ -19,6 +19,8 @@
 import jsPDF from "jspdf";
 import { svg2pdf } from "svg2pdf.js";
 import { renderPathToSvg, pageBreakOffsets } from "./sheetMusicExport";
+import { toMusicXml } from "./scoreExport";
+import { renderMusicXmlToSvg, parseSvgString } from "./verovioRenderer";
 import type { HarmonicPath } from "./paths";
 import type { InstrumentPitch } from "./scoreGenerator";
 import {
@@ -45,6 +47,8 @@ export interface BookPdfArgs {
   title: string;
   author: string;
   instrument?: InstrumentPitch;
+  /** Score engraver: abcjs (default, frozen) or Verovio (WASM). */
+  engraver?: "abcjs" | "verovio";
 }
 
 /**
@@ -63,6 +67,7 @@ export async function exportBookPdf(args: BookPdfArgs): Promise<Blob> {
     title,
     author,
     instrument = "Concert",
+    engraver = "abcjs",
   } = args;
 
   const doc = new jsPDF({
@@ -83,7 +88,7 @@ export async function exportBookPdf(args: BookPdfArgs): Promise<Blob> {
     const path = paths[i];
     tocEntries.push({ title: ex.title, page: doc.getNumberOfPages() + 1 });
 
-    await renderScorePages(doc, ex, path, instrument, i);
+    await renderScorePages(doc, ex, path, instrument, i, engraver);
     renderChordChart(doc, ex, path, i);
     renderPracticeNotes(doc, ex, i);
   }
@@ -142,7 +147,12 @@ async function renderScorePages(
   path: HarmonicPath,
   instrument: InstrumentPitch,
   exerciseIndex: number,
+  engraver: "abcjs" | "verovio",
 ): Promise<void> {
+  if (engraver === "verovio") {
+    await renderVerovioScorePages(doc, ex, path, exerciseIndex);
+    return;
+  }
   const svgElem = renderPathToSvg(path, instrument);
   const svgRect = svgElem.getBoundingClientRect();
   const svgW = svgRect.width || A4_W - 2 * MARGIN;
@@ -166,6 +176,47 @@ async function renderScorePages(
       height: targetH,
     });
   }
+}
+
+/**
+ * Verovio score pages: engrave the path's MusicXML (arp voice, form
+ * trimmed) via the WASM renderer and draw the single-page SVG onto the
+ * PDF with the same exercise header as the abcjs path. Verovio's
+ * adjustPageHeight fits the whole form on one engraved page, so no
+ * page-break tiling is needed.
+ */
+async function renderVerovioScorePages(
+  doc: jsPDF,
+  ex: BookExercise,
+  path: HarmonicPath,
+  exerciseIndex: number,
+): Promise<void> {
+  const musicXml = toMusicXml(path, { voiceStyle: "arp", trimToForm: true });
+  const svgString = await renderMusicXmlToSvg(musicXml, {
+    pageWidth: 2100,
+    scale: 100,
+    breaks: "auto",
+    adjustPageHeight: true,
+  });
+  const svgElem = parseSvgString(svgString);
+
+  const svgW = parseFloat(svgElem.getAttribute("width") ?? "") || A4_W - 2 * MARGIN;
+  const svgH = parseFloat(svgElem.getAttribute("height") ?? "") || 200;
+
+  const targetW = A4_W - 2 * MARGIN;
+  const scale = targetW / svgW;
+  const targetH = svgH * scale;
+
+  doc.addPage();
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, MARGIN, MARGIN + 14);
+  await svg2pdf(svgElem, doc, {
+    x: MARGIN,
+    y: MARGIN + SCORE_HEADER_H,
+    width: targetW,
+    height: targetH,
+  });
 }
 
 function renderChordChart(

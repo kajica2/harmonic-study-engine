@@ -23,6 +23,10 @@ import {
   type MasterclassEntry,
 } from "../data/masterclass";
 import { findPathById, type HarmonicPath } from "../lib/paths";
+import { renderPathToWav } from "../lib/loopWav";
+import { exportToMidiFile } from "../lib/midiExport";
+import { deriveSlug, midiDataUriToBlob } from "../lib/marketplace";
+import { zipSync } from "fflate";
 
 const EMAIL_BOOK_ENDPOINT =
   "https://sainted-word-records.vercel.app/api/email-book";
@@ -51,6 +55,8 @@ export const BookSection: React.FC = () => {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
+  const [isCollecting, setIsCollecting] = useState(false);
+  const [engraver, setEngraver] = useState<"abcjs" | "verovio">("abcjs");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -88,6 +94,7 @@ export const BookSection: React.FC = () => {
       cards,
       title: "Harmonic Study Book",
       author: "Harmonic Study Engine",
+      engraver,
     });
     return { blob };
   };
@@ -138,6 +145,37 @@ export const BookSection: React.FC = () => {
     }
   };
 
+  const handleGenerateCollection = async () => {
+    if (selectedIds.size === 0 || isCollecting) return;
+    const selected = catalog.filter((c) => selectedIds.has(c.entry.id));
+    setIsCollecting(true);
+    setError("");
+    setStatus("");
+    try {
+      const members: Record<string, Uint8Array> = {};
+      for (const { path } of selected) {
+        const slug = deriveSlug(path.title ?? path.name ?? "untitled");
+        const [wavBlob, midiBlob] = await Promise.all([
+          renderPathToWav(path, { mode: "arp" }),
+          Promise.resolve(midiDataUriToBlob(exportToMidiFile(path))),
+        ]);
+        members[`${slug}.wav`] = new Uint8Array(await wavBlob.arrayBuffer());
+        members[`${slug}.mid`] = new Uint8Array(await midiBlob.arrayBuffer());
+      }
+      const zipBytes = zipSync(members);
+      const { downloadBlob } = await import("../lib/composeExport");
+      downloadBlob(
+        new Blob([zipBytes as unknown as BlobPart], { type: "application/zip" }),
+        "harmonic-study-collection.zip",
+      );
+      setStatus(`Downloaded collection (${selected.length} exercises)`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsCollecting(false);
+    }
+  };
+
   return (
     <section
       aria-label="Print-ready book"
@@ -154,6 +192,8 @@ export const BookSection: React.FC = () => {
       <p className="t-small text-[color:var(--color-text-2)]">
         Compile selected exercises into one PDF: cover, table of contents,
         score, chord chart, practice notes, and double-sided memory cards.
+        Optionally engrave scores with Verovio, or download a ZIP of
+        per-exercise WAV + MIDI backing tracks.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -186,6 +226,24 @@ export const BookSection: React.FC = () => {
           className={buttonClass}
         >
           {isGenerating ? "Generating..." : "Generate book PDF"}
+        </button>
+        <label className="flex items-center gap-1.5 text-xs text-[color:var(--color-text-2)]">
+          <input
+            type="checkbox"
+            checked={engraver === "verovio"}
+            onChange={(e) => setEngraver(e.target.checked ? "verovio" : "abcjs")}
+            className="accent-[color:var(--color-brand)]"
+          />
+          Verovio engraving
+        </label>
+        <button
+          type="button"
+          aria-label="Generate audio collection ZIP"
+          onClick={handleGenerateCollection}
+          disabled={isCollecting || selectedIds.size === 0}
+          className={buttonClass}
+        >
+          {isCollecting ? "Rendering..." : "Generate collection ZIP"}
         </button>
         <input
           type="email"
