@@ -119,20 +119,18 @@ export function pageBreakOffsets(
 }
 
 /**
- * Render a HarmonicPath to a PDF Blob.
+ * Render a HarmonicPath to a detached SVG element via abcjs. Shared by
+ * exportSheetMusicPDF (single-path export) and exportBookPdf (book
+ * composition) so both flows render the score identically.
  *
- * Returns a Promise<Blob> resolving to an application/pdf Blob.
- * Throws if the path is empty or if the SVG render fails.
+ * The host div is detached from the document before the SVG is
+ * returned; svg2pdf.js serializes the SVG element directly, so a
+ * detached node is fine.
  */
-export async function exportSheetMusicPDF(
-  args: SheetMusicExportArgs,
-): Promise<Blob> {
-  const { path, instrument, composerName, activeStepIndex } = args;
-
-  if (!path.steps || path.steps.length === 0) {
-    throw new Error("Cannot export an empty path");
-  }
-
+export function renderPathToSvg(
+  path: HarmonicPath,
+  instrument: InstrumentPitch,
+): Element {
   // Build the ABC notation from the existing lead-sheet helper — same
   // data shape as the in-app LeadSheet component, so the PDF matches
   // what the user is seeing on screen.
@@ -147,21 +145,39 @@ export async function exportSheetMusicPDF(
   host.style.width = `${A4_W}pt`;
   document.body.appendChild(host);
 
-  let svgElem: Element | null = null;
   try {
     abcjs.renderAbc(host, abc, {
       responsive: "resize",
       staffwidth: A4_W - 40, // ~40pt margin (20pt each side)
       add_classes: true,
     });
-    svgElem = host.querySelector("svg");
+    const svgElem = host.querySelector("svg");
     if (!svgElem) {
       throw new Error("abcjs.renderAbc did not produce an <svg> element");
     }
+    return svgElem;
   } finally {
     // Detach the host div even if renderAbc throws.
     document.body.removeChild(host);
   }
+}
+
+/**
+ * Render a HarmonicPath to a PDF Blob.
+ *
+ * Returns a Promise<Blob> resolving to an application/pdf Blob.
+ * Throws if the path is empty or if the SVG render fails.
+ */
+export async function exportSheetMusicPDF(
+  args: SheetMusicExportArgs,
+): Promise<Blob> {
+  const { path, instrument, composerName, activeStepIndex } = args;
+
+  if (!path.steps || path.steps.length === 0) {
+    throw new Error("Cannot export an empty path");
+  }
+
+  const svgElem = renderPathToSvg(path, instrument);
 
   // Build the PDF: cover page first, then the rendered score.
   const doc = new jsPDF({

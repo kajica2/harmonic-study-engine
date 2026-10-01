@@ -40,6 +40,7 @@ import {
 } from "../lib/marketplace";
 import { renderPathToWav } from "../lib/loopWav";
 import { exportToMidiFile } from "../lib/midiExport";
+import { BookSection } from "./BookSection";
 import type { HarmonicPath } from "../lib/paths";
 import type { InstrumentType } from "../lib/audio";
 
@@ -286,6 +287,11 @@ export const MarketplaceMode: React.FC<MarketplaceModeProps> = ({
           )}
         </section>
       )}
+
+      {/* Print-ready book generator: compile selected exercises into a
+          single PDF with score, chord chart, practice notes, and
+          double-sided memory cards. */}
+      <BookSection />
 
       {loadState === "loading" && (
         <p role="status" className="t-small text-[color:var(--color-text-2)]">
