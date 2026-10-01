@@ -2,10 +2,14 @@
  * src/lib/bookGenerator.ts - pure book-composition logic for the
  * print-ready book generator. Node-testable (no DOM, no jsPDF).
  *
- * Three pure functions:
+ * Pure functions:
  *   - deriveBookExercises: HarmonicPath[] + masterclass map -> BookExercise[]
  *   - buildMemoryCards:    BookExercise[] -> MemoryCard[] (capped)
  *   - cardGridLayout:      card count -> double-sided grid math
+ *   - deriveScaleSyllabus: BookExercise -> parent scale + modes
+ *   - modeForChord:        chord symbol -> suggested scale mode
+ *   - romanNumeralForChord: chord symbol + key -> roman numeral
+ *   - guideTonesForChord:  chord symbol -> 3rd + 7th
  *
  * The browser-side PDF composition (src/lib/bookPdf.ts) consumes these
  * shapes; all content derivation lives here so it can be pinned in
@@ -37,6 +41,19 @@ export interface BookExercise {
 export interface MemoryCard {
   front: string;
   back: string;
+  /** Roman numeral relative to the exercise key (chord cards only). */
+  roman?: string;
+  /** Chord tones (chord cards only). */
+  chordTones?: string[];
+  /** Guide tones: 3rd and 7th of the chord (chord cards only). */
+  guideTones?: string[];
+}
+
+/** Scale Syllabus appendix entry: the parent scale for an exercise
+ *  plus the modes suggested by its chord progression. */
+export interface ScaleSyllabus {
+  parentScale: string;
+  modes: string[];
 }
 
 /** Cap on memory cards: 24 cards = 6 pages of 4-card grids. */
@@ -228,8 +245,12 @@ function chordCardBack(
 /**
  * Build the memory-card deck. For each exercise: one summary card
  * ("Exercise N: title" -> key/tempo/feel) plus one card per unique
- * chord (chord symbol -> chord tones + source exercise). Capped at
- * MAX_MEMORY_CARDS so the deck stays a sensible print size.
+ * chord (chord symbol -> chord tones + source exercise). Chord cards
+ * carry the roman numeral (relative to the exercise key), the chord
+ * tones, and the guide tones (3rd + 7th) so the card front can show
+ * the symbol large with the numeral above and the back can show tones
+ * plus guide tones. Capped at MAX_MEMORY_CARDS so the deck stays a
+ * sensible print size.
  */
 export function buildMemoryCards(exercises: BookExercise[]): MemoryCard[] {
   const cards: MemoryCard[] = [];
@@ -242,13 +263,13 @@ export function buildMemoryCards(exercises: BookExercise[]): MemoryCard[] {
     });
     for (let j = 0; j < ex.chordNames.length; j++) {
       if (cards.length >= MAX_MEMORY_CARDS) break;
+      const chord = ex.chordNames[j];
       cards.push({
-        front: ex.chordNames[j],
-        back: chordCardBack(
-          ex.chordNames[j],
-          ex.chordTones[j] ?? [],
-          ex.title,
-        ),
+        front: chord,
+        back: chordCardBack(chord, ex.chordTones[j] ?? [], ex.title),
+        roman: romanNumeralForChord(chord, ex.key),
+        chordTones: ex.chordTones[j] ?? [],
+        guideTones: guideTonesForChord(chord),
       });
     }
   }
@@ -269,4 +290,164 @@ export function cardGridLayout(
   const cardsPerPage = Math.max(1, cols * rows);
   const pages = Math.ceil(cardCount / cardsPerPage);
   return { pages, cardsPerPage };
+}
+
+// ---------------------------------------------------------------------------
+// Scale Syllabus + chord analysis helpers (advanced jazz content)
+// ---------------------------------------------------------------------------
+
+/** Pitch-class lookup for note tokens ("C", "Bb", "F#", ...). */
+const NOTE_PC: Record<string, number> = {
+  C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5,
+  "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11,
+};
+
+/** Diatonic scale degrees (semitones above the tonic). */
+const SCALE_DEGREES = [0, 2, 4, 5, 7, 9, 11];
+
+/** Roman numerals for major keys (diatonic case). */
+const MAJOR_ROMAN = ["I", "ii", "iii", "IV", "V", "vi", "vii\u00B0"];
+
+/** Roman numerals for minor keys (diatonic case). */
+const MINOR_ROMAN = ["i", "ii\u00B0", "III", "iv", "v", "VI", "VII"];
+
+/** Degree symbol, escaped so this file stays free of the literal
+ *  typographic character (same convention as MIDDLE_DOT). */
+const DEGREE = "\u00B0";
+
+/** Half-diminished symbol (o with slash), escaped. */
+const HALF_DIM = "\u00F8";
+
+/** Major-seventh triangle symbol, escaped. */
+const MAJ_TRI = "\u0394";
+
+/**
+ * Parse a key token ("F", "Bb", "G-", "C-", "D minor") into the tonic
+ * pitch class and whether the key is minor. Minor keys use the "-"
+ * suffix convention from the path descriptions, with "min"/"minor"
+ * accepted as a fallback.
+ */
+function parseKeyTonic(key: string): { tonicPc: number; minor: boolean } {
+  const trimmed = (key ?? "").trim();
+  const minor =
+    /-$/.test(trimmed) ||
+    /m(?:in(?:or)?)?$/i.test(trimmed.replace(/-$/, ""));
+  const tonicToken = trimmed
+    .replace(/-$/, "")
+    .replace(/\s*(?:m(?:in(?:or)?)?|maj(?:or)?)\s*$/i, "")
+    .trim();
+  const tonicPc = NOTE_PC[tonicToken] ?? 0;
+  return { tonicPc, minor };
+}
+
+/**
+ * Suggested scale mode for a chord symbol (advanced jazz convention:
+ * ii-V-I maps to Dorian/Mixolydian/Ionian). Falls back to Ionian for
+ * unrecognized symbols so the syllabus always has a usable answer.
+ */
+export function modeForChord(chord: string): string {
+  const c = chord.trim();
+  if (/^[A-G][#b]?m7b5$/.test(c) || c.includes(HALF_DIM)) return "Locrian";
+  if (/^[A-G][#b]?m(?:7|9|11|6)?$/.test(c)) return "Dorian";
+  if (/^[A-G][#b]?dim7?$/.test(c) || c.includes(DEGREE)) {
+    return "Diminished (whole-half)";
+  }
+  if (/^[A-G][#b]?mM(?:7|9)?$/.test(c) || /m\(maj7\)/.test(c)) {
+    return "Melodic Minor";
+  }
+  if (/^[A-G][#b]?7(?:b9|#9|b5|#5|sus4?)?$/.test(c)) return "Mixolydian";
+  if (/^[A-G][#b]?(?:9|13)$/.test(c)) return "Mixolydian";
+  if (/^[A-G][#b]?(?:maj7|maj9|maj13|maj6|6)$/.test(c) || c.includes(MAJ_TRI)) {
+    return "Ionian";
+  }
+  if (/^[A-G][#b]?(?:aug|\+)$/.test(c)) return "Whole Tone";
+  return "Ionian";
+}
+
+/**
+ * Derive the Scale Syllabus entry for an exercise: the parent scale
+ * from the exercise key (major/minor) plus the unique modes suggested
+ * by the chord types in the progression, in first-appearance order.
+ */
+export function deriveScaleSyllabus(exercise: BookExercise): ScaleSyllabus {
+  const { tonicPc, minor } = parseKeyTonic(exercise.key);
+  const tonicName = NOTE_NAMES_FLAT[tonicPc];
+  const parentScale = minor ? `${tonicName} Minor` : `${tonicName} Major`;
+  const modes: string[] = [];
+  const seen = new Set<string>();
+  for (const chord of exercise.chordNames) {
+    const mode = modeForChord(chord);
+    if (!seen.has(mode)) {
+      seen.add(mode);
+      modes.push(mode);
+    }
+  }
+  return { parentScale, modes };
+}
+
+/**
+ * Roman numeral for a chord relative to the exercise key (e.g. "Gm7"
+ * in F major -> "ii", "C7" in F major -> "V"). Case follows the chord
+ * quality: minor-family chords are lowercase, diminished chords get a
+ * degree symbol, everything else is uppercase. Returns "" when the
+ * chord root or key cannot be parsed.
+ */
+export function romanNumeralForChord(chord: string, key: string): string {
+  const { tonicPc, minor } = parseKeyTonic(key);
+  const rootMatch = chord.trim().match(/^([A-G][#b]?)/);
+  if (!rootMatch) return "";
+  const rootPc = NOTE_PC[rootMatch[1]] ?? 0;
+  const degree = ((rootPc - tonicPc) % 12 + 12) % 12;
+  const idx = SCALE_DEGREES.indexOf(degree);
+  if (idx === -1) return "";
+  const base = minor ? MINOR_ROMAN[idx] : MAJOR_ROMAN[idx];
+  const isDiminished =
+    /(?:m7b5|dim)/.test(chord) ||
+    chord.includes(HALF_DIM) ||
+    chord.includes(DEGREE);
+  const isMinor =
+    /^[A-G][#b]?m(?:7|9|11|6)?$/.test(chord) || isDiminished;
+  if (isDiminished) {
+    // The diatonic base may already carry a degree symbol ("vii°",
+    // "ii°"); strip it before re-adding so we never double it.
+    const plain = base.toLowerCase().replace(new RegExp(DEGREE, "g"), "");
+    return plain.replace(/[iv]+/g, (m) => `${m}${DEGREE}`);
+  }
+  if (isMinor) return base.toLowerCase();
+  return base.toUpperCase();
+}
+
+/**
+ * Guide tones for a chord symbol: the 3rd and 7th (the two notes that
+ * define the chord quality and drive voice leading). Flat-preferred
+ * note names, jazz convention. Returns [] when the root cannot be
+ * parsed.
+ */
+export function guideTonesForChord(chord: string): string[] {
+  const rootMatch = chord.trim().match(/^([A-G][#b]?)/);
+  if (!rootMatch) return [];
+  const rootPc = NOTE_PC[rootMatch[1]] ?? 0;
+  let third = 4;
+  let seventh = 11;
+  if (
+    /^[A-G][#b]?m(?:7|9|11|6)?$/.test(chord) ||
+    /m7b5/.test(chord) ||
+    chord.includes(HALF_DIM)
+  ) {
+    third = 3;
+    seventh = 10;
+  } else if (
+    /^[A-G][#b]?7(?:b9|#9|b5|#5|sus4?)?$/.test(chord) ||
+    /^[A-G][#b]?(?:9|13)$/.test(chord)
+  ) {
+    third = 4;
+    seventh = 10;
+  } else if (/dim/.test(chord) || chord.includes(DEGREE)) {
+    third = 3;
+    seventh = 9;
+  }
+  return [
+    NOTE_NAMES_FLAT[(rootPc + third) % 12],
+    NOTE_NAMES_FLAT[(rootPc + seventh) % 12],
+  ];
 }

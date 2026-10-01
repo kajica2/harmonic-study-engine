@@ -10,6 +10,10 @@ import {
   deriveBookExercises,
   buildMemoryCards,
   cardGridLayout,
+  deriveScaleSyllabus,
+  modeForChord,
+  romanNumeralForChord,
+  guideTonesForChord,
   MAX_MEMORY_CARDS,
   type BookExercise,
 } from "./bookGenerator";
@@ -161,6 +165,24 @@ describe("buildMemoryCards", () => {
     expect(cards[5].back).toContain("C Eb G Bb");
   });
 
+  it("chord cards carry roman numeral, chord tones, and guide tones", () => {
+    const exercises = deriveBookExercises(FIXTURE_PATHS, FIXTURE_MAP);
+    const cards = buildMemoryCards(exercises);
+    // Star Eyes is in F major: Fmaj7 -> I, Gm7 -> ii, C7 -> V.
+    expect(cards[1].roman).toBe("I");
+    expect(cards[1].chordTones).toEqual(["F", "A", "C", "E"]);
+    expect(cards[1].guideTones).toEqual(["A", "E"]);
+    expect(cards[2].roman).toBe("ii");
+    expect(cards[2].guideTones).toEqual(["Bb", "F"]);
+    expect(cards[3].roman).toBe("V");
+    expect(cards[3].guideTones).toEqual(["E", "Bb"]);
+    // Solar is in C minor: Cm7 -> i, F7 -> IV (dominant quality -> V).
+    expect(cards[5].roman).toBe("i");
+    expect(cards[5].guideTones).toEqual(["Eb", "Bb"]);
+    expect(cards[6].roman).toBe("IV");
+    expect(cards[6].guideTones).toEqual(["A", "Eb"]);
+  });
+
   it("caps the card count at MAX_MEMORY_CARDS", () => {
     const many: BookExercise[] = Array.from({ length: 12 }, (_, i) => ({
       id: `ex-${i}`,
@@ -207,5 +229,123 @@ describe("cardGridLayout", () => {
   it("respects custom cols and rows", () => {
     expect(cardGridLayout(9, 3, 3)).toEqual({ pages: 1, cardsPerPage: 9 });
     expect(cardGridLayout(10, 3, 3)).toEqual({ pages: 2, cardsPerPage: 9 });
+  });
+});
+
+describe("deriveScaleSyllabus", () => {
+  it("derives the parent scale from a major key", () => {
+    const exercises = deriveBookExercises(FIXTURE_PATHS, FIXTURE_MAP);
+    const syllabus = deriveScaleSyllabus(exercises[0]);
+    expect(syllabus.parentScale).toBe("F Major");
+  });
+
+  it("derives the parent scale from a minor key", () => {
+    const exercises = deriveBookExercises(FIXTURE_PATHS, FIXTURE_MAP);
+    const syllabus = deriveScaleSyllabus(exercises[1]);
+    expect(syllabus.parentScale).toBe("C Minor");
+  });
+
+  it("maps ii-V-I chord types to Dorian/Mixolydian/Ionian", () => {
+    const exercises = deriveBookExercises(FIXTURE_PATHS, FIXTURE_MAP);
+    // Star Eyes: Fmaj7, Gm7, C7 -> Ionian, Dorian, Mixolydian.
+    const syllabus = deriveScaleSyllabus(exercises[0]);
+    expect(syllabus.modes).toEqual(["Ionian", "Dorian", "Mixolydian"]);
+  });
+
+  it("dedupes modes in first-appearance order", () => {
+    const exercises = deriveBookExercises(FIXTURE_PATHS, FIXTURE_MAP);
+    // Solar: Cm7, F7 -> Dorian, Mixolydian (no duplicates).
+    const syllabus = deriveScaleSyllabus(exercises[1]);
+    expect(syllabus.modes).toEqual(["Dorian", "Mixolydian"]);
+  });
+
+  it("falls back to C Major for an empty key", () => {
+    const ex: BookExercise = {
+      id: "x",
+      title: "X",
+      composer: "",
+      key: "",
+      tempo: 0,
+      feel: "",
+      bars: 0,
+      chordNames: ["Cmaj7"],
+      chordTones: [["C", "E", "G", "B"]],
+      practiceNotes: [],
+      tags: [],
+    };
+    expect(deriveScaleSyllabus(ex).parentScale).toBe("C Major");
+  });
+});
+
+describe("modeForChord", () => {
+  it("maps the ii-V-I families", () => {
+    expect(modeForChord("Dm7")).toBe("Dorian");
+    expect(modeForChord("G7")).toBe("Mixolydian");
+    expect(modeForChord("Cmaj7")).toBe("Ionian");
+  });
+
+  it("maps extended and altered dominants to Mixolydian", () => {
+    expect(modeForChord("G9")).toBe("Mixolydian");
+    expect(modeForChord("G13")).toBe("Mixolydian");
+    expect(modeForChord("G7b9")).toBe("Mixolydian");
+    expect(modeForChord("G7#9")).toBe("Mixolydian");
+  });
+
+  it("maps half-diminished and diminished chords", () => {
+    expect(modeForChord("F#m7b5")).toBe("Locrian");
+    expect(modeForChord("Bdim7")).toBe("Diminished (whole-half)");
+  });
+
+  it("maps minor-major and augmented chords", () => {
+    expect(modeForChord("CmM7")).toBe("Melodic Minor");
+    expect(modeForChord("Caug")).toBe("Whole Tone");
+  });
+
+  it("falls back to Ionian for unrecognized symbols", () => {
+    expect(modeForChord("N.C.")).toBe("Ionian");
+  });
+});
+
+describe("romanNumeralForChord", () => {
+  it("maps diatonic chords in a major key", () => {
+    expect(romanNumeralForChord("Fmaj7", "F")).toBe("I");
+    expect(romanNumeralForChord("Gm7", "F")).toBe("ii");
+    expect(romanNumeralForChord("C7", "F")).toBe("V");
+  });
+
+  it("maps diatonic chords in a minor key", () => {
+    expect(romanNumeralForChord("Cm7", "C-")).toBe("i");
+    expect(romanNumeralForChord("F7", "C-")).toBe("IV");
+    expect(romanNumeralForChord("G7", "C-")).toBe("V");
+  });
+
+  it("marks diminished chords with a degree symbol", () => {
+    expect(romanNumeralForChord("Bm7b5", "C")).toBe("vii\u00B0");
+  });
+
+  it("returns empty for unparseable chords", () => {
+    expect(romanNumeralForChord("N.C.", "C")).toBe("");
+  });
+});
+
+describe("guideTonesForChord", () => {
+  it("returns the 3rd and 7th for major 7th chords", () => {
+    expect(guideTonesForChord("Fmaj7")).toEqual(["A", "E"]);
+  });
+
+  it("returns the 3rd and 7th for minor 7th chords", () => {
+    expect(guideTonesForChord("Gm7")).toEqual(["Bb", "F"]);
+  });
+
+  it("returns the 3rd and 7th for dominant 7th chords", () => {
+    expect(guideTonesForChord("C7")).toEqual(["E", "Bb"]);
+  });
+
+  it("returns the 3rd and 7th for half-diminished chords", () => {
+    expect(guideTonesForChord("Bm7b5")).toEqual(["D", "A"]);
+  });
+
+  it("returns empty for unparseable chords", () => {
+    expect(guideTonesForChord("N.C.")).toEqual([]);
   });
 });

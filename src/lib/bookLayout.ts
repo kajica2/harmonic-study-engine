@@ -7,8 +7,18 @@
  *   - bookLayoutFor: paper dimensions + margins + card grid constants
  *   - layoutCardGrid: memory-card positions computed from margins and
  *     gaps (never overlapping, never exceeding the page)
- *   - layoutScorePage: vertical bands (header / score / footer) that
- *     partition the page with no intersection
+ *   - layoutScorePage: Real Book tune-page bands (header / score /
+ *     footer) that partition the page with no intersection
+ *   - layoutExercisePage: Aebersold exercise-page bands (title /
+ *     changes / notation / practice / footer)
+ *   - layoutSyllabusPage: Scale Syllabus appendix bands (header /
+ *     content / footer)
+ *
+ * The geometry follows published jazz-book conventions (Aebersold
+ * play-along volumes + Real Book lead sheets): a ~54pt margin, a tune
+ * header band with the title left and key/tempo/feel right, generous
+ * whitespace around the engraved score, and a footer carrying the page
+ * number + book title.
  */
 
 export type PaperSize = "a4" | "letter";
@@ -51,26 +61,53 @@ export interface CardGridLayout {
 }
 
 export interface ScorePageLayout {
-  /** Y baseline for the exercise header text. */
+  /** Y baseline for the tune header text (title left, meta right). */
   headerY: number;
   /** Y where the score content starts. */
   scoreY: number;
   /** Vertical space available for the score (footerY - scoreY). */
   scoreHeight: number;
-  /** Y baseline for the footer text. */
+  /** Y where the footer band starts. */
+  footerY: number;
+}
+
+export interface ExercisePageLayout {
+  /** Y baseline for the exercise title. */
+  titleY: number;
+  /** Y baseline for the changes row (chord symbols). */
+  changesY: number;
+  /** Y where the arpeggio/pattern notation starts. */
+  notationY: number;
+  /** Vertical space available for the notation. */
+  notationHeight: number;
+  /** Y baseline for the practice line. */
+  practiceY: number;
+  /** Y where the footer band starts. */
+  footerY: number;
+}
+
+export interface SyllabusPageLayout {
+  /** Y baseline for the syllabus header. */
+  headerY: number;
+  /** Y where the syllabus content starts. */
+  contentY: number;
+  /** Vertical space available for the content. */
+  contentHeight: number;
+  /** Y where the footer band starts. */
   footerY: number;
 }
 
 /**
  * Page geometry for a paper size. A4 is 595x842pt, letter is
- * 612x792pt; both use a 48pt margin, a 40pt header band, a 30pt
- * footer band, and a 2x2 memory-card grid with a 12pt gap.
+ * 612x792pt; both use a 54pt margin (Real Book style), a 60pt tune
+ * header band, a 36pt footer band, and a 2x2 memory-card grid with a
+ * 12pt gap.
  */
 export function bookLayoutFor(paper: PaperSize): BookLayout {
   const base = {
-    margin: 48,
-    headerHeight: 40,
-    footerHeight: 30,
+    margin: 54,
+    headerHeight: 60,
+    footerHeight: 36,
     cardCols: 2,
     cardRows: 2,
     cardGap: 12,
@@ -113,10 +150,11 @@ export function layoutCardGrid(
 }
 
 /**
- * Vertical rhythm for a score page: a header band at the top, a score
- * band in the middle, and a footer band at the bottom. The bands
- * partition the page (header ends where the score starts, the score
- * ends where the footer starts), so nothing can overlap.
+ * Vertical rhythm for a Real Book tune page: a header band at the top
+ * (title left, key/tempo/feel right), a score band in the middle, and
+ * a footer band at the bottom. The bands partition the page (header
+ * ends where the score starts, the score ends where the footer
+ * starts), so nothing can overlap.
  *
  * `exerciseIndex` is reserved for per-exercise layout variation; the
  * current template is uniform across exercises.
@@ -131,4 +169,41 @@ export function layoutScorePage(
   const footerY = pageHeight - margin - footerHeight;
   const scoreHeight = footerY - scoreY;
   return { headerY, scoreY, scoreHeight, footerY };
+}
+
+/**
+ * Vertical rhythm for an Aebersold-style exercise page: title, a
+ * changes row (chord symbols), the arpeggio/pattern notation, a
+ * practice line, then the footer. Bands are ordered top to bottom and
+ * never intersect; the notation band is the flexible middle.
+ */
+export function layoutExercisePage(
+  exerciseIndex: number,
+  layout: BookLayout,
+): ExercisePageLayout {
+  const { pageHeight, margin, footerHeight } = layout;
+  const titleY = margin + 24;
+  const changesY = margin + 58;
+  const notationY = margin + 96;
+  const footerY = pageHeight - margin - footerHeight;
+  const practiceY = footerY - 44;
+  const notationHeight = practiceY - notationY - 28;
+  return { titleY, changesY, notationY, notationHeight, practiceY, footerY };
+}
+
+/**
+ * Vertical rhythm for a Scale Syllabus appendix page: header, content
+ * band (parent scale + modes over the changes), footer. The content
+ * band fills the space between header and footer.
+ */
+export function layoutSyllabusPage(
+  exerciseIndex: number,
+  layout: BookLayout,
+): SyllabusPageLayout {
+  const { pageHeight, margin, footerHeight } = layout;
+  const headerY = margin + 24;
+  const contentY = margin + 64;
+  const footerY = pageHeight - margin - footerHeight;
+  const contentHeight = footerY - contentY;
+  return { headerY, contentY, contentHeight, footerY };
 }

@@ -57,8 +57,8 @@ export const BookSection: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
-  const [engraver, setEngraver] = useState<"abcjs" | "verovio">("abcjs");
-  const [arpStyle, setArpStyle] = useState<ArpStyle>("quarters");
+  const [engraver, setEngraver] = useState<"abcjs" | "verovio">("verovio");
+  const [arpStyle, setArpStyle] = useState<ArpStyle>("triplets");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -189,14 +189,18 @@ export const BookSection: React.FC = () => {
           Print-Ready Book
         </h3>
         <span className="t-label text-[color:var(--color-text-3)]">
-          {selectedIds.size} selected
+          Level: Advanced
         </span>
       </div>
       <p className="t-small text-[color:var(--color-text-2)]">
         Compile selected exercises into one PDF: cover, table of contents,
-        score, chord chart, practice notes, and double-sided memory cards.
-        Optionally engrave scores with Verovio, or download a ZIP of
-        per-exercise WAV + MIDI backing tracks.
+        Real Book tune pages, Aebersold-style exercise pages, a Scale
+        Syllabus appendix, and double-sided memory cards. Scores are
+        engraved with Verovio by default (abcjs available as an option),
+        or download a ZIP of per-exercise WAV + MIDI backing tracks.
+      </p>
+      <p className="t-small text-[color:var(--color-text-3)]">
+        {selectedIds.size} selected
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

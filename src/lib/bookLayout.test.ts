@@ -8,6 +8,8 @@ import {
   bookLayoutFor,
   layoutCardGrid,
   layoutScorePage,
+  layoutExercisePage,
+  layoutSyllabusPage,
   type BookLayout,
 } from "./bookLayout";
 
@@ -27,13 +29,13 @@ function assertPairwiseDisjoint(positions: { x: number; y: number; w: number; h:
 }
 
 describe("bookLayoutFor", () => {
-  it("A4 is 595x842 with the standard margins", () => {
+  it("A4 is 595x842 with the Real Book margins", () => {
     const l = bookLayoutFor("a4");
     expect(l.pageWidth).toBe(595);
     expect(l.pageHeight).toBe(842);
-    expect(l.margin).toBe(48);
-    expect(l.headerHeight).toBe(40);
-    expect(l.footerHeight).toBe(30);
+    expect(l.margin).toBe(54);
+    expect(l.headerHeight).toBe(60);
+    expect(l.footerHeight).toBe(36);
     expect(l.cardCols).toBe(2);
     expect(l.cardRows).toBe(2);
     expect(l.cardGap).toBe(12);
@@ -43,9 +45,9 @@ describe("bookLayoutFor", () => {
     const l = bookLayoutFor("letter");
     expect(l.pageWidth).toBe(612);
     expect(l.pageHeight).toBe(792);
-    expect(l.margin).toBe(48);
-    expect(l.headerHeight).toBe(40);
-    expect(l.footerHeight).toBe(30);
+    expect(l.margin).toBe(54);
+    expect(l.headerHeight).toBe(60);
+    expect(l.footerHeight).toBe(36);
     expect(l.cardCols).toBe(2);
     expect(l.cardRows).toBe(2);
     expect(l.cardGap).toBe(12);
@@ -137,6 +139,58 @@ describe("layoutScorePage", () => {
     const l = bookLayoutFor("a4");
     const a = layoutScorePage(0, l);
     const b = layoutScorePage(7, l);
+    expect(a).toEqual(b);
+  });
+});
+
+describe("layoutExercisePage", () => {
+  it("orders title, changes, notation, practice, and footer top to bottom", () => {
+    for (const paper of ["a4", "letter"] as const) {
+      const l = bookLayoutFor(paper);
+      const e = layoutExercisePage(0, l);
+      expect(e.titleY).toBeLessThan(e.changesY);
+      expect(e.changesY).toBeLessThan(e.notationY);
+      expect(e.notationY).toBeLessThan(e.practiceY);
+      expect(e.practiceY).toBeLessThan(e.footerY);
+      expect(e.footerY).toBeLessThanOrEqual(l.pageHeight - l.margin);
+      expect(e.notationHeight).toBeGreaterThan(0);
+    }
+  });
+
+  it("notation band never overlaps the changes row or practice line", () => {
+    const l = bookLayoutFor("a4");
+    const e = layoutExercisePage(0, l);
+    // Notation occupies [notationY, notationY + notationHeight).
+    const notationBottom = e.notationY + e.notationHeight;
+    expect(e.changesY).toBeLessThan(e.notationY);
+    expect(notationBottom).toBeLessThanOrEqual(e.practiceY);
+  });
+
+  it("is uniform across exercises", () => {
+    const l = bookLayoutFor("a4");
+    const a = layoutExercisePage(0, l);
+    const b = layoutExercisePage(7, l);
+    expect(a).toEqual(b);
+  });
+});
+
+describe("layoutSyllabusPage", () => {
+  it("partitions the page into header, content, and footer bands", () => {
+    for (const paper of ["a4", "letter"] as const) {
+      const l = bookLayoutFor(paper);
+      const s = layoutSyllabusPage(0, l);
+      expect(s.headerY).toBeLessThan(s.contentY);
+      expect(s.contentY).toBeLessThan(s.footerY);
+      expect(s.footerY).toBeLessThanOrEqual(l.pageHeight - l.margin);
+      expect(s.contentHeight).toBe(s.footerY - s.contentY);
+      expect(s.contentHeight).toBeGreaterThan(0);
+    }
+  });
+
+  it("is uniform across exercises", () => {
+    const l = bookLayoutFor("a4");
+    const a = layoutSyllabusPage(0, l);
+    const b = layoutSyllabusPage(7, l);
     expect(a).toEqual(b);
   });
 });
