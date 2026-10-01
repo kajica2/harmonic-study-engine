@@ -153,3 +153,70 @@ describe("buildLeadSheetAbc — one step = one bar (A2: form-truthful)", () => {
     expect(abc).toContain("%%text Form: 4 bars, repeats 3x in practice.");
   });
 });
+
+describe("buildLeadSheetAbc — opt-in arpStyle (even arpeggiation)", () => {
+  const path: HarmonicPath = {
+    id: "arp-style",
+    title: "Arp style",
+    description: "",
+    key: "C",
+    steps: [
+      { name: "Cmaj7", notes: [60, 64, 67, 71], descriptions: "" },
+      { name: "Fmaj7", notes: [65, 69, 72, 76], descriptions: "" },
+    ],
+  };
+
+  it("default output is byte-identical to explicit quarters", () => {
+    expect(buildLeadSheetAbc(path, "Concert")).toBe(
+      buildLeadSheetAbc(path, "Concert", "quarters"),
+    );
+  });
+
+  it("default quarters keeps the legacy overflow bracket for 5+ note chords", () => {
+    const five: HarmonicPath = {
+      id: "five",
+      title: "Five",
+      description: "",
+      key: "C",
+      steps: [{ name: "Cmaj9", notes: [60, 64, 67, 71, 74], descriptions: "" }],
+    };
+    const abc = buildLeadSheetAbc(five, "Concert");
+    // Frozen legacy: first 4 notes as quarters, 5th tacked on as an
+    // 8th inside the (malformed) bracket syntax.
+    expect(abc).toContain("c'4 e'4 g'4 b'4 [d''8]");
+  });
+
+  it("eighths emits 8 eighth notes per bar with no overflow brackets", () => {
+    const abc = buildLeadSheetAbc(path, "Concert", "eighths");
+    // 2 bars x 8 eighth tokens = 16 "8" duration tokens.
+    expect((abc.match(/[a-g][',]*8/g) || []).length).toBe(16);
+    // No overflow bracket syntax, no mixed quarter durations.
+    expect(abc).not.toContain("[");
+    expect(abc).not.toContain("]");
+    expect((abc.match(/[a-g][',]*4/g) || []).length).toBe(0);
+  });
+
+  it("eighths repeats the chord ascending (2 passes of a 4-note chord)", () => {
+    const abc = buildLeadSheetAbc(path, "Concert", "eighths");
+    const bar = abc.match(/\| [^|]+ \|/g)?.[0] ?? "";
+    // First bar: C E G B C E G B (concert pitches, abcjs octave suffix).
+    expect(bar).toContain("c'8 e'8 g'8 b'8 c'8 e'8 g'8 b'8");
+  });
+
+  it("triplets emits 12 triplet eighths grouped by the (3 prefix", () => {
+    const abc = buildLeadSheetAbc(path, "Concert", "triplets");
+    // 2 bars x 4 triplet groups = 8 "(3" prefixes.
+    expect((abc.match(/\(3/g) || []).length).toBe(8);
+    // 2 bars x 12 eighth tokens = 24.
+    expect((abc.match(/[a-g][',]*8/g) || []).length).toBe(24);
+    expect(abc).not.toContain("[");
+    expect(abc).not.toContain("]");
+  });
+
+  it("triplets groups every 3 notes into a tuplet", () => {
+    const abc = buildLeadSheetAbc(path, "Concert", "triplets");
+    const bar = abc.match(/\| [^|]+ \|/g)?.[0] ?? "";
+    // 4 groups of (3 + 3 eighths = 12 notes = 4 beats.
+    expect(bar).toContain("(3c'8 e'8 g'8 (3b'8 c'8 e'8 (3g'8 b'8 c'8 (3e'8 g'8 b'8");
+  });
+});

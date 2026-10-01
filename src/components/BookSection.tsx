@@ -26,6 +26,7 @@ import { findPathById, type HarmonicPath } from "../lib/paths";
 import { renderPathToWav } from "../lib/loopWav";
 import { exportToMidiFile } from "../lib/midiExport";
 import { deriveSlug, midiDataUriToBlob } from "../lib/marketplace";
+import type { ArpStyle } from "../lib/arpNotation";
 import { zipSync } from "fflate";
 
 const EMAIL_BOOK_ENDPOINT =
@@ -57,6 +58,7 @@ export const BookSection: React.FC = () => {
   const [isEmailing, setIsEmailing] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const [engraver, setEngraver] = useState<"abcjs" | "verovio">("abcjs");
+  const [arpStyle, setArpStyle] = useState<ArpStyle>("quarters");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -95,6 +97,7 @@ export const BookSection: React.FC = () => {
       title: "Harmonic Study Book",
       author: "Harmonic Study Engine",
       engraver,
+      arpStyle,
     });
     return { blob };
   };
@@ -235,6 +238,19 @@ export const BookSection: React.FC = () => {
             className="accent-[color:var(--color-brand)]"
           />
           Verovio engraving
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-[color:var(--color-text-2)]">
+          Arpeggiation
+          <select
+            value={arpStyle}
+            onChange={(e) => setArpStyle(e.target.value as ArpStyle)}
+            aria-label="Arpeggiation style for the book score pages"
+            className="px-2 py-1 rounded border border-[color:var(--color-border)] bg-transparent text-xs text-[color:var(--color-text-1)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--color-brand)]"
+          >
+            <option value="quarters">Quarters</option>
+            <option value="eighths">Eighths</option>
+            <option value="triplets">Triplets</option>
+          </select>
         </label>
         <button
           type="button"

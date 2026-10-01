@@ -39,6 +39,7 @@ import { svg2pdf } from "svg2pdf.js";
 import { buildLeadSheetAbc } from "./leadSheet";
 import type { HarmonicPath } from "./paths";
 import type { InstrumentPitch } from "./scoreGenerator";
+import type { ArpStyle } from "./arpNotation";
 import abcjs from "abcjs";
 // F3 (D110, blast-table #15): the cover page counts TRUE form bars.
 import { detectFormPeriod } from "./formPeriod";
@@ -130,11 +131,13 @@ export function pageBreakOffsets(
 export function renderPathToSvg(
   path: HarmonicPath,
   instrument: InstrumentPitch,
+  arpStyle: ArpStyle = "quarters",
 ): Element {
   // Build the ABC notation from the existing lead-sheet helper — same
   // data shape as the in-app LeadSheet component, so the PDF matches
-  // what the user is seeing on screen.
-  const abc = buildLeadSheetAbc(path, instrument);
+  // what the user is seeing on screen. arpStyle is OPT-IN; the default
+  // "quarters" keeps the historical output byte-identical.
+  const abc = buildLeadSheetAbc(path, instrument, arpStyle);
 
   // Render to a detached div. We can't use document.body directly
   // because the user would see a flash of unstyled SVG. The div is

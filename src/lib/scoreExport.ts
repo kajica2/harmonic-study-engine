@@ -17,6 +17,7 @@ import { transposeMidiList } from "./scoreGenerator";
 import { clampToPlayableRange } from "./leadSheet";
 import { detectFormPeriod } from "./formPeriod";
 import { totalFormBars } from "../../engine/practice/windows";
+import { arpNoteSequence, type ArpStyle } from "./arpNotation";
 
 // ---------------------------------------------------------------------------
 // MusicXML 4.0 export
@@ -48,6 +49,13 @@ export interface MusicXmlOptions {
    *  Block output stays byte-identical to the historical export.
    *  Arp uses divisions=2 with sequential quarters, eighths, rest. */
   voiceStyle?: VoiceStyle;
+  /** Arpeggiation style for the arp voice. OPT-IN: the default
+   *  "quarters" keeps the historical mixed quarter/eighth output
+   *  byte-identical. "eighths" and "triplets" emit an even full-bar
+   *  arpeggio (8 eighths at divisions=2, or 12 triplet eighths at
+   *  divisions=3) with no rests and no truncation; every measure
+   *  still sums to exactly beatsPerMeasure. */
+  arpStyle?: ArpStyle;
   /** When true, render the form once (slice steps to the detected
    *  form period) instead of the full padded step list. Default false. */
   trimToForm?: boolean;
@@ -338,6 +346,7 @@ export function toMusicXml(
     stepsPerMeasure = 1,
     melody,
     voiceStyle = "block",
+    arpStyle = "quarters",
     trimToForm = false,
   } = opts;
   if (path.steps.length === 0) throw new Error("Cannot export empty path");
@@ -352,7 +361,9 @@ export function toMusicXml(
   if (stepCount === 0) throw new Error("Cannot export empty path");
 
   const isArp = voiceStyle === "arp";
-  const divisions = isArp ? 2 : 1;
+  // Triplet eighths need divisions=3 (one division per triplet eighth,
+  // 12 divisions per 4/4 bar); quarters and eighths use divisions=2.
+  const divisions = isArp ? (arpStyle === "triplets" ? 3 : 2) : 1;
 
   const measures: string[] = [];
   let measureNumber = 1;
@@ -389,7 +400,11 @@ export function toMusicXml(
       measureNumber++;
     }
   } else {
-    const totalDivPerMeasure = beatsPerMeasure * 2;
+    // Even styles fill the bar with one duration class: eighths use
+    // 8 divisions (divisions=2), triplets use 12 (divisions=3). The
+    // quarters style keeps the historical allocator below.
+    const slotsPerBeat = arpStyle === "triplets" ? 3 : 2;
+    const totalDivPerMeasure = beatsPerMeasure * slotsPerBeat;
     for (let i = 0; i < stepCount; i += stepsPerMeasure) {
       const stepSlice = effectiveSteps.slice(i, i + stepsPerMeasure);
       const sliceLen = stepSlice.length;
@@ -400,52 +415,86 @@ export function toMusicXml(
         .map((step, stepIdx) => {
           const budgetDiv =
             stepIdx === sliceLen - 1 ? base + remainder : base;
-          const budgetQuarters = budgetDiv / 2;
           const arpNotes = prepareArpNotes(step.notes, transpose);
-          const alloc = allocateArpDurations(
-            arpNotes.length,
-            budgetQuarters,
-          );
-          const used = arpNotes.slice(0, alloc.usedNotes);
-          const quarterNotes = used.slice(0, alloc.quarters);
-          const eighthNotes = used.slice(
-            alloc.quarters,
-            alloc.quarters + alloc.eighths,
-          );
-          const quarterXml = quarterNotes
-            .map(
-              (m) => `
+          if (arpStyle === "quarters") {
+            const budgetQuarters = budgetDiv / 2;
+            const alloc = allocateArpDurations(
+              arpNotes.length,
+              budgetQuarters,
+            );
+            const used = arpNotes.slice(0, alloc.usedNotes);
+            const quarterNotes = used.slice(0, alloc.quarters);
+            const eighthNotes = used.slice(
+              alloc.quarters,
+              alloc.quarters + alloc.eighths,
+            );
+            const quarterXml = quarterNotes
+              .map(
+                (m) => `
         <note>
           <pitch>${midiToXmlPitch(m, 0)}</pitch>
           <duration>2</duration>
           <voice>1</voice>
           <type>quarter</type>
         </note>`,
-            )
-            .join("");
-          const eighthXml = eighthNotes
-            .map(
-              (m) => `
+              )
+              .join("");
+            const eighthXml = eighthNotes
+              .map(
+                (m) => `
         <note>
           <pitch>${midiToXmlPitch(m, 0)}</pitch>
           <duration>1</duration>
           <voice>1</voice>
           <type>eighth</type>
         </note>`,
-            )
-            .join("");
-          const restXml =
-            alloc.restDiv > 0
-              ? `
+              )
+              .join("");
+            const restXml =
+              alloc.restDiv > 0
+                ? `
         <note>
           <rest/>
           <duration>${alloc.restDiv}</duration>
           <voice>1</voice>
         </note>`
-              : "";
-          measureSum +=
-            alloc.quarters * 2 + alloc.eighths * 1 + alloc.restDiv;
-          return `${harmonyXmlForStep(step)}${quarterXml}${eighthXml}${restXml}`;
+                : "";
+            measureSum +=
+              alloc.quarters * 2 + alloc.eighths * 1 + alloc.restDiv;
+            return `${harmonyXmlForStep(step)}${quarterXml}${eighthXml}${restXml}`;
+          }
+          // Even styles: repeat the chord ascending to fill the step's
+          // budget exactly. Each note is one division (an eighth at
+          // divisions=2, a triplet eighth at divisions=3), so the sum
+          // is always budgetDiv and the measure never needs a rest.
+          // A degenerate empty chord falls back to a full-budget rest
+          // so the exact-sum invariant still holds.
+          const seq = arpNoteSequence(
+            arpNotes,
+            arpStyle,
+            budgetDiv / slotsPerBeat,
+          );
+          const noteXml =
+            seq.length > 0
+              ? seq
+                  .map(
+                    (m) => `
+        <note>
+          <pitch>${midiToXmlPitch(m, 0)}</pitch>
+          <duration>1</duration>
+          <voice>1</voice>
+          <type>eighth</type>
+        </note>`,
+                  )
+                  .join("")
+              : `
+        <note>
+          <rest/>
+          <duration>${budgetDiv}</duration>
+          <voice>1</voice>
+        </note>`;
+          measureSum += seq.length > 0 ? seq.length : budgetDiv;
+          return `${harmonyXmlForStep(step)}${noteXml}`;
         })
         .join("");
       if (measureSum !== totalDivPerMeasure) {

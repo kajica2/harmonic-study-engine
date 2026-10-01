@@ -441,3 +441,179 @@ describe("arp empty path", () => {
     ).toThrow(/empty/);
   });
 });
+
+describe("arp opt-in arpStyle (even arpeggiation)", () => {
+  it("default arp output is byte-identical to explicit quarters", () => {
+    const def = toMusicXml(TEST_PATH, { voiceStyle: "arp" });
+    const explicit = toMusicXml(TEST_PATH, {
+      voiceStyle: "arp",
+      arpStyle: "quarters",
+    });
+    expect(explicit).toBe(def);
+  });
+
+  it("eighths renders 8 eighth notes summing to 8 divisions", () => {
+    const xml = toMusicXml(TEST_PATH, {
+      voiceStyle: "arp",
+      arpStyle: "eighths",
+    });
+    expect(xml).toContain("<divisions>2</divisions>");
+    const measures = dataMeasures(p1Section(xml));
+    expect(measures.length).toBe(3);
+    for (const m of measures) {
+      expect(sumDurations(m)).toBe(8);
+      expect(countTag(m, "<type>eighth</type>")).toBe(8);
+      expect(countTag(m, "<type>quarter</type>")).toBe(0);
+      expect(countTag(m, "<rest/>")).toBe(0);
+      expect(countTag(m, "<pitch>")).toBe(8);
+    }
+  });
+
+  it("eighths repeats the chord ascending (2 passes of a 4-note chord)", () => {
+    const xml = toMusicXml(TEST_PATH, {
+      voiceStyle: "arp",
+      arpStyle: "eighths",
+    });
+    const m = dataMeasures(p1Section(xml))[0];
+    // Dm7 = [50, 53, 57, 60] -> D3 F3 A3 C4, twice.
+    const pitches = m.match(/<pitch>([^<]+)<\/pitch>/g) ?? [];
+    expect(pitches).toEqual([
+      "<pitch>D3</pitch>",
+      "<pitch>F3</pitch>",
+      "<pitch>A3</pitch>",
+      "<pitch>C4</pitch>",
+      "<pitch>D3</pitch>",
+      "<pitch>F3</pitch>",
+      "<pitch>A3</pitch>",
+      "<pitch>C4</pitch>",
+    ]);
+  });
+
+  it("triplets renders 12 triplet eighths at divisions 3 summing to 12", () => {
+    const xml = toMusicXml(TEST_PATH, {
+      voiceStyle: "arp",
+      arpStyle: "triplets",
+    });
+    expect(xml).toContain("<divisions>3</divisions>");
+    const measures = dataMeasures(p1Section(xml));
+    expect(measures.length).toBe(3);
+    for (const m of measures) {
+      expect(sumDurations(m)).toBe(12);
+      expect(countTag(m, "<type>eighth</type>")).toBe(12);
+      expect(countTag(m, "<type>quarter</type>")).toBe(0);
+      expect(countTag(m, "<rest/>")).toBe(0);
+      expect(countTag(m, "<pitch>")).toBe(12);
+    }
+  });
+
+  it("triplets repeats the chord ascending (3 passes of a 4-note chord)", () => {
+    const xml = toMusicXml(TEST_PATH, {
+      voiceStyle: "arp",
+      arpStyle: "triplets",
+    });
+    const m = dataMeasures(p1Section(xml))[0];
+    const pitches = m.match(/<pitch>([^<]+)<\/pitch>/g) ?? [];
+    expect(pitches.length).toBe(12);
+    expect(pitches.slice(0, 4)).toEqual([
+      "<pitch>D3</pitch>",
+      "<pitch>F3</pitch>",
+      "<pitch>A3</pitch>",
+      "<pitch>C4</pitch>",
+    ]);
+    expect(pitches.slice(4, 8)).toEqual(pitches.slice(0, 4));
+    expect(pitches.slice(8, 12)).toEqual(pitches.slice(0, 4));
+  });
+
+  it("eighths with a 3-note chord fills 8 slots with 2 passes plus 2", () => {
+    const path: HarmonicPath = {
+      id: "triad",
+      title: "Triad",
+      description: "",
+      steps: [{ name: "C", notes: [60, 64, 67], descriptions: "" }],
+    };
+    const xml = toMusicXml(path, { voiceStyle: "arp", arpStyle: "eighths" });
+    const m = dataMeasures(p1Section(xml))[0];
+    expect(sumDurations(m)).toBe(8);
+    expect(countTag(m, "<pitch>")).toBe(8);
+    const pitches = m.match(/<pitch>([^<]+)<\/pitch>/g) ?? [];
+    expect(pitches).toEqual([
+      "<pitch>C4</pitch>",
+      "<pitch>E4</pitch>",
+      "<pitch>G4</pitch>",
+      "<pitch>C4</pitch>",
+      "<pitch>E4</pitch>",
+      "<pitch>G4</pitch>",
+      "<pitch>C4</pitch>",
+      "<pitch>E4</pitch>",
+    ]);
+  });
+
+  it("triplets with a 5-note chord fills 12 slots with 2 passes plus 2", () => {
+    const path: HarmonicPath = {
+      id: "pent",
+      title: "Pent",
+      description: "",
+      steps: [{ name: "C", notes: [60, 62, 64, 67, 69], descriptions: "" }],
+    };
+    const xml = toMusicXml(path, { voiceStyle: "arp", arpStyle: "triplets" });
+    const m = dataMeasures(p1Section(xml))[0];
+    expect(sumDurations(m)).toBe(12);
+    expect(countTag(m, "<pitch>")).toBe(12);
+  });
+
+  it("even styles keep the exact-sum invariant under stepsPerMeasure splits", () => {
+    const path: HarmonicPath = {
+      id: "s3",
+      title: "S3",
+      description: "",
+      steps: [
+        { name: "C", notes: [60], descriptions: "" },
+        { name: "F", notes: [65], descriptions: "" },
+        { name: "G", notes: [67], descriptions: "" },
+      ],
+    };
+    const eighths = toMusicXml(path, {
+      voiceStyle: "arp",
+      arpStyle: "eighths",
+      stepsPerMeasure: 3,
+    });
+    const m8 = dataMeasures(p1Section(eighths))[0];
+    expect(sumDurations(m8)).toBe(8);
+    expect(countTag(m8, "<pitch>")).toBe(8);
+
+    const triplets = toMusicXml(path, {
+      voiceStyle: "arp",
+      arpStyle: "triplets",
+      stepsPerMeasure: 3,
+    });
+    const m3 = dataMeasures(p1Section(triplets))[0];
+    expect(sumDurations(m3)).toBe(12);
+    expect(countTag(m3, "<pitch>")).toBe(12);
+  });
+
+  it("even styles fall back to a full-budget rest for an empty chord", () => {
+    const path: HarmonicPath = {
+      id: "empty-notes",
+      title: "Empty Notes",
+      description: "",
+      steps: [{ name: "C", notes: [], descriptions: "" }],
+    };
+    const eighths = toMusicXml(path, {
+      voiceStyle: "arp",
+      arpStyle: "eighths",
+    });
+    const m8 = dataMeasures(p1Section(eighths))[0];
+    expect(sumDurations(m8)).toBe(8);
+    expect(countTag(m8, "<pitch>")).toBe(0);
+    expect(countTag(m8, "<rest/>")).toBe(1);
+
+    const triplets = toMusicXml(path, {
+      voiceStyle: "arp",
+      arpStyle: "triplets",
+    });
+    const m3 = dataMeasures(p1Section(triplets))[0];
+    expect(sumDurations(m3)).toBe(12);
+    expect(countTag(m3, "<pitch>")).toBe(0);
+    expect(countTag(m3, "<rest/>")).toBe(1);
+  });
+});

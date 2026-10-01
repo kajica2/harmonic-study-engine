@@ -23,21 +23,15 @@ import { toMusicXml } from "./scoreExport";
 import { renderMusicXmlToSvg, parseSvgString } from "./verovioRenderer";
 import type { HarmonicPath } from "./paths";
 import type { InstrumentPitch } from "./scoreGenerator";
+import type { ArpStyle } from "./arpNotation";
 import {
-  cardGridLayout,
-  type BookExercise,
-  type MemoryCard,
-} from "./bookGenerator";
-
-/** A4 portrait in points - 595.28 x 841.89 */
-const A4_W = 595.28;
-const A4_H = 841.89;
-
-/** Page margin (pts). */
-const MARGIN = 40;
-
-/** Vertical space reserved for the exercise header above each score. */
-const SCORE_HEADER_H = 36;
+  bookLayoutFor,
+  layoutCardGrid,
+  layoutScorePage,
+  type BookLayout,
+  type PaperSize,
+} from "./bookLayout";
+import type { BookExercise, MemoryCard } from "./bookGenerator";
 
 export interface BookPdfArgs {
   exercises: BookExercise[];
@@ -49,6 +43,10 @@ export interface BookPdfArgs {
   instrument?: InstrumentPitch;
   /** Score engraver: abcjs (default, frozen) or Verovio (WASM). */
   engraver?: "abcjs" | "verovio";
+  /** Paper size for the book (default A4). */
+  paper?: PaperSize;
+  /** Arpeggiation style for the score pages (default quarters). */
+  arpStyle?: ArpStyle;
 }
 
 /**
@@ -68,16 +66,22 @@ export async function exportBookPdf(args: BookPdfArgs): Promise<Blob> {
     author,
     instrument = "Concert",
     engraver = "abcjs",
+    paper = "a4",
+    arpStyle = "quarters",
   } = args;
+
+  // All page geometry derives from the shared layout template so the
+  // header, score, footer, and card grids never overlap.
+  const layout = bookLayoutFor(paper);
 
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "pt",
-    format: "a4",
+    format: paper,
   });
 
   // Page 1: cover.
-  renderCover(doc, title, author, exercises.length, cards.length);
+  renderCover(doc, title, author, exercises.length, cards.length, layout);
 
   // Track where each exercise starts for the TOC.
   const tocEntries: { title: string; page: number }[] = [];
@@ -88,27 +92,27 @@ export async function exportBookPdf(args: BookPdfArgs): Promise<Blob> {
     const path = paths[i];
     tocEntries.push({ title: ex.title, page: doc.getNumberOfPages() + 1 });
 
-    await renderScorePages(doc, ex, path, instrument, i, engraver);
-    renderChordChart(doc, ex, path, i);
-    renderPracticeNotes(doc, ex, i);
+    await renderScorePages(doc, ex, path, instrument, i, engraver, layout, arpStyle);
+    renderChordChart(doc, ex, path, i, layout);
+    renderPracticeNotes(doc, ex, i, layout);
   }
 
   // Memory cards: front pages then back pages (same grid positions).
-  const layout = cardGridLayout(cards.length);
+  const cardLayout = layoutCardGrid(cards.length, layout);
   const cardStartPage = doc.getNumberOfPages() + 1;
-  for (let p = 0; p < layout.pages; p++) {
+  for (let p = 0; p < cardLayout.frontPages; p++) {
     doc.addPage();
-    renderCardGrid(doc, cards, p, layout.cardsPerPage, "front");
+    renderCardGrid(doc, cards, p, layout, "front");
   }
-  for (let p = 0; p < layout.pages; p++) {
+  for (let p = 0; p < cardLayout.backPages; p++) {
     doc.addPage();
-    renderCardGrid(doc, cards, p, layout.cardsPerPage, "back");
+    renderCardGrid(doc, cards, p, layout, "back");
   }
 
   // TOC: render last, then move to page 2.
   const tocPage = doc.getNumberOfPages() + 1;
   doc.addPage();
-  renderToc(doc, title, tocEntries, cardStartPage);
+  renderToc(doc, title, tocEntries, cardStartPage, layout);
   doc.movePage(tocPage, 2);
 
   return doc.output("blob");
@@ -120,24 +124,26 @@ function renderCover(
   author: string,
   exerciseCount: number,
   cardCount: number,
+  layout: BookLayout,
 ): void {
+  const { pageWidth, pageHeight, margin } = layout;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(28);
-  doc.text(title, MARGIN, 120);
+  doc.text(title, margin, 120);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(14);
   if (author) {
-    doc.text(`by ${author}`, MARGIN, 150);
+    doc.text(`by ${author}`, margin, 150);
   }
 
   doc.setFontSize(11);
-  doc.text(`${exerciseCount} exercises`, MARGIN, 190);
-  doc.text(`${cardCount} memory cards`, MARGIN, 210);
+  doc.text(`${exerciseCount} exercises`, margin, 190);
+  doc.text(`${cardCount} memory cards`, margin, 210);
   doc.text(
     `Generated ${new Date().toISOString().slice(0, 10)}`,
-    MARGIN,
-    A4_H - MARGIN,
+    margin,
+    pageHeight - margin,
   );
 }
 
@@ -148,30 +154,34 @@ async function renderScorePages(
   instrument: InstrumentPitch,
   exerciseIndex: number,
   engraver: "abcjs" | "verovio",
+  layout: BookLayout,
+  arpStyle: ArpStyle,
 ): Promise<void> {
   if (engraver === "verovio") {
-    await renderVerovioScorePages(doc, ex, path, exerciseIndex);
+    await renderVerovioScorePages(doc, ex, path, exerciseIndex, layout, arpStyle);
     return;
   }
-  const svgElem = renderPathToSvg(path, instrument);
+  const { pageWidth, margin } = layout;
+  const score = layoutScorePage(exerciseIndex, layout);
+  const svgElem = renderPathToSvg(path, instrument, arpStyle);
   const svgRect = svgElem.getBoundingClientRect();
-  const svgW = svgRect.width || A4_W - 2 * MARGIN;
+  const svgW = svgRect.width || pageWidth - 2 * margin;
   const svgH = svgRect.height || 200;
 
-  const targetW = A4_W - 2 * MARGIN;
+  const targetW = pageWidth - 2 * margin;
   const scale = targetW / svgW;
   const targetH = svgH * scale;
-  const usableH = A4_H - MARGIN - SCORE_HEADER_H - MARGIN;
+  const usableH = score.scoreHeight;
   const offsets = pageBreakOffsets(svgElem, scale, usableH, targetH);
 
   for (let i = 0; i < offsets.length; i++) {
     doc.addPage();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, MARGIN, MARGIN + 14);
+    doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, margin, score.headerY);
     await svg2pdf(svgElem as unknown as SVGElement, doc, {
-      x: MARGIN,
-      y: MARGIN + SCORE_HEADER_H - offsets[i] * scale,
+      x: margin,
+      y: score.scoreY - offsets[i] * scale,
       width: targetW,
       height: targetH,
     });
@@ -190,8 +200,16 @@ async function renderVerovioScorePages(
   ex: BookExercise,
   path: HarmonicPath,
   exerciseIndex: number,
+  layout: BookLayout,
+  arpStyle: ArpStyle,
 ): Promise<void> {
-  const musicXml = toMusicXml(path, { voiceStyle: "arp", trimToForm: true });
+  const { pageWidth, margin } = layout;
+  const score = layoutScorePage(exerciseIndex, layout);
+  const musicXml = toMusicXml(path, {
+    voiceStyle: "arp",
+    arpStyle,
+    trimToForm: true,
+  });
   const svgString = await renderMusicXmlToSvg(musicXml, {
     pageWidth: 2100,
     scale: 100,
@@ -200,20 +218,20 @@ async function renderVerovioScorePages(
   });
   const svgElem = parseSvgString(svgString);
 
-  const svgW = parseFloat(svgElem.getAttribute("width") ?? "") || A4_W - 2 * MARGIN;
+  const svgW = parseFloat(svgElem.getAttribute("width") ?? "") || pageWidth - 2 * margin;
   const svgH = parseFloat(svgElem.getAttribute("height") ?? "") || 200;
 
-  const targetW = A4_W - 2 * MARGIN;
+  const targetW = pageWidth - 2 * margin;
   const scale = targetW / svgW;
   const targetH = svgH * scale;
 
   doc.addPage();
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, MARGIN, MARGIN + 14);
+  doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, margin, score.headerY);
   await svg2pdf(svgElem, doc, {
-    x: MARGIN,
-    y: MARGIN + SCORE_HEADER_H,
+    x: margin,
+    y: score.scoreY,
     width: targetW,
     height: targetH,
   });
@@ -224,20 +242,22 @@ function renderChordChart(
   ex: BookExercise,
   path: HarmonicPath,
   exerciseIndex: number,
+  layout: BookLayout,
 ): void {
+  const { pageWidth, pageHeight, margin } = layout;
   const steps = path.steps;
-  const cellW = (A4_W - 2 * MARGIN) / 4;
+  const cellW = (pageWidth - 2 * margin) / 4;
   const cellH = 44;
-  const rowsPerPage = Math.floor((A4_H - 130 - MARGIN) / cellH);
+  const rowsPerPage = Math.floor((pageHeight - 130 - margin) / cellH);
   const perPage = rowsPerPage * 4;
 
   for (let start = 0; start < steps.length; start += perPage) {
     if (start > 0) doc.addPage();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, MARGIN, 60);
+    doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, margin, 60);
     doc.setFontSize(11);
-    doc.text("Chord Chart", MARGIN, 80);
+    doc.text("Chord Chart", margin, 80);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
@@ -249,13 +269,13 @@ function renderChordChart(
     ]
       .filter(Boolean)
       .join("  |  ");
-    if (meta) doc.text(meta, MARGIN, 100);
+    if (meta) doc.text(meta, margin, 100);
 
     const chunk = steps.slice(start, start + perPage);
     chunk.forEach((step, i) => {
       const col = i % 4;
       const row = Math.floor(i / 4);
-      const x = MARGIN + col * cellW;
+      const x = margin + col * cellW;
       const cy = 130 + row * cellH;
       doc.setFontSize(9);
       doc.setTextColor(120);
@@ -273,13 +293,15 @@ function renderPracticeNotes(
   doc: jsPDF,
   ex: BookExercise,
   exerciseIndex: number,
+  layout: BookLayout,
 ): void {
+  const { pageWidth, margin } = layout;
   doc.addPage();
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, MARGIN, 60);
+  doc.text(`Exercise ${exerciseIndex + 1}: ${ex.title}`, margin, 60);
   doc.setFontSize(11);
-  doc.text("Practice Notes", MARGIN, 80);
+  doc.text("Practice Notes", margin, 80);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
@@ -287,11 +309,11 @@ function renderPracticeNotes(
   const notes =
     ex.practiceNotes.length > 0 ? ex.practiceNotes : ["No practice notes yet."];
   for (const note of notes) {
-    const lines = doc.splitTextToSize(note, A4_W - 2 * MARGIN - 20);
-    doc.text(`- ${lines[0]}`, MARGIN, y);
+    const lines = doc.splitTextToSize(note, pageWidth - 2 * margin - 20);
+    doc.text(`- ${lines[0]}`, margin, y);
     y += 16;
     for (let i = 1; i < lines.length; i++) {
-      doc.text(lines[i], MARGIN + 12, y);
+      doc.text(lines[i], margin + 12, y);
       y += 16;
     }
     y += 8;
@@ -300,9 +322,9 @@ function renderPracticeNotes(
   if (ex.tags.length > 0) {
     y += 10;
     doc.setFont("helvetica", "bold");
-    doc.text("Tags:", MARGIN, y);
+    doc.text("Tags:", margin, y);
     doc.setFont("helvetica", "normal");
-    doc.text(ex.tags.join(", "), MARGIN + 44, y);
+    doc.text(ex.tags.join(", "), margin + 44, y);
   }
 }
 
@@ -310,28 +332,22 @@ function renderCardGrid(
   doc: jsPDF,
   cards: MemoryCard[],
   pageIndex: number,
-  cardsPerPage: number,
+  layout: BookLayout,
   side: "front" | "back",
 ): void {
-  const cols = 2;
-  const rows = 2;
-  const gap = 24;
-  const cardW = (A4_W - 2 * MARGIN - gap) / cols;
-  const cardH = (A4_H - 2 * MARGIN - gap) / rows;
+  const grid = layoutCardGrid(cards.length, layout);
+  const { positions, cardsPerPage } = grid;
 
   for (let i = 0; i < cardsPerPage; i++) {
     const cardIndex = pageIndex * cardsPerPage + i;
     if (cardIndex >= cards.length) break;
     const card = cards[cardIndex];
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const x = MARGIN + col * (cardW + gap);
-    const y = MARGIN + row * (cardH + gap);
+    const pos = positions[i];
 
     // Dashed cut line around the card.
     doc.setLineDashPattern([4, 4], 0);
     doc.setDrawColor(150);
-    doc.rect(x, y, cardW, cardH);
+    doc.rect(pos.x, pos.y, pos.w, pos.h);
     doc.setLineDashPattern([], 0);
 
     // Card number (top-left corner) so the user can verify alignment
@@ -339,19 +355,19 @@ function renderCardGrid(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(120);
-    doc.text(`Card ${cardIndex + 1}`, x + 8, y + 12);
+    doc.text(`Card ${cardIndex + 1}`, pos.x + 8, pos.y + 12);
     doc.setTextColor(0);
 
     if (side === "front") {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(26);
-      const lines = doc.splitTextToSize(card.front, cardW - 20);
-      doc.text(lines, x + cardW / 2, y + cardH / 2, { align: "center" });
+      const lines = doc.splitTextToSize(card.front, pos.w - 20);
+      doc.text(lines, pos.x + pos.w / 2, pos.y + pos.h / 2, { align: "center" });
     } else {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
-      const lines = doc.splitTextToSize(card.back, cardW - 20);
-      doc.text(lines, x + cardW / 2, y + cardH / 2, { align: "center" });
+      const lines = doc.splitTextToSize(card.back, pos.w - 20);
+      doc.text(lines, pos.x + pos.w / 2, pos.y + pos.h / 2, { align: "center" });
     }
   }
 }
@@ -361,27 +377,29 @@ function renderToc(
   title: string,
   entries: { title: string; page: number }[],
   cardStartPage: number,
+  layout: BookLayout,
 ): void {
+  const { pageWidth, margin } = layout;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.text("Table of Contents", MARGIN, 60);
+  doc.text("Table of Contents", margin, 60);
   doc.setFontSize(11);
-  doc.text(title, MARGIN, 80);
+  doc.text(title, margin, 80);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   let y = 110;
   entries.forEach((entry, i) => {
-    doc.text(`${i + 1}. ${entry.title}`, MARGIN, y);
-    doc.text(String(entry.page + 1), A4_W - MARGIN, y, { align: "right" });
+    doc.text(`${i + 1}. ${entry.title}`, margin, y);
+    doc.text(String(entry.page + 1), pageWidth - margin, y, { align: "right" });
     y += 20;
   });
 
   y += 10;
   doc.setFont("helvetica", "bold");
-  doc.text("Memory Cards", MARGIN, y);
+  doc.text("Memory Cards", margin, y);
   doc.setFont("helvetica", "normal");
-  doc.text(String(cardStartPage + 1), A4_W - MARGIN, y, { align: "right" });
+  doc.text(String(cardStartPage + 1), pageWidth - margin, y, { align: "right" });
 }
 
 /**

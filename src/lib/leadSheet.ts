@@ -27,6 +27,13 @@ import {
 import { transposeChordName } from "./theory";
 import { detectFormPeriod } from "./formPeriod";
 import { totalFormBars } from "../../engine/practice/windows";
+import {
+  arpNoteSequence,
+  arpDurationTokens,
+  ABC_TRIPLET_PREFIX,
+  TRIPLET_GROUP_SIZE,
+  type ArpStyle,
+} from "./arpNotation";
 
 const NOTE_TO_ABC: Record<number, string> = {
   0: "c", 1: "_d", 2: "d", 3: "_e", 4: "e", 5: "f",
@@ -128,10 +135,18 @@ export function abcKeySignature(
  * form to satisfy the bar-count policy), we render the form exactly
  * once and append a `%%text` footer reporting the repeat count the
  * live transport will play through.
+ *
+ * `arpStyle` is OPT-IN: the default "quarters" keeps the historical
+ * first-4-notes-as-quarters output byte-identical (including the
+ * overflow 8ths tacked onto 5+ note chords). "eighths" and "triplets"
+ * emit an even full-bar arpeggio (8 eighths or 12 triplet eighths)
+ * with no overflow brackets and no mixed durations, so every bar sums
+ * to exactly 4/4.
  */
 export function buildLeadSheetAbc(
   path: HarmonicPath,
   instrument: InstrumentPitch,
+  arpStyle: ArpStyle = "quarters",
 ): string {
   const transposeSemitones = TRANSPOSITIONS[instrument];
   const lines: string[] = [];
@@ -168,24 +183,39 @@ export function buildLeadSheetAbc(
       barTokens.push(`"^${s.name}"`);
     }
 
-    // Arpeggiate across 4 quarter beats. If we have more notes
-    // than beats, switch to 8ths at the end of the arpeggio.
-    const quarterNotes = playable.slice(0, 4);
-    const overflow = playable.slice(4);
+    // Arpeggiate across the bar. The default "quarters" style is the
+    // FROZEN legacy path: first 4 notes as quarters, overflow tacked
+    // on as 8ths (byte-identical to the pre-arpStyle output). The
+    // "eighths" and "triplets" styles emit an even full-bar arpeggio
+    // with no overflow brackets and no mixed durations.
+    if (arpStyle === "quarters") {
+      const quarterNotes = playable.slice(0, 4);
+      const overflow = playable.slice(4);
 
-    quarterNotes.forEach((midi, noteIdx) => {
-      barTokens.push(`${midiToABC(midi)}4`);
-      if (noteIdx < quarterNotes.length - 1) barTokens.push(" ");
-    });
-    if (overflow.length > 0) {
-      // First quarter slot is already used — switch overflow to
-      // 8ths and tack them onto the end of the bar. The bar
-      // already has 4 quarters; we add 8ths after.
-      if (quarterNotes.length > 0) barTokens.push(" ");
-      overflow.forEach((midi) => {
-        barTokens.push(`[${midiToABC(midi)}8`);
+      quarterNotes.forEach((midi, noteIdx) => {
+        barTokens.push(`${midiToABC(midi)}4`);
+        if (noteIdx < quarterNotes.length - 1) barTokens.push(" ");
       });
-      if (overflow.length > 0) barTokens.push("]");
+      if (overflow.length > 0) {
+        // First quarter slot is already used — switch overflow to
+        // 8ths and tack them onto the end of the bar. The bar
+        // already has 4 quarters; we add 8ths after.
+        if (quarterNotes.length > 0) barTokens.push(" ");
+        overflow.forEach((midi) => {
+          barTokens.push(`[${midiToABC(midi)}8`);
+        });
+        if (overflow.length > 0) barTokens.push("]");
+      }
+    } else {
+      const seq = arpNoteSequence(playable, arpStyle);
+      const { duration } = arpDurationTokens(arpStyle);
+      seq.forEach((midi, noteIdx) => {
+        if (arpStyle === "triplets" && noteIdx % TRIPLET_GROUP_SIZE === 0) {
+          barTokens.push(ABC_TRIPLET_PREFIX);
+        }
+        barTokens.push(`${midiToABC(midi)}${duration}`);
+        if (noteIdx < seq.length - 1) barTokens.push(" ");
+      });
     }
 
     barBuffer.push(`| ${barTokens.join("")} |`);
