@@ -313,10 +313,14 @@ async function renderExercisePage(
 ): Promise<void> {
   const { pageWidth, margin } = layout;
   const exLayout = layoutExercisePage(exerciseIndex, layout);
-  const musicXml = toMusicXml(path, {
+  // Coker/Aebersold convention: the pattern page shows the first 8 bars
+  // of the arpeggio, not the whole form - the player repeats it over the
+  // changes. Keeps the engraved vector load per page bounded.
+  const patternPath = { ...path, steps: path.steps.slice(0, 8) };
+  const musicXml = toMusicXml(patternPath, {
     voiceStyle: "arp",
     arpStyle,
-    trimToForm: true,
+    trimToForm: false,
   });
   const svgString = await renderMusicXmlToSvg(musicXml, {
     pageWidth: 2100,
