@@ -59,6 +59,7 @@ export const BookSection: React.FC = () => {
   const [isEmailing, setIsEmailing] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
   const [isMusicXml, setIsMusicXml] = useState(false);
+  const [scoreFormat, setScoreFormat] = useState<"svg" | "png" | null>(null);
   const [engraver, setEngraver] = useState<"abcjs" | "verovio">("verovio");
   const [arpStyle, setArpStyle] = useState<ArpStyle>("triplets");
   const [email, setEmail] = useState("");
@@ -208,6 +209,47 @@ export const BookSection: React.FC = () => {
     }
   };
 
+  /**
+   * Engrave every selected exercise (arp voice, trimmed to form) and
+   * download the scores as a ZIP of SVG files or of PNG rasters. One
+   * busy state is shared by both buttons so two Verovio renders never
+   * run at the same time.
+   */
+  const handleDownloadScores = async (format: "svg" | "png") => {
+    if (selectedIds.size === 0 || scoreFormat !== null) return;
+    const selected = catalog.filter((c) => selectedIds.has(c.entry.id));
+    setScoreFormat(format);
+    setError("");
+    setStatus("");
+    try {
+      const scoreImages = await import("../lib/scoreImages");
+      const members: Record<string, Uint8Array> = {};
+      for (const { path } of selected) {
+        const svg = await scoreImages.buildScoreSvg(path, { arpStyle });
+        if (format === "svg") {
+          members[scoreImages.scoreImageFilename(path, "svg")] = strToU8(svg);
+        } else {
+          const png = await scoreImages.svgToPngBlob(svg);
+          members[scoreImages.scoreImageFilename(path, "png")] =
+            new Uint8Array(await png.arrayBuffer());
+        }
+      }
+      const zipBytes = zipSync(members);
+      const { downloadBlob } = await import("../lib/composeExport");
+      downloadBlob(
+        new Blob([zipBytes as unknown as BlobPart], { type: "application/zip" }),
+        `harmonic-study-book-${format}.zip`,
+      );
+      setStatus(
+        `Downloaded ${format.toUpperCase()} (${selected.length} exercises)`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setScoreFormat(null);
+    }
+  };
+
   return (
     <section
       aria-label="Print-ready book"
@@ -227,7 +269,9 @@ export const BookSection: React.FC = () => {
         Syllabus appendix, and double-sided memory cards. Scores are
         engraved with Verovio by default (abcjs available as an option),
         or download a ZIP of per-exercise WAV + MIDI backing tracks, or a
-        ZIP of per-exercise MusicXML scores for MuseScore / Finale / Dorico.
+        ZIP of per-exercise MusicXML scores for MuseScore / Finale / Dorico,
+        or a ZIP of the engraved scores as SVG / PNG files for the web,
+        print, and further editing.
       </p>
       <p className="t-small text-[color:var(--color-text-3)]">
         {selectedIds.size} selected
@@ -303,6 +347,24 @@ export const BookSection: React.FC = () => {
           className={buttonClass}
         >
           {isMusicXml ? "Exporting..." : "Download MusicXML (all)"}
+        </button>
+        <button
+          type="button"
+          aria-label="Download SVG scores for all selected exercises"
+          onClick={() => handleDownloadScores("svg")}
+          disabled={scoreFormat !== null || selectedIds.size === 0}
+          className={buttonClass}
+        >
+          {scoreFormat === "svg" ? "Engraving..." : "Download SVG (all)"}
+        </button>
+        <button
+          type="button"
+          aria-label="Download PNG scores for all selected exercises"
+          onClick={() => handleDownloadScores("png")}
+          disabled={scoreFormat !== null || selectedIds.size === 0}
+          className={buttonClass}
+        >
+          {scoreFormat === "png" ? "Rasterizing..." : "Download PNG (all)"}
         </button>
         <input
           type="email"
