@@ -102,6 +102,7 @@ export async function exportBookPdf(args: BookPdfArgs): Promise<Blob> {
     orientation: "portrait",
     unit: "pt",
     format: paper,
+    compress: true,
   });
 
   // Page 1: cover.
