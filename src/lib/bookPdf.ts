@@ -105,7 +105,7 @@ export async function exportBookPdf(args: BookPdfArgs): Promise<Blob> {
     // svg2pdf/jsPDF arithmetic emits float64 garbage like
     // "757.8899999999999864"; 3 decimals (0.001pt) is invisible and
     // deflates far better.
-    floatPrecision: 2,
+    floatPrecision: 1,
   });
 
   // Page 1: cover.
