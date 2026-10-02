@@ -80,7 +80,7 @@ The 3 high-value items already shipped; remaining are incremental.
 | `rendering-content-visibility` | ✅ | `PathCatalog` cards: `content-visibility:auto` + `contain-intrinsic-size:auto 140px` (long catalogs skip offscreen layout/repaint). LiveScore is a single SVG — not applicable |
 | `rendering-svg-precision` | N/A | No heavy dynamic SVG coordinate strings |
 | `rendering-usetransition-loading` | ✅ | Folded into `rerender-transitions` (startTransition around path select + tab switch shipped in Phase 2) |
-| `rendering-resource-hints` / `rendering-script-defer-async` | ☐ | Deferred with `bundle-preload` phase |
+| `rendering-resource-hints` / `rendering-script-defer-async` | ✅ | Closed with the `bundle-preload` slice (2026-10-02): the magentaHelper chunk preloads on hover/focus via dynamic-import modulepreload — exactly the resource-hint shape the roadmap asked for. `script-defer-async` is N/A (the only script in `index.html` is `<script type="module">` which is deferred-by-spec). No 3rd-party origins in the hot path so no `preconnect`/`dns-prefetch` to add. |
 
 **Effort:** JSX extraction 1–2 days; rest under a day.
 
