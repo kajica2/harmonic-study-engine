@@ -97,6 +97,10 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
+        // tfjs aggregate without backend-cpu (webgl is the real
+        // backend; cpu's registration is a side effect that can't
+        // tree-shake). See src/lib/tfjs-shim.ts.
+        '@tensorflow/tfjs': path.resolve(__dirname, 'src/lib/tfjs-shim.ts'),
         'node-fetch': path.resolve(__dirname, 'src/lib/fetch-shim.ts'),
         'node:stream/web': path.resolve(__dirname, 'src/lib/empty-shim.ts'),
         'stream/web': path.resolve(__dirname, 'src/lib/empty-shim.ts'),
