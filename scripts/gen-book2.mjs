@@ -6,11 +6,21 @@ const page = await browser.newPage({ acceptDownloads: true });
 try {
   await page.goto(APP, { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(3000);
+  console.log('LOADED URL:', page.url());
+  const served = await page.evaluate(() => fetch('/src/lib/bookPdf.ts').then((r) => r.text()));
+  console.log('served has patternPath:', served.includes('patternPath'));
   await page.keyboard.press('4');
   await page.waitForTimeout(3000);
-  // Enable Verovio engraving
-  const vLabel = page.locator('label:has-text("Verovio")').first();
-  if (await vLabel.count()) { await vLabel.click(); console.log('Verovio on'); }
+  // Engraver checkbox: default is ON (verovio) - only click if unchecked.
+  const vCheckbox = page.locator('input[type="checkbox"]').filter({ has: page.locator('xpath=..') }).first();
+  const vBox = page.getByRole('checkbox', { name: /verovio/i });
+  if (await vBox.count()) {
+    const isChecked = await vBox.isChecked();
+    if (!isChecked) await vBox.check();
+    console.log('Verovio on:', await vBox.isChecked());
+  } else {
+    console.log('no verovio checkbox found');
+  }
   // Select Triplets arpeggiation
   const arpSelect = page.locator('select').filter({ hasText: /Quarters|Eighths|Triplets/ }).first();
   if (await arpSelect.count()) {
