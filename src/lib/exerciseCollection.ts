@@ -11,7 +11,8 @@
  * URL convention (pinned):
  *   {baseUrl}/collection/{slug}.wav
  *   {baseUrl}/collection/{slug}.mid
- *   {baseUrl}/collection/{slug}.mp3   (only when mp3 is requested)
+ *   {baseUrl}/collection/{slug}.mp3       (only when mp3 is requested)
+ *   {baseUrl}/collection/{slug}.musicxml  (only when musicXml is requested)
  *
  * The slug reuses the marketplace deriveSlug law (lowercase, collapse
  * non-alphanumerics to dashes, "untitled" fallback) so collection
@@ -33,11 +34,15 @@ export interface ExerciseAudio {
   midiUrl: string;
   /** MP3 URL - present only when mp3 was requested. */
   mp3Url?: string;
+  /** MusicXML score URL - present only when musicXml was requested. */
+  musicXmlUrl?: string;
 }
 
 export interface CollectionManifestOptions {
   /** Include an MP3 URL per exercise (default false). */
   includeMp3?: boolean;
+  /** Include a MusicXML score URL per exercise (default false). */
+  includeMusicXml?: boolean;
 }
 
 /**
@@ -54,6 +59,7 @@ export function buildCollectionManifest(
   opts: CollectionManifestOptions = {},
 ): ExerciseAudio[] {
   const includeMp3 = opts.includeMp3 ?? false;
+  const includeMusicXml = opts.includeMusicXml ?? false;
   return exercises.map((ex) => {
     const slug = deriveSlug(ex.title);
     const entry: ExerciseAudio = {
@@ -64,6 +70,9 @@ export function buildCollectionManifest(
     };
     if (includeMp3) {
       entry.mp3Url = `${baseUrl}/collection/${slug}.mp3`;
+    }
+    if (includeMusicXml) {
+      entry.musicXmlUrl = `${baseUrl}/collection/${slug}.musicxml`;
     }
     return entry;
   });

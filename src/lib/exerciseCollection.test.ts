@@ -9,6 +9,8 @@
  *   - The slug reuses the marketplace deriveSlug law (lowercase,
  *     collapse non-alphanumerics to dashes, "untitled" fallback).
  *   - mp3Url is absent by default and present when includeMp3 is set.
+ *   - musicXmlUrl is absent by default and present when includeMusicXml
+ *     is set, following {baseUrl}/collection/{slug}.musicxml.
  *   - The base URL is used verbatim (no trailing-slash normalization).
  */
 
@@ -73,6 +75,25 @@ describe("buildCollectionManifest", () => {
     });
     expect(manifest[0].mp3Url).toBe("https://cdn.example.com/collection/star-eyes.mp3");
     expect(manifest[1].mp3Url).toBe("https://cdn.example.com/collection/solar.mp3");
+  });
+
+  it("omits musicXmlUrl by default", () => {
+    const manifest = buildCollectionManifest(EXERCISES, "https://cdn.example.com");
+    for (const entry of manifest) {
+      expect(entry.musicXmlUrl).toBeUndefined();
+    }
+  });
+
+  it("adds musicXmlUrl when includeMusicXml is set", () => {
+    const manifest = buildCollectionManifest(EXERCISES, "https://cdn.example.com", {
+      includeMusicXml: true,
+    });
+    expect(manifest[0].musicXmlUrl).toBe(
+      "https://cdn.example.com/collection/star-eyes.musicxml",
+    );
+    expect(manifest[1].musicXmlUrl).toBe(
+      "https://cdn.example.com/collection/solar.musicxml",
+    );
   });
 
   it("falls back to the untitled slug for symbol-only titles", () => {

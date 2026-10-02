@@ -26,8 +26,9 @@ import { findPathById, type HarmonicPath } from "../lib/paths";
 import { renderPathToWav } from "../lib/loopWav";
 import { exportToMidiFile } from "../lib/midiExport";
 import { deriveSlug, midiDataUriToBlob } from "../lib/marketplace";
+import { toMusicXml } from "../lib/scoreExport";
 import type { ArpStyle } from "../lib/arpNotation";
-import { zipSync } from "fflate";
+import { zipSync, strToU8 } from "fflate";
 
 const EMAIL_BOOK_ENDPOINT =
   "https://sainted-word-records.vercel.app/api/email-book";
@@ -57,6 +58,7 @@ export const BookSection: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
+  const [isMusicXml, setIsMusicXml] = useState(false);
   const [engraver, setEngraver] = useState<"abcjs" | "verovio">("verovio");
   const [arpStyle, setArpStyle] = useState<ArpStyle>("triplets");
   const [email, setEmail] = useState("");
@@ -179,6 +181,33 @@ export const BookSection: React.FC = () => {
     }
   };
 
+  const handleGenerateMusicXml = async () => {
+    if (selectedIds.size === 0 || isMusicXml) return;
+    const selected = catalog.filter((c) => selectedIds.has(c.entry.id));
+    setIsMusicXml(true);
+    setError("");
+    setStatus("");
+    try {
+      const members: Record<string, Uint8Array> = {};
+      for (const { path } of selected) {
+        const slug = deriveSlug(path.title ?? path.name ?? "untitled");
+        const xml = toMusicXml(path, { voiceStyle: "arp", trimToForm: true });
+        members[`${slug}.musicxml`] = strToU8(xml);
+      }
+      const zipBytes = zipSync(members);
+      const { downloadBlob } = await import("../lib/composeExport");
+      downloadBlob(
+        new Blob([zipBytes as unknown as BlobPart], { type: "application/zip" }),
+        "harmonic-study-book-musicxml.zip",
+      );
+      setStatus(`Downloaded MusicXML (${selected.length} exercises)`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsMusicXml(false);
+    }
+  };
+
   return (
     <section
       aria-label="Print-ready book"
@@ -197,7 +226,8 @@ export const BookSection: React.FC = () => {
         Real Book tune pages, Aebersold-style exercise pages, a Scale
         Syllabus appendix, and double-sided memory cards. Scores are
         engraved with Verovio by default (abcjs available as an option),
-        or download a ZIP of per-exercise WAV + MIDI backing tracks.
+        or download a ZIP of per-exercise WAV + MIDI backing tracks, or a
+        ZIP of per-exercise MusicXML scores for MuseScore / Finale / Dorico.
       </p>
       <p className="t-small text-[color:var(--color-text-3)]">
         {selectedIds.size} selected
@@ -264,6 +294,15 @@ export const BookSection: React.FC = () => {
           className={buttonClass}
         >
           {isCollecting ? "Rendering..." : "Generate collection ZIP"}
+        </button>
+        <button
+          type="button"
+          aria-label="Download MusicXML for all selected exercises"
+          onClick={handleGenerateMusicXml}
+          disabled={isMusicXml || selectedIds.size === 0}
+          className={buttonClass}
+        >
+          {isMusicXml ? "Exporting..." : "Download MusicXML (all)"}
         </button>
         <input
           type="email"
