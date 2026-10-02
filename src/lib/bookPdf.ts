@@ -13,7 +13,7 @@
  *      b. Exercise page (Aebersold): exercise title, the changes
  *         (chord symbols in a row), the arpeggio/pattern notation,
  *         then a practice line.
- *   4. Scale Syllabus appendix: one page per exercise (parent scale +
+ *   4. Scale Syllabus appendix: one compact table (parent scale +
  *      modes over the changes).
  *   5. Memory cards: front pages (2x2 grid, dashed cut lines, card
  *      numbers) followed by back pages in the SAME grid positions so
@@ -44,7 +44,6 @@ import {
   layoutCardGrid,
   layoutScorePage,
   layoutExercisePage,
-  layoutSyllabusPage,
   type BookLayout,
   type ExercisePageLayout,
   type PaperSize,
@@ -129,11 +128,10 @@ export async function exportBookPdf(args: BookPdfArgs): Promise<Blob> {
     );
   }
 
-  // Scale Syllabus appendix: one page per exercise.
+  // Scale Syllabus appendix: one compact table page (Aebersold
+  // scale-syllabus convention) instead of a page per exercise.
   const syllabusStartPage = doc.getNumberOfPages() + 1;
-  for (let i = 0; i < exercises.length; i++) {
-    renderSyllabusPage(doc, exercises[i], i, layout);
-  }
+  renderSyllabusTable(doc, exercises, layout);
 
   // Memory cards: front pages then back pages (same grid positions).
   const cardLayout = layoutCardGrid(cards.length, layout);
@@ -435,47 +433,54 @@ function renderExercisePagePractice(
  * modes suggested by its chord progression, each paired with the
  * chords that imply it (Omnibook/Aebersold convention).
  */
-function renderSyllabusPage(
+function renderSyllabusTable(
   doc: jsPDF,
-  ex: BookExercise,
-  exerciseIndex: number,
+  exercises: BookExercise[],
   layout: BookLayout,
 ): void {
   const { pageWidth, margin } = layout;
-  const syl = layoutSyllabusPage(exerciseIndex, layout);
-  const syllabus = deriveScaleSyllabus(ex);
-
   doc.addPage();
+
+  const headerY = margin + 16;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text(`Scale Syllabus: ${ex.title}`, margin, syl.headerY);
+  doc.text("Scale Syllabus", margin, headerY);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  doc.text(`Parent scale: ${syllabus.parentScale}`, margin, syl.contentY);
+  // Column x positions (content width = pageWidth - 2*margin).
+  const xNum = margin;
+  const xTitle = margin + 22;
+  const xParent = pageWidth - margin - 240;
+  const xModes = pageWidth - margin - 160;
+  const titleW = xParent - xTitle - 10;
+  const modesW = pageWidth - margin - xModes;
 
+  doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text("Modes over the changes", margin, syl.contentY + 26);
-
-  const modeToChords = new Map<string, string[]>();
-  for (const chord of ex.chordNames) {
-    const mode = modeForChord(chord);
-    const list = modeToChords.get(mode) ?? [];
-    list.push(chord);
-    modeToChords.set(mode, list);
-  }
+  let y = headerY + 20;
+  doc.text("#", xNum, y);
+  doc.text("Exercise", xTitle, y);
+  doc.text("Parent scale", xParent, y);
+  doc.text("Modes over the changes", xModes, y);
+  y += 6;
+  doc.setDrawColor(150);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 12;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  let y = syl.contentY + 46;
-  for (const [mode, chords] of modeToChords) {
-    doc.setFont("helvetica", "bold");
-    doc.text(mode, margin, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(chords.join("  "), margin + 170, y);
-    y += 20;
-  }
+  exercises.forEach((ex, i) => {
+    const syllabus = deriveScaleSyllabus(ex);
+    const modes = Array.from(
+      new Set(ex.chordNames.map((c) => modeForChord(c))),
+    ).join(", ");
+
+    doc.text(String(i + 1), xNum, y);
+    const titleLines = doc.splitTextToSize(ex.title, titleW) as string[];
+    doc.text(titleLines[0], xTitle, y);
+    doc.text(syllabus.parentScale, xParent, y);
+    const modeLines = doc.splitTextToSize(modes, modesW) as string[];
+    doc.text(modeLines[0], xModes, y);
+    y += 13;
+  });
 }
 
 function renderCardGrid(
