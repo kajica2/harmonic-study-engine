@@ -2852,6 +2852,18 @@ function AppShell() {
     resetTransposeSlice();
   };
 
+  // perf(bundle-preload): hover/focus on the Etude Generate button
+  // pre-fetches the magentaHelper chunk so the click→generate path
+  // doesn't wait for the ~2.5MB chunk fetch. Latched: ref prevents
+  // repeat prefetch on later hovers. The dynamic import is the
+  // build-time hint Vite emits as its own modulepreload tag.
+  const magentaPreloadedRef = useRef(false);
+  const preloadMagenta = useCallback(() => {
+    if (magentaPreloadedRef.current) return;
+    magentaPreloadedRef.current = true;
+    void import("./lib/magentaHelper");
+  }, []);
+
   const handleGenerateEtude = async () => {
     const lengthMap = [8, 16, 32];
     const len = lengthMap[genLength - 1];
@@ -4382,6 +4394,8 @@ function AppShell() {
                         </select>
                         <button
                           onClick={handleGenerateEtude}
+                          onMouseEnter={preloadMagenta}
+                          onFocus={preloadMagenta}
                           disabled={isGeneratingML}
                           className={`w-full py-2 bg-purple-900/40 hover:bg-purple-900/60 text-purple-200 text-xs rounded border border-purple-800/50 transition-colors font-mono ${isGeneratingML ? "opacity-50 cursor-wait" : ""}`}
                         >
