@@ -30,8 +30,8 @@ is perceived-speed preloading.
 | `bundle-dynamic-imports` | ✅ | `ImportExportModal`/`RecordingModal` = `lazy()`; `SetEditor` loaded on demand; `@magenta/music` + `sheetMusicExport` behind `import()` |
 | `bundle-conditional` | ✅ | Magenta loads only on "Generate"; DDSP probe is opt-in |
 | `bundle-analyzable-paths` | ✅ | All dynamic imports use static string literals (no template paths) |
-| `bundle-defer-third-party` | ☐ | Check RUM/timing scripts post-hydrate (currently none) — keep future analytics `requestIdleCallback`-gated |
-| `bundle-preload` | ☐ | `<link rel="preload">` / hover-preload the Magenta chunk on first hover of the generator button (`App.tsx` gen button) |
+| `bundle-defer-third-party` | ✅ | Audited 2026-10-02: no RUM / timing / analytics scripts in `index.html` or loaded post-hydrate. The app has zero 3rd-party scripts in the bundle. If future analytics land they MUST be `requestIdleCallback`-gated (the standing rule). |
+| `bundle-preload` | ✅ | `cd24517` (2026-10-02): `magentaHelper` chunk preloads on `onMouseEnter`/`onFocus` of the Etude Generate button, latched via ref. Click→generate no longer waits for the ~2.5MB chunk fetch. |
 
 **Effort:** 0.5–1 day total (preload + any analytics guard).
 
@@ -63,7 +63,7 @@ The 3 high-value items already shipped; remaining are incremental.
 | Rule | Status | Evidence / work |
 |------|--------|-----------------|
 | `client-event-listeners` | ✅ | `playbackClock` is a single shared subscription (module-level listener set); MidiInPicker scopes its `midin` listener |
-| `client-passive-event-listeners` | ☐ | Global `keydown`/`mousedown` init listeners (`App.tsx:426`) are fine; ensure any future `wheel`/`touchmove` uses `{ passive: true }` |
+| `client-passive-event-listeners` | ✅ | Audited 2026-10-02: `grep -rn "addEventListener.*\(wheel\|touchmove\|touchstart\)" src/` returns zero matches. Only `keydown`/`mousedown` exist (already passive-safe by spec — they're not scroll-blocking). No code change needed. |
 | `client-localstorage-schema` | ☐ | **Biggest open medium item.** Bare keys: `synesthesia_paths`, `synesthesia_melodyByStep`, `synesthesia_counterMelodyByStep`, `synesthesia_feedbackHistory`, `synesthesia_quizScore`, `synesthesia_stylePackId`, `synesthesia_humanize*`, `synesthesia_arpType`, etc. Perf log already versioned (`hse.performance.log.v1`). Plan: introduce a single `synesthesia.schema.v1` marker + migration registry in `usePersistedState`/`useSessionStore`; wrap reads through one helper |
 | `client-swr-dedup` | N/A | No client HTTP data fetching in-app (FastAPI/DDSB only server-side) |
 
