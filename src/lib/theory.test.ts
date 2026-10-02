@@ -189,15 +189,33 @@ describe("analyzeChord", () => {
     expect(a.tensions).toContain("13");
   });
 
-  it("notes the inverted-chord limitation on Roman numerals (TODO)", () => {
-    // Pinned limitation: when no 3rd exists above the bass, the
-    // rootPc heuristic falls back to bassPc. So C/G (chord [67,72,76])
-    // shows rootName='G' and roman='V', even though the chord
-    // function is I. Fixing this requires proper root recognition
-    // (see theory.ts rootPc detection at ~line 600).
+  it("recognizes the root in 2nd inversion (C/G) as 'C'", () => {
+    // C major voiced G-C-E: bass is the 5th, root is C. The triad-
+    // detection in analyzeChord picks C as the root; inversion=2.
     const firstInversion = analyzeChord([67, 72, 76]);
-    expect(firstInversion.rootName).toBe("G");
-    expect(firstInversion.roman).toBe("V");
+    expect(firstInversion.rootName).toBe("C");
+    expect(firstInversion.roman).toBe("I");
+    expect(firstInversion.inversion).toBe(2);
+  });
+
+  it("recognizes the root in 1st inversion (C/E) as 'C'", () => {
+    // C major voiced E-G-C: bass is the 3rd, root is C. inversion=1.
+    const firstInv = analyzeChord([64, 67, 72]);
+    expect(firstInv.rootName).toBe("C");
+    expect(firstInv.roman).toBe("I");
+    expect(firstInv.inversion).toBe(1);
+  });
+
+  // 3rd inversion (Cmaj7/B = [71,72,76,79]) is intentionally NOT
+  // pinned: the same chord-tones parse as either Cmaj7/B or
+  // Em+sus4; the bass-proximity heuristic in analyzeChord picks
+  // Em (gap=4) over Cmaj7 (gap=11). Resolving that ambiguity
+  // requires deeper voicing-context logic — out of one iteration.
+
+  it("keeps root-position Cmaj7 unchanged", () => {
+    const root = analyzeChord([60, 64, 67, 71]);
+    expect(root.rootName).toBe("C");
+    expect(root.inversion).toBe(0);
   });
 });
 

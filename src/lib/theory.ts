@@ -646,32 +646,46 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
   const bassMidi = sorted[0];
   const bassPc = ((bassMidi % 12) + 12) % 12;
   const bassName = `${PC_TO_NOTE[bassPc]}${Math.floor(bassMidi / 12) - 1}`;
-  const rootName = PC_TO_NOTE[bassPc];
+  const chordPcs = new Set(sorted.map((n) => ((n % 12) + 12) % 12));
 
-  // Pick the root: try the bass, then the third-above if present
-  let root = bassPc;
-  for (let i = 1; i < sorted.length; i++) {
-    const s = intervalSemitones(root, sorted[i]);
-    if (s === 4 || s === 3) break;
+  // Pick the root. First try bassPc; if that doesn't form a triad
+  // (root + 3rd-or-4th + 5th all in chord), try bassPc minus each
+  // triad-position offset in priority order: bass-is-3rd, bass-is-5th,
+  // bass-is-7th. This catches 1st / 2nd / 3rd inversion without a
+  // separate inversion heuristic.
+  function hasTriadOn(cand: number): boolean {
+    return (
+      chordPcs.has(cand) &&
+      (chordPcs.has((cand + 3) % 12) || chordPcs.has((cand + 4) % 12)) &&
+      chordPcs.has((cand + 7) % 12)
+    );
   }
-  // Detect inversion: is the chord built on the bass or on a higher note?
-  // Heuristic: bass = root → root position; bass = root+3 or 4 → 1st inv; root+7 → 2nd inv
+  const rootCandidates = [
+    bassPc,
+    (bassPc - 3 + 12) % 12, // bass is the 3rd → candidate is the root
+    (bassPc - 4 + 12) % 12,
+    (bassPc - 7 + 12) % 12, // bass is the 5th
+    (bassPc - 10 + 12) % 12, // bass is the m7
+    (bassPc - 11 + 12) % 12, // bass is the M7
+  ];
+  let rootPc = bassPc;
+  for (const cand of rootCandidates) {
+    if (hasTriadOn(cand)) { rootPc = cand; break; }
+  }
+  const rootName = PC_TO_NOTE[rootPc];
+
+  // Inversion: gap from root to bass in semitones, mapped to the
+  // nearest triad/7th position.
   let inversion = 0;
-  // Find a 3rd, 5th, 7th by relative semitones; whichever the bass is closest to
-  const candidates = [0, 3, 4, 5, 7, 8, 9, 10, 11];
-  // The "actual root" of this inversion is the lowest note whose pitch class is the bass or its stacked 3rds
-  // We use a simple test: if a major or minor 3rd above the bass exists in the chord,
-  // it's most likely the bass of a triad → inversion 0
-  let hasThirdAboveBass = false;
-  for (const n of sorted.slice(1)) {
-    const s = intervalSemitones(bassPc, n);
-    if (s === 3 || s === 4) { hasThirdAboveBass = true; break; }
+  if (rootPc !== bassPc) {
+    const gap = intervalSemitones(rootPc, bassPc);
+    if (gap === 3 || gap === 4) inversion = 1;
+    else if (gap === 7 || gap === 8) inversion = 2;
+    else if (gap === 10 || gap === 11) inversion = 3;
   }
-  inversion = hasThirdAboveBass ? 0 : 1;
 
   // Tensions: look for 9 (semitone 2), #9 (3), 11 (5), #11 (6), 13 (9), b13 (8)
-  // relative to root — but root we treat as bass pc unless inversion > 0
-  const rootPc = root;
+  // relative to the detected root.
   const tensions: string[] = [];
   for (const n of sorted) {
     if (n === bassMidi) continue;
@@ -688,38 +702,32 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
     else if (s === 9) tensions.push("13");
   }
 
-  // Family: based on the lowest three notes (the chord's triad plus a 7th if present)
-  // Treat M3+m7 as dominant, M3+M7 as major, m3+m3 as diminished, etc.
-  // First detect the 7th by the 4th note (if any), then the triad type by 3rd+5th.
-  const lowestThree = sorted.slice(0, Math.min(3, sorted.length));
-  const third = intervalSemitones(bassPc, lowestThree[1] ?? bassPc);
-  const fifth = intervalSemitones(bassPc, lowestThree[2] ?? bassPc);
-  // Look for the chord's 7th (4th unique note from the bass)
-  const fourth = sorted[3] !== undefined ? intervalSemitones(bassPc, sorted[3]) : -1;
-  const hasMinor7 = fourth === 10;
-  const hasMajor7 = fourth === 11;
+  // Family: detect triad + 7th relative to the inferred ROOT (not bass).
+  // For inverted chords the bass-relative test mis-identifies the family.
+  // Walk the chord and tag each note by its interval from rootPc.
+  const intervalsFromRoot = new Set(
+    sorted.map((n) => intervalSemitones(rootPc, n)),
+  );
+  const hasMajor3 = intervalsFromRoot.has(4);
+  const hasMinor3 = intervalsFromRoot.has(3);
+  const hasFifth = intervalsFromRoot.has(7) || intervalsFromRoot.has(19);
+  const hasMinor7 = intervalsFromRoot.has(10) || intervalsFromRoot.has(22);
+  const hasMajor7 = intervalsFromRoot.has(11) || intervalsFromRoot.has(23);
 
   let family: ChordAnalysis["family"] = "unknown";
-  if (third === 4 && (fifth === 7 || fifth === 14) && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
+  if (hasMajor3 && hasFifth && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
     if (hasMajor7) family = "major";        // M3 P5 M7
     else if (hasMinor7) family = "dominant"; // M3 P5 m7 = dominant 7th
     else family = "major";                   // M3 P5 triad only
   }
-  else if (third === 3 && (fifth === 7 || fifth === 14) && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
+  else if (hasMinor3 && hasFifth && (hasMinor7 || hasMajor7 || sorted.length < 4)) {
     if (hasMajor7) family = "minor";         // m3 P5 M7 = mMaj7
     else family = "minor";                   // m3 P5 m7 = min 7th
   }
-  else if (third === 3 && fifth === 6) family = "half-diminished";
-  else if (third === 3 && fifth === 5) family = "diminished";
-  // Fallbacks when chord exceeds 3 notes but classification failed above:
-  else if (third === 4 && hasMinor7) family = "dominant";
-  else if (third === 4 && hasMajor7) family = "major";
+  else if (hasMinor3 && intervalsFromRoot.has(6)) family = "half-diminished";
+  else if (hasMinor3 && intervalsFromRoot.has(5)) family = "diminished";
 
-  // Roman numeral based on the chord root (when determinable). The
-  // heuristic for finding rootPc falls back to bassPc when no 3rd
-  // exists above bass — that means inverted chords (e.g. C/G) end
-  // up with rootName=G, and the Roman reflects that ("V" not "I").
-  // Full root-recognition is out of scope for this iteration.
+  // Roman numeral based on the inferred chord root.
   const roman = ROMAN_BY_SEMITONE[rootPc] ?? "?";
 
   // Function (very lightweight; assumes major key center)
