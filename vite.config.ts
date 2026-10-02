@@ -61,7 +61,16 @@ export default defineConfig(() => {
       // them up directly; vite/esbuild would otherwise pull them
       // in via dynamic import chains.
       rollupOptions: {
-        external: (id) => /\.test\.(ts|tsx)$/.test(id),
+        // jspdf's svg()/html() helpers pull canvg + html2canvas via
+        // dynamic import; this app never calls them (svg2pdf drives
+        // jspdf's primitive ops directly), so externalizing keeps the
+        // ~100 kB pair out of the bundle entirely.
+        external: (id) =>
+          /\.test\.(ts|tsx)$/.test(id) ||
+          id === "canvg" ||
+          id === "html2canvas" ||
+          id.includes("node_modules/canvg/") ||
+          id.includes("node_modules/html2canvas/"),
         // Split the heavyweight vendor libs into stable, cacheable
         // chunks. This is a pure caching/parallelism win — dangerously
         // large libs (magentaHelper is already a dynamic chunk) get

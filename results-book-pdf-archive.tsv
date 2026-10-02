@@ -1,0 +1,13 @@
+experiment	commit	metric	status	description
+0	84d3927	3622077	baseline	unmodified code, Verovio ON, triplets, full form
+1	3ba1585	290407	keep	jsPDF compress:true (deflate)
+2	451d5a7	194144	keep	exercise page first 8 bars (Coker convention)
+3	2d6fdfc	193796	discard	prune class attrs (348B, not worth the complexity)
+4	982fede	194157	discard	round SVG coords 1dp (+13B)
+5	721be77	188286	keep	syllabus as one compact table page
+6	17d013f	159770	keep	jsPDF floatPrecision 3 (kill float64 garbage)
+7	629c0c5	156010	keep	floatPrecision 2
+8	f518a73	151451	keep	floatPrecision 1 (0.1pt, sub-printable)
+9	921adb1	151398	discard	precision:1 legacy knob (+53B only)
+10	20d76de	151328	discard	verovio scale 70 (+123B, rendering param, negligible)
+final	f518a73	151451	result	best kept state (plateau reached)
