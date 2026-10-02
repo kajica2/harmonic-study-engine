@@ -70,7 +70,9 @@ export default defineConfig(() => {
           id === "canvg" ||
           id === "html2canvas" ||
           id.includes("node_modules/canvg/") ||
-          id.includes("node_modules/html2canvas/"),
+          id.includes("node_modules/html2canvas/") ||
+          id === "dompurify" ||
+          id.includes("node_modules/dompurify/"),
         // Split the heavyweight vendor libs into stable, cacheable
         // chunks. This is a pure caching/parallelism win — dangerously
         // large libs (magentaHelper is already a dynamic chunk) get
