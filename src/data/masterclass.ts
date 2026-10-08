@@ -269,7 +269,7 @@ export const MASTERCLASS_TUNES: MasterclassEntry[] = [
   { id: "concept-line-cliches", title: "Line cliches through the form", classes: ["MC 27", "MC 28"],
     mainExercise: "5 → ♯9 → 1 → 2 on any dominant 7 with a ♯9.",
     description: "Concept file; the single most useful line cliché in the series.",
-    inApp: false },
+    inApp: true },
   { id: "concept-three-to-nine", title: "3-to-9 / 9-to-3 through the form", classes: ["MC 28", "MC 29", "MC 40"],
     mainExercise: "For every minor-7 chord, play 3-5-7-9 ascending, then a half-step to the next chord.",
     description: "Concept file; the road-map through any tune.",

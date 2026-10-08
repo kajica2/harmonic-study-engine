@@ -131,10 +131,10 @@ authored as `concept-*` ids)
       (`concept-house-of-harmony`, MC 16 / MC 17 / MC 18)
       - [ ] blocked: needs concept-path authoring — no `concept-*`
         path in conceptPaths.ts; beat-level authoring is >1 iteration.
-- [ ] **Line cliches through the form**
+- [x] **Line cliches through the form**
       (`concept-line-cliches`, MC 27 / MC 28)
-      - [ ] blocked: needs concept-path authoring — no `concept-*`
-        path in conceptPaths.ts; beat-level authoring is >1 iteration.
+      — 4-bar G7♯9 with 5 → ♯9 → 1 → 2 motif per bar. inApp: true.
+      Pinned by tests/concept-line-cliches.test.ts (5 cases).
 - [x] **3-to-9 / 9-to-3 through the form**
       (`concept-three-to-nine`, MC 28 / MC 29 / MC 40)
       — 4-bar ii-V-I in C with per-step 3rd→9th voice-leading
