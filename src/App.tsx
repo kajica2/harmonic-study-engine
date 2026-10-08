@@ -5639,6 +5639,10 @@ function AppShell() {
                   tempo={tempo}
                   // F3 (D110): the score window is 4 TRUE form bars.
                   formLen={formLen}
+                  // Grand-staff split follows the on-screen piano's
+                  // keyboard range so the score mirrors the range
+                  // the user just set.
+                  kbRange={kbRange}
                 />
               </Suspense>
               </div>

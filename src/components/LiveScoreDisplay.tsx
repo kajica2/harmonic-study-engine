@@ -5,6 +5,7 @@ import { midiToABCName, transposeMidiList } from "../lib/scoreGenerator";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { transposeChordName } from "../lib/theory";
+import type { KeyboardRange } from "../hooks/useSessionStore";
 import { slicePathForRepeat, type BeatCell } from "../lib/sliceAndRepeat";
 import { TimeSignature } from "../lib/rhythm";
 // Sliced persona mode only (frozen helper table, blast-table #20).
@@ -33,6 +34,10 @@ interface LiveScoreDisplayProps {
    *  would require abcjs post-process — out of scope for this
    *  PR. The zoom level itself is already wired (zoomScale state). */
   displayMode?: ScoreDisplayMode;
+  /** Keyboard range — drives the grand-staff treble/bass split so
+   *  the score matches the on-screen piano. Default split at C4 (60)
+   *  is preserved when omitted. */
+  kbRange?: KeyboardRange;
 }
 
 /**
@@ -59,6 +64,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   formLen,
   timeSignature = "4/4",
   displayMode = "full",
+  kbRange,
 }) => {
   const svgRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -195,8 +201,14 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
           evt.notes,
           transposeShift + visualTranspose,
         );
-        const treblePitches = shiftedNotes.filter((p) => p >= 60);
-        const bassPitches = shiftedNotes.filter((p) => p < 60);
+        // Grand-staff split: split at the keyboard range's midpoint
+        // when provided, so the score mirrors the on-screen piano.
+        // Fallback to C4 (60) preserves prior behavior.
+        const splitMidi = kbRange
+          ? Math.floor((kbRange.from + kbRange.to) / 2)
+          : 60;
+        const treblePitches = shiftedNotes.filter((p) => p >= splitMidi);
+        const bassPitches = shiftedNotes.filter((p) => p < splitMidi);
 
         let chordLabel = evt.name
           ? evt.name.replace(/m/g, "m").replace(/#/g, "#")
