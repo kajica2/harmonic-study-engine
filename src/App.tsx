@@ -1059,14 +1059,25 @@ function AppShell() {
   // Panic: full reset for the "stuck note" recovery (rare on
   // some WebAudio devices) and the "switch paths mid-session"
   // fast-reset. Stable identity so the keyboard handler can
-  // depend on it.
+  // depend on it. Routes through requestPlayState(false) so the
+  // existing isPlayingAuto useEffects stop the rhythm engine,
+  // backing engine, and chord play loop. Without that, the play
+  // loop keeps advancing and the chord useEffect re-fires every
+  // bar (D128 cleanup re-calls audioEngine.stopAll() but the
+  // next step re-plays it). requestPlayState(false) is the
+  // choke-point; the explicit engine stops are belt-beyond
+  // (defensive, in case the effect deps change later). ponytail:
+  // global panic, per-engine fan-out if any new engine joins.
   const handlePanic = useCallback(() => {
     setActiveMidis([]);
     audioEngine.stopAll();
     midiOut.stopAll();
     setActiveStepIndex(0);
     if (isLooping) setIsLooping(false);
-  }, [setActiveMidis, isLooping]);
+    requestPlayState(false);
+    rhythmEngine.stop();
+    backingEngine.stop();
+  }, [setActiveMidis, isLooping, requestPlayState]);
   // Tap-tempo: average inter-tap interval over the last 4 taps
   // (rounded to int bpm). A >2s gap resets the rolling history so
   // the user can re-tap without first clearing state. The pure
