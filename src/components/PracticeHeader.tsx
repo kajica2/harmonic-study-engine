@@ -64,6 +64,9 @@ interface PracticeHeaderProps {
   formLen: number;
   /** Display name of the chord (already transposed by caller). */
   chordName: string;
+  /** Display name of the NEXT chord (already transposed). Lets the
+   *  player see what's coming without looking ahead. Optional. */
+  nextChordName?: string;
   timeSignature: TimeSignature;
   /** Transposed chord notes (MIDI) for the active step — fed to
    *  the GuideToneFeedback classifier. */
@@ -201,6 +204,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   activeStepIndex,
   formLen,
   chordName,
+  nextChordName,
   timeSignature,
   chordNotes,
   guideToneTrail,
@@ -342,10 +346,19 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           </span>
         </div>
         <div
-          className="text-lg font-semibold text-neutral-100 leading-tight mt-0.5"
+          className="text-lg font-semibold text-neutral-100 leading-tight mt-0.5 flex items-baseline gap-2 flex-wrap"
           data-testid="practice-header-readout"
         >
-          {readout}
+          <span>{readout}</span>
+          {nextChordName && (
+            <span
+              className="text-[11px] t-mono text-neutral-500"
+              title="The next chord — read ahead to anticipate voice-leading"
+              data-testid="practice-header-next"
+            >
+              → {nextChordName}
+            </span>
+          )}
         </div>
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
           <GuideToneFeedback chordNotes={chordNotes} />

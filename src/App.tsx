@@ -1014,6 +1014,10 @@ function AppShell() {
 
   const path = paths[activePathIndex];
   const step = path.steps[activeStepIndex];
+  // Next-chord preview: wrap to step 0 at the end of the form so
+  // the chip is always populated (players read ahead to anticipate
+  // voice-leading, even on the final bar).
+  const nextStep = path.steps[(activeStepIndex + 1) % path.steps.length] ?? step;
 
   // Cycle-all-12 (D13): repeating form length of the active path,
   // memoized per path identity. detectFormPeriod is pure; a 32-step
@@ -3448,6 +3452,11 @@ function AppShell() {
         // helpers stay exported-unused in practiceHeader.ts).
         formLen={formLen}
         chordName={transposeChordName(step.name ?? "", soundingShift)}
+        nextChordName={
+          nextStep === step
+            ? undefined
+            : transposeChordName(nextStep.name ?? "", soundingShift)
+        }
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
         guideToneTrail={guideTrail.tally}
