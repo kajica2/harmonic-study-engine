@@ -135,10 +135,11 @@ authored as `concept-*` ids)
       (`concept-line-cliches`, MC 27 / MC 28)
       - [ ] blocked: needs concept-path authoring — no `concept-*`
         path in conceptPaths.ts; beat-level authoring is >1 iteration.
-- [ ] **3-to-9 / 9-to-3 through the form**
+- [x] **3-to-9 / 9-to-3 through the form**
       (`concept-three-to-nine`, MC 28 / MC 29 / MC 40)
-      - [ ] blocked: needs concept-path authoring — no `concept-*`
-        path in conceptPaths.ts; beat-level authoring is >1 iteration.
+      — 4-bar ii-V-I in C with per-step 3rd→9th voice-leading
+      descriptions. inApp: true. Pinned by
+      tests/concept-three-to-nine.test.ts (5 cases).
 
 ### Batch G — Deep cuts (lowest priority, can defer)
 
