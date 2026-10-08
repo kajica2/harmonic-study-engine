@@ -35,6 +35,14 @@ Dates use the user's local timezone on commit.
   musical invariant: lowering a dim7's root a semitone yields the
   dominant 7th below it, pitch for pitch.
 
+- The chord inspector's "Original (as written)" panel analyzed the
+  PREVIOUS bar's notes while showing the SELECTED bar's chord symbol,
+  so its Roman / Family / Function / Bass / Inversion rows all
+  described the wrong chord. Found live while smoke-testing
+  `concept-diminished-trail`. Fixed at the `App.tsx` call site;
+  `ChordInspector.tsx` needed no change. Pinned by
+  `src/components/ChordInspector.test.tsx` (4 cases).
+
 ## [0.2.0] - 2026-09-13
 
 ### Sprint 7 (this session) — classical personas, behavioral wiring, audio quality, tests, docs, e2e

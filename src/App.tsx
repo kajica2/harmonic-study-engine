@@ -5960,7 +5960,7 @@ function AppShell() {
           onClose={() => setShowChordInspector(false)}
           path={path}
           stepIndex={activeStepIndex}
-          originalNotes={path.steps[Math.max(0, activeStepIndex - 1)]?.notes ?? []}
+          originalNotes={path.steps[activeStepIndex]?.notes ?? []}
           currentNotes={optimizedStepsNotes[activeStepIndex] ?? path.steps[activeStepIndex]?.notes ?? []}
           prevNotes={optimizedStepsNotes[Math.max(0, activeStepIndex - 1)] ?? []}
           nextNotes={optimizedStepsNotes[Math.min(path.steps.length - 1, activeStepIndex + 1)] ?? []}
