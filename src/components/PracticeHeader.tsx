@@ -70,6 +70,10 @@ interface PracticeHeaderProps {
   /** Restart from bar 1. Caller is the source of truth (it owns
    *  the play state + activeStepIndex); the button just requests. */
   onRestart: () => void;
+  /** Step forward by one bar (clamped to the last step). */
+  onNextBar: () => void;
+  /** Step backward by one bar (clamped to step 0). */
+  onPrevBar: () => void;
   /** Tap-tempo: caller maintains the rolling tap history and pushes
    *  the resulting bpm back via onTempoChange. PracticeHeader just
    *  fires the click. */
@@ -213,6 +217,8 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   chordName,
   nextChordName,
   onRestart,
+  onNextBar,
+  onPrevBar,
   onTapTempo,
   timeSignature,
   chordNotes,
@@ -368,16 +374,38 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
               → {nextChordName}
             </span>
           )}
-          <button
-            type="button"
-            onClick={onRestart}
-            title="Restart from bar 1 (R) — keeps play/pause state"
-            aria-label="Restart from bar 1"
-            data-testid="practice-header-restart"
-            className="ml-auto text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
-          >
-            R · restart
-          </button>
+          <div className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onPrevBar}
+              title="Previous bar (←) — keeps play/pause state"
+              aria-label="Previous bar"
+              data-testid="practice-header-prev-bar"
+              className="text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={onNextBar}
+              title="Next bar (→) — keeps play/pause state"
+              aria-label="Next bar"
+              data-testid="practice-header-next-bar"
+              className="text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+            >
+              →
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              title="Restart from bar 1 (R) — keeps play/pause state"
+              aria-label="Restart from bar 1"
+              data-testid="practice-header-restart"
+              className="text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+            >
+              R · restart
+            </button>
+          </div>
         </div>
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
           <GuideToneFeedback chordNotes={chordNotes} />
