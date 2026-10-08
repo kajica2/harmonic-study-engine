@@ -662,11 +662,12 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
   }
   const rootCandidates = [
     bassPc,
+    (bassPc + 1) % 12, // bass is the m7 → root is 1 semitone above
     (bassPc - 3 + 12) % 12, // bass is the 3rd → candidate is the root
     (bassPc - 4 + 12) % 12,
     (bassPc - 7 + 12) % 12, // bass is the 5th
-    (bassPc - 10 + 12) % 12, // bass is the m7
-    (bassPc - 11 + 12) % 12, // bass is the M7
+    (bassPc - 10 + 12) % 12, // bass is the m7 (M7 above)
+    (bassPc - 11 + 12) % 12, // bass is the M7 (m7 above)
   ];
   let rootPc = bassPc;
   for (const cand of rootCandidates) {

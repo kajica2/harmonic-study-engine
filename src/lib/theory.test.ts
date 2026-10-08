@@ -206,11 +206,15 @@ describe("analyzeChord", () => {
     expect(firstInv.inversion).toBe(1);
   });
 
-  // 3rd inversion (Cmaj7/B = [71,72,76,79]) is intentionally NOT
-  // pinned: the same chord-tones parse as either Cmaj7/B or
-  // Em+sus4; the bass-proximity heuristic in analyzeChord picks
-  // Em (gap=4) over Cmaj7 (gap=11). Resolving that ambiguity
-  // requires deeper voicing-context logic — out of one iteration.
+  it("recognizes the root in 3rd inversion (Cmaj7/B) as 'C'", () => {
+    // Cmaj7 voiced B-C-E-G: bass is the m7 below C. The
+    // 1-semitone-above-bass candidate (C) wins because it forms
+    // a triad with two of the other notes; the lower M7/m7
+    // candidates don't. inversion=3 (bass = M7 below root).
+    const thirdInv = analyzeChord([71, 72, 76, 79]);
+    expect(thirdInv.rootName).toBe("C");
+    expect(thirdInv.inversion).toBe(3);
+  });
 
   it("keeps root-position Cmaj7 unchanged", () => {
     const root = analyzeChord([60, 64, 67, 71]);
