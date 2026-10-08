@@ -262,6 +262,10 @@ textarea:focus-visible,
   .print-area [data-highlighted="true"] path,
   .print-area [data-highlighted="true"] text { fill: #92400e !important; }
   .print-area [data-bar-highlight="true"] { fill: rgba(146, 64, 14, 0.10) !important; }
+  /* Played-note highlight: dark orange-red on white instead of the
+   * dark-mode orange (#f97316, 2.8:1 vs white). The [data-played]
+   * attribute is set by the LiveScoreDisplay activeMidis effect. */
+  .print-area [data-played="true"] { fill: #c2410c !important; }
   /* LeadSheet (and any other modal-mounted print area) needs to
    * escape its fixed-positioned modal shell: static + 100% width
    * reaches the full @page. Static overrides the @media rule's
