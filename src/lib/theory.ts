@@ -725,7 +725,16 @@ export function analyzeChord(notes: number[]): ChordAnalysis {
     if (hasMajor7) family = "minor";         // m3 P5 M7 = mMaj7
     else family = "minor";                   // m3 P5 m7 = min 7th
   }
-  else if (hasMinor3 && intervalsFromRoot.has(6)) family = "half-diminished";
+  // m3 + b5 is shared by the two diminished families; the 7th tells them
+  // apart. A b7 (10 semitones) over the b5 = half-diminished (m7b5);
+  // a bb7 (9 semitones, enharmonically the dim7's b7) = fully
+  // diminished. Triads (3 notes) carry no 7th and classify by their
+  // own intervals: b5 (6) or bb5 (5).
+  else if (hasMinor3 && intervalsFromRoot.has(6)) {
+    if (hasMinor7) family = "half-diminished";          // m3 b5 b7
+    else if (intervalsFromRoot.has(9)) family = "diminished"; // m3 b5 bb7 = dim7
+    else family = "diminished";                          // m3 b5 triad = dim
+  }
   else if (hasMinor3 && intervalsFromRoot.has(5)) family = "diminished";
 
   // Roman numeral based on the inferred chord root.

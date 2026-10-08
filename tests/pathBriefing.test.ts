@@ -67,13 +67,14 @@ describe("briefingForPath", () => {
 
 describe("curatedBriefingCount", () => {
   it("counts exactly the entries with an `objective` field set", () => {
-    // Today: 12 (star-eyes, yardbird-suite, sometimes-im-happy,
+    // Today: 13 (star-eyes, yardbird-suite, sometimes-im-happy,
     // stella-by-starlight, there-will-never-be-another-you,
     // out-of-nowhere, nostalgia-in-october, groovin-high,
-    // hot-house, confirmation, lady-be-good, ill-remember-april).
+    // hot-house, confirmation, lady-be-good, ill-remember-april,
+    // concept-diminished-trail).
     // The count grows as more paths are hand-curated. This test
     // pins the current count so any unexpected change triggers a
     // deliberate update.
-    expect(curatedBriefingCount()).toBe(12);
+    expect(curatedBriefingCount()).toBe(13);
   });
 });

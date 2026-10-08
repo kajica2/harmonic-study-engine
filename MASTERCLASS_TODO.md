@@ -123,10 +123,13 @@ authored as `concept-*` ids)
 - [ ] **Solar diatonic solo** (`concept-solar-diatonic-solo`, MC 8)
       - [ ] blocked: needs concept-path authoring — no `concept-*`
         path in conceptPaths.ts; beat-level authoring is >1 iteration.
-- [ ] **Diminished trail through changes**
+- [x] **Diminished trail through changes**
       (`concept-diminished-trail`, MC 15)
-      - [ ] blocked: needs concept-path authoring — no `concept-*`
-        path in conceptPaths.ts; beat-level authoring is >1 iteration.
+      — 9-bar descending whole-step chain (G7 | F#°7 | Fmaj7 | E°7 |
+      Em7 | D#°7 | Dm7 | C#°7 | Cmaj7), 4 steps per bar. Each dim7
+      is a true 0/3/6/9 minor-3rd stack. inApp: true + curated
+      `objective`. Pinned by tests/concept-diminished-trail.test.ts
+      (8 cases). Required fixing `analyzeChord` first — see below.
 - [ ] **House of Harmony (graphic)**
       (`concept-house-of-harmony`, MC 16 / MC 17 / MC 18)
       - [ ] blocked: needs concept-path authoring — no `concept-*`

@@ -438,7 +438,86 @@ const concept_line_cliches: HarmonicPath = {
 };
 
 /**
- * All nine Phase 3 concept paths, in order.
+ * Concept — Diminished Trail Through the Changes.
+ *
+ * A 9-bar descending whole-step chain (G7 → Fmaj7 → Em7 → Dm7 →
+ * Cmaj7) with a fully-diminished 7th wedged between each pair. The
+ * dim7s are the exercise: each one resolves by semitone into the
+ * chord below it, and — because a dim7's four pitches are three
+ * minor thirds stacked — the SAME dim7 can be respelled over any
+ * of the dominant chords in the chain. That inversion-symmetric
+ * ambiguity is the point: the player holds one dim7 sound and
+ * re-targets it from bar to bar.
+ *
+ * The dim voicings are true minor-third stacks (intervals 0/3/6/9
+ * from root), root position within G3–F#5. Placement: each dim7's
+ * root sits a semitone at-or-above the chord it resolves into
+ * (F#°7 → Fmaj7, E°7 → Em7, D#°7 → Dm7, C#°7 → Cmaj7); the dim7's
+ * own ♭7 is the voice that falls to the destination's 3rd.
+ *
+ * `analyzeChord` reports these as family "diminished" (m3 + b5 +
+ * bb7), distinct from "half-diminished" (m3 + b5 + b7).
+ */
+const concept_diminished_trail: HarmonicPath = {
+  id: "concept-diminished-trail",
+  title: "Diminished Trail Through the Changes",
+  description:
+    "A 9-bar descending whole-step chain (G7 → Fmaj7 → Em7 → Dm7 → Cmaj7) with a fully-diminished 7th between each pair. Each dim7 shares all four of its pitch classes with both neighbours, so the same voicing slides through the whole chain.",
+  composer: "Jazz tradition",
+  key: "G → C (descending whole steps)",
+  feel: "educational / chromatic",
+  techniques: ["diminished_trail", "chromatic_passing"],
+  steps: [
+    // Bar 1 — G7 (the anchor the trail starts from)
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V7 — top of the chain. The trail starts here." },
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V7 — hold." },
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V7 — hold." },
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V7 — hold." },
+    // Bar 2 — F#°7 (passing dim between G7 and Fmaj7)
+    { name: "F#dim7", notes: [54, 57, 60, 63], descriptions: "°7 — a semitone above Fmaj7's root. Lower the root and the stack becomes G7." },
+    { name: "F#dim7", notes: [54, 57, 60, 63], descriptions: "°7 — hold. Hear it as Fmaj7's ♭9/♯9 passing from above." },
+    { name: "F#dim7", notes: [54, 57, 60, 63], descriptions: "°7 — hold." },
+    { name: "F#dim7", notes: [54, 57, 60, 63], descriptions: "°7 — hold." },
+    // Bar 3 — Fmaj7
+    { name: "Fmaj7", notes: [53, 57, 60, 64], descriptions: "Imaj7 — the dim7 landed a semitone below. Four voices settle." },
+    { name: "Fmaj7", notes: [53, 57, 60, 64], descriptions: "Imaj7 — hold." },
+    { name: "Fmaj7", notes: [53, 57, 60, 64], descriptions: "Imaj7 — hold." },
+    { name: "Fmaj7", notes: [53, 57, 60, 64], descriptions: "Imaj7 — hold." },
+    // Bar 4 — E°7 (passing dim between Fmaj7 and Em7)
+    { name: "Edim7", notes: [52, 55, 58, 61], descriptions: "°7 — major 2nd above Em7. Hold these four pitches over the I and the i." },
+    { name: "Edim7", notes: [52, 55, 58, 61], descriptions: "°7 — hold. Its upper structure is Fmaj7." },
+    { name: "Edim7", notes: [52, 55, 58, 61], descriptions: "°7 — hold." },
+    { name: "Edim7", notes: [52, 55, 58, 61], descriptions: "°7 — hold." },
+    // Bar 5 — Em7
+    { name: "Em7", notes: [52, 55, 59, 62], descriptions: "ii7 — dim7 resolved down a semitone. Third voice dropped; the chord turns minor." },
+    { name: "Em7", notes: [52, 55, 59, 62], descriptions: "ii7 — hold." },
+    { name: "Em7", notes: [52, 55, 59, 62], descriptions: "ii7 — hold." },
+    { name: "Em7", notes: [52, 55, 59, 62], descriptions: "ii7 — hold." },
+    // Bar 6 — D#°7 (passing dim between Em7 and Dm7)
+    { name: "D#dim7", notes: [51, 54, 57, 60], descriptions: "°7 — a semitone above Dm7's root. Its upper structure is Em7." },
+    { name: "D#dim7", notes: [51, 54, 57, 60], descriptions: "°7 — hold." },
+    { name: "D#dim7", notes: [51, 54, 57, 60], descriptions: "°7 — hold." },
+    { name: "D#dim7", notes: [51, 54, 57, 60], descriptions: "°7 — hold." },
+    // Bar 7 — Dm7
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "vi7 — dim7 resolved down a semitone." },
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "vi7 — hold." },
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "vi7 — hold." },
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "vi7 — hold." },
+    // Bar 8 — C#°7 (passing dim between Dm7 and Cmaj7)
+    { name: "C#dim7", notes: [49, 52, 55, 58], descriptions: "°7 — a semitone above Cmaj7's root. Its upper structure is Dm7." },
+    { name: "C#dim7", notes: [49, 52, 55, 58], descriptions: "°7 — hold." },
+    { name: "C#dim7", notes: [49, 52, 55, 58], descriptions: "°7 — hold." },
+    { name: "C#dim7", notes: [49, 52, 55, 58], descriptions: "°7 — hold." },
+    // Bar 9 — Cmaj7 (bottom of the chain)
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — the trail's landing. The dim7's ♭7 fell a semitone to E, the tonic's 3rd." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold. Loop back to bar 1 and re-run the trail an octave up." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+  ],
+};
+
+/**
+ * All ten Phase 3 concept paths, in order.
  *
  * Spread into `RAW_PATHS` by `src/lib/paths.ts` so they go through
  * the same `padPath()` pass as the classical Phase 5 entries.
@@ -453,4 +532,5 @@ export const CONCEPT_PATHS: HarmonicPath[] = [
   backdoor_ii_v_demo,
   concept_three_to_nine,
   concept_line_cliches,
+  concept_diminished_trail,
 ];

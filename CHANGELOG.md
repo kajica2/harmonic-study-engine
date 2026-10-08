@@ -4,6 +4,37 @@ All notable changes to Harmonic Study Engine are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Dates use the user's local timezone on commit.
 
+## [Unreleased]
+
+### Batch F — concept paths
+
+**Fixed**
+
+- `analyzeChord` classified every fully-diminished 7th as
+  `"half-diminished"`, making the `"diminished"` family in the
+  `ChordAnalysis` type unreachable. The `m3 + b5` test ignored the
+  7th, so a `Cdim7` (m3 + b5 + bb7) matched the same branch as a
+  `Cm7b5` (m3 + b5 + b7). The branch now reads the 7th: b7 (10
+  semitones) = half-diminished, bb7 (9 semitones) = diminished.
+  Impacted the chord inspector's Family row, the co-compose accept
+  path's quality mapping (`App.tsx` maps `half-diminished` to a minor
+  triad), and quiz wording. 242 shipped path steps now classify as
+  `"diminished"` that previously reported `"half-diminished"`.
+- The test that pinned the old behavior (`theory.test.ts`, "fully
+  diminished triad per code's actual rule") was retired rather than
+  re-pinned; it asserted a defect, not a contract.
+
+**Added**
+
+- `concept-diminished-trail` (MC 15): a 9-bar descending whole-step
+  chain (G7 → Fmaj7 → Em7 → Dm7 → Cmaj7) with a fully-diminished 7th
+  wedged between each pair — 36 steps, root-position voicings in
+  G3–F#5. Flipped `inApp: true` with a curated `objective`, bumping
+  the `curatedBriefingCount` pin 12 → 13. Pinned by
+  `tests/concept-diminished-trail.test.ts` (8 cases), including the
+  musical invariant: lowering a dim7's root a semitone yields the
+  dominant 7th below it, pitch for pitch.
+
 ## [0.2.0] - 2026-09-13
 
 ### Sprint 7 (this session) — classical personas, behavioral wiring, audio quality, tests, docs, e2e

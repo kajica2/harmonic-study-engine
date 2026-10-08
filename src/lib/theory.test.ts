@@ -162,11 +162,17 @@ describe("analyzeChord", () => {
   it("classifies a half-diminished (Cm7b5) as 'half-diminished'", () => {
     expect(analyzeChord([60, 63, 66, 70]).family).toBe("half-diminished");
   });
-  it("classifies a fully diminished triad (C Eb Gb) per code's actual rule", () => {
-    // Code: third=3, fifth=6 → "half-diminished" (it matches the first
-    // matching branch). Encoding the real behavior so a refactor that
-    // changes it gets a flagged failure.
-    expect(analyzeChord([60, 63, 66]).family).toBe("half-diminished");
+  it("classifies a fully diminished 7th (Cdim7 = C Eb Gb Bbb) as 'diminished'", () => {
+    // m3 + b5 + bb7. The bb7 (9 semitones) is what separates dim7 from
+    // m7b5 — an earlier branch tested b5 alone, so every dim7 fell
+    // through as "half-diminished" and the "diminished" family was
+    // unreachable. Pin the distinction both ways.
+    expect(analyzeChord([60, 63, 66, 69]).family).toBe("diminished");
+    expect(analyzeChord([60, 63, 66, 70]).family).toBe("half-diminished");
+  });
+  it("classifies a fully diminished triad (C Eb Gb) as 'diminished'", () => {
+    // No 7th present, so the b5 alone identifies the dim triad.
+    expect(analyzeChord([60, 63, 66]).family).toBe("diminished");
   });
   it("classifies a major 7th (C E G B) as 'major'", () => {
     expect(analyzeChord([60, 64, 67, 71]).family).toBe("major");
