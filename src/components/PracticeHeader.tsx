@@ -78,6 +78,9 @@ interface PracticeHeaderProps {
    *  the resulting bpm back via onTempoChange. PracticeHeader just
    *  fires the click. */
   onTapTempo: () => void;
+  /** Show a "MIDI live" chip when at least one MIDI note is held.
+   *  The caller (App.tsx) reads from useSynesthesiaActive(). */
+  midiLive: boolean;
   timeSignature: TimeSignature;
   /** Transposed chord notes (MIDI) for the active step — fed to
    *  the GuideToneFeedback classifier. */
@@ -220,6 +223,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onNextBar,
   onPrevBar,
   onTapTempo,
+  midiLive,
   timeSignature,
   chordNotes,
   guideToneTrail,
@@ -408,6 +412,21 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           </div>
         </div>
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+          {midiLive && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] border border-emerald-500/30 bg-emerald-500/10 text-[11px] t-mono text-emerald-300"
+              role="status"
+              aria-live="polite"
+              data-testid="midi-live-chip"
+              title="MIDI input is live — at least one note is being held"
+            >
+              <span
+                aria-hidden="true"
+                className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+              />
+              MIDI live
+            </span>
+          )}
           <GuideToneFeedback chordNotes={chordNotes} />
           {guideToneLabel && (
             <span

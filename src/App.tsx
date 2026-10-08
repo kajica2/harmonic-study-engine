@@ -494,6 +494,12 @@ function AppShell() {
   const exerciseTranspose = useNewSessionStore((s) => s.exerciseTranspose);
   const keyCycleActive = useNewSessionStore((s) => s.keyCycleActive);
   const soundingShift = globalTranspose + exerciseTranspose;
+  // MIDI live indicator: at least one note currently held. Powers
+  // the "MIDI live" chip in the PracticeHeader so the user can
+  // confirm their input is reaching the app without playing a wrong
+  // note into the silence. Re-derives from the synesthesia context
+  // (same source the played-note highlight uses).
+  const midiLive = useSynesthesiaActive().length > 0;
 
   // Mirror of activeStepIndex for the measure handler so the cycle
   // decision can be computed OUTSIDE the setActiveStepIndex updater
@@ -3488,6 +3494,7 @@ function AppShell() {
         onTapTempo={handleTapTempo}
         onNextBar={() => setActiveStepIndex((p) => Math.min(p + 1, path.steps.length - 1))}
         onPrevBar={() => setActiveStepIndex((p) => Math.max(p - 1, 0))}
+        midiLive={midiLive}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
         guideToneTrail={guideTrail.tally}
