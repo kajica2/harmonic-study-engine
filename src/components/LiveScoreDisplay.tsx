@@ -38,6 +38,10 @@ interface LiveScoreDisplayProps {
    *  the score matches the on-screen piano. Default split at C4 (60)
    *  is preserved when omitted. */
   kbRange?: KeyboardRange;
+  /** Currently held MIDI notes — when a note is in this list and
+   *  appears in the score, its notehead gets a colored fill so the
+   *  player can see what's sounding against the notated music. */
+  activeMidis?: number[];
 }
 
 /**
@@ -65,6 +69,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   timeSignature = "4/4",
   displayMode = "full",
   kbRange,
+  activeMidis,
 }) => {
   const svgRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -438,6 +443,71 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
     }, 80);
     return () => window.clearTimeout(id);
   }, [activeStepIndex]);
+
+  // Note-level highlight: tag each rendered .abcjs-notehead with the
+  // MIDI pitch it represents, then color the ones currently held.
+  //
+  // The flat pitch order matches the ABC emitter above: in grand mode
+  // the treble voice's pitches come first (all events), then the bass
+  // voice's pitches. In single-voice modes it's the simple flat list.
+  // abcjs lays out .abcjs-notehead elements in the same order inside
+  // each voice, so document-order walk + the matching flat list gives
+  // us the pitch for each notehead.
+  useEffect(() => {
+    if (!svgRef.current) return;
+
+    // Rebuild the flat pitch list the way the ABC was emitted.
+    const splitMidi = kbRange
+      ? Math.floor((kbRange.from + kbRange.to) / 2)
+      : 60;
+    const flat: number[] = [];
+    if (clefLayout === "grand") {
+      for (const c of windowCells) {
+        const shifted = transposeMidiList(c.notes, transposeShift + visualTranspose);
+        for (const p of shifted) if (p >= splitMidi) flat.push(p);
+      }
+      for (const c of windowCells) {
+        const shifted = transposeMidiList(c.notes, transposeShift + visualTranspose);
+        for (const p of shifted) if (p < splitMidi) flat.push(p);
+      }
+    } else {
+      for (const c of windowCells) {
+        const shifted = transposeMidiList(c.notes, transposeShift + visualTranspose);
+        for (const p of shifted) flat.push(p);
+      }
+    }
+
+    const held = new Set(activeMidis ?? []);
+    const noteheads = svgRef.current.querySelectorAll<SVGElement>(".abcjs-notehead");
+    noteheads.forEach((el, i) => {
+      const pitch = flat[i];
+      if (pitch === undefined) return;
+      el.setAttribute("data-pitch", String(pitch));
+      // Held notes: bright orange. Untouched notes: clear any prior
+      // highlight. (Bar-highlight brass color is owned by the
+      // active-step effect above; we never overwrite that fill here
+      // because the bar highlight sets it on a parent class.)
+      if (held.has(pitch)) {
+        el.setAttribute("data-played", "true");
+        el.style.fill = "#f97316"; // orange-500, contrasts with brass
+      } else {
+        el.removeAttribute("data-played");
+        // Clear only the inline fill if WE set it; leave untouched
+        // the bar highlight's fill (set inline by the bar effect).
+        if (el.getAttribute("data-played") === null) {
+          el.style.removeProperty("fill");
+        }
+      }
+    });
+  }, [
+    activeMidis,
+    path,
+    transposeShift,
+    visualTranspose,
+    clefLayout,
+    kbRange,
+    windowCells.length,
+  ]);
 
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 mb-4">

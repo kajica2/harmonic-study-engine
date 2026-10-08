@@ -90,6 +90,7 @@ import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
 import { MidiInPicker } from "./components/MidiInPicker";
 import {
   SynesthesiaProvider,
+  useSynesthesiaActive,
   useSynesthesiaSetActive,
 } from "./components/SynesthesiaProvider";
 import {
@@ -5643,6 +5644,9 @@ function AppShell() {
                   // keyboard range so the score mirrors the range
                   // the user just set.
                   kbRange={kbRange}
+                  // Color the noteheads of any notes the player is
+                  // currently holding so the score reflects the input.
+                  activeMidis={useSynesthesiaActive()}
                 />
               </Suspense>
               </div>
