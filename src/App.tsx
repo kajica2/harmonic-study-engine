@@ -113,6 +113,7 @@ import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
 import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
+import { computeTapTempo } from "./lib/tapTempo";
 import { STEPS_PER_BAR } from "./lib/paths";
 import type { AlternativeChord } from "./lib/coCompose";
 import { ensureStorageSchemaVersion, K, storageSet } from "./lib/storage";
@@ -1051,23 +1052,19 @@ function AppShell() {
   );
   // Tap-tempo: average inter-tap interval over the last 4 taps
   // (rounded to int bpm). A >2s gap resets the rolling history so
-  // the user can re-tap without first clearing state.
+  // the user can re-tap without first clearing state. The pure
+  // decision lives in src/lib/tapTempo.ts so it's unit-testable.
   const handleTapTempo = useCallback(() => {
     const now = Date.now();
-    const taps = tapTimesRef.current;
-    const last = taps[taps.length - 1];
-    if (last !== undefined && now - last > 2000) {
+    const result = computeTapTempo(tapTimesRef.current, now);
+    if (result.reset) {
       tapTimesRef.current = [now];
       return;
     }
-    taps.push(now);
-    if (taps.length < 3) return; // need ≥3 taps to estimate
-    const recent = taps.slice(-4);
-    const intervals = recent.slice(1).map((t, i) => t - recent[i]);
-    const avgMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const bpm = Math.round(60000 / avgMs);
-    const clamped = Math.max(30, Math.min(240, bpm));
-    setTempo(clamped);
+    tapTimesRef.current.push(now);
+    if (result.bpm !== null) {
+      setTempo(result.bpm);
+    }
   }, [setTempo]);
   // FOLLOW-ON to F3: one-click loop preset (1/2/4 bars) anchored at
   // the current form bar. The form-relative anchor handles padded
