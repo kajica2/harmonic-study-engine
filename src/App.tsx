@@ -1548,6 +1548,12 @@ function AppShell() {
         // M → toggle Play Along (mute synth melody)
         e.preventDefault();
         audioEngine.setMelodyMuted(!audioEngine.melodyMuted);
+      } else if (e.key === "r" || e.key === "R") {
+        // R → restart from bar 1 (active step 0). Doesn't change
+        // play state — if you were paused, you're still paused; if
+        // you were playing, you keep playing from the top.
+        e.preventDefault();
+        setActiveStepIndex(0);
       } else if (globalShortcut !== null) {
         // T/N/L/P/C global letter shortcuts. Classified by e.code
         // (the D14 law) with the PHASE-1-01 modifier guard inside the
@@ -3457,6 +3463,7 @@ function AppShell() {
             ? undefined
             : transposeChordName(nextStep.name ?? "", soundingShift)
         }
+        onRestart={() => setActiveStepIndex(0)}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
         guideToneTrail={guideTrail.tally}

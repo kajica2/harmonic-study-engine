@@ -37,6 +37,11 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Playback",
   },
   {
+    keys: ["R"],
+    description: "Restart from bar 1 (keeps play/pause state)",
+    group: "Playback",
+  },
+  {
     keys: ["P"],
     description: "Toggle Auto-playback (Space alias)",
     group: "Playback",

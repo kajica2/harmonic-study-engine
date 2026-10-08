@@ -67,6 +67,9 @@ interface PracticeHeaderProps {
   /** Display name of the NEXT chord (already transposed). Lets the
    *  player see what's coming without looking ahead. Optional. */
   nextChordName?: string;
+  /** Restart from bar 1. Caller is the source of truth (it owns
+   *  the play state + activeStepIndex); the button just requests. */
+  onRestart: () => void;
   timeSignature: TimeSignature;
   /** Transposed chord notes (MIDI) for the active step — fed to
    *  the GuideToneFeedback classifier. */
@@ -205,6 +208,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   formLen,
   chordName,
   nextChordName,
+  onRestart,
   timeSignature,
   chordNotes,
   guideToneTrail,
@@ -359,6 +363,16 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
               → {nextChordName}
             </span>
           )}
+          <button
+            type="button"
+            onClick={onRestart}
+            title="Restart from bar 1 (R) — keeps play/pause state"
+            aria-label="Restart from bar 1"
+            data-testid="practice-header-restart"
+            className="ml-auto text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+          >
+            R · restart
+          </button>
         </div>
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
           <GuideToneFeedback chordNotes={chordNotes} />
