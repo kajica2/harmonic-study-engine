@@ -252,5 +252,24 @@ textarea:focus-visible,
   /* In-area controls never belong on paper. */
   .print-hide { display: none !important; }
   .print-area svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* Active-bar highlight: dark amber on white instead of the dark-mode
+   * brass color (2.2:1 contrast on white is below WCAG AA for non-text
+   * decorative content). The CSS attribute selector targets the
+   * [data-highlighted="true"] tag set by the LiveScoreDisplay effect.
+   * The bar-band fill is set inline as an SVG attribute; we override
+   * it via the [data-bar-highlight] selector. */
+  .print-area [data-highlighted="true"],
+  .print-area [data-highlighted="true"] path,
+  .print-area [data-highlighted="true"] text { fill: #92400e !important; }
+  .print-area [data-bar-highlight="true"] { fill: rgba(146, 64, 14, 0.10) !important; }
+  /* Played-note highlight: dark orange-red on white instead of the
+   * dark-mode orange (#f97316, 2.8:1 vs white). The [data-played]
+   * attribute is set by the LiveScoreDisplay activeMidis effect. */
+  .print-area [data-played="true"] { fill: #c2410c !important; }
+  /* LeadSheet (and any other modal-mounted print area) needs to
+   * escape its fixed-positioned modal shell: static + 100% width
+   * reaches the full @page. Static overrides the @media rule's
+   * absolute positioning. */
+  .print-area { position: static !important; width: 100% !important; }
   @page { margin: 14mm; }
 }

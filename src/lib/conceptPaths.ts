@@ -346,7 +346,99 @@ const backdoor_ii_v_demo: HarmonicPath = {
 };
 
 /**
- * All seven Phase 3 concept paths, in order.
+ * Concept — 3-to-9 Voice Leading Through the Form.
+ *
+ * A single ii-V-I in C major (Cmaj7 | Dm7 | G7 | Cmaj7) where the
+ * exercise is the voice-leading trick: raising the 3rd an octave at
+ * every chord change produces the 9th of the next chord (E3 → E4
+ * turns Cmaj7's 3rd into Dm7's 9th, F3 → F4 turns Dm7's 3rd into
+ * G7's 9th, B3 → B4 turns G7's 3rd into Cmaj7's 9th). Voicings
+ * are root-position 7th chords (root, 3, 5, 7) within C3–C5; the
+ * player is expected to mentally transpose the 3rd up an octave
+ * from the previous bar's voicing to hear the connection.
+ */
+const concept_three_to_nine: HarmonicPath = {
+  id: "concept-three-to-nine",
+  title: "3-to-9 Voice Leading Through the Form",
+  description:
+    "A 4-bar ii-V-I in C major (I | ii | V | I) where the player practices raising the 3rd an octave (= 9th) at every chord change. The 3rd of the previous chord becomes the 9th of the next chord.",
+  composer: "Masterclass concept tradition",
+  key: "C major",
+  feel: "educational / voice_leading",
+  techniques: ["voice_leading", "ninth_chord"],
+  steps: [
+    // Bar 1 — Cmaj7
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — root position. The 3rd E3 will become Dm7's 9th." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+    // Bar 2 — Dm7
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "ii — root position. The 3rd F3 will become G7's 9th." },
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "ii — hold." },
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "ii — hold." },
+    { name: "Dm7", notes: [50, 53, 57, 60], descriptions: "ii — hold." },
+    // Bar 3 — G7
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V — root position. The 3rd B3 will become Cmaj7's 9th." },
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V — hold." },
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V — hold." },
+    { name: "G7", notes: [55, 59, 62, 65], descriptions: "V — hold." },
+    // Bar 4 — Cmaj7
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — root position. The cycle is complete; raise E3 back to E4 to start over." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+    { name: "Cmaj7", notes: [48, 52, 55, 59], descriptions: "I — hold." },
+  ],
+};
+
+/**
+ * Concept — Line Cliché (5 → ♯9 → 1 → 2) on a Dominant 7♯9.
+ *
+ * A 4-bar practice space on a single dominant 7 chord with ♯9
+ * (G7♯9). The exercise: play the 4-note motif `5 → ♯9 → 1 → 2`
+ * over the chord change — D (the 5th) up to A♯ (the ♯9), down
+ * to G (the root = 1), up to A (the 2nd / 9th) — a
+ * descending-then-ascending gesture that resolves onto the 9th.
+ * The chord stays G7♯9 for all 4 bars so the player can practice
+ * the motif repeatedly before moving on.
+ *
+ * Voicings are root-position 7♯9 (root, 3, 5, ♭7, ♯9) within
+ * C3–C5: G3, B3, D4, F4, A♯4 = MIDI 55, 59, 62, 65, 70.
+ */
+const concept_line_cliches: HarmonicPath = {
+  id: "concept-line-cliches",
+  title: "Line Cliché: 5 → ♯9 → 1 → 2",
+  description:
+    "A 4-bar practice space on a single dominant 7 chord with ♯9 (G7♯9). The exercise: play the 4-note motif 5 → ♯9 → 1 → 2 over the chord change.",
+  composer: "Jazz tradition",
+  key: "G",
+  feel: "educational / dominant7_sharp9",
+  techniques: ["line_cliche", "dominant7_sharp9"],
+  steps: [
+    // Bar 1 — G7♯9 (motif: 5 → ♯9 → 1 → 2)
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — root position. The motif target: 5 → ♯9 (D up to A♯)." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    // Bar 2 — G7♯9 (repeat)
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — repeat bar. The motif: ♯9 → 1 (A♯ down to G)." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    // Bar 3 — G7♯9 (repeat)
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — repeat bar. The motif: 1 → 2 (G up to A)." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    // Bar 4 — G7♯9 (resolution: repeat motif, prepares turnaround)
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — repeat bar. The motif lands on 2 (A), preparing a turnaround." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+    { name: "G7#9", notes: [55, 59, 62, 65, 70], descriptions: "V♯9 — hold." },
+  ],
+};
+
+/**
+ * All nine Phase 3 concept paths, in order.
  *
  * Spread into `RAW_PATHS` by `src/lib/paths.ts` so they go through
  * the same `padPath()` pass as the classical Phase 5 entries.
@@ -359,4 +451,6 @@ export const CONCEPT_PATHS: HarmonicPath[] = [
   bird_blues,
   modal_vamp_demo,
   backdoor_ii_v_demo,
+  concept_three_to_nine,
+  concept_line_cliches,
 ];

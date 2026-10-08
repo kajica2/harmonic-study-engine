@@ -1,8 +1,12 @@
-import * as mm from "@magenta/music";
+// Deep imports: only MusicRNN + sequences are used here. The package
+// barrel (@magenta/music) also pulls the player/recorder stack, which
+// transitively bundles tone.js (~59 kB gzip) nobody calls.
+import { MusicRNN } from "@magenta/music/esm/music_rnn";
+import * as sequences from "@magenta/music/esm/core/sequences";
 import { HarmonicPath, HarmonicStep } from "./paths";
 import { generateEtude } from "./etude";
 
-let musicRnn: mm.MusicRNN | null = null;
+let musicRnn: MusicRNN | null = null;
 let isInitializing = false;
 let initPromise: Promise<void> | null = null;
 
@@ -31,7 +35,7 @@ export async function initMagenta(): Promise<boolean> {
 
   isInitializing = true;
   initPromise = (async () => {
-    musicRnn = new mm.MusicRNN(
+    musicRnn = new MusicRNN(
       "https://storage.googleapis.com/magentadata/js/checkpoints/music_rnn/basic_rnn",
     );
     await musicRnn.initialize();
@@ -82,7 +86,7 @@ export async function generateMagentaSequence(
   if (!ok || !musicRnn) return melodicFallback(rootMidi, stepsCount);
 
   try {
-    const qns = mm.sequences.quantizeNoteSequence(
+    const qns = sequences.quantizeNoteSequence(
       {
         ticksPerQuarter: 220,
         totalTime: 0.5,

@@ -64,6 +64,27 @@ interface PracticeHeaderProps {
   formLen: number;
   /** Display name of the chord (already transposed by caller). */
   chordName: string;
+  /** Display name of the NEXT chord (already transposed). Lets the
+   *  player see what's coming without looking ahead. Optional. */
+  nextChordName?: string;
+  /** Restart from bar 1. Caller is the source of truth (it owns
+   *  the play state + activeStepIndex); the button just requests. */
+  onRestart: () => void;
+  /** Step forward by one bar (clamped to the last step). */
+  onNextBar: () => void;
+  /** Step backward by one bar (clamped to step 0). */
+  onPrevBar: () => void;
+  /** Panic: silence everything, reset the playhead, disable loop. */
+  onPanic: () => void;
+  /** Tap-tempo: caller maintains the rolling tap history and pushes
+   *  the resulting bpm back via onTempoChange. PracticeHeader just
+   *  fires the click. */
+  onTapTempo: () => void;
+  /** Reset tempo to the path's default reference (typically 120). */
+  onResetTempo: () => void;
+  /** Show a "MIDI live" chip when at least one MIDI note is held.
+   *  The caller (App.tsx) reads from useSynesthesiaActive(). */
+  midiLive: boolean;
   timeSignature: TimeSignature;
   /** Transposed chord notes (MIDI) for the active step — fed to
    *  the GuideToneFeedback classifier. */
@@ -201,6 +222,14 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   activeStepIndex,
   formLen,
   chordName,
+  nextChordName,
+  onRestart,
+  onNextBar,
+  onPrevBar,
+  onPanic,
+  onTapTempo,
+  onResetTempo,
+  midiLive,
   timeSignature,
   chordNotes,
   guideToneTrail,
@@ -342,12 +371,85 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           </span>
         </div>
         <div
-          className="text-lg font-semibold text-neutral-100 leading-tight mt-0.5"
+          className="text-lg font-semibold text-neutral-100 leading-tight mt-0.5 flex items-baseline gap-2 flex-wrap"
           data-testid="practice-header-readout"
         >
-          {readout}
+          <span>{readout}</span>
+          {nextChordName && (
+            <span
+              className="text-[11px] t-mono text-neutral-500"
+              title="The next chord — read ahead to anticipate voice-leading"
+              data-testid="practice-header-next"
+            >
+              → {nextChordName}
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onPrevBar}
+              title="Previous bar (←) — keeps play/pause state"
+              aria-label="Previous bar"
+              data-testid="practice-header-prev-bar"
+              className="text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={onNextBar}
+              title="Next bar (→) — keeps play/pause state"
+              aria-label="Next bar"
+              data-testid="practice-header-next-bar"
+              className="text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+            >
+              →
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              title="Restart from bar 1 (R) — keeps play/pause state"
+              aria-label="Restart from bar 1"
+              data-testid="practice-header-restart"
+              className="text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+            >
+              R · restart
+            </button>
+            <button
+              type="button"
+              onClick={onPanic}
+              title="Panic — silence everything, stop playback, reset to bar 1, disable loop"
+              aria-label="Panic reset"
+              data-testid="practice-header-panic"
+              className="text-[10px] t-mono uppercase tracking-widest text-red-400 hover:text-red-200 border border-red-500/30 rounded px-1.5 py-0.5 transition-colors"
+            >
+              panic
+            </button>
+          </div>
         </div>
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+          <span
+            className="inline-flex items-center px-2 py-1 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 text-[11px] t-mono text-neutral-300"
+            data-testid="practice-header-time-sig"
+            title="Active time signature — drives the live beat count"
+          >
+            {timeSignature}
+          </span>
+          {midiLive && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] border border-emerald-500/30 bg-emerald-500/10 text-[11px] t-mono text-emerald-300"
+              role="status"
+              aria-live="polite"
+              data-testid="midi-live-chip"
+              title="MIDI input is live — at least one note is being held"
+            >
+              <span
+                aria-hidden="true"
+                className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+              />
+              MIDI live
+            </span>
+          )}
           <GuideToneFeedback chordNotes={chordNotes} />
           {guideToneLabel && (
             <span
@@ -470,6 +572,26 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           <span className="t-mono text-[11px] text-neutral-200 w-14 text-right">
             {formatTempo(tempo)}
           </span>
+          <button
+            type="button"
+            onClick={onTapTempo}
+            title="Tap tempo — tap 3+ times to set the bpm from the average interval"
+            aria-label="Tap tempo"
+            data-testid="practice-header-tap-tempo"
+            className="ml-1 text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+          >
+            tap
+          </button>
+          <button
+            type="button"
+            onClick={onResetTempo}
+            title="Reset tempo to 120 bpm (the path's default reference)"
+            aria-label="Reset tempo to 120 bpm"
+            data-testid="practice-header-reset-tempo"
+            className="ml-1 text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+          >
+            120
+          </button>
         </label>
 
         {/* Loop */}

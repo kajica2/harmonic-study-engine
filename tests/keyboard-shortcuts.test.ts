@@ -32,6 +32,8 @@ const HANDLED_KEYS: ReadonlyArray<{ key: string; description: string }> = [
   { key: "ArrowUp", description: "path -1 (resets to step 1)" },
   { key: "Space", description: "toggle Auto-playback" },
   { key: "M", description: "toggle Play Along (mute synth melody)" },
+  { key: "R", description: "restart from bar 1 (keeps play/pause state)" },
+  { key: "0", description: "panic — silence, restart, disable loop" },
   { key: "T", description: "toggle tuner (off while piano keys are armed)" },
   { key: "N", description: "toggle metronome click" },
   { key: "L", description: "toggle loop (repeat whole form)" },
@@ -63,6 +65,8 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
       ArrowUp: "↑",
       "?": "?",
       M: "M",
+      R: "R",
+      "0": "0",
       T: "T",
       N: "N",
       L: "L",
@@ -97,6 +101,8 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
       Esc: "Escape",
       "?": "?",
       M: "M",
+      R: "R",
+      "0": "0",
       T: "T",
       N: "N",
       L: "L",
@@ -127,9 +133,16 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
     // T/N/L/P/C global shortcuts are likewise explicit toggles; T
     // additionally yields while the computer-keyboard piano is armed.)
     for (const { key } of HANDLED_KEYS) {
-      // Acceptable single-character shortcuts: ?, [, ], M, T, N, L, P, C
-      // (and "Space" — the alternate name for the spacebar)
-      const acceptable = ["?", "[", "]", "M", "T", "N", "L", "P", "C", "Space"];
+      // Acceptable single-character shortcuts: ?, [, ], M, T, N, L, P, C, R
+      // (and "Space" — the alternate name for the spacebar).
+      // R is a typing letter; it's only safe because the handler
+      // suppresses all single-letter shortcuts while the focus is
+      // in an input/textarea/contenteditable (App.tsx handler's
+      // isTyping guard, lines ~1380-1390).
+      // "0" is a digit and the panic shortcut. Digits aren't
+      // typed letters, so the typing-conflict concern doesn't apply
+      // — the `isTyping` guard catches them the same way anyway.
+      const acceptable = ["?", "[", "]", "M", "T", "N", "L", "P", "C", "R", "Space", "0"];
       const isArrow = key.startsWith("Arrow");
       const isSpecial =
         key === "Escape" || key === " " || key === "Space" || isArrow || acceptable.includes(key);

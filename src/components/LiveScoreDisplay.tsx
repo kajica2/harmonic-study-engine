@@ -5,6 +5,7 @@ import { midiToABCName, transposeMidiList } from "../lib/scoreGenerator";
 import { playbackClock } from "../lib/playbackClock";
 import { useTick } from "../lib/useTick";
 import { transposeChordName } from "../lib/theory";
+import type { KeyboardRange } from "../hooks/useSessionStore";
 import { slicePathForRepeat, type BeatCell } from "../lib/sliceAndRepeat";
 import { TimeSignature } from "../lib/rhythm";
 // Sliced persona mode only (frozen helper table, blast-table #20).
@@ -33,6 +34,18 @@ interface LiveScoreDisplayProps {
    *  would require abcjs post-process — out of scope for this
    *  PR. The zoom level itself is already wired (zoomScale state). */
   displayMode?: ScoreDisplayMode;
+  /** Keyboard range — drives the grand-staff treble/bass split so
+   *  the score matches the on-screen piano. Default split at C4 (60)
+   *  is preserved when omitted. */
+  kbRange?: KeyboardRange;
+  /** Currently held MIDI notes — when a note is in this list and
+   *  appears in the score, its notehead gets a colored fill so the
+   *  player can see what's sounding against the notated music. */
+  activeMidis?: number[];
+  /** Click on a bar in the score → jump the playhead to that bar.
+   *  The component handles the SVG/DOM walk; the parent receives
+   *  the form-relative bar index and decides what to do with it. */
+  onBarClick?: (formBarIndex: number) => void;
 }
 
 /**
@@ -59,6 +72,9 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   formLen,
   timeSignature = "4/4",
   displayMode = "full",
+  kbRange,
+  activeMidis,
+  onBarClick,
 }) => {
   const svgRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -195,8 +211,14 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
           evt.notes,
           transposeShift + visualTranspose,
         );
-        const treblePitches = shiftedNotes.filter((p) => p >= 60);
-        const bassPitches = shiftedNotes.filter((p) => p < 60);
+        // Grand-staff split: split at the keyboard range's midpoint
+        // when provided, so the score mirrors the on-screen piano.
+        // Fallback to C4 (60) preserves prior behavior.
+        const splitMidi = kbRange
+          ? Math.floor((kbRange.from + kbRange.to) / 2)
+          : 60;
+        const treblePitches = shiftedNotes.filter((p) => p >= splitMidi);
+        const bassPitches = shiftedNotes.filter((p) => p < splitMidi);
 
         let chordLabel = evt.name
           ? evt.name.replace(/m/g, "m").replace(/#/g, "#")
@@ -330,6 +352,46 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
     });
   }, [path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex, isSliced, windowCells.length]);
 
+  // Click-to-jump: attach a single click handler to the SVG host.
+  // The handler walks up from the click target to the closest bar
+  // element (abcjs-m{N}, 1-based) and reports the form-relative
+  // bar index back to the parent. abcjs always re-renders this
+  // tree when path/clefLayout/tempo change, so a fresh handler
+  // is bound on each render — old listeners are GC'd with the
+  // previous tree.
+  useEffect(() => {
+    if (!svgRef.current || !onBarClick) return;
+    const host = svgRef.current;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      const barEl = target?.closest<HTMLElement>("[class*='abcjs-m']");
+      if (!barEl) return;
+      // abcjs emits classes like "abcjs-m5" or combined
+      // "abcjs-l1 abcjs-m5". Find the m class and parse.
+      const m = barEl.className.match(/abcjs-m(\d+)/);
+      if (!m) return;
+      const measureNum = Number(m[1]); // 1-based
+      // abcjs measure numbers match form-relative bar numbers
+      // (1-based). Convert to 0-based for the parent.
+      onBarClick(measureNum - 1);
+    };
+    host.addEventListener("click", handleClick);
+    return () => host.removeEventListener("click", handleClick);
+  }, [onBarClick, path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex, isSliced, windowCells.length]);
+
+  // Cursor hint: bars are clickable (jump-to-bar). Applied as an
+  // inline style on the host so it ships without a new CSS file.
+  // Only when onBarClick is wired — silent otherwise.
+  useEffect(() => {
+    if (!svgRef.current || !onBarClick) return;
+    const host = svgRef.current;
+    const prev = host.style.cursor;
+    host.style.cursor = "pointer";
+    return () => {
+      host.style.cursor = prev;
+    };
+  }, [onBarClick, path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex, isSliced, windowCells.length]);
+
   useEffect(() => {
     if (!svgRef.current) return;
 
@@ -426,6 +488,71 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
     }, 80);
     return () => window.clearTimeout(id);
   }, [activeStepIndex]);
+
+  // Note-level highlight: tag each rendered .abcjs-notehead with the
+  // MIDI pitch it represents, then color the ones currently held.
+  //
+  // The flat pitch order matches the ABC emitter above: in grand mode
+  // the treble voice's pitches come first (all events), then the bass
+  // voice's pitches. In single-voice modes it's the simple flat list.
+  // abcjs lays out .abcjs-notehead elements in the same order inside
+  // each voice, so document-order walk + the matching flat list gives
+  // us the pitch for each notehead.
+  useEffect(() => {
+    if (!svgRef.current) return;
+
+    // Rebuild the flat pitch list the way the ABC was emitted.
+    const splitMidi = kbRange
+      ? Math.floor((kbRange.from + kbRange.to) / 2)
+      : 60;
+    const flat: number[] = [];
+    if (clefLayout === "grand") {
+      for (const c of windowCells) {
+        const shifted = transposeMidiList(c.notes, transposeShift + visualTranspose);
+        for (const p of shifted) if (p >= splitMidi) flat.push(p);
+      }
+      for (const c of windowCells) {
+        const shifted = transposeMidiList(c.notes, transposeShift + visualTranspose);
+        for (const p of shifted) if (p < splitMidi) flat.push(p);
+      }
+    } else {
+      for (const c of windowCells) {
+        const shifted = transposeMidiList(c.notes, transposeShift + visualTranspose);
+        for (const p of shifted) flat.push(p);
+      }
+    }
+
+    const held = new Set(activeMidis ?? []);
+    const noteheads = svgRef.current.querySelectorAll<SVGElement>(".abcjs-notehead");
+    noteheads.forEach((el, i) => {
+      const pitch = flat[i];
+      if (pitch === undefined) return;
+      el.setAttribute("data-pitch", String(pitch));
+      // Held notes: bright orange. Untouched notes: clear any prior
+      // highlight. (Bar-highlight brass color is owned by the
+      // active-step effect above; we never overwrite that fill here
+      // because the bar highlight sets it on a parent class.)
+      if (held.has(pitch)) {
+        el.setAttribute("data-played", "true");
+        el.style.fill = "#f97316"; // orange-500, contrasts with brass
+      } else {
+        el.removeAttribute("data-played");
+        // Clear only the inline fill if WE set it; leave untouched
+        // the bar highlight's fill (set inline by the bar effect).
+        if (el.getAttribute("data-played") === null) {
+          el.style.removeProperty("fill");
+        }
+      }
+    });
+  }, [
+    activeMidis,
+    path,
+    transposeShift,
+    visualTranspose,
+    clefLayout,
+    kbRange,
+    windowCells.length,
+  ]);
 
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 mb-4">

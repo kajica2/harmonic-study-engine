@@ -30,8 +30,8 @@ is perceived-speed preloading.
 | `bundle-dynamic-imports` | ✅ | `ImportExportModal`/`RecordingModal` = `lazy()`; `SetEditor` loaded on demand; `@magenta/music` + `sheetMusicExport` behind `import()` |
 | `bundle-conditional` | ✅ | Magenta loads only on "Generate"; DDSP probe is opt-in |
 | `bundle-analyzable-paths` | ✅ | All dynamic imports use static string literals (no template paths) |
-| `bundle-defer-third-party` | ☐ | Check RUM/timing scripts post-hydrate (currently none) — keep future analytics `requestIdleCallback`-gated |
-| `bundle-preload` | ☐ | `<link rel="preload">` / hover-preload the Magenta chunk on first hover of the generator button (`App.tsx` gen button) |
+| `bundle-defer-third-party` | ✅ | Audited 2026-10-02: no RUM / timing / analytics scripts in `index.html` or loaded post-hydrate. The app has zero 3rd-party scripts in the bundle. If future analytics land they MUST be `requestIdleCallback`-gated (the standing rule). |
+| `bundle-preload` | ✅ | `cd24517` (2026-10-02): `magentaHelper` chunk preloads on `onMouseEnter`/`onFocus` of the Etude Generate button, latched via ref. Click→generate no longer waits for the ~2.5MB chunk fetch. |
 
 **Effort:** 0.5–1 day total (preload + any analytics guard).
 
@@ -63,7 +63,7 @@ The 3 high-value items already shipped; remaining are incremental.
 | Rule | Status | Evidence / work |
 |------|--------|-----------------|
 | `client-event-listeners` | ✅ | `playbackClock` is a single shared subscription (module-level listener set); MidiInPicker scopes its `midin` listener |
-| `client-passive-event-listeners` | ☐ | Global `keydown`/`mousedown` init listeners (`App.tsx:426`) are fine; ensure any future `wheel`/`touchmove` uses `{ passive: true }` |
+| `client-passive-event-listeners` | ✅ | Audited 2026-10-02: `grep -rn "addEventListener.*\(wheel\|touchmove\|touchstart\)" src/` returns zero matches. Only `keydown`/`mousedown` exist (already passive-safe by spec — they're not scroll-blocking). No code change needed. |
 | `client-localstorage-schema` | ☐ | **Biggest open medium item.** Bare keys: `synesthesia_paths`, `synesthesia_melodyByStep`, `synesthesia_counterMelodyByStep`, `synesthesia_feedbackHistory`, `synesthesia_quizScore`, `synesthesia_stylePackId`, `synesthesia_humanize*`, `synesthesia_arpType`, etc. Perf log already versioned (`hse.performance.log.v1`). Plan: introduce a single `synesthesia.schema.v1` marker + migration registry in `usePersistedState`/`useSessionStore`; wrap reads through one helper |
 | `client-swr-dedup` | N/A | No client HTTP data fetching in-app (FastAPI/DDSB only server-side) |
 
@@ -80,7 +80,7 @@ The 3 high-value items already shipped; remaining are incremental.
 | `rendering-content-visibility` | ✅ | `PathCatalog` cards: `content-visibility:auto` + `contain-intrinsic-size:auto 140px` (long catalogs skip offscreen layout/repaint). LiveScore is a single SVG — not applicable |
 | `rendering-svg-precision` | N/A | No heavy dynamic SVG coordinate strings |
 | `rendering-usetransition-loading` | ✅ | Folded into `rerender-transitions` (startTransition around path select + tab switch shipped in Phase 2) |
-| `rendering-resource-hints` / `rendering-script-defer-async` | ☐ | Deferred with `bundle-preload` phase |
+| `rendering-resource-hints` / `rendering-script-defer-async` | ✅ | Closed with the `bundle-preload` slice (2026-10-02): the magentaHelper chunk preloads on hover/focus via dynamic-import modulepreload — exactly the resource-hint shape the roadmap asked for. `script-defer-async` is N/A (the only script in `index.html` is `<script type="module">` which is deferred-by-spec). No 3rd-party origins in the hot path so no `preconnect`/`dns-prefetch` to add. |
 
 **Effort:** JSX extraction 1–2 days; rest under a day.
 

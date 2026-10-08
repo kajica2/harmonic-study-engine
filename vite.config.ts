@@ -61,7 +61,18 @@ export default defineConfig(() => {
       // them up directly; vite/esbuild would otherwise pull them
       // in via dynamic import chains.
       rollupOptions: {
-        external: (id) => /\.test\.(ts|tsx)$/.test(id),
+        // jspdf's svg()/html() helpers pull canvg + html2canvas via
+        // dynamic import; this app never calls them (svg2pdf drives
+        // jspdf's primitive ops directly), so externalizing keeps the
+        // ~100 kB pair out of the bundle entirely.
+        external: (id) =>
+          /\.test\.(ts|tsx)$/.test(id) ||
+          id === "canvg" ||
+          id === "html2canvas" ||
+          id.includes("node_modules/canvg/") ||
+          id.includes("node_modules/html2canvas/") ||
+          id === "dompurify" ||
+          id.includes("node_modules/dompurify/"),
         // Split the heavyweight vendor libs into stable, cacheable
         // chunks. This is a pure caching/parallelism win — dangerously
         // large libs (magentaHelper is already a dynamic chunk) get
@@ -86,6 +97,10 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
+        // tfjs aggregate without backend-cpu (webgl is the real
+        // backend; cpu's registration is a side effect that can't
+        // tree-shake). See src/lib/tfjs-shim.ts.
+        '@tensorflow/tfjs': path.resolve(__dirname, 'src/lib/tfjs-shim.ts'),
         'node-fetch': path.resolve(__dirname, 'src/lib/fetch-shim.ts'),
         'node:stream/web': path.resolve(__dirname, 'src/lib/empty-shim.ts'),
         'stream/web': path.resolve(__dirname, 'src/lib/empty-shim.ts'),

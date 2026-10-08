@@ -65,7 +65,6 @@ import {
   templateMeter,
 } from "./lib/arpRhythm";
 import { playbackClock } from "./lib/playbackClock";
-import { usePlaybackState } from "./hooks/use-playback-state";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, type DrillSubdivision } from "./lib/rhythmDrill";
@@ -90,6 +89,7 @@ import { SynesthesiaCanvas } from "./components/SynesthesiaCanvas";
 import { MidiInPicker } from "./components/MidiInPicker";
 import {
   SynesthesiaProvider,
+  useSynesthesiaActive,
   useSynesthesiaSetActive,
 } from "./components/SynesthesiaProvider";
 import {
@@ -112,6 +112,7 @@ import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
 import { audioRecorder, RecordingResult } from "./lib/audioRecorder";
 import { renderPathToWav, downloadWavFromBlob, RenderMode } from "./lib/loopWav";
+import { computeTapTempo } from "./lib/tapTempo";
 import { STEPS_PER_BAR } from "./lib/paths";
 import type { AlternativeChord } from "./lib/coCompose";
 import { ensureStorageSchemaVersion, K, storageSet } from "./lib/storage";
@@ -492,6 +493,12 @@ function AppShell() {
   const exerciseTranspose = useNewSessionStore((s) => s.exerciseTranspose);
   const keyCycleActive = useNewSessionStore((s) => s.keyCycleActive);
   const soundingShift = globalTranspose + exerciseTranspose;
+  // MIDI live indicator: at least one note currently held. Powers
+  // the "MIDI live" chip in the PracticeHeader so the user can
+  // confirm their input is reaching the app without playing a wrong
+  // note into the silence. Re-derives from the synesthesia context
+  // (same source the played-note highlight uses).
+  const midiLive = useSynesthesiaActive().length > 0;
 
   // Mirror of activeStepIndex for the measure handler so the cycle
   // decision can be computed OUTSIDE the setActiveStepIndex updater
@@ -542,6 +549,10 @@ function AppShell() {
   const pauseCfgRef = useRef<PauseConfig>(practiceMechanics.pause);
   const abCfgRef = useRef<AbConfig>(practiceMechanics.ab);
   const rampCfgRef = useRef(practiceMechanics.ramp);
+  // Tap-tempo: rolling list of recent tap timestamps. Cleared on
+  // a >2s gap so the user can re-tap a new tempo without resetting
+  // (D35: 2s matches a typical metronome's tap-tempo window).
+  const tapTimesRef = useRef<number[]>([]);
 
   // PRD-001 Phase 2 (MED-002 review fix) + fix round 2: the exercise
   // row + cycle toggle are Etude-surface-only and must NEVER disagree
@@ -1013,6 +1024,10 @@ function AppShell() {
 
   const path = paths[activePathIndex];
   const step = path.steps[activeStepIndex];
+  // Next-chord preview: wrap to step 0 at the end of the form so
+  // the chip is always populated (players read ahead to anticipate
+  // voice-leading, even on the final bar).
+  const nextStep = path.steps[(activeStepIndex + 1) % path.steps.length] ?? step;
 
   // Cycle-all-12 (D13): repeating form length of the active path,
   // memoized per path identity. detectFormPeriod is pure; a 32-step
@@ -1040,6 +1055,44 @@ function AppShell() {
     () => setIsLooping(!isLooping),
     [isLooping],
   );
+  // Panic: full reset for the "stuck note" recovery (rare on
+  // some WebAudio devices) and the "switch paths mid-session"
+  // fast-reset. Stable identity so the keyboard handler can
+  // depend on it. Routes through requestPlayState(false) so the
+  // existing isPlayingAuto useEffects stop the rhythm engine,
+  // backing engine, and chord play loop. Without that, the play
+  // loop keeps advancing and the chord useEffect re-fires every
+  // bar (D128 cleanup re-calls audioEngine.stopAll() but the
+  // next step re-plays it). requestPlayState(false) is the
+  // choke-point; the explicit engine stops are belt-beyond
+  // (defensive, in case the effect deps change later). ponytail:
+  // global panic, per-engine fan-out if any new engine joins.
+  const handlePanic = useCallback(() => {
+    setActiveMidis([]);
+    audioEngine.stopAll();
+    midiOut.stopAll();
+    setActiveStepIndex(0);
+    if (isLooping) setIsLooping(false);
+    requestPlayState(false);
+    rhythmEngine.stop();
+    backingEngine.stop();
+  }, [setActiveMidis, isLooping, requestPlayState]);
+  // Tap-tempo: average inter-tap interval over the last 4 taps
+  // (rounded to int bpm). A >2s gap resets the rolling history so
+  // the user can re-tap without first clearing state. The pure
+  // decision lives in src/lib/tapTempo.ts so it's unit-testable.
+  const handleTapTempo = useCallback(() => {
+    const now = Date.now();
+    const result = computeTapTempo(tapTimesRef.current, now);
+    if (result.reset) {
+      tapTimesRef.current = [now];
+      return;
+    }
+    tapTimesRef.current.push(now);
+    if (result.bpm !== null) {
+      setTempo(result.bpm);
+    }
+  }, [setTempo]);
   // FOLLOW-ON to F3: one-click loop preset (1/2/4 bars) anchored at
   // the current form bar. The form-relative anchor handles padded
   // paths correctly (1 step = 1 bar; barOfStep wraps). Degenerate
@@ -1382,8 +1435,7 @@ function AppShell() {
         target?.isContentEditable;
       if (isTyping) return;
 
-      const { playing, progress } = usePlaybackState(); // B-deep wire
-    // Global Escape: close any open modal first, then stop playback.
+      // Global Escape: close any open modal first, then stop playback.
       if (e.key === "Escape") {
         if (showImportExport) {
           setShowImportExport(false);
@@ -1529,13 +1581,32 @@ function AppShell() {
         // Space -> toggle Auto playback. Functional form (D35): the
         // count-in gate resolves the toggle against the COMBINED
         // playing-or-counting state, so Space during a pre-roll
-        // CANCELS it instead of restarting it.
+        // CANCELS it instead of restarting it. Same instant-stop
+        // bypass as the PracticeHeader button: silence the audio
+        // context NOW, not on the next render.
         e.preventDefault();
+        const wasActive = isPlayingAutoRef.current || countInRef.current.active;
+        if (wasActive) {
+          audioEngine.stopAll();
+          midiOut.stopAll();
+        }
         requestPlayState((p) => !p);
       } else if (e.key === "m" || e.key === "M") {
         // M → toggle Play Along (mute synth melody)
         e.preventDefault();
         audioEngine.setMelodyMuted(!audioEngine.melodyMuted);
+      } else if (e.key === "r" || e.key === "R") {
+        // R → restart from bar 1 (active step 0). Doesn't change
+        // play state — if you were paused, you're still paused; if
+        // you were playing, you keep playing from the top.
+        e.preventDefault();
+        setActiveStepIndex(0);
+      } else if (e.key === "0") {
+        // 0 → panic (full reset: silence, drop playhead, disable
+        // loop). Escape already stops playback; 0 is the heavier
+        // "everything off" recovery for stuck notes.
+        e.preventDefault();
+        handlePanic();
       } else if (globalShortcut !== null) {
         // T/N/L/P/C global letter shortcuts. Classified by e.code
         // (the D14 law) with the PHASE-1-01 modifier guard inside the
@@ -3431,6 +3502,7 @@ function AppShell() {
         </div>
       </header>
 
+      <div className="sticky bottom-0 z-40 surface-1 pt-2 pb-3 px-2 -mx-2 rounded-t-[var(--radius-md)] border-t border-[color:var(--color-border)] shadow-[0_-4px_12px_rgba(0,0,0,0.25)]">
       <PracticeHeader
         path={path}
         activeStepIndex={activeStepIndex}
@@ -3439,6 +3511,18 @@ function AppShell() {
         // helpers stay exported-unused in practiceHeader.ts).
         formLen={formLen}
         chordName={transposeChordName(step.name ?? "", soundingShift)}
+        nextChordName={
+          nextStep === step
+            ? undefined
+            : transposeChordName(nextStep.name ?? "", soundingShift)
+        }
+        onRestart={() => setActiveStepIndex(0)}
+        onTapTempo={handleTapTempo}
+        onResetTempo={() => setTempo(120)}
+        onNextBar={() => setActiveStepIndex((p) => Math.min(p + 1, path.steps.length - 1))}
+        onPrevBar={() => setActiveStepIndex((p) => Math.max(p - 1, 0))}
+        onPanic={handlePanic}
+        midiLive={midiLive}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
         guideToneTrail={guideTrail.tally}
@@ -3447,6 +3531,16 @@ function AppShell() {
           // Functional form (D35): the gate resolves the toggle
           // against playing-OR-counting, so the header button shows
           // PAUSE during the pre-roll and pressing it cancels.
+          // Instant-pause: stop the audio + MIDI NOW, before the
+          // state flip lands. requestPlayState(false) takes a render
+          // + effect tick to silence; calling stopAll() synchronously
+          // closes that gap (the user feels the click → silence at
+          // the same frame, not the next one).
+          const wasActive = isPlayingAutoRef.current || countInRef.current.active;
+          if (wasActive) {
+            audioEngine.stopAll();
+            midiOut.stopAll();
+          }
           requestPlayState((p) => !p);
         }}
         tempo={tempo}
@@ -3504,6 +3598,7 @@ function AppShell() {
         sessions={recentPracticeSessions}
         lastSession={lastClosedSession}
       />
+      </div>
 
       <main
         id="main"
@@ -5639,6 +5734,20 @@ function AppShell() {
                   tempo={tempo}
                   // F3 (D110): the score window is 4 TRUE form bars.
                   formLen={formLen}
+                  // Grand-staff split follows the on-screen piano's
+                  // keyboard range so the score mirrors the range
+                  // the user just set.
+                  kbRange={kbRange}
+                  // Color the noteheads of any notes the player is
+                  // currently holding so the score reflects the input.
+                  activeMidis={useSynesthesiaActive()}
+                  // Click a bar in the score to jump the playhead to
+                  // that form bar (1 step = 1 bar, wrap at the form end).
+                  onBarClick={(formBarIndex) => {
+                    const total = totalFormBars(formLen);
+                    const target = ((formBarIndex % total) + total) % total;
+                    setActiveStepIndex(barOfStep(target, total));
+                  }}
                 />
               </Suspense>
               </div>
