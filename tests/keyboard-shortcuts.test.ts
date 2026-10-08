@@ -33,6 +33,7 @@ const HANDLED_KEYS: ReadonlyArray<{ key: string; description: string }> = [
   { key: "Space", description: "toggle Auto-playback" },
   { key: "M", description: "toggle Play Along (mute synth melody)" },
   { key: "R", description: "restart from bar 1 (keeps play/pause state)" },
+  { key: "0", description: "panic — silence, restart, disable loop" },
   { key: "T", description: "toggle tuner (off while piano keys are armed)" },
   { key: "N", description: "toggle metronome click" },
   { key: "L", description: "toggle loop (repeat whole form)" },
@@ -65,6 +66,7 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
       "?": "?",
       M: "M",
       R: "R",
+      "0": "0",
       T: "T",
       N: "N",
       L: "L",
@@ -100,6 +102,7 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
       "?": "?",
       M: "M",
       R: "R",
+      "0": "0",
       T: "T",
       N: "N",
       L: "L",
@@ -136,7 +139,10 @@ describe("keyboard shortcut handler vs cheatsheet", () => {
       // suppresses all single-letter shortcuts while the focus is
       // in an input/textarea/contenteditable (App.tsx handler's
       // isTyping guard, lines ~1380-1390).
-      const acceptable = ["?", "[", "]", "M", "T", "N", "L", "P", "C", "R", "Space"];
+      // "0" is a digit and the panic shortcut. Digits aren't
+      // typed letters, so the typing-conflict concern doesn't apply
+      // — the `isTyping` guard catches them the same way anyway.
+      const acceptable = ["?", "[", "]", "M", "T", "N", "L", "P", "C", "R", "Space", "0"];
       const isArrow = key.startsWith("Arrow");
       const isSpecial =
         key === "Escape" || key === " " || key === "Space" || isArrow || acceptable.includes(key);

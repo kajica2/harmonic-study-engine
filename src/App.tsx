@@ -1056,6 +1056,17 @@ function AppShell() {
     () => setIsLooping(!isLooping),
     [isLooping],
   );
+  // Panic: full reset for the "stuck note" recovery (rare on
+  // some WebAudio devices) and the "switch paths mid-session"
+  // fast-reset. Stable identity so the keyboard handler can
+  // depend on it.
+  const handlePanic = useCallback(() => {
+    setActiveMidis([]);
+    audioEngine.stopAll();
+    midiOut.stopAll();
+    setActiveStepIndex(0);
+    if (isLooping) setIsLooping(false);
+  }, [setActiveMidis, isLooping]);
   // Tap-tempo: average inter-tap interval over the last 4 taps
   // (rounded to int bpm). A >2s gap resets the rolling history so
   // the user can re-tap without first clearing state. The pure
@@ -1581,6 +1592,12 @@ function AppShell() {
         // you were playing, you keep playing from the top.
         e.preventDefault();
         setActiveStepIndex(0);
+      } else if (e.key === "0") {
+        // 0 → panic (full reset: silence, drop playhead, disable
+        // loop). Escape already stops playback; 0 is the heavier
+        // "everything off" recovery for stuck notes.
+        e.preventDefault();
+        handlePanic();
       } else if (globalShortcut !== null) {
         // T/N/L/P/C global letter shortcuts. Classified by e.code
         // (the D14 law) with the PHASE-1-01 modifier guard inside the
@@ -3494,17 +3511,7 @@ function AppShell() {
         onTapTempo={handleTapTempo}
         onNextBar={() => setActiveStepIndex((p) => Math.min(p + 1, path.steps.length - 1))}
         onPrevBar={() => setActiveStepIndex((p) => Math.max(p - 1, 0))}
-        onPanic={() => {
-          // Full reset: silence everything, drop the playhead to
-          // bar 1, disable loop. The "stuck note" recovery for
-          // when the audio context holds a note that won't release
-          // (rare but real on some WebAudio devices).
-          setActiveMidis([]);
-          audioEngine.stopAll();
-          midiOut.stopAll();
-          setActiveStepIndex(0);
-          if (isLooping) setIsLooping(false);
-        }}
+        onPanic={handlePanic}
         midiLive={midiLive}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}

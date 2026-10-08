@@ -42,6 +42,11 @@ export const SHORTCUTS: Shortcut[] = [
     group: "Playback",
   },
   {
+    keys: ["0"],
+    description: "Panic — silence, restart, disable loop (stuck-note recovery)",
+    group: "Playback",
+  },
+  {
     keys: ["P"],
     description: "Toggle Auto-playback (Space alias)",
     group: "Playback",
