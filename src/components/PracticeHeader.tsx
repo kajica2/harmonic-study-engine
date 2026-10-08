@@ -418,7 +418,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
             <button
               type="button"
               onClick={onPanic}
-              title="Panic — silence everything, reset to bar 1, disable loop"
+              title="Panic — silence everything, stop playback, reset to bar 1, disable loop"
               aria-label="Panic reset"
               data-testid="practice-header-panic"
               className="text-[10px] t-mono uppercase tracking-widest text-red-400 hover:text-red-200 border border-red-500/30 rounded px-1.5 py-0.5 transition-colors"

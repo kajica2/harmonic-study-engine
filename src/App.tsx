@@ -65,7 +65,6 @@ import {
   templateMeter,
 } from "./lib/arpRhythm";
 import { playbackClock } from "./lib/playbackClock";
-import { usePlaybackState } from "./hooks/use-playback-state";
 import { useTimeoutRef } from "./lib/useTimeoutRef";
 import { playScaleUpDown, getDiatonicScale, SCALE_MODES } from "./lib/scalePlayer";
 import { playRhythmDrill, type DrillSubdivision } from "./lib/rhythmDrill";
@@ -1436,8 +1435,7 @@ function AppShell() {
         target?.isContentEditable;
       if (isTyping) return;
 
-      const { playing, progress } = usePlaybackState(); // B-deep wire
-    // Global Escape: close any open modal first, then stop playback.
+      // Global Escape: close any open modal first, then stop playback.
       if (e.key === "Escape") {
         if (showImportExport) {
           setShowImportExport(false);

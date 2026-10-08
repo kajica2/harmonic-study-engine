@@ -43,7 +43,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     keys: ["0"],
-    description: "Panic — silence, restart, disable loop (stuck-note recovery)",
+    description: "Panic — silence, stop, restart, disable loop (stuck-note recovery)",
     group: "Playback",
   },
   {
