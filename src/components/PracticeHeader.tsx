@@ -74,6 +74,8 @@ interface PracticeHeaderProps {
   onNextBar: () => void;
   /** Step backward by one bar (clamped to step 0). */
   onPrevBar: () => void;
+  /** Panic: silence everything, reset the playhead, disable loop. */
+  onPanic: () => void;
   /** Tap-tempo: caller maintains the rolling tap history and pushes
    *  the resulting bpm back via onTempoChange. PracticeHeader just
    *  fires the click. */
@@ -222,6 +224,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onRestart,
   onNextBar,
   onPrevBar,
+  onPanic,
   onTapTempo,
   midiLive,
   timeSignature,
@@ -408,6 +411,16 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
               className="text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
             >
               R · restart
+            </button>
+            <button
+              type="button"
+              onClick={onPanic}
+              title="Panic — silence everything, reset to bar 1, disable loop"
+              aria-label="Panic reset"
+              data-testid="practice-header-panic"
+              className="text-[10px] t-mono uppercase tracking-widest text-red-400 hover:text-red-200 border border-red-500/30 rounded px-1.5 py-0.5 transition-colors"
+            >
+              panic
             </button>
           </div>
         </div>

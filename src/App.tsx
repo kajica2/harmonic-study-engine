@@ -3494,6 +3494,17 @@ function AppShell() {
         onTapTempo={handleTapTempo}
         onNextBar={() => setActiveStepIndex((p) => Math.min(p + 1, path.steps.length - 1))}
         onPrevBar={() => setActiveStepIndex((p) => Math.max(p - 1, 0))}
+        onPanic={() => {
+          // Full reset: silence everything, drop the playhead to
+          // bar 1, disable loop. The "stuck note" recovery for
+          // when the audio context holds a note that won't release
+          // (rare but real on some WebAudio devices).
+          setActiveMidis([]);
+          audioEngine.stopAll();
+          midiOut.stopAll();
+          setActiveStepIndex(0);
+          if (isLooping) setIsLooping(false);
+        }}
         midiLive={midiLive}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
