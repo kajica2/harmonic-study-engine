@@ -70,6 +70,10 @@ interface PracticeHeaderProps {
   /** Restart from bar 1. Caller is the source of truth (it owns
    *  the play state + activeStepIndex); the button just requests. */
   onRestart: () => void;
+  /** Tap-tempo: caller maintains the rolling tap history and pushes
+   *  the resulting bpm back via onTempoChange. PracticeHeader just
+   *  fires the click. */
+  onTapTempo: () => void;
   timeSignature: TimeSignature;
   /** Transposed chord notes (MIDI) for the active step — fed to
    *  the GuideToneFeedback classifier. */
@@ -209,6 +213,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   chordName,
   nextChordName,
   onRestart,
+  onTapTempo,
   timeSignature,
   chordNotes,
   guideToneTrail,
@@ -497,6 +502,16 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           <span className="t-mono text-[11px] text-neutral-200 w-14 text-right">
             {formatTempo(tempo)}
           </span>
+          <button
+            type="button"
+            onClick={onTapTempo}
+            title="Tap tempo — tap 3+ times to set the bpm from the average interval"
+            aria-label="Tap tempo"
+            data-testid="practice-header-tap-tempo"
+            className="ml-1 text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+          >
+            tap
+          </button>
         </label>
 
         {/* Loop */}

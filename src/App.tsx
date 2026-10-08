@@ -543,6 +543,10 @@ function AppShell() {
   const pauseCfgRef = useRef<PauseConfig>(practiceMechanics.pause);
   const abCfgRef = useRef<AbConfig>(practiceMechanics.ab);
   const rampCfgRef = useRef(practiceMechanics.ramp);
+  // Tap-tempo: rolling list of recent tap timestamps. Cleared on
+  // a >2s gap so the user can re-tap a new tempo without resetting
+  // (D35: 2s matches a typical metronome's tap-tempo window).
+  const tapTimesRef = useRef<number[]>([]);
 
   // PRD-001 Phase 2 (MED-002 review fix) + fix round 2: the exercise
   // row + cycle toggle are Etude-surface-only and must NEVER disagree
@@ -1045,6 +1049,26 @@ function AppShell() {
     () => setIsLooping(!isLooping),
     [isLooping],
   );
+  // Tap-tempo: average inter-tap interval over the last 4 taps
+  // (rounded to int bpm). A >2s gap resets the rolling history so
+  // the user can re-tap without first clearing state.
+  const handleTapTempo = useCallback(() => {
+    const now = Date.now();
+    const taps = tapTimesRef.current;
+    const last = taps[taps.length - 1];
+    if (last !== undefined && now - last > 2000) {
+      tapTimesRef.current = [now];
+      return;
+    }
+    taps.push(now);
+    if (taps.length < 3) return; // need ≥3 taps to estimate
+    const recent = taps.slice(-4);
+    const intervals = recent.slice(1).map((t, i) => t - recent[i]);
+    const avgMs = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const bpm = Math.round(60000 / avgMs);
+    const clamped = Math.max(30, Math.min(240, bpm));
+    setTempo(clamped);
+  }, [setTempo]);
   // FOLLOW-ON to F3: one-click loop preset (1/2/4 bars) anchored at
   // the current form bar. The form-relative anchor handles padded
   // paths correctly (1 step = 1 bar; barOfStep wraps). Degenerate
@@ -3464,6 +3488,7 @@ function AppShell() {
             : transposeChordName(nextStep.name ?? "", soundingShift)
         }
         onRestart={() => setActiveStepIndex(0)}
+        onTapTempo={handleTapTempo}
         timeSignature={timeSignature}
         chordNotes={currentChordNotes}
         guideToneTrail={guideTrail.tally}
