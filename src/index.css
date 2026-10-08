@@ -252,5 +252,10 @@ textarea:focus-visible,
   /* In-area controls never belong on paper. */
   .print-hide { display: none !important; }
   .print-area svg { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* LeadSheet (and any other modal-mounted print area) needs to
+   * escape its fixed-positioned modal shell: static + 100% width
+   * reaches the full @page. Static overrides the @media rule's
+   * absolute positioning. */
+  .print-area { position: static !important; width: 100% !important; }
   @page { margin: 14mm; }
 }

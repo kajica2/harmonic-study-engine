@@ -5,7 +5,7 @@ import { buildLeadSheetAbc, renderLeadSheet } from "../lib/leadSheet";
 import { downloadText } from "../lib/download";
 import { toMusicXml } from "../lib/scoreExport";
 import { loadOSMD, renderOSMD } from "../lib/osmd";
-import { Download, FileText, Music } from "lucide-react";
+import { Download, FileText, Music, Printer } from "lucide-react";
 import { StageFrame, ToolChip, ToolGroup } from "./StageFrame";
 
 interface LeadSheetProps {
@@ -24,8 +24,11 @@ type Engine = "abcjs" | "osmd";
  * fall back to abcjs and surface an inline error message.
  */
 export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
-  const [instrument, setInstrument] = useState<InstrumentPitch>("Concert");
-  const [engine, setEngine] = useState<Engine>("abcjs");
+  // Default to F horn transposition — this is the lead sheet the
+  // practice engine is built around, and the F transposition is
+  // what the rest of the engine emits for horn players.
+  const [instrument, setInstrument] = useState<InstrumentPitch>("F");
+  const [engine, setEngine] = useState<Engine>("osmd");
   const [osmdReady, setOsmdReady] = useState(false);
   const [osmdError, setOsmdError] = useState<string | null>(null);
   const abcRef = useRef<HTMLDivElement>(null);
@@ -110,6 +113,13 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
       actions={
         <div className="flex items-center gap-1">
           <button
+            onClick={() => window.print()}
+            title="Open the print dialog (Ctrl/Cmd+P). The page renders the score full-width on a single sheet with controls hidden."
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm)] surface-1 border border-[color:var(--color-border)] t-mono text-xs hover:border-[color:var(--color-text-1)]"
+          >
+            <Printer size={12} /> Print
+          </button>
+          <button
             onClick={downloadAbc}
             title="Download ABC source"
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-sm)] surface-1 border border-[color:var(--color-border)] t-mono text-xs hover:border-[color:var(--color-text-1)]"
@@ -126,8 +136,8 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
         </div>
       }
     >
-      {/* Controls row: transposition + engine choice */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
+      {/* Controls row: transposition + engine choice (hidden on print). */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap print-hide">
         <ToolGroup label="Transposed for">
           <ToolChip
             active={instrument === "Concert"}
@@ -173,12 +183,15 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
       {osmdError && (
         <div
           role="alert"
-          className="text-[11px] t-mono text-[color:var(--color-warn)] mb-2 px-1"
+          className="text-[11px] t-mono text-[color:var(--color-warn)] mb-2 px-1 print-hide"
         >
           {osmdError}
         </div>
       )}
 
+      {/* Score area: the .print-area class makes this the only visible
+          element on paper; @page margin is set in index.css. */}
+      <div className="print-area">
       {/* Two score hosts — only one is visible at a time. */}
       <div
         className={`bg-white text-black rounded-[var(--radius-md)] p-3 overflow-auto max-h-[60vh] ${engine === "abcjs" ? "" : "hidden"}`}
@@ -195,6 +208,7 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
             Loading engraving library…
           </div>
         )}
+      </div>
       </div>
     </StageFrame>
   );

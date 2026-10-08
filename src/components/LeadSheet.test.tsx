@@ -79,16 +79,17 @@ describe("LeadSheet ABC download (regression: textarea scrape always fell back)"
     expect(downloadTextMock).toHaveBeenCalledTimes(1);
     const [filename, content, mime] = downloadTextMock.mock.calls[0];
     // Filename keeps the file's existing convention: <path.id>_<instrument>.abc
-    expect(filename).toBe("test-ii-v-i_Concert.abc");
+    // The default instrument is F (horn players) since the print view ships F.
+    expect(filename).toBe("test-ii-v-i_F.abc");
     expect(mime).toBe("text/plain");
     // THE regression pin: real ABC header lines from the builder. The old
     // scrape shipped "ABC source unavailable", which fails every line below.
     expect(content.startsWith("X:")).toBe(true);
     expect(content).toContain("K:");
-    expect(content).toContain("T:Test ii-V-I (Concert)");
+    expect(content).toContain("T:Test ii-V-I (F)");
     expect(content).toContain("M:4/4");
     // Byte-identical to the pure source the renderer feeds abcjs.
-    expect(content).toBe(buildLeadSheetAbc(PATH, "Concert"));
+    expect(content).toBe(buildLeadSheetAbc(PATH, "F"));
   });
 
   it("the downloaded text is NOT the old 'ABC source unavailable' fallback", () => {
