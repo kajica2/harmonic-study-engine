@@ -42,6 +42,10 @@ interface LiveScoreDisplayProps {
    *  appears in the score, its notehead gets a colored fill so the
    *  player can see what's sounding against the notated music. */
   activeMidis?: number[];
+  /** Click on a bar in the score → jump the playhead to that bar.
+   *  The component handles the SVG/DOM walk; the parent receives
+   *  the form-relative bar index and decides what to do with it. */
+  onBarClick?: (formBarIndex: number) => void;
 }
 
 /**
@@ -70,6 +74,7 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
   displayMode = "full",
   kbRange,
   activeMidis,
+  onBarClick,
 }) => {
   const svgRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -346,6 +351,46 @@ export const LiveScoreDisplay: React.FC<LiveScoreDisplayProps> = ({
       paddingright: 20,
     });
   }, [path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex, isSliced, windowCells.length]);
+
+  // Click-to-jump: attach a single click handler to the SVG host.
+  // The handler walks up from the click target to the closest bar
+  // element (abcjs-m{N}, 1-based) and reports the form-relative
+  // bar index back to the parent. abcjs always re-renders this
+  // tree when path/clefLayout/tempo change, so a fresh handler
+  // is bound on each render — old listeners are GC'd with the
+  // previous tree.
+  useEffect(() => {
+    if (!svgRef.current || !onBarClick) return;
+    const host = svgRef.current;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      const barEl = target?.closest<HTMLElement>("[class*='abcjs-m']");
+      if (!barEl) return;
+      // abcjs emits classes like "abcjs-m5" or combined
+      // "abcjs-l1 abcjs-m5". Find the m class and parse.
+      const m = barEl.className.match(/abcjs-m(\d+)/);
+      if (!m) return;
+      const measureNum = Number(m[1]); // 1-based
+      // abcjs measure numbers match form-relative bar numbers
+      // (1-based). Convert to 0-based for the parent.
+      onBarClick(measureNum - 1);
+    };
+    host.addEventListener("click", handleClick);
+    return () => host.removeEventListener("click", handleClick);
+  }, [onBarClick, path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex, isSliced, windowCells.length]);
+
+  // Cursor hint: bars are clickable (jump-to-bar). Applied as an
+  // inline style on the host so it ships without a new CSS file.
+  // Only when onBarClick is wired — silent otherwise.
+  useEffect(() => {
+    if (!svgRef.current || !onBarClick) return;
+    const host = svgRef.current;
+    const prev = host.style.cursor;
+    host.style.cursor = "pointer";
+    return () => {
+      host.style.cursor = prev;
+    };
+  }, [onBarClick, path, transposeShift, visualTranspose, clefLayout, tempo, showChords, activeStepIndex, isSliced, windowCells.length]);
 
   useEffect(() => {
     if (!svgRef.current) return;

@@ -5706,6 +5706,13 @@ function AppShell() {
                   // Color the noteheads of any notes the player is
                   // currently holding so the score reflects the input.
                   activeMidis={useSynesthesiaActive()}
+                  // Click a bar in the score to jump the playhead to
+                  // that form bar (1 step = 1 bar, wrap at the form end).
+                  onBarClick={(formBarIndex) => {
+                    const total = totalFormBars(formLen);
+                    const target = ((formBarIndex % total) + total) % total;
+                    setActiveStepIndex(barOfStep(target, total));
+                  }}
                 />
               </Suspense>
               </div>
