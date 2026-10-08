@@ -428,6 +428,13 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
           </div>
         </div>
         <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+          <span
+            className="inline-flex items-center px-2 py-1 rounded-[var(--radius-md)] border border-[color:var(--color-border)] surface-1 text-[11px] t-mono text-neutral-300"
+            data-testid="practice-header-time-sig"
+            title="Active time signature — drives the live beat count"
+          >
+            {timeSignature}
+          </span>
           {midiLive && (
             <span
               className="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] border border-emerald-500/30 bg-emerald-500/10 text-[11px] t-mono text-emerald-300"
