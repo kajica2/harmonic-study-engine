@@ -1530,8 +1530,15 @@ function AppShell() {
         // Space -> toggle Auto playback. Functional form (D35): the
         // count-in gate resolves the toggle against the COMBINED
         // playing-or-counting state, so Space during a pre-roll
-        // CANCELS it instead of restarting it.
+        // CANCELS it instead of restarting it. Same instant-stop
+        // bypass as the PracticeHeader button: silence the audio
+        // context NOW, not on the next render.
         e.preventDefault();
+        const wasActive = isPlayingAutoRef.current || countInRef.current.active;
+        if (wasActive) {
+          audioEngine.stopAll();
+          midiOut.stopAll();
+        }
         requestPlayState((p) => !p);
       } else if (e.key === "m" || e.key === "M") {
         // M → toggle Play Along (mute synth melody)
@@ -3432,6 +3439,7 @@ function AppShell() {
         </div>
       </header>
 
+      <div className="sticky bottom-0 z-40 surface-1 pt-2 pb-3 px-2 -mx-2 rounded-t-[var(--radius-md)] border-t border-[color:var(--color-border)] shadow-[0_-4px_12px_rgba(0,0,0,0.25)]">
       <PracticeHeader
         path={path}
         activeStepIndex={activeStepIndex}
@@ -3448,6 +3456,16 @@ function AppShell() {
           // Functional form (D35): the gate resolves the toggle
           // against playing-OR-counting, so the header button shows
           // PAUSE during the pre-roll and pressing it cancels.
+          // Instant-pause: stop the audio + MIDI NOW, before the
+          // state flip lands. requestPlayState(false) takes a render
+          // + effect tick to silence; calling stopAll() synchronously
+          // closes that gap (the user feels the click → silence at
+          // the same frame, not the next one).
+          const wasActive = isPlayingAutoRef.current || countInRef.current.active;
+          if (wasActive) {
+            audioEngine.stopAll();
+            midiOut.stopAll();
+          }
           requestPlayState((p) => !p);
         }}
         tempo={tempo}
@@ -3505,6 +3523,7 @@ function AppShell() {
         sessions={recentPracticeSessions}
         lastSession={lastClosedSession}
       />
+      </div>
 
       <main
         id="main"
