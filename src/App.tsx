@@ -3509,6 +3509,7 @@ function AppShell() {
         }
         onRestart={() => setActiveStepIndex(0)}
         onTapTempo={handleTapTempo}
+        onResetTempo={() => setTempo(120)}
         onNextBar={() => setActiveStepIndex((p) => Math.min(p + 1, path.steps.length - 1))}
         onPrevBar={() => setActiveStepIndex((p) => Math.max(p - 1, 0))}
         onPanic={handlePanic}

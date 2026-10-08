@@ -80,6 +80,8 @@ interface PracticeHeaderProps {
    *  the resulting bpm back via onTempoChange. PracticeHeader just
    *  fires the click. */
   onTapTempo: () => void;
+  /** Reset tempo to the path's default reference (typically 120). */
+  onResetTempo: () => void;
   /** Show a "MIDI live" chip when at least one MIDI note is held.
    *  The caller (App.tsx) reads from useSynesthesiaActive(). */
   midiLive: boolean;
@@ -226,6 +228,7 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
   onPrevBar,
   onPanic,
   onTapTempo,
+  onResetTempo,
   midiLive,
   timeSignature,
   chordNotes,
@@ -571,6 +574,16 @@ export const PracticeHeader: React.FC<PracticeHeaderProps> = ({
             className="ml-1 text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
           >
             tap
+          </button>
+          <button
+            type="button"
+            onClick={onResetTempo}
+            title="Reset tempo to 120 bpm (the path's default reference)"
+            aria-label="Reset tempo to 120 bpm"
+            data-testid="practice-header-reset-tempo"
+            className="ml-1 text-[10px] t-mono uppercase tracking-widest text-neutral-500 hover:text-neutral-200 border border-[color:var(--color-border)] rounded px-1.5 py-0.5 transition-colors"
+          >
+            120
           </button>
         </label>
 
