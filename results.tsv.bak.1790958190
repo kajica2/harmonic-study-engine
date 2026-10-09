@@ -1,0 +1,8 @@
+experiment	commit	metric	status	description
+0	c1b013e	1439.43	baseline	dist/assets JS gzip sum (index=283.02, magentaHelper=504.59 warns >500)
+1	3d6b49d	1339.71	keep	externalize jspdf's unused canvg/html2canvas (boot+PDF verified)
+2	fb98df8	1338.13	discard	abcjs basic alias (-1.6kB, fragile internal path)
+3	5becc61	1244.57	keep	deep-import MusicRNN+sequences, drop magenta barrel (tone+player gone)
+4	ecd754c	1233.47	keep	externalize jspdf's unused dompurify dynamic import
+5	e79469b	1231.00	discard	tfjs shim minus data (-2.5kB, export-conflict risk not worth it)
+6	264aad5	1198.66	keep	tfjs shim without backend-cpu (e2e 4/4 + webgl probed)
