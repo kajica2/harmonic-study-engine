@@ -51,7 +51,14 @@ function pwaServiceWorker(): Plugin {
         '/icons/app-icon.svg',
         '/icons/app-icon-maskable.svg',
         ...Object.keys(bundle)
-          .filter((file) => /^assets\/.*\.(?:js|css)$/.test(file))
+          .filter((file) => {
+            if (!/^assets\/.*\.(?:js|css)$/.test(file)) return false;
+            const output = bundle[file];
+            const bytes = output.type === 'chunk'
+              ? Buffer.byteLength(output.code)
+              : Buffer.byteLength(output.source);
+            return bytes <= 5 * 1024 * 1024;
+          })
           .map((file) => `/${file}`),
       ];
       const source = `
@@ -85,7 +92,7 @@ self.addEventListener('fetch', (event) => {
       url.pathname.startsWith('/api/') || url.pathname.startsWith('/recordings/') ||
         request.headers.has('range') || (request.mode !== 'navigate' &&
           ['audio', 'video', 'document', 'embed', 'object'].includes(request.destination)) ||
-        /\\\\.(?:mp3|wav|ogg|m4a|mp4|webm|zip)$/i.test(url.pathname)) return;
+        /\\.(?:mp3|wav|ogg|m4a|mp4|webm|zip)$/i.test(url.pathname)) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).then(async (response) => {
