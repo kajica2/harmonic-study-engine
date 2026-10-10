@@ -29,12 +29,16 @@ import App from "./App.tsx";
 import { isPlayRoute } from "./lib/playRoute";
 import { PlaySurface } from "./components/PlaySurface";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PwaPrompt } from "./components/PwaPrompt";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ErrorBoundary scope="App">
-      {isPlayRoute(window.location.pathname) ? <PlaySurface /> : <App />}
-    </ErrorBoundary>
+    <>
+      <ErrorBoundary scope="App">
+        {isPlayRoute(window.location.pathname) ? <PlaySurface /> : <App />}
+      </ErrorBoundary>
+      <PwaPrompt />
+    </>
   </StrictMode>,
 );

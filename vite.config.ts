@@ -4,6 +4,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import {defineConfig} from 'vite';
+import type { Plugin } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 // -------------------------------------------------------------------------
@@ -38,11 +39,103 @@ function resolveAppCommit(): string {
 export const APP_COMMIT = resolveAppCommit();
 export const APP_BUILD_TIME = new Date().toISOString();
 
+function pwaServiceWorker(): Plugin {
+  return {
+    name: 'hse-pwa-service-worker',
+    apply: 'build',
+    generateBundle(_, bundle) {
+      const precache = [
+        '/',
+        '/index.html',
+        '/manifest.webmanifest',
+        '/icons/app-icon.svg',
+        '/icons/app-icon-maskable.svg',
+        ...Object.keys(bundle)
+          .filter((file) => {
+            if (!/^assets\/.*\.(?:js|css)$/.test(file)) return false;
+            const output = bundle[file];
+            const bytes = output.type === 'chunk'
+              ? Buffer.byteLength(output.code)
+              : Buffer.byteLength(output.source);
+            return bytes <= 5 * 1024 * 1024;
+          })
+          .map((file) => `/${file}`),
+      ];
+      const source = `
+const CACHE_PREFIX = 'hse-pwa-';
+const CACHE_NAME = CACHE_PREFIX + ${JSON.stringify(APP_COMMIT)};
+const PRECACHE_URLS = ${JSON.stringify(precache)};
+const APP_ROUTES = new Set(['/', '/index.html', '/play', '/play/']);
+const MAX_RUNTIME_BYTES = 5 * 1024 * 1024;
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(
+      keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+        .map((key) => caches.delete(key)),
+    )).then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin ||
+      url.pathname.startsWith('/api/') || url.pathname.startsWith('/recordings/') ||
+        request.headers.has('range') || (request.mode !== 'navigate' &&
+          ['audio', 'video', 'document', 'embed', 'object'].includes(request.destination)) ||
+        /\\.(?:mp3|wav|ogg|m4a|mp4|webm|zip)$/i.test(url.pathname)) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(fetch(request).then(async (response) => {
+      if (response.ok) {
+        const copy = response.clone();
+        await caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    }).catch(async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(request);
+      return cached || (APP_ROUTES.has(url.pathname) ? cache.match('/index.html') : Response.error());
+    }));
+    return;
+  }
+
+  event.respondWith(caches.match(request).then(async (cached) => {
+    if (cached) return cached;
+    try {
+      const response = await fetch(request);
+      const size = Number(response.headers.get('content-length') || 0);
+      if (response.ok && response.type === 'basic' && size > 0 && size <= MAX_RUNTIME_BYTES) {
+        const copy = response.clone();
+        await caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    } catch {
+      return Response.error();
+    }
+  }));
+});
+`;
+      this.emitFile({ type: 'asset', fileName: 'service-worker.js', source });
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
     plugins: [
       react(),
       tailwindcss(),
+      pwaServiceWorker(),
       nodePolyfills({
         exclude: ['fs', 'net'],
       }),
