@@ -68,6 +68,9 @@
 }
 
 body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
   font-family: var(--font-sans);
   background: var(--color-bg-0);
   color: var(--color-text-1);
@@ -76,6 +79,23 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  nav[aria-label="Playback controls"] > div {
+    padding-block: 4px;
+  }
+
+  nav[aria-label="Playback controls"] button[aria-label="Play"],
+  nav[aria-label="Playback controls"] button[aria-label="Pause"] {
+    width: 48px;
+    height: 48px;
+  }
 }
 
 /* Type scale — Major Third (1.250) — gives us 5 readable roles */

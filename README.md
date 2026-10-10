@@ -80,7 +80,9 @@ and full export to MIDI / MusicXML / Score21 / MP4.
   (fflate-backed); the single-path "Download MIDI" button
   keeps its one-click behavior.
 - **Mobile-first**: fixed bottom-sheet command bar,
-  safe-area padding.
+  safe-area padding, installable offline PWA shell. See
+  [Mobile/PWA guide](docs/MOBILE-PWA.md) for install, update, and offline
+  behavior.
 - **Audio quality**: warm soft-knee saturation on the melody
   bus (WaveShaper, k=2.5, 4x oversample), per-note velocity
   scaling (bass softer, top louder; arpeggiator accents every

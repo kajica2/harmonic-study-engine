@@ -29,6 +29,7 @@ const JSDOM_FILES = [
   // env comments - the list is the only opt-in (AGENTS gotcha).
   "src/lib/backingEngine.test.ts",
   "src/components/PracticeMechanicsPanel.test.tsx",
+  "src/components/PwaPrompt.test.tsx",
   // PRD-001 Phase 7 S3: the detection hook jsdom pins (synthetic
   // "midin" CustomEvents + explicit flushNow - the flush API is the
   // seam, the test NEVER starts a clock).

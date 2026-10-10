@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Harmonic Study Engine",
+  "short_name": "Harmonic Study",
+  "description": "A mobile-friendly harmonic practice and study engine.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0C0B10",
+  "theme_color": "#0C0B10",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/app-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
