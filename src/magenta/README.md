@@ -43,13 +43,39 @@ bassist playing slightly ahead, behind, or loose against the click.
 
 ## Adding a Magenta model later
 
-The adapter is the only file that touches `INoteSequence`. When
-P1 ships (MusicRNN Continue with chord conditioning):
+The adapter is the only file that touches `INoteSequence`. The existing
+MusicRNN path is in `src/lib/magentaHelper.ts`; any expansion should build
+on that supported import path rather than assume MusicVAE works here.
+
+### Verified model-path findings
+
+- `@magenta/music` is already declared as `^1.23.1` in `package.json`
+  and pinned in the lockfile; no dependency installation is outstanding.
+- MusicVAE does not load through this Vite setup: its import reaches
+  `esm/protobuf/proto.js`, where Closure-generated `$root.tensorflow`
+  is not exposed as the ESM named export Vite expects. The existing
+  MusicRNN path is unaffected because it imports protobuf through
+  `core/sequences`.
+- Of the evaluated melody MusicVAE checkpoints, only `mel_2bar_small`
+  resolves on magentadata; `mel_2bar`, `mel_4bar`, and `mel_4bar_cond`
+  return 404. Its config has no `chordEncoder`, so its
+  `chordProgression` control is unavailable and this MusicVAE route
+  cannot provide chord-conditioned melody.
+- ImprovRNN is not shipped in `@magenta/music`; it is part of the Python
+  `magenta` package, which this project skipped.
+- `magenta-rt` is audio-only: its `mrt` command exposes `checkpoints`,
+  `jax`, `mlx`, and `models`, with no MIDI, generation, or rendering
+  subcommand.
+
+These findings apply to the evaluated MusicVAE / ImprovRNN alternatives;
+they do not invalidate the existing MusicRNN continuation path.
+
+For future work that extends the existing path:
 
 1. `src/magenta/MagentaService.ts` — worker-side facade, owns the
    `MusicRNN` instance, handles checkpoint fetch + lazy load.
 2. `src/magenta/continueSequence.ts` — wraps `pathToNoteSequence` →
-   `quantizeNoteSequence` → `mvae.continueSequence(qns, steps, temp, chords)`
+   `quantizeNoteSequence` → `MusicRNN.continueSequence(qns, steps, temp)`
    → `humanize()` → returns a commit-ready `HarmonicPath`.
 3. UI: a "Continue with Magenta" button in the Generator Lab
    (component TBD when that surface lands).
