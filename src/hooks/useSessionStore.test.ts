@@ -142,3 +142,51 @@ describe("useSessionStore metronome persistence (D32/F2)", () => {
     expect(result.current.metronomeConfig.preset).toBe("beep");
   });
 });
+
+// ---------- kbRange persistence (F2-class regression) -------------------
+//
+// kbRange (the keyboard-range control in App.tsx) hydrates from
+// localStorage at boot but - until this effect was added - had NO
+// write-back effect. Every slider move silently reset on reload.
+// The pattern is the same as the metronomeOn F2 fix (D32): boot-time
+// read promise, no write effect, comment that says "persisted" but
+// isn't. Pin the write so the comment becomes true.
+
+describe("useSessionStore kbRange persistence", () => {
+  afterEach(() => {
+    localStorage.removeItem("synesthesia_kbRange");
+  });
+
+  it("writes the new range to localStorage on every setKbRange call", () => {
+    const { result } = renderHook(() => useSessionStore());
+    act(() => {
+      result.current.setKbRange({ from: 48, to: 84 });
+    });
+    expect(JSON.parse(localStorage.getItem("synesthesia_kbRange")!)).toEqual({
+      from: 48,
+      to: 84,
+    });
+    act(() => {
+      result.current.setKbRange({ from: 36, to: 72 });
+    });
+    expect(JSON.parse(localStorage.getItem("synesthesia_kbRange")!)).toEqual({
+      from: 36,
+      to: 72,
+    });
+  });
+
+  it("hydrates from a previously-stored range on boot", () => {
+    localStorage.setItem(
+      "synesthesia_kbRange",
+      JSON.stringify({ from: 55, to: 79 }),
+    );
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.kbRange).toEqual({ from: 55, to: 79 });
+  });
+
+  it("corrupt stored JSON hydrates to the C2..C5 default (no throw)", () => {
+    localStorage.setItem("synesthesia_kbRange", "{not json");
+    const { result } = renderHook(() => useSessionStore());
+    expect(result.current.kbRange).toEqual({ from: 36, to: 72 });
+  });
+});

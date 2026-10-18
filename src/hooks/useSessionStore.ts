@@ -422,6 +422,13 @@ export function useSessionStore(): SessionStore {
   const [kbRange, setKbRange] = useState<KeyboardRange>(() =>
     loadJSON<KeyboardRange>("synesthesia_kbRange", { from: 36, to: 72 }),
   );
+  // D32-style persistence: kbRange hydrates from storage at boot but
+  // the boot comment ("default C2..C5") was a write promise that was
+  // never implemented. Without this effect every slider move silently
+  // reset on reload - the same regression class as metronomeOn (F2).
+  useEffect(() => {
+    storageSet(K.kbRange, JSON.stringify(kbRange));
+  }, [kbRange]);
 
   // loop range + transport mode
   const [isLooping, setIsLooping] = useState(() =>

@@ -157,6 +157,12 @@ import { CoComposePanel } from "./components/CoComposePanel";
 import { QuizPanel } from "./components/QuizPanel";
 import { HumanFeelDial } from "./components/HumanFeelDial";
 import { useSessionStore as useLegacySessionStore } from "./hooks/useSessionStore";
+import {
+  clampKbRange,
+  KB_RANGE_DEFAULT,
+  KB_RANGE_MIN,
+  KB_RANGE_MAX,
+} from "./lib/kbRange";
 import { usePersistedState } from "./lib/usePersistedState";
 import { useFeedback } from "./hooks/useFeedback";
 import { useDDSPProbe } from "./hooks/useDDSPProbe";
@@ -5755,48 +5761,69 @@ function AppShell() {
 
             {/* Piano area */}
             <div className="w-full flex justify-between items-end px-2 mb-2 mt-4">
-              <div className="flex gap-4 items-center">
+              <div className="flex gap-4 items-center flex-wrap">
                 <span className="text-xs uppercase tracking-widest text-neutral-500 font-semibold">
                   Keyboard Range
                 </span>
                 <div className="flex gap-4 text-xs text-neutral-400">
                   <div className="flex items-center gap-2">
-                    <span className="w-10">
-                      From: {NOTE_NAMES_FLAT[kbRange.from % 12]}
+                    <span className="w-14 font-mono">
+                      From: {NOTE_NAMES_FLAT[((kbRange.from % 12) + 12) % 12]}
                       {Math.floor(kbRange.from / 12) - 1}
                     </span>
                     <input
                       type="range"
-                      min="24"
-                      max="60"
-                      step="12"
+                      min={KB_RANGE_MIN}
+                      max={KB_RANGE_MAX}
+                      step={1}
                       value={kbRange.from}
                       onChange={(e) =>
-                        setKbRange({ ...kbRange, from: Number(e.target.value) })
+                        setKbRange(
+                          clampKbRange(
+                            { ...kbRange, from: Number(e.target.value) },
+                            kbRange,
+                            "from",
+                          ),
+                        )
                       }
                       aria-label="Keyboard range start"
-                      className="w-20 accent-purple-500"
+                      className="w-24 accent-purple-500"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-10">
-                      To: {NOTE_NAMES_FLAT[kbRange.to % 12]}
+                    <span className="w-14 font-mono">
+                      To: {NOTE_NAMES_FLAT[((kbRange.to % 12) + 12) % 12]}
                       {Math.floor(kbRange.to / 12) - 1}
                     </span>
                     <input
                       type="range"
-                      min="48"
-                      max="96"
-                      step="12"
+                      min={KB_RANGE_MIN}
+                      max={KB_RANGE_MAX}
+                      step={1}
                       value={kbRange.to}
                       onChange={(e) =>
-                        setKbRange({ ...kbRange, to: Number(e.target.value) })
+                        setKbRange(
+                          clampKbRange(
+                            { ...kbRange, to: Number(e.target.value) },
+                            kbRange,
+                            "to",
+                          ),
+                        )
                       }
                       aria-label="Keyboard range end"
-                      className="w-20 accent-purple-500"
+                      className="w-24 accent-purple-500"
                     />
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setKbRange(KB_RANGE_DEFAULT)}
+                  aria-label="Reset keyboard range to default"
+                  title="Reset to C2..C5"
+                  className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded-md surface-1 border border-[color:var(--color-border)] text-neutral-300 hover:text-neutral-100 transition-colors focus-visible:ring-2 focus-visible:ring-[color:var(--color-brand-strong)]"
+                >
+                  Reset
+                </button>
               </div>
             </div>
             {/* PRD-001 Phase 7 S4 (REQ-IO-4/6, D140): the touch-friendly
