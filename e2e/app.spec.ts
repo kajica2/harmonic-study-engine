@@ -63,9 +63,13 @@ test("app loads, persona grid renders, clicking Scriabin changes path + voicing"
   const voicingSelect = page.locator('select[aria-label="Voicing style"]');
   await expect(voicingSelect).toHaveValue("quartal", { timeout: 5_000 });
 
-  // The MIDI chips should be present.
-  await expect(page.getByText(/^MIDI$/)).toBeVisible();
-  await expect(page.getByText(/^IN$/)).toBeVisible();
+  // The MIDI chips should be present (MIDI out + MIDI in, both in the
+  // header). Scope to the header banner and match EXACT text: the chart
+  // viewer's "Download MIDI" button carries the same visible label, so
+  // an unscoped getByText(/^MIDI$/) is a strict-mode violation.
+  const banner = page.getByRole("banner");
+  await expect(banner.getByText("MIDI", { exact: true })).toBeVisible();
+  await expect(banner.getByText("IN", { exact: true })).toBeVisible();
 });
 
 test("Path Catalog tab is reachable", async ({ page }) => {
