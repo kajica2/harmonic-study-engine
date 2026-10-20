@@ -99,7 +99,15 @@ import {
 import { PracticeSetBrowser } from "./components/PracticeSetBrowser";
 import { PracticeSessionPlayer } from "./components/PracticeSessionPlayer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { KeyboardShortcutsCheatsheet } from "./components/KeyboardShortcutsCheatsheet";
+// Lazy: cheatsheet is a `?`-keypress modal - pulled in only when the
+// user actually opens it. SHORTCUTS is re-exported so the cheatsheet
+// test can still import the constant (typed via a TS-ignore-safe
+// barrel pattern).
+const KeyboardShortcutsCheatsheet = lazy(() =>
+  import("./components/KeyboardShortcutsCheatsheet").then((m) => ({
+    default: m.KeyboardShortcutsCheatsheet,
+  })),
+);
 import { generateHarmonicPath } from "./lib/generator";
 import { applyVoiceLeading, VOICINGS, applyVoicing, deriveBehavioralMarkers, deriveBarTransposeDrift, transposeChordName, NOTE_NAMES_FLAT, type VoicingId } from "./lib/theory";
 import { useCanvasSize } from "./lib/useCanvasSize";
@@ -5942,6 +5950,7 @@ function AppShell() {
       )}
 
       {showCheatsheet && (
+        <Suspense fallback={null}>
         <ModalShell
           labelledBy={cheatsheetTitleId}
           onDismiss={() => setShowCheatsheet(false)}
@@ -5952,6 +5961,7 @@ function AppShell() {
           </div>
           <KeyboardShortcutsCheatsheet onClose={() => setShowCheatsheet(false)} />
         </ModalShell>
+        </Suspense>
       )}
 
       {showChordInspector && (
