@@ -205,8 +205,20 @@ test("S4 persistence + guard: octave survives reload; Meta+A never sounds", asyn
   await panel.getByTestId("noteinput-toggle").check();
   await expect(page.getByTestId("note-input-piano")).toBeVisible();
   await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C4");
+
+  // The root octave is CLAMPED 3..4 (D139; narrowed 2..5 -> 3..4 in
+  // 65de1db "trumpet register", pins re-derived there). The default 4
+  // (C4) therefore sits at the TOP of the range, where "+" is a
+  // deliberate no-op - so shift DOWN to C3 to prove the shift lands,
+  // back UP to prove it returns, then leave it at C3 (a NON-default
+  // value) so the reload below proves persistence rather than a
+  // re-read of the shipped default.
+  await page.getByTestId("noteinput-octave-down").click();
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C3");
   await page.getByTestId("noteinput-octave-up").click();
-  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C5");
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C4");
+  await page.getByTestId("noteinput-octave-down").click();
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C3");
 
   // Envelope roundtrip (noteInput rides practiceMechanics, no v5):
   // a real reload keeps BOTH the toggle and the shifted root.
@@ -214,7 +226,7 @@ test("S4 persistence + guard: octave survives reload; Meta+A never sounds", asyn
   const panel2 = await openDrills(page);
   await expect(panel2.getByTestId("noteinput-toggle")).toBeChecked();
   await expect(page.getByTestId("note-input-piano")).toBeVisible();
-  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C5");
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C3");
 
   // MODIFIER GUARD in a REAL browser: arm detection + play, then
   // hammer Meta+A across a full pass - the detector must see
