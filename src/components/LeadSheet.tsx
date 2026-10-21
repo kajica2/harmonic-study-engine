@@ -28,7 +28,7 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
   // practice engine is built around, and the F transposition is
   // what the rest of the engine emits for horn players.
   const [instrument, setInstrument] = useState<InstrumentPitch>("F");
-  const [engine, setEngine] = useState<Engine>("osmd");
+  const [engine, setEngine] = useState<Engine>("abcjs");
   const [osmdReady, setOsmdReady] = useState(false);
   const [osmdError, setOsmdError] = useState<string | null>(null);
   const abcRef = useRef<HTMLDivElement>(null);
