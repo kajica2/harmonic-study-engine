@@ -40,6 +40,7 @@ const SHORTCUT_NUMBER: Readonly<Record<Mode, number>> = {
   etude: 2,
   explore: 3,
   marketplace: 4,
+  daily: 5,
 };
 
 const TABLIST_BASE =

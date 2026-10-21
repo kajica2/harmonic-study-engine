@@ -44,6 +44,7 @@ import {
 import { ComposeSurface } from "./ComposeSurface";
 import { ExploreSurface } from "./ExploreSurface";
 import { MarketplaceMode } from "./MarketplaceMode";
+import { DailyStudyMode } from "./DailyStudyMode";
 import type { HarmonicPath } from "../lib/paths";
 import type { InstrumentType } from "../lib/audio";
 
@@ -117,6 +118,9 @@ export const ModeGate: React.FC<ModeGateProps> = ({
         instrument={marketplaceInstrument}
       />
     );
+  }
+  if (mode === "daily") {
+    return <DailyStudyMode />;
   }
   // Etude (default) - render the existing legacy main surface.
   return <>{AppMain}</>;

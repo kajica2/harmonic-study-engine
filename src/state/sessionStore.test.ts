@@ -253,17 +253,18 @@ describe("persistence", () => {
 });
 
 describe("isMode / MODES / resolveEffectiveMode helpers", () => {
-  it("isMode accepts the 4 known literals only", () => {
+  it("isMode accepts the 5 known literals only", () => {
     expect(isMode("compose")).toBe(true);
     expect(isMode("etude")).toBe(true);
     expect(isMode("explore")).toBe(true);
     expect(isMode("marketplace")).toBe(true);
+    expect(isMode("daily")).toBe(true);
     expect(isMode("wat")).toBe(false);
     expect(isMode("")).toBe(false);
   });
 
   it("MODES preserves display order", () => {
-    expect(MODES).toEqual(["compose", "etude", "explore", "marketplace"]);
+    expect(MODES).toEqual(["compose", "etude", "explore", "marketplace", "daily"]);
   });
 
   it("resolveEffectiveMode falls back to etude for legacy / null", () => {
@@ -540,6 +541,7 @@ describe("Phase 3 Slice 2: acceptEtude dirty semantics (D30)", () => {
       etude: "etude-pending-accept",
       explore: "none",
       marketplace: "none",
+      daily: "none",
     });
   });
 

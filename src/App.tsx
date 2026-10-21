@@ -883,6 +883,7 @@ function AppShell() {
           etude: "etude-pending-accept",
           explore: "none",
           marketplace: "none",
+          daily: "none",
         },
       });
     },
