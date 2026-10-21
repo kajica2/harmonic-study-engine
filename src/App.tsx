@@ -114,7 +114,7 @@ import { useCanvasSize } from "./lib/useCanvasSize";
 import { velocityToGain } from "./lib/audioHelpers";
 import { generateEtude, generateEtudeAsync, EtudeAlgorithm } from "./lib/etude";
 import { toMusicXml, toScore21 } from "./lib/scoreExport";
-import { generateGeminiEtude } from "./lib/geminiHelper";
+import { generateGeminiEtude, generateMiniMaxEtude, generateGrokEtude, generateProviderEtude } from "./lib/geminiHelper";
 import { synthesizeAndPlay, checkDDSPStatus } from "./lib/ddspSynth";
 import { PERSONAS, Persona, VisualTheme } from "./lib/personas";
 import { recorder } from "./lib/recorder";
@@ -2949,7 +2949,22 @@ function AppShell() {
     const rootMidi = 60 + soundingShift;
 
     const isGemini = etudeAlgorithm.startsWith("gemini_");
-    if (isGemini && !hasOpenRouterKey) {
+    const isMiniMax = etudeAlgorithm.startsWith("minimacx_");
+    const isGrok = etudeAlgorithm.startsWith("grok_");
+    const isGoogle = etudeAlgorithm.startsWith("google_");
+    const isAnthropic = etudeAlgorithm.startsWith("anthropic_");
+    const isCohere = etudeAlgorithm.startsWith("cohere_");
+    const isOllama = etudeAlgorithm.startsWith("ollama_");
+    const isCloud = isGemini || isMiniMax || isGrok || isGoogle || isAnthropic || isCohere || isOllama;
+    const needsOpenRouter = isGemini || isMiniMax;
+    const needsGrokKey = isGrok;
+    const needsGoogleKey = isGoogle;
+    const needsAnthropicKey = isAnthropic;
+    const needsCohereKey = isCohere;
+    const needsOllamaKey = isOllama;
+    const hasKey = hasOpenRouterKey || import.meta.env.VITE_GROK_API_KEY || import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_ANTHROPIC_API_KEY || import.meta.env.VITE_COHERE_API_KEY;
+
+    if (isCloud && !hasKey) {
       // Cloud options are visually disabled in the select, but guard
       // here too in case the user opened the DevTools and re-enabled.
       setEtudeStatus(
@@ -2957,7 +2972,7 @@ function AppShell() {
       );
       return;
     }
-    if (etudeAlgorithm === "magenta_rnn" || isGemini) {
+    if (etudeAlgorithm === "magenta_rnn" || isCloud) {
       try {
         setIsGeneratingML(true);
         setEtudeStatus(null);
@@ -2966,6 +2981,29 @@ function AppShell() {
           const geminiAlgo = etudeAlgorithm.replace("gemini_", "");
           const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string;
           newPath = await generateGeminiEtude(rootMidi, len, apiKey, geminiAlgo);
+        } else if (isMiniMax) {
+          const miniMaxAlgo = etudeAlgorithm.replace("minimacx_", "");
+          const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY as string;
+          newPath = await generateMiniMaxEtude(rootMidi, len, apiKey, miniMaxAlgo);
+        } else if (isGrok) {
+          const grokAlgo = etudeAlgorithm.replace("grok_", "");
+          const apiKey = import.meta.env.VITE_GROK_API_KEY as string;
+          newPath = await generateGrokEtude(rootMidi, len, apiKey, grokAlgo);
+        } else if (isGoogle) {
+          const googleAlgo = etudeAlgorithm.replace("google_", "");
+          const apiKey = import.meta.env.VITE_GEMINI_API_KEY as string;
+          newPath = await generateProviderEtude("google", rootMidi, len, apiKey, googleAlgo);
+        } else if (isAnthropic) {
+          const anthropicAlgo = etudeAlgorithm.replace("anthropic_", "");
+          const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string;
+          newPath = await generateProviderEtude("anthropic", rootMidi, len, apiKey, anthropicAlgo);
+        } else if (isCohere) {
+          const cohereAlgo = etudeAlgorithm.replace("cohere_", "");
+          const apiKey = import.meta.env.VITE_COHERE_API_KEY as string;
+          newPath = await generateProviderEtude("cohere", rootMidi, len, apiKey, cohereAlgo);
+        } else if (isOllama) {
+          const ollamaAlgo = etudeAlgorithm.replace("ollama_", "");
+          newPath = await generateProviderEtude("ollama", rootMidi, len, "", ollamaAlgo);
         } else {
           const { generateMagentaSequence } = await import("./lib/magentaHelper");
           // generateMagentaSequence now resolves with a melodic
@@ -4484,15 +4522,59 @@ function AppShell() {
                             <option value="magenta_rnn">Magenta AI (RNN)</option>
                           </optgroup>
                           <optgroup
-                            label={`Cloud (requires VITE_OPENROUTER_API_KEY)${
-                              hasOpenRouterKey ? " ✓" : " — not configured"
-                            }`}
+                            label={`OpenRouter (${hasOpenRouterKey ? "✓" : "needs key"})`}
                             disabled={!hasOpenRouterKey}
                           >
                             <option value="gemini_jazz">Gemini Jazz (ii-V-I)</option>
                             <option value="gemini_classical">Gemini Classical</option>
                             <option value="gemini_modern">Gemini Modern</option>
                             <option value="gemini_romantic">Gemini Romantic</option>
+                            <option value="minimacx_jazz">MiniMax Jazz (ii-V-I)</option>
+                            <option value="minimacx_classical">MiniMax Classical</option>
+                            <option value="minimacx_modern">MiniMax Modern</option>
+                            <option value="minimacx_romantic">MiniMax Romantic</option>
+                          </optgroup>
+                          <optgroup
+                            label={`x.ai Grok (${import.meta.env.VITE_GROK_API_KEY ? "✓" : "needs key"})`}
+                            disabled={!import.meta.env.VITE_GROK_API_KEY}
+                          >
+                            <option value="grok_jazz">Grok Jazz (ii-V-I)</option>
+                            <option value="grok_classical">Grok Classical</option>
+                            <option value="grok_modern">Grok Modern</option>
+                            <option value="grok_romantic">Grok Romantic</option>
+                          </optgroup>
+                          <optgroup
+                            label={`Google AI (${import.meta.env.VITE_GEMINI_API_KEY ? "✓" : "needs key"})`}
+                            disabled={!import.meta.env.VITE_GEMINI_API_KEY}
+                          >
+                            <option value="google_jazz">Google Jazz (ii-V-I)</option>
+                            <option value="google_classical">Google Classical</option>
+                            <option value="google_modern">Google Modern</option>
+                            <option value="google_romantic">Google Romantic</option>
+                          </optgroup>
+                          <optgroup
+                            label={`Anthropic (${import.meta.env.VITE_ANTHROPIC_API_KEY ? "✓" : "needs key"})`}
+                            disabled={!import.meta.env.VITE_ANTHROPIC_API_KEY}
+                          >
+                            <option value="anthropic_jazz">Claude Jazz (ii-V-I)</option>
+                            <option value="anthropic_classical">Claude Classical</option>
+                            <option value="anthropic_modern">Claude Modern</option>
+                            <option value="anthropic_romantic">Claude Romantic</option>
+                          </optgroup>
+                          <optgroup
+                            label={`Cohere (${import.meta.env.VITE_COHERE_API_KEY ? "✓" : "needs key"})`}
+                            disabled={!import.meta.env.VITE_COHERE_API_KEY}
+                          >
+                            <option value="cohere_jazz">Cohere Jazz (ii-V-I)</option>
+                            <option value="cohere_classical">Cohere Classical</option>
+                            <option value="cohere_modern">Cohere Modern</option>
+                            <option value="cohere_romantic">Cohere Romantic</option>
+                          </optgroup>
+                          <optgroup label="Ollama (Local)">
+                            <option value="ollama_jazz">Ollama Jazz (ii-V-I)</option>
+                            <option value="ollama_classical">Ollama Classical</option>
+                            <option value="ollama_modern">Ollama Modern</option>
+                            <option value="ollama_romantic">Ollama Romantic</option>
                           </optgroup>
                         </select>
                         <button

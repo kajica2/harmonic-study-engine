@@ -9,6 +9,30 @@ export type EtudeAlgorithm =
   | "gemini_classical"
   | "gemini_modern"
   | "gemini_romantic"
+  | "minimacx_jazz"
+  | "minimacx_classical"
+  | "minimacx_modern"
+  | "minimacx_romantic"
+  | "grok_jazz"
+  | "grok_classical"
+  | "grok_modern"
+  | "grok_romantic"
+  | "google_jazz"
+  | "google_classical"
+  | "google_modern"
+  | "google_romantic"
+  | "anthropic_jazz"
+  | "anthropic_classical"
+  | "anthropic_modern"
+  | "anthropic_romantic"
+  | "cohere_jazz"
+  | "cohere_classical"
+  | "cohere_modern"
+  | "cohere_romantic"
+  | "ollama_jazz"
+  | "ollama_classical"
+  | "ollama_modern"
+  | "ollama_romantic"
   | "trumpet_etude";
 
 const NOTE_NAMES = [
@@ -27,6 +51,30 @@ function prettyAlgorithmTitle(algorithm: EtudeAlgorithm): string {
   if (algorithm.startsWith("gemini_")) {
     const feel = algorithm.replace("gemini_", "");
     return `Etude: Gemini ${feel.charAt(0).toUpperCase() + feel.slice(1)}`;
+  }
+  if (algorithm.startsWith("minimacx_")) {
+    const feel = algorithm.replace("minimacx_", "");
+    return `Etude: MiniMax ${feel.charAt(0).toUpperCase() + feel.slice(1)}`;
+  }
+  if (algorithm.startsWith("grok_")) {
+    const feel = algorithm.replace("grok_", "");
+    return `Etude: Grok ${feel.charAt(0).toUpperCase() + feel.slice(1)}`;
+  }
+  if (algorithm.startsWith("google_")) {
+    const feel = algorithm.replace("google_", "");
+    return `Etude: Google ${feel.charAt(0).toUpperCase() + feel.slice(1)}`;
+  }
+  if (algorithm.startsWith("anthropic_")) {
+    const feel = algorithm.replace("anthropic_", "");
+    return `Etude: Claude ${feel.charAt(0).toUpperCase() + feel.slice(1)}`;
+  }
+  if (algorithm.startsWith("cohere_")) {
+    const feel = algorithm.replace("cohere_", "");
+    return `Etude: Cohere ${feel.charAt(0).toUpperCase() + feel.slice(1)}`;
+  }
+  if (algorithm.startsWith("ollama_")) {
+    const feel = algorithm.replace("ollama_", "");
+    return `Etude: Ollama ${feel.charAt(0).toUpperCase() + feel.slice(1)}`;
   }
   return `Etude: ${algorithm}`;
 }
