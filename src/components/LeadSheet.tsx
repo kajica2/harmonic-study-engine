@@ -191,7 +191,7 @@ export const LeadSheet: React.FC<LeadSheetProps> = ({ path }) => {
 
       {/* Score area: the .print-area class makes this the only visible
           element on paper; @page margin is set in index.css. */}
-      <div className="print-area">
+      <div className="Print-area w-full rounded-[var(--radius-xl)] border border-[color:var(--color-border)] bg-[color:var(--color-bg-1)] p-3 sm:p-4 flex flex-col gap-3">
       {/* Two score hosts — only one is visible at a time. */}
       <div
         className={`bg-white text-black rounded-[var(--radius-md)] p-3 overflow-auto max-h-[60vh] ${engine === "abcjs" ? "" : "hidden"}`}
