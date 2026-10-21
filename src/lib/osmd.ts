@@ -21,7 +21,7 @@
  */
 
 const OSMD_CDN_URL =
-  "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.1.1/build/opensheetmusicdisplay.min.js";
+  "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.2.1/build/opensheetmusicdisplay.min.js";
 
 type OSMDClass = new (host: HTMLElement, opts?: object) => any;
 
@@ -96,6 +96,13 @@ export async function renderOSMD(
     // OSMD 2.x renamed loadData → load; skill §2 calls this out.
     await osmd.load(musicXml);
     await osmd.render();
+    // Defensive: verify something actually rendered (OSMD can return
+    // success but produce empty output on some edge cases).
+    const svg = host.querySelector("svg");
+    if (!svg || svg.children.length === 0) {
+      console.error("[osmd] render returned success but produced no SVG");
+      return false;
+    }
     return true;
   } catch (e) {
     console.error("[osmd] render failed:", e);
