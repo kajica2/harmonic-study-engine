@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import {defineConfig} from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // -------------------------------------------------------------------------
 // Build-time stamp: surface a short commit SHA in the bundle so the UI can
@@ -45,6 +46,44 @@ export default defineConfig(() => {
       tailwindcss(),
       nodePolyfills({
         exclude: ['fs', 'net'],
+      }),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['favicon.svg'],
+        workbox: {
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB for large assets
+          // Cache all assets for offline use
+          globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+          runtimeCaching: [
+            {
+              // Cache CDN resources
+              urlPattern: /^https:\/\/cdn\./,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'cdn-cache',
+                expiration: {
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                },
+              },
+            },
+          ],
+        },
+        manifest: {
+          name: 'Harmonic Study Engine',
+          short_name: 'HSE',
+          description: 'Jazz practice app with daily variations',
+          theme_color: '#D4A857',
+          background_color: '#0C0B10',
+          display: 'standalone',
+          icons: [
+            {
+              src: 'favicon.svg',
+              sizes: 'any',
+              type: 'image/svg+xml',
+            },
+          ],
+        },
       }),
     ],
     define: {
