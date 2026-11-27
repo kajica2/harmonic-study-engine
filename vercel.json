@@ -6,6 +6,14 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/learn",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/learn/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/engine",
       "destination": "/sainted-word-records.html"
     },
