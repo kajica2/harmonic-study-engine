@@ -45,6 +45,16 @@ To enable a catalog tune (see MASTERCLASS_TODO.md):
 
 ## Architecture essentials
 
+### Ultimate Exercise learning area
+
+- `/learn` mounts `src/learning/LearningSurface.tsx`. Start with `docs/ULTIMATE-EXERCISE-DEVELOPMENT.md` and the ordered `docs/ULTIMATE-EXERCISE-BACKLOG.md`.
+- `npm run dev:learn` opens the student surface; `npm run test:learning` runs focused unit tests; `npm run verify:learning` runs docs, types, full unit tests, both builds and focused browser checks.
+- `src/learning/persistence.ts` is the implemented progress adapter. `src/learning/ports.ts` contains **type-only future contracts** for capture, take storage, review and notation; do not present them as connected features.
+- Keep learning audio blobs out of localStorage. Reference lesson events use beats/sounding MIDI; performed-note timing uses seconds, with written transposition applied at display/export only.
+- Shared engine changes still require the full browser suite. The focused learning command does not replace existing CI gates.
+
+### Existing engine
+
 - `src/App.tsx` is a ~5300-line monolith owning playback state, persona/voicing/tempo, keyboard/MIDI wiring. Most UI changes touch it.
 - Audio engines are module-level singletons: `audioEngine` (`src/lib/audio.ts`), `rhythmEngine` (`src/lib/rhythm.ts`), `backingEngine` (`src/lib/backingEngine.ts`), `playbackClock` (`src/lib/playbackClock.ts`).
 - **Metronome click**: `rhythmEngine.playStep()` fires `audioEngine.playMetronomeClick()` gated on `metronomeEnabled`. App.tsx syncs the UI toggle via `useEffect(() => rhythmEngine.setMetronomeEnabled(metronomeOn), [metronomeOn])`. The backing beat styles are owned by `backingEngine` — muting the click does NOT mute the backing track (by design).

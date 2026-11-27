@@ -2,7 +2,9 @@
 const g = (typeof globalThis !== "undefined" ? globalThis : window) as any;
 g.process = g.process || {};
 if (!g.process.hrtime) {
-  g.process.hrtime = function (previousTimestamp?: [number, number]): [number, number] {
+  g.process.hrtime = function (
+    previousTimestamp?: [number, number],
+  ): [number, number] {
     const clocktime = performance.now() * 1e-3;
     let seconds = Math.floor(clocktime);
     let nanoseconds = Math.floor((clocktime % 1) * 1e9);
@@ -18,7 +20,7 @@ if (!g.process.hrtime) {
   };
 }
 
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 // PRD-001 Phase 8 S1 (D148): the whole "router" - one pathname
@@ -31,10 +33,23 @@ import { PlaySurface } from "./components/PlaySurface";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./index.css";
 
+const LearningSurface = lazy(() => import("./learning/LearningSurface"));
+const isLearningRoute =
+  window.location.pathname === "/learn" ||
+  window.location.pathname === "/learn/";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary scope="App">
-      {isPlayRoute(window.location.pathname) ? <PlaySurface /> : <App />}
+      {isLearningRoute ? (
+        <Suspense fallback={<p role="status">Loading Ultimate Exercise…</p>}>
+          <LearningSurface />
+        </Suspense>
+      ) : isPlayRoute(window.location.pathname) ? (
+        <PlaySurface />
+      ) : (
+        <App />
+      )}
     </ErrorBoundary>
   </StrictMode>,
 );

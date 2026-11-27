@@ -3295,6 +3295,9 @@ function AppShell() {
             <p className="t-small text-[color:var(--color-text-3)] truncate">
               Synesthesia-guided harmonic practice for trumpet
             </p>
+            <a href="/learn" className="t-small underline text-[color:var(--color-brand-strong)]">
+              Ultimate Exercise · Learning paths →
+            </a>
           </div>
           {/* PRD-001 Phase 1: persistent top-bar mode selector. On
               md+ screens it sits between the title and the existing

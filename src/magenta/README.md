@@ -67,4 +67,6 @@ respect when adding model-touching tests.
   output, Miles drops notes, Glass doesn't, shared-clock continuity,
   Box–Muller / OUDrift statistical sanity.
 
-Total: 515 tests passing across the repo (422 frontend it() + 93 backend def test_).
+Legacy drift-gate marker (scoped declaration inventory, not the complete test run):
+Total: 526 tests passing across the repo (433 frontend it() + 93 backend def test_).
+The full frontend run for the learning scaffold and development foundation has 3,201 passing tests and one skipped test; backend tests were not rerun locally in this change.

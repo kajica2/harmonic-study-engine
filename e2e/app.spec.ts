@@ -64,8 +64,8 @@ test("app loads, persona grid renders, clicking Scriabin changes path + voicing"
   await expect(voicingSelect).toHaveValue("quartal", { timeout: 5_000 });
 
   // The MIDI chips should be present.
-  await expect(page.getByText(/^MIDI$/)).toBeVisible();
-  await expect(page.getByText(/^IN$/)).toBeVisible();
+  await expect(page.getByRole("banner").getByText("MIDI", { exact: true })).toBeVisible();
+  await expect(page.getByRole("banner").getByText("IN", { exact: true })).toBeVisible();
 });
 
 test("Path Catalog tab is reachable", async ({ page }) => {

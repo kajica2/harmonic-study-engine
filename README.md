@@ -99,10 +99,13 @@ and full export to MIDI / MusicXML / Score21 / MP4.
 
 ## Surfaces
 
-Three user-facing surfaces, all from one repo:
+**Ultimate Exercise learning lab:** `/learn` adds original lessons for all starting levels, a guided practice room, a two-sound loop studio, English/Serbian instructions and device-local progress with JSON backups. It links to the existing full engine for recording and notation. See [the scaffold guide](docs/ULTIMATE-EXERCISE-SCAFFOLD.md) and [starter footage plan](docs/ULTIMATE-EXERCISE-FOOTAGE.md). Checklist completion is self-reported; automated assessment is a future slice.
+
+Four user-facing surfaces, all from one repo:
 
 | URL | Purpose | Local entry |
 |---|---|---|
+| `/learn` | Ultimate Exercise learning paths, guided practice, loop studio and local progress | `npm run dev:vite`, then `/learn` |
 | `/` (or `https://harmonic-study-engine.vercel.app`) | Main React 19 SPA — full practice engine with personas, scales, rhythm drill | `npm run dev:vite` (port 5173) |
 | `/engine` (or `https://harmonic-study-engine.vercel.app/engine`) | Audio-reactive engine v2 (sainted-word-records) | `public/sainted-word-records.html` |
 | `/rnn` (or `https://harmonic-study-engine.vercel.app/rnn`) | Magenta RNN-driven generator | `public/rnn.html` + `public/rnn-engine.bundle.js` |
@@ -110,6 +113,9 @@ Three user-facing surfaces, all from one repo:
 The `/engine` and `/rnn` rewrites are configured in `vercel.json`.
 
 ## Documentation
+
+- [Ultimate Exercise development](docs/ULTIMATE-EXERCISE-DEVELOPMENT.md) — local setup, module boundaries, integration contracts and validation commands
+- [Ultimate Exercise backlog](docs/ULTIMATE-EXERCISE-BACKLOG.md) — ordered milestones and acceptance gates for recording, review, notation and learning packs
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system map
   (engine graph, file-by-file role table, wiring)
@@ -269,9 +275,10 @@ Coverage:
 - `tests/useSessionStore.test.ts` — localStorage hydration + the
   legacy `beatType` migration map
 
-515 tests passing as of this commit (422 frontend it() + 93 backend def test_) = 515.
-Both counts verified by `npm test` and `npm run test:py` against the
-repo today. New tests added for previously-untested lib files
+Legacy drift-gate inventory: 526 tests passing as of this commit (433 frontend it() + 93 backend def test_) = 526 declarations.
+This required marker counts only `tests/*.test.ts` and `server/tests/test_*.py`.
+The full frontend run for the learning scaffold and development foundation has 3,201 passing tests and one skipped test; backend tests were not rerun locally in this change.
+Tests also cover previously-untested lib files
 (useBassNotes, importRealBook, ireal — the ones the older "What to
 add next" section listed). Run `npm test -- --coverage` for an HTML
 coverage report (defaults to `coverage/`).
