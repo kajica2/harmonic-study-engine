@@ -38,6 +38,8 @@ export type LessonMedia = {
 } & ({ kind: "video"; captions: string } | { kind: "audio"; captions?: never });
 export interface Lesson {
   id: string;
+  /** Bump when reference music or exercise targets change. */
+  revision: string;
   level: Level;
   role: Role;
   minutes: number;

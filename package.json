@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bash dev.sh",
     "dev:vite": "vite --port=5173 --host=0.0.0.0",
+    "dev:learn": "vite --host=127.0.0.1 --port=5173 --strictPort --open=/learn",
     "dev:backend": "python3 -m uvicorn server.app:app --host 127.0.0.1 --port 8765",
     "dev:ddsp": "bash dev.sh",
     "build": "vite build --config vite.rnn.config.ts && vite build",
@@ -14,8 +15,12 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:learning": "vitest run tests/learning",
+    "check:docs": "node assets/check-links.cjs",
+    "verify:learning": "npm run check:docs && npm run lint && npm test && npm run build && npm run test:e2e:learning",
     "check:paths": "tsx scripts/check-path-bars.ts",
     "test:e2e": "playwright test",
+    "test:e2e:learning": "playwright test e2e/learning.spec.ts e2e/play-route.spec.ts",
     "test:all": "npm run test && npm run build && npm run test:e2e",
     "e2e:install": "playwright install chromium",
     "test:py": "bash scripts/test-py.sh"

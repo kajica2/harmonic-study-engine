@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -16,13 +16,10 @@ import { LESSON_IDS, LESSONS } from "./catalog";
 import { COPY, INSTRUMENT_LABELS, LEVEL_LABELS, ROLE_LABELS } from "./copy";
 import {
   completedCount,
-  DEFAULT_STATE,
   engineHref,
   INSTRUMENTS,
   LEVELS,
-  parseLearningState,
   STEPS,
-  STORAGE_KEY,
   toggleStep,
   type Instrument,
   type LearningState,
@@ -30,24 +27,18 @@ import {
   type Locale,
 } from "./model";
 import { LearningAudio, type SoundEvent } from "./audio";
+import { createProgressRepository } from "./persistence";
 import "./learning.css";
 
 type View = "home" | "practice" | "studio" | "progress";
-function loadState(): LearningState {
-  try {
-    return (
-      parseLearningState(
-        JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"),
-        LESSON_IDS,
-      ) ?? structuredClone(DEFAULT_STATE)
-    );
-  } catch {
-    return structuredClone(DEFAULT_STATE);
-  }
-}
-
 export default function LearningSurface() {
-  const [state, setState] = useState<LearningState>(loadState);
+  const progressRepository = useMemo(
+    () => createProgressRepository(() => window.localStorage, LESSON_IDS),
+    [],
+  );
+  const [state, setState] = useState<LearningState>(
+    () => progressRepository.load().state,
+  );
   const [view, setView] = useState<View>("home");
   const [filter, setFilter] = useState<Level | "all">("all");
   const [storageOK, setStorageOK] = useState(true);
@@ -76,13 +67,8 @@ export default function LearningSurface() {
   const roles = ROLE_LABELS[locale];
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      setStorageOK(true);
-    } catch {
-      setStorageOK(false);
-    }
-  }, [state]);
+    setStorageOK(progressRepository.save(state));
+  }, [state, progressRepository]);
   useEffect(() => {
     const previousTitle = document.title;
     const previousLanguage = document.documentElement.lang;
@@ -176,7 +162,9 @@ export default function LearningSurface() {
   }
   function exportBackup() {
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
+      new Blob([progressRepository.backup(state)], {
+        type: "application/json",
+      }),
     );
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -188,10 +176,7 @@ export default function LearningSurface() {
     if (!file) return;
     try {
       if (file.size > 1_000_000) throw new Error("Oversized backup");
-      const parsed = parseLearningState(
-        JSON.parse(await file.text()),
-        LESSON_IDS,
-      );
+      const parsed = progressRepository.restore(await file.text());
       if (!parsed) throw new Error("Incompatible backup");
       stop();
       setState(parsed);

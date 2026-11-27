@@ -68,5 +68,5 @@ respect when adding model-touching tests.
   Box–Muller / OUDrift statistical sanity.
 
 Legacy drift-gate marker (scoped declaration inventory, not the complete test run):
-Total: 521 tests passing across the repo (428 frontend it() + 93 backend def test_).
-The full frontend run for the learning scaffold has 3,196 passing tests and one skipped test; backend tests were not rerun in this change.
+Total: 526 tests passing across the repo (433 frontend it() + 93 backend def test_).
+The full frontend run for the learning scaffold and development foundation has 3,201 passing tests and one skipped test; backend tests were not rerun locally in this change.

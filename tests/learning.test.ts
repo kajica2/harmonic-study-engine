@@ -18,6 +18,7 @@ describe("Ultimate Exercise curriculum and engine boundary", () => {
     for (const level of LEVELS)
       expect(LESSONS.some((l) => l.level === level)).toBe(true);
     for (const lesson of LESSONS) {
+      expect(lesson.revision.trim().length).toBeGreaterThan(0);
       expect(lesson.provenance).toBe("Original Ultimate Exercise study");
       for (const locale of ["en", "sr-Latn"] as const) {
         expect(lesson.title[locale].length).toBeGreaterThan(0);

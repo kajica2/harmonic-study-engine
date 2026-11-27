@@ -1,0 +1,37 @@
+name: Ultimate Exercise development slice
+description: One usable student action with a testable acceptance gate.
+title: "[Learning] "
+body:
+  - type: input
+    id: backlog
+    attributes:
+      label: Backlog ID
+      placeholder: UE-10
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Student outcome
+      description: What can the learner do when this slice is complete?
+    validations:
+      required: true
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Modules and dependencies
+      description: Identify the adapter, reused engine module and required earlier slice.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance checks
+      description: Include the happy path, failure handling, persistence and relevant phone checks.
+    validations:
+      required: true
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Outside this slice
+      description: Keep optional or unconnected services out of the student flow.

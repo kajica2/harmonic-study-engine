@@ -114,6 +114,9 @@ The `/engine` and `/rnn` rewrites are configured in `vercel.json`.
 
 ## Documentation
 
+- [Ultimate Exercise development](docs/ULTIMATE-EXERCISE-DEVELOPMENT.md) — local setup, module boundaries, integration contracts and validation commands
+- [Ultimate Exercise backlog](docs/ULTIMATE-EXERCISE-BACKLOG.md) — ordered milestones and acceptance gates for recording, review, notation and learning packs
+
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system map
   (engine graph, file-by-file role table, wiring)
 - [docs/DEVELOPING.md](docs/DEVELOPING.md) — contributor
@@ -272,9 +275,9 @@ Coverage:
 - `tests/useSessionStore.test.ts` — localStorage hydration + the
   legacy `beatType` migration map
 
-Legacy drift-gate inventory: 521 tests passing as of this commit (428 frontend it() + 93 backend def test_) = 521 declarations.
+Legacy drift-gate inventory: 526 tests passing as of this commit (433 frontend it() + 93 backend def test_) = 526 declarations.
 This required marker counts only `tests/*.test.ts` and `server/tests/test_*.py`.
-The full frontend run for the learning scaffold has 3,196 passing tests and one skipped test; backend tests were not rerun in this change.
+The full frontend run for the learning scaffold and development foundation has 3,201 passing tests and one skipped test; backend tests were not rerun locally in this change.
 Tests also cover previously-untested lib files
 (useBassNotes, importRealBook, ireal — the ones the older "What to
 add next" section listed). Run `npm test -- --coverage` for an HTML

@@ -15,6 +15,7 @@ const prompts = (
   create: Copy,
 ): Record<Step, Copy> => ({ listen, sing, play, review, create });
 const common = {
+  revision: "1",
   media: [],
   provenance: "Original Ultimate Exercise study",
 } as const;

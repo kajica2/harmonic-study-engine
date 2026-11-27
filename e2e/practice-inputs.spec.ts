@@ -205,8 +205,14 @@ test("S4 persistence + guard: octave survives reload; Meta+A never sounds", asyn
   await panel.getByTestId("noteinput-toggle").check();
   await expect(page.getByTestId("note-input-piano")).toBeVisible();
   await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C4");
+  // The shipped input range is C3..C4 (D139). The initial C4 is
+  // already at the ceiling; verify both bounds, then persist C3.
   await page.getByTestId("noteinput-octave-up").click();
-  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C5");
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C4");
+  await page.getByTestId("noteinput-octave-down").click();
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C3");
+  await page.getByTestId("noteinput-octave-down").click();
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C3");
 
   // Envelope roundtrip (noteInput rides practiceMechanics, no v5):
   // a real reload keeps BOTH the toggle and the shifted root.
@@ -214,7 +220,7 @@ test("S4 persistence + guard: octave survives reload; Meta+A never sounds", asyn
   const panel2 = await openDrills(page);
   await expect(panel2.getByTestId("noteinput-toggle")).toBeChecked();
   await expect(page.getByTestId("note-input-piano")).toBeVisible();
-  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C5");
+  await expect(page.getByTestId("noteinput-root-label")).toHaveText("Root C3");
 
   // MODIFIER GUARD in a REAL browser: arm detection + play, then
   // hammer Meta+A across a full pass - the detector must see

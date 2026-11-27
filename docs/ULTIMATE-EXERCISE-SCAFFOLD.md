@@ -2,6 +2,8 @@
 
 The `/learn` surface adds a small learning layer to harmonic-study-engine. It uses the existing React/Vite toolchain and links into the existing practice engine. It does not replace the root app, `/play`, `/engine`, or `/rnn`.
 
+For ongoing implementation, start with the [development guide](ULTIMATE-EXERCISE-DEVELOPMENT.md) and [ordered backlog](ULTIMATE-EXERCISE-BACKLOG.md). The progress adapter is implemented in `src/learning/persistence.ts`; `src/learning/ports.ts` defines type-only boundaries for the next recorder, IndexedDB take store, review and notation slices.
+
 ## Run and review
 
 ```sh
@@ -68,7 +70,7 @@ MuseScripter and solokit are future adapter boundaries; neither is connected by 
 
 ## Verification limits
 
-Verified on 2026-11-27: TypeScript check, 3,196 unit tests passing (one existing skip), both production builds, seven browser checks (four learning workflows and three existing `/play` regressions), desktop/mobile visual review and all 83 path-length invariants. The learning workflows cover no microphone requests, no private API calls, keyboard tapping, reference/loop start-stop controls, tempo change, progress reload, English/Serbian switching, backup round-trip, incompatible import rejection, storage failure and 390px layout.
+Initial scaffold verification on 2026-11-27 (commit `64c4019`): TypeScript check, 3,196 unit tests passing (one existing skip), both production builds, seven browser checks (four learning workflows and three existing `/play` regressions), desktop/mobile visual review and all 83 path-length invariants. The learning workflows cover no microphone requests, no private API calls, keyboard tapping, reference/loop start-stop controls, tempo change, progress reload, English/Serbian switching, backup round-trip, incompatible import rejection, storage failure and 390px layout.
 
 For this restricted test environment, a temporary packaged Chromium executable replaced the blocked Playwright browser download. A temporary Python static server read the built `serve.json` rewrites because the standard `serve` CLI could not enumerate network interfaces. These workarounds are outside the repository; CI keeps its existing Playwright setup.
 
